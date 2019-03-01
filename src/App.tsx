@@ -1,6 +1,6 @@
-import React, { Component } from 'react';
-import { ReactiveBase, CategorySearch, SingleRange, ResultList } from '@appbaseio/reactivesearch';
-import './App.css';
+import React, { Component } from "react";
+import { ReactiveBase, CategorySearch, SingleRange, ResultList } from "@appbaseio/reactivesearch";
+import "./App.css";
 
 class App extends Component {
   render() {
@@ -22,8 +22,8 @@ class App extends Component {
             dataField="rating"
             title="Filter by ratings"
             data={[
-              {"start": 4, "end": 5, "label": "4 stars and up"},
-              {"start": 3, "end": 5, "label": "3 stars and up"}
+              { start: 4, end: 5, label: "4 stars and up" },
+              { start: 3, end: 5, label: "3 stars and up" },
             ]}
             showRadio={true}
           />
@@ -37,7 +37,7 @@ class App extends Component {
             showResultStats={true}
             loader="Loading Results.."
             react={{
-              and: ["PriceFilter", "SearchFilter"]
+              and: ["PriceFilter", "SearchFilter"],
             }}
             // onData={this.onData}
           />
