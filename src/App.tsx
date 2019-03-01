@@ -1,26 +1,48 @@
 import React, { Component } from 'react';
-import logo from './logo.svg';
+import { ReactiveBase, CategorySearch, SingleRange, ResultList } from '@appbaseio/reactivesearch';
 import './App.css';
 
 class App extends Component {
   render() {
     return (
-      <div className="App">
-        <header className="App-header">
-          <img src={logo} className="App-logo" alt="logo" />
-          <p>
-            Edit <code>src/App.tsx</code> and save to reload.
-          </p>
-          <a
-            className="App-link"
-            href="https://reactjs.org"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Learn React
-          </a>
-        </header>
-      </div>
+      <ReactiveBase
+        app="_index"
+        url="https://api.openraadsinformatie.nl/v1/elastic/ori_*/_search"
+        credentials="4HWI27QmA:58c731f7-79ab-4f55-a590-7e15c7e36721">
+        <div>
+          <CategorySearch
+            componentId="searchbox"
+            dataField="model"
+            categoryField="brand.keyword"
+            placeholder="Zoek in 109 gemeenten.."
+          />
+          Hello ReactiveSearch!
+          <SingleRange
+            componentId="ratingsfilter"
+            dataField="rating"
+            title="Filter by ratings"
+            data={[
+              {"start": 4, "end": 5, "label": "4 stars and up"},
+              {"start": 3, "end": 5, "label": "3 stars and up"}
+            ]}
+            showRadio={true}
+          />
+          <ResultList
+            componentId="ResultList01"
+            dataField="ratings"
+            stream={true}
+            sortBy="desc"
+            size={8}
+            pagination={false}
+            showResultStats={true}
+            loader="Loading Results.."
+            react={{
+              and: ["PriceFilter", "SearchFilter"]
+            }}
+            // onData={this.onData}
+          />
+        </div>
+      </ReactiveBase>
     );
   }
 }
