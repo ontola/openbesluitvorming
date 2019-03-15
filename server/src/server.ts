@@ -9,12 +9,14 @@ const staticDir = process.env.WWW_DIR || "/usr/src/app/www/";
 const defaultPort = 8080;
 const app = express();
 
+// Enable all CORS requests
 app.use(cors());
+// Logger middleware
 app.use(morgan("combined"));
 
-// Proxy search requests, remove `/search` from URL
+// Proxy search requests
 app.all("/search", httpProxyMiddleware({
-  target: "https://api.openraadsinformatie.nl/v1/elastic/ori_*/_search",
+  target: "https://api.openraadsinformatie.nl/v1/elastic/",
   changeOrigin: true,
   pathRewrite: { "^/search": "" },
   logLevel: process.env.NODE_ENV === "production" ? "info" :  "debug",

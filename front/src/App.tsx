@@ -7,7 +7,7 @@ class App extends Component {
     return (
       <ReactiveBase
         app="ori_*"
-        url="https://api.openraadsinformatie.nl/v1/elastic/"
+        url="http://localhost:8080/search/"
       >
         <div>
           <CategorySearch
