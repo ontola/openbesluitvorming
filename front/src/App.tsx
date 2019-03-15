@@ -6,9 +6,9 @@ class App extends Component {
   render() {
     return (
       <ReactiveBase
-        app="_index"
-        url="https://api.openraadsinformatie.nl/v1/elastic/ori_*/_search"
-        credentials="4HWI27QmA:58c731f7-79ab-4f55-a590-7e15c7e36721">
+        app="ori_*"
+        url="https://api.openraadsinformatie.nl/v1/elastic/"
+      >
         <div>
           <CategorySearch
             componentId="searchbox"
