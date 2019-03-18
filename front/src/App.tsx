@@ -1,6 +1,46 @@
 import React, { Component } from "react";
-import { ReactiveBase, CategorySearch, SingleRange, ResultList } from "@appbaseio/reactivesearch";
+import {
+  ReactiveBase,
+  CategorySearch,
+  SingleRange,
+  ResultList
+} from "@appbaseio/reactivesearch";
 import "./App.css";
+
+const ResultCard = (res: any) => {
+  return {
+    image: res.image,
+    title: res.name,
+    description: (
+        <div>
+            TEST
+            <div className="price">${res.price}</div>
+            <p>{res.room_type} · {res.accommodates} guests</p>
+        </div>
+    ),
+    url: res.listing_url,
+    containerProps: {
+      onMouseEnter: () => console.log("😁"),
+      onMouseLeave: () => console.log("🙀"),
+    },
+  };
+};
+
+const aggOptions = () => ({
+  aggs: {
+    min_date: {
+      min: {
+        field: "dateCreated"
+      }
+    },
+    max_date: {
+      max: {
+        field: "dateCreated"
+      }
+    }
+  }
+}
+);
 
 class App extends Component {
   render() {
@@ -12,11 +52,13 @@ class App extends Component {
         <div>
           <CategorySearch
             componentId="searchbox"
-            dataField="model"
-            categoryField="brand.keyword"
+            defaultValue={{
+              term: "Politie",
+            }}
+            dataField={["text", "title"]}
             placeholder="Zoek in 109 gemeenten.."
+            URLParams={true}
           />
-          Hello ReactiveSearch!
           <SingleRange
             componentId="ratingsfilter"
             dataField="rating"
@@ -29,17 +71,19 @@ class App extends Component {
           />
           <ResultList
             componentId="ResultList01"
-            dataField="ratings"
+            dataField="date_modified"
             stream={true}
+            defaultQuery={aggOptions}
             sortBy="desc"
             size={8}
             pagination={false}
             showResultStats={true}
             loader="Loading Results.."
             react={{
-              and: ["PriceFilter", "SearchFilter"],
+              // When these components change, update the results
+              and: ["ratingsfilter", "SearchFilter"],
             }}
-            // onData={this.onData}
+            renderData={ResultCard}
           />
         </div>
       </ReactiveBase>
