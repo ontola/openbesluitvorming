@@ -5,7 +5,7 @@ A search webapplication that uses [Open Raadsinformatie](http://openraadsinforma
 
 ## Run front-end
 
-- `cd front`
+- `cd start`
 - `yarn dev`
 
 ## Run server
