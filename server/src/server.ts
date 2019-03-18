@@ -15,7 +15,7 @@ app.use(cors());
 app.use(morgan("combined"));
 
 // Proxy search requests
-app.all("/search", httpProxyMiddleware({
+app.all("/search/*", httpProxyMiddleware({
   target: "https://api.openraadsinformatie.nl/v1/elastic/",
   changeOrigin: true,
   pathRewrite: { "^/search": "" },
