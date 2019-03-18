@@ -2,45 +2,92 @@ import React, { Component } from "react";
 import {
   ReactiveBase,
   CategorySearch,
-  SingleRange,
-  ResultList
+  ResultList,
+  DateRange,
+  MultiList,
+  SelectedFilters,
 } from "@appbaseio/reactivesearch";
 import "./App.css";
 
-const ResultCard = (res: any) => {
+interface ORIItemType {
+  _id: string;
+  _score: number;
+  _index: string;
+  _type: string;
+  // TODO: specify?
+  _source: any;
+  _version?: number;
+  _explanation?: any;
+  content_type: string;
+  date_modified: string;
+  fields?: any;
+  highlight?: any;
+  hightlight: string;
+  inner_hits?: any;
+  matched_queries?: string[];
+  name: string;
+  original_url: string;
+  size_in_bytes: string;
+  sort?: string[];
+  text: string;
+  title: string;
+}
+
+const ResultCard = (res: ORIItemType) => {
+  const date = new Date(res.date_modified);
   return {
-    image: res.image,
     title: res.name,
     description: (
-        <div>
-            TEST
-            <div className="price">${res.price}</div>
-            <p>{res.room_type} · {res.accommodates} guests</p>
-        </div>
+      <div>
+        <p>{date.toLocaleDateString()}</p>
+        <p>{res._type}</p>
+        <p>{res._index}</p>
+        <p>{res.content_type}</p>
+        <p><span dangerouslySetInnerHTML={{ __html: res.highlight.text }}/></p>
+      </div>
     ),
-    url: res.listing_url,
-    containerProps: {
-      onMouseEnter: () => console.log("😁"),
-      onMouseLeave: () => console.log("🙀"),
-    },
+    url: res.original_url,
   };
 };
+
+const NoResults = () =>
+  <p>no results</p>;
 
 const aggOptions = () => ({
   aggs: {
     min_date: {
       min: {
-        field: "dateCreated"
+        field: "dateCreated",
       }
     },
     max_date: {
       max: {
-        field: "dateCreated"
+        field: "dateCreated",
       }
     }
   }
-}
-);
+});
+
+const allComponentIds = [
+  "searchbox",
+  "gemeenten",
+  "daterange",
+];
+
+const defaultSuggestions = [
+  {
+    label: "Omgevingswet",
+  },
+  {
+    label: "Klimaat",
+  },
+  {
+    label: "Argu",
+  },
+  {
+    label: "Open State Foundation",
+  },
+];
 
 class App extends Component {
   render() {
@@ -56,18 +103,64 @@ class App extends Component {
               term: "Politie",
             }}
             dataField={["text", "title"]}
+            defaultSuggestions={defaultSuggestions}
+            categoryField="@type"
+            highlight
             placeholder="Zoek in 109 gemeenten.."
             URLParams={true}
+            customHighlight={() => ({
+              highlight: {
+                pre_tags: ["<b>"],
+                post_tags: ["</b>"],
+                fields: {
+                  text: {},
+                  title: {},
+                },
+                fragment_size: 100,
+                number_of_fragments: 3,
+              },
+            })}
           />
-          <SingleRange
-            componentId="ratingsfilter"
-            dataField="rating"
-            title="Filter by ratings"
-            data={[
-              { start: 4, end: 5, label: "4 stars and up" },
-              { start: 3, end: 5, label: "3 stars and up" },
-            ]}
-            showRadio={true}
+          <SelectedFilters />
+          <MultiList
+            componentId="gemeenten"
+            dataField="_index"
+            title="Gemeenten"
+            size={100}
+            sortBy="count"
+            queryFormat="or"
+            // selectAllLabel="Alle gemeenten"
+            showCheckbox={true}
+            showCount={true}
+            showSearch={true}
+            placeholder="Zoek gemeente..."
+            react={{
+              or: allComponentIds,
+            }}
+            showFilter={true}
+            filterLabel="City"
+            URLParams={true}
+            loader="Loading ..."
+          />
+          <DateRange
+            componentId="daterange"
+            dataField="date_modified"
+            title="Datum"
+            defaultValue={{
+              start: new Date("2019-01-21"),
+              end: new Date("2019-01-23"),
+            }}
+            placeholder={{
+              start: "Start Date",
+              end: "End Date",
+            }}
+            numberOfMonths={2}
+            queryFormat="date"
+            autoFocusEnd={true}
+            showClear={true}
+            showFilter={true}
+            filterLabel="Date"
+            URLParams={true}
           />
           <ResultList
             componentId="ResultList01"
@@ -78,10 +171,11 @@ class App extends Component {
             size={8}
             pagination={false}
             showResultStats={true}
+            onNoResults={NoResults}
             loader="Loading Results.."
             react={{
               // When these components change, update the results
-              and: ["ratingsfilter", "SearchFilter"],
+              or: allComponentIds,
             }}
             renderData={ResultCard}
           />

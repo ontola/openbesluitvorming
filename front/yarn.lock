@@ -989,6 +989,11 @@
     "@svgr/plugin-svgo" "^4.0.3"
     loader-utils "^1.1.0"
 
+"@types/elasticsearch@^5.0.31":
+  version "5.0.31"
+  resolved "https://registry.yarnpkg.com/@types/elasticsearch/-/elasticsearch-5.0.31.tgz#82c02c743a5eaca6dbb4b04a0689e6c53fd4f296"
+  integrity sha512-XiYeE0vQMJG6rSrDw2WgNIK1RelWB1FmplDJGlmlLG5/Cb75Q0+EHS0X38hzptI+jjvyvPorE6pvJkgPoM6hhg==
+
 "@types/jest-diff@*":
   version "20.0.1"
   resolved "https://registry.yarnpkg.com/@types/jest-diff/-/jest-diff-20.0.1.tgz#35cc15b9c4f30a18ef21852e255fdb02f6d59b89"
