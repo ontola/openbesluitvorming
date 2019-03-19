@@ -1,6 +1,6 @@
 import React, { Component } from "react";
 import { Router, Route } from "react-router";
-import createBrowserHistory from "history/createBrowserHistory";
+import { createBrowserHistory } from "history";
 import { ReactiveBase } from "@appbaseio/reactivesearch";
 
 import SearchRoute from "./Routes/SearchRoute";

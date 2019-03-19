@@ -1,13 +1,6 @@
 @import 'shared';
 
-.SearchApp {
-  padding-top: $navbar-height;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-}
-
-.LeftBar {
+.FilterBar {
   padding: 1rem;
   width: 26rem;
   border-right: solid 1px $g2;
@@ -39,16 +32,39 @@
   background-color: white;
 }
 
-.RightBar {
-  background-color: #efefef;
-  flex: 1;
+.ResultsBar {
+  background-color: $g1;
   padding-left: 1rem;
   padding-top: 1rem;
+  overflow-y: scroll;
+  display: flex;
+  flex: 1;
+}
+
+.Results {
+  flex-basis: $result-width;
+}
+
+.Widgets {
+  padding: 1rem;
+  flex: 0;
+  flex-basis: 20rem;
+}
+
+.WidgetsBar {
+  flex: 1;
+  flex-basis: (20rem);
+}
+
+.ResourceBar {
+  border-left: solid 1px $g2;
+  flex: 100;
+  max-width: 70vw;
 }
 
 .ResultCard {
   background-color: white;
-  max-width: 34rem;
+  max-width: $result-width;
   margin-bottom: 1rem;
   padding: .5rem 1rem;
   border-radius: 5px;
@@ -57,7 +73,7 @@
   h2 {
     margin-top: 0;
     margin-bottom: .2rem;
-    font-size: 1.2rem;
+    font-size: 1rem;
   }
 
   &__details{
@@ -72,6 +88,15 @@
       word-wrap: break-word;
     }
   }
+}
+
+.SearchRoute {
+  padding-top: $navbar-height;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
 }
 
 .SearchBar {

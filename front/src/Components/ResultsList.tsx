@@ -11,7 +11,7 @@ interface ResultsType {
   total_results: number;
 }
 
-const Results = ({
+const ResultStats = ({
   total_results,
 }: ResultsType) =>
   <div>{total_results}</div>;
@@ -32,9 +32,9 @@ const ResultsList: React.FunctionComponent<ResultsListProps> = (props) => {
       size={20}
       pagination={false}
       showResultStats={true}
-      onNoResults={NoResults}
-      onResultStats={Results}
-      loader={Loading}
+      onNoResults={<NoResults/>}
+      onResultStats={ResultStats}
+      loader={<Loading/>}
       react={{
         // When these components change, update the results
         and: allComponentIds,

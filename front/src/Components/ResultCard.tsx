@@ -8,11 +8,11 @@ interface ResultCardProps extends ORIItemType {
 const ResultCard: React.FunctionComponent<ResultCardProps> = (props) => {
   const date = new Date(props.date_modified);
   return (
-    <div className="ResultCard">
+    <div key={props._id} className="ResultCard">
       <h2>{props.name}</h2>
       {props.highlight.text && props.highlight.text.map(
         ((text: string) => (
-          <div>
+          <div key={text}>
             <span dangerouslySetInnerHTML={{ __html: `${text}...` }}/>
           </div>
         )))
