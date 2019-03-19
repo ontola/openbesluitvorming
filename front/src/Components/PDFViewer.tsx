@@ -35,6 +35,7 @@ export default class PDFViewer extends React.Component<PDFViewerProps, PDFViewer
 
     return (
       <div>
+        <p>Page {pageNumber} of {numPages}</p>
         <Document
           file={this.props.url}
           onLoadSuccess={this.onDocumentLoadSuccess}
@@ -42,7 +43,6 @@ export default class PDFViewer extends React.Component<PDFViewerProps, PDFViewer
         >
           <Page pageNumber={pageNumber} />
         </Document>
-        <p>Page {pageNumber} of {numPages}</p>
       </div>
     );
   }

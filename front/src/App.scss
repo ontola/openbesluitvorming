@@ -57,9 +57,15 @@
 }
 
 .ResourceBar {
+  position: fixed;
   border-left: solid 1px $g2;
   flex: 100;
   max-width: 70vw;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  background-color: white;
 }
 
 .ResultCard {
