@@ -1,6 +1,7 @@
 // https://opensource.appbase.io/reactive-manual/v3/theming/themes.html
 const theme: any = {
   typography: {
+    // tslint:disable-next-line
     fontFamily: "\"Open Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", \"Roboto\", \"Noto Sans\", \"Ubuntu\", \"Droid Sans\", \"Helvetica Neue\", sans-serif",
     fontSize: "16px",
   },

@@ -15,6 +15,6 @@ const HomeRoute = (props: HomeRouteProps) => {
       </Link>
     </div>
   );
-}
+};
 
 export default HomeRoute;

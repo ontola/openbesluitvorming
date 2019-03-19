@@ -1,5 +1,5 @@
-import * as React from 'react';
-import { CategorySearch } from '@appbaseio/reactivesearch';
+import * as React from "react";
+import { CategorySearch } from "@appbaseio/reactivesearch";
 
 interface SearchBarProps {
 }

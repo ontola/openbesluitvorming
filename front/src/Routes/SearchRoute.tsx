@@ -20,6 +20,6 @@ const SearchRoute = (props: SearchRouteProps) => {
       </div>
     </div>
   );
-}
+};
 
 export default SearchRoute;
