@@ -8,7 +8,7 @@ interface ResultsListProps {
 }
 
 const NoResults = () =>
-  <p>no results</p>;
+  <div>no results</div>;
 
 const ResultsList: React.FunctionComponent<ResultsListProps> = (props) => {
   return (

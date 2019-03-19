@@ -8,7 +8,7 @@ const theme: any = {
   colors: {
     textColor: "#424242",
     primaryTextColor: "#fff",
-    primaryColor: "#0B6AFF",
+    primaryColor: "#03A9F4",
     titleColor: "#424242",
     alertColor: "#d9534f",
   },

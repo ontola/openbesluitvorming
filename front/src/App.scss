@@ -1,18 +1,30 @@
+@import 'shared';
+
 .App {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
 }
 
-.Wrapper {
-  display: flex;
-  min-height: 100%;
-  flex: 1;
-}
-
 .LeftBar {
   padding: 1rem;
   width: 26rem;
+}
+
+.Logo {
+  font-weight: bold;
+  color: $blue;
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+
+  &__first {
+    color: $blue_dark;
+  }
+}
+
+.NavBar {
+  display: flex;
 }
 
 .RightBar {
@@ -28,6 +40,8 @@
   padding: .5rem 1rem;
 
   h2 {
+    margin-top: 0;
+    margin-bottom: .2rem;
     font-size: 1.2rem;
   }
 
@@ -43,4 +57,10 @@
       word-wrap: break-word;
     }
   }
+}
+
+.Wrapper {
+  display: flex;
+  min-height: 100%;
+  flex: 1;
 }

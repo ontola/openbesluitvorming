@@ -10,13 +10,19 @@ const ResultCard: React.FunctionComponent<ResultCardProps> = (props) => {
   return (
     <div className="ResultCard">
       <h2>{props.name}</h2>
-      <p><span dangerouslySetInnerHTML={{ __html: props.highlight.text }}/></p>
+      {console.log(props.highlight)}
+      {props.highlight.text && (
+        <div>
+          <span dangerouslySetInnerHTML={{ __html: props.highlight.text }}/>
+        </div>
+      )
+      }
       <div className="ResultCard__details">
         <a className="ResultCard__detail" href={props.original_url}>download</a>
-        <p className="ResultCard__detail" >{props._type}</p>
-        <p className="ResultCard__detail" >{props._index}</p>
-        <p className="ResultCard__detail" >{props.content_type}</p>
-        <p className="ResultCard__detail" >{date.toLocaleDateString()}</p>
+        <div className="ResultCard__detail" >{props._type}</div>
+        <div className="ResultCard__detail" >{props._index}</div>
+        <div className="ResultCard__detail" >{props.content_type}</div>
+        <div className="ResultCard__detail" >{date.toLocaleDateString()}</div>
       </div>
     </div>
   );
