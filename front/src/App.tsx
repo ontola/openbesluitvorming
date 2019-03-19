@@ -53,40 +53,10 @@ const ResultCard = (res: ORIItemType) => {
 const NoResults = () =>
   <p>no results</p>;
 
-const aggOptions = () => ({
-  aggs: {
-    min_date: {
-      min: {
-        field: "dateCreated",
-      }
-    },
-    max_date: {
-      max: {
-        field: "dateCreated",
-      }
-    }
-  }
-});
-
-const allComponentIds = [
+  const allComponentIds = [
   "searchbox",
   "gemeenten",
   "daterange",
-];
-
-const defaultSuggestions = [
-  {
-    label: "Omgevingswet",
-  },
-  {
-    label: "Klimaat",
-  },
-  {
-    label: "Argu",
-  },
-  {
-    label: "Open State Foundation",
-  },
 ];
 
 class App extends Component {
@@ -99,11 +69,7 @@ class App extends Component {
         <div>
           <CategorySearch
             componentId="searchbox"
-            defaultValue={{
-              term: "Politie",
-            }}
             dataField={["text", "title"]}
-            defaultSuggestions={defaultSuggestions}
             categoryField="@type"
             highlight
             placeholder="Zoek in 109 gemeenten.."
@@ -122,37 +88,13 @@ class App extends Component {
             })}
           />
           <SelectedFilters />
-          <MultiList
-            componentId="gemeenten"
-            dataField="_index"
-            title="Gemeenten"
-            size={100}
-            sortBy="count"
-            queryFormat="or"
-            // selectAllLabel="Alle gemeenten"
-            showCheckbox={true}
-            showCount={true}
-            showSearch={true}
-            placeholder="Zoek gemeente..."
-            react={{
-              or: allComponentIds,
-            }}
-            showFilter={true}
-            filterLabel="City"
-            URLParams={true}
-            loader="Loading ..."
-          />
           <DateRange
             componentId="daterange"
             dataField="date_modified"
             title="Datum"
-            defaultValue={{
-              start: new Date("2019-01-21"),
-              end: new Date("2019-01-23"),
-            }}
             placeholder={{
-              start: "Start Date",
-              end: "End Date",
+              start: "Van...",
+              end: "Tot...",
             }}
             numberOfMonths={2}
             queryFormat="date"
@@ -162,20 +104,39 @@ class App extends Component {
             filterLabel="Date"
             URLParams={true}
           />
+          <MultiList
+            componentId="gemeenten"
+            dataField="_index"
+            title="Gemeenten"
+            size={100}
+            sortBy="count"
+            queryFormat="or"
+            selectAllLabel="Alle gemeenten"
+            showCheckbox={true}
+            showCount={true}
+            showSearch={true}
+            placeholder="Zoek gemeente..."
+            react={{
+              and: ["searchbox", "daterange"],
+            }}
+            showFilter={true}
+            filterLabel="City"
+            URLParams={true}
+            loader="Loading ..."
+          />
           <ResultList
             componentId="ResultList01"
             dataField="date_modified"
             stream={true}
-            defaultQuery={aggOptions}
             sortBy="desc"
-            size={8}
+            size={12}
             pagination={false}
             showResultStats={true}
             onNoResults={NoResults}
             loader="Loading Results.."
             react={{
               // When these components change, update the results
-              or: allComponentIds,
+              and: allComponentIds,
             }}
             renderData={ResultCard}
           />
