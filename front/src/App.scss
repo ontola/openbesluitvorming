@@ -1,6 +1,7 @@
 @import 'shared';
 
-.App {
+.SearchApp {
+  padding-top: $navbar-height;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -9,6 +10,7 @@
 .LeftBar {
   padding: 1rem;
   width: 26rem;
+  border-right: solid 1px $g2;
 }
 
 .Logo {
@@ -17,6 +19,8 @@
   display: flex;
   align-items: center;
   text-decoration: none;
+  margin-left: 1rem;
+  margin-right: 1rem;
 
   &__first {
     color: $blue_dark;
@@ -25,19 +29,30 @@
 
 .NavBar {
   display: flex;
+  box-shadow: 1px 0px 10px rgba(0, 0, 0, 0.24);
+  z-index: 1;
+  height: $navbar-height;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  background-color: white;
 }
 
 .RightBar {
   background-color: #efefef;
   flex: 1;
+  padding-left: 1rem;
+  padding-top: 1rem;
 }
 
 .ResultCard {
   background-color: white;
   max-width: 34rem;
-  margin-left: 1rem;
   margin-bottom: 1rem;
   padding: .5rem 1rem;
+  border-radius: 5px;
+  border: solid 1px $g2;
 
   h2 {
     margin-top: 0;
@@ -52,11 +67,15 @@
     & .ResultCard__detail {
       display: inline;
       margin: 0;
-      color: #7f7f7f;
+      color: $g3;
       margin-right: 1rem;
       word-wrap: break-word;
     }
   }
+}
+
+.SearchBar {
+  border-radius: 5px;
 }
 
 .Wrapper {

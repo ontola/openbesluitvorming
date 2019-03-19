@@ -7,14 +7,26 @@ export interface SearchRouteProps {
 }
 
 const SearchRoute = (props: SearchRouteProps) => {
+  const [showFilters, setShowFilters] = React.useState(false);
+
   return (
-    <div className="App">
+    <div className="SearchApp">
       <NavBar/>
       <div className="Wrapper">
-        <div className="LeftBar">
+        <div
+          style={{
+            display: showFilters ? "block" : "none",
+          }}
+          className="LeftBar"
+        >
           <Filtersbar/>
         </div>
         <div className="RightBar">
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+          >
+            Filters {showFilters ? "verbergen" : "tonen"}
+          </button>
           <ResultsList/>
         </div>
       </div>

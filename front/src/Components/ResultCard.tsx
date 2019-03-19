@@ -10,12 +10,12 @@ const ResultCard: React.FunctionComponent<ResultCardProps> = (props) => {
   return (
     <div className="ResultCard">
       <h2>{props.name}</h2>
-      {console.log(props.highlight)}
-      {props.highlight.text && (
-        <div>
-          <span dangerouslySetInnerHTML={{ __html: props.highlight.text }}/>
-        </div>
-      )
+      {props.highlight.text && props.highlight.text.map(
+        ((text: string) => (
+          <div>
+            <span dangerouslySetInnerHTML={{ __html: `${text}...` }}/>
+          </div>
+        )))
       }
       <div className="ResultCard__details">
         <a className="ResultCard__detail" href={props.original_url}>download</a>

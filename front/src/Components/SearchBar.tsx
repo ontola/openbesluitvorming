@@ -1,19 +1,20 @@
 import * as React from "react";
-import { CategorySearch } from "@appbaseio/reactivesearch";
+import { DataSearch } from "@appbaseio/reactivesearch";
 
 interface SearchBarProps {
 }
 
 const SearchBar: React.FunctionComponent<SearchBarProps> = (props) => {
   return (
-    <CategorySearch
+    <DataSearch
+      className="SearchBar"
       componentId="searchbox"
+      debounce={400}
       dataField={["text", "title"]}
-      categoryField="@type"
       highlight
+      autosuggest={false}
       placeholder="Zoek in 109 gemeenten.."
       URLParams={true}
-      onChange={() => console.log("QUERY CHANGED")}
       customHighlight={() => ({
         highlight: {
           pre_tags: ["<b>"],

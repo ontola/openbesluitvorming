@@ -7,8 +7,20 @@ import ResultCard from "../Components/ResultCard";
 interface ResultsListProps {
 }
 
+interface ResultsType {
+  total_results: number;
+}
+
+const Results = ({
+  total_results,
+}: ResultsType) =>
+  <div>{total_results}</div>;
+
 const NoResults = () =>
   <div>no results</div>;
+
+const Loading = () =>
+  <div>Loading...</div>;
 
 const ResultsList: React.FunctionComponent<ResultsListProps> = (props) => {
   return (
@@ -21,7 +33,8 @@ const ResultsList: React.FunctionComponent<ResultsListProps> = (props) => {
       pagination={false}
       showResultStats={true}
       onNoResults={NoResults}
-      loader="Loading Results.."
+      onResultStats={Results}
+      loader={Loading}
       react={{
         // When these components change, update the results
         and: allComponentIds,
