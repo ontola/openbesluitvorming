@@ -13,6 +13,7 @@ const SearchBar: React.FunctionComponent<SearchBarProps> = (props) => {
       highlight
       placeholder="Zoek in 109 gemeenten.."
       URLParams={true}
+      onChange={() => console.log("QUERY CHANGED")}
       customHighlight={() => ({
         highlight: {
           pre_tags: ["<b>"],

@@ -1,29 +1,27 @@
 import React, { Component } from "react";
+import { Router, Route } from "react-router";
+import createBrowserHistory from "history/createBrowserHistory";
 import { ReactiveBase } from "@appbaseio/reactivesearch";
-import "./App.css";
-import Filtersbar from "./Components/FiltersBar";
-import ResultsList from "./Components/ResultsList";
-import SearchBar from "./Components/SearchBar";
+
+import SearchRoute from "./Routes/SearchRoute";
+import HomeRoute from "./Routes/HomeRoute";
+import "./App.scss";
+
+import theme from "./theme";
 
 class App extends Component {
   render() {
     return (
-      <ReactiveBase
-        app="ori_*"
-        url="http://localhost:8080/search/"
-      >
-        <div className="App">
-          <SearchBar/>
-          <div className="Wrapper">
-            <div className="LeftBar">
-              <Filtersbar/>
-            </div>
-            <div className="RightBar">
-              <ResultsList/>
-            </div>
-          </div>
-        </div>
-      </ReactiveBase>
+      <Router history={createBrowserHistory()}>
+        <ReactiveBase
+          theme={theme}
+          app="ori_*"
+          url="http://localhost:8080/search/"
+        >
+          <Route exact path="/" component={HomeRoute} />
+          <Route path="/search" component={SearchRoute} />
+        </ReactiveBase>
+      </Router>
     );
   }
 }

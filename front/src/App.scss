@@ -1,0 +1,46 @@
+.App {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.Wrapper {
+  display: flex;
+  min-height: 100%;
+  flex: 1;
+}
+
+.LeftBar {
+  padding: 1rem;
+  width: 26rem;
+}
+
+.RightBar {
+  background-color: #efefef;
+  flex: 1;
+}
+
+.ResultCard {
+  background-color: white;
+  max-width: 34rem;
+  margin-left: 1rem;
+  margin-bottom: 1rem;
+  padding: .5rem 1rem;
+
+  h2 {
+    font-size: 1.2rem;
+  }
+
+  &__details{
+    display: flex;
+    flex-wrap: wrap;
+
+    & .ResultCard__detail {
+      display: inline;
+      margin: 0;
+      color: #7f7f7f;
+      margin-right: 1rem;
+      word-wrap: break-word;
+    }
+  }
+}
