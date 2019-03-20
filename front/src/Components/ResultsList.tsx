@@ -39,7 +39,7 @@ const ResultsList: React.FunctionComponent<ResultsListProps> = (props) => {
         // When these components change, update the results
         and: allComponentIds,
       }}
-      renderData={ResultCard}
+      renderData={props => <ResultCard {...props} />}
     />
   );
 };

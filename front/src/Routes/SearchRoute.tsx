@@ -1,12 +1,34 @@
 import * as React from "react";
+import { withRouter, RouteComponentProps } from "react-router";
+import { History } from "history";
+
 import Filtersbar from "../Components/FiltersBar";
 import ResultsList from "../Components/ResultsList";
 import NavBar from "../Components/NavBar";
 import PDFViewer from "../Components/PDFViewer";
 
-const SearchRoute = () => {
+const SearchRoute = (props: RouteComponentProps) => {
   const [showFilters, setShowFilters] = React.useState(false);
-  const [showPDF, setShowPDF] = React.useState(false);
+
+  const getCurrentDocument = (history: History) => {
+    const urlObject = new URL(window.location.href);
+    const params = new URLSearchParams(urlObject.search);
+    const showDocumentBase = params.get("showDocument");
+    let showDocument = null;
+    if (showDocumentBase !== null) {
+      showDocument = atob(showDocumentBase);
+    }
+    return showDocument;
+  };
+
+  const closeDocument = () => {
+    const currentURL = new URL(window.location.href);
+    const params = new URLSearchParams(currentURL.search);
+    params.delete("showDocument");
+    props.history.push(`/search?${params.toString()}`);
+  };
+
+  const currentDocument = getCurrentDocument(props.history);
 
   return (
     <div className="SearchRoute">
@@ -27,11 +49,6 @@ const SearchRoute = () => {
             >
               Filters {showFilters ? "verbergen" : "tonen"}
             </button>
-            <button
-              onClick={() => setShowPDF(!showPDF)}
-            >
-              PDF {showPDF ? "verbergen" : "tonen"}
-            </button>
             <ResultsList/>
           </div>
           <div className="Widgets">
@@ -42,15 +59,15 @@ const SearchRoute = () => {
             </div>
           </div>
         </div>
-        {showPDF &&
+        {currentDocument &&
           <div className="ResourceBar">
             <button
-              onClick={() => setShowPDF(false)}
+              onClick={closeDocument}
             >
               Sluiten
             </button>
             <PDFViewer
-              url={"https://api.notubiz.nl/document/7208290/3"}
+              url={currentDocument}
             />
           </div>
         }
@@ -59,4 +76,4 @@ const SearchRoute = () => {
   );
 };
 
-export default SearchRoute;
+export default withRouter(SearchRoute);
