@@ -13,6 +13,16 @@ const NavBar: React.FunctionComponent<NavBarProps> = (props) => {
         <span>Raadsinformatie</span>
       </Link>
       <SearchBar/>
+      {/* tslint:disable-next-line:max-line-length */}
+      <a href="https://www.vngrealisatie.nl/producten/pilots-open-raadsinformatie" className="NavBar__link">
+        <span>over</span>
+      </a>
+      <a href="http://docs.openraadsinformatie.nl/" className="NavBar__link">
+        <span>docs</span>
+      </a>
+      <a href="https://github.com/openstate/open-raadsinformatie/" className="NavBar__link">
+        <span>github</span>
+      </a>
     </div>
   );
 };

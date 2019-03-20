@@ -34,15 +34,13 @@ const SearchRoute = () => {
             </button>
             <ResultsList/>
           </div>
-          {!showPDF &&
-            <div className="Widgets">
-              <div className="Widget">
-                <h2>Meldingen ontvangen</h2>
-                {/* tslint:disable-next-line:max-line-length */}
-                <p>Wil je een e-mail ontvangen wanneer er nieuwe items worden geplaatst over duurzaamheid?</p>
-              </div>
+          <div className="Widgets">
+            <div className="Widget">
+              <h2>Meldingen ontvangen</h2>
+              {/* tslint:disable-next-line:max-line-length */}
+              <p>Wil je een e-mail ontvangen wanneer er nieuwe items worden geplaatst over duurzaamheid?</p>
             </div>
-          }
+          </div>
         </div>
         {showPDF &&
           <div className="ResourceBar">

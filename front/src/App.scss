@@ -6,12 +6,21 @@
   border-right: solid 1px $g2;
 }
 
-.Logo {
+.Logo, .NavBar__link {
   font-weight: bold;
   color: $blue;
   display: flex;
   align-items: center;
   text-decoration: none;
+  margin-left: 0;
+  margin-right: 1rem;
+}
+
+.NavBar__link:hover {
+  color: $blue_dark;
+}
+
+.Logo {
   margin-left: 1rem;
   margin-right: 1rem;
 
@@ -106,7 +115,19 @@
 }
 
 .SearchBar {
-  border-radius: 5px;
+  flex: 1;
+  display: flex;
+  margin-right: 1rem;
+
+  > div {
+    flex: 1;
+    display: flex;
+  }
+
+  input {
+    align-self: center;
+    border-radius: 5px;
+  }
 }
 
 .Wrapper {

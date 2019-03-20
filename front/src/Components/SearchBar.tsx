@@ -10,7 +10,7 @@ const SearchBar: React.FunctionComponent<SearchBarProps> = (props) => {
       className="SearchBar"
       componentId="searchbox"
       debounce={400}
-      dataField={["text", "title"]}
+      dataField={["text", "title", "description"]}
       highlight
       autosuggest={false}
       placeholder="Zoek in 109 gemeenten.."

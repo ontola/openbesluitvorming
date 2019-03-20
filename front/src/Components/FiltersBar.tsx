@@ -32,6 +32,7 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
           componentId="gemeenten"
           dataField="_index"
           title="Gemeenten"
+          filterLabel="Gemeenten"
           size={100}
           sortBy="count"
           queryFormat="or"
@@ -40,10 +41,28 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
           showSearch={true}
           placeholder="Zoek gemeente..."
           react={{
-            and: ["searchbox", "daterange"],
+            and: ["searchbox", "daterange", "type"],
           }}
           showFilter={true}
-          filterLabel="City"
+          URLParams={true}
+          loader="Loading ..."
+        />
+        <MultiList
+          componentId="type"
+          dataField="_type"
+          filterLabel="Type"
+          title="Type"
+          size={100}
+          sortBy="count"
+          queryFormat="or"
+          showCheckbox={true}
+          showCount={true}
+          showSearch={false}
+          placeholder="Zoek type..."
+          react={{
+            and: ["searchbox", "daterange", "daterange", "gemeenten"],
+          }}
+          showFilter={true}
           URLParams={true}
           loader="Loading ..."
         />
