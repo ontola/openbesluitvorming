@@ -1,4 +1,4 @@
-import React, { PureComponent } from "react";
+import React from "react";
 import throttle from "lodash.throttle";
 import Resizable from "re-resizable";
 import Button from "./Button";
@@ -34,88 +34,95 @@ const calcMaxWidth = (windowWidth: number) => {
   return windowWidth;
 };
 
-class PDFViewer extends PureComponent<PDFViewerProps & RouteComponentProps, PDFViewerState> {
-  private pdfWrapper: React.RefObject<HTMLInputElement>;
-  constructor(props: (PDFViewerProps & RouteComponentProps)) {
-    super(props);
-    this.state = {
-      width: 300,
-      pageNumber: 1,
-      numPages: null,
-      maxWidth: calcMaxWidth(window.outerWidth),
+function usePersistedState<T>(key: string, initial: T):
+  [T, React.Dispatch<React.SetStateAction<T>>] {
+
+  const [value, setValue] = React.useState<T>(() => {
+    const storageValue = sessionStorage.getItem(key);
+    if (storageValue) {
+      return JSON.parse(storageValue) || initial;
+    }
+
+    return initial;
+  });
+
+  const setPersistedValue = (next: T | React.SetStateAction<T>): void => {
+    sessionStorage.setItem(key, JSON.stringify(next));
+    setValue(next);
+  };
+
+  return [value, setPersistedValue];
+}
+
+const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
+  const [pageNumber] = React.useState<number>(1);
+  const [, setNumPages] = React.useState<number>(0);
+  const [width, setWidth] = usePersistedState<number>("orisearch.pdfviewer.width", 300);
+  const [maxWidth, setMaxWidth] = React.useState<number>(calcMaxWidth(window.outerWidth));
+
+  const pdfWrapper = React.createRef<HTMLInputElement>();
+
+  React.useLayoutEffect(() => {
+    const handleResize = () => {
+      if (pdfWrapper.current) {
+        setWidth(pdfWrapper.current.getBoundingClientRect().width);
+        setMaxWidth(calcMaxWidth(window.outerWidth));
+      }
     };
-    this.pdfWrapper = React.createRef();
-  }
 
-  componentDidMount () {
-    this.handleResize();
-    window.addEventListener("resize", throttle(this.handleResize, 500));
-  }
+    const listener = throttle(handleResize, 500);
+    window.addEventListener("resize", listener);
 
-  componentWillUnmount () {
-    window.removeEventListener("resize", throttle(this.handleResize, 500));
-  }
+    return () => window.removeEventListener("resize", listener)
+  });
 
-  handleResize = () => {
-    this.pdfWrapper.current && this.setState({
-      maxWidth: calcMaxWidth(window.outerWidth),
-      width: this.pdfWrapper.current.getBoundingClientRect().width,
-    });
-  }
+  const onDocumentLoadSuccess = (e: OnLoadSuccessType) => {
+    setNumPages(e.numPages);
+  };
 
-  closeDocument = () => {
+  const closeDocument = () => {
     const currentURL = new URL(window.location.href);
     const params = new URLSearchParams(currentURL.search);
     params.delete("showDocument");
-    this.props.history.push(`/search?${params.toString()}`);
-  }
+    props.history.push(`/search?${params.toString()}`);
+  };
 
-  onDocumentLoadSuccess = (args: OnLoadSuccessType) => {
-    this.setState({ numPages: args.numPages });
-  }
-
-  render() {
-    return (
-      <Resizable
-        size={{ width: this.state.width, height: "100%" }}
-        maxWidth={this.state.maxWidth}
-        minWidth={200}
-        onResizeStop={(e, direction, ref, d) => {
-          this.setState({
-            width: this.state.width + d.width,
-          });
-        }}
-        enable={{ left: true }}
+  return (
+    <Resizable
+      size={{ width, height: "100%" }}
+      maxWidth={maxWidth}
+      minWidth={200}
+      onResizeStop={(_e, _direction, _ref, d) => setWidth(width + d.width)}
+      enable={{ left: true }}
+    >
+      <Button
+        onClick={closeDocument}
+        className="Button__close"
       >
-        <Button
-          onClick={this.closeDocument}
-          className="Button__close"
-        >
-          Sluiten
-        </Button>
-        <div
-          onKeyDown={(e: any) => console.log(e.keyCode)}
-          id="row"
-          style={{
-            height: "100%",
-            width: "100%",
-            display: "flex",
-            "overflow-y": "auto",
-            "overflow-x": "hidden",
-          }}
-        >
-          <div id="pdfWrapper" style={{ width: "100%" }} ref={this.pdfWrapper}>
-            <Document
-              file={this.props.url}
-              onLoadSuccess={this.onDocumentLoadSuccess}
-            >
-              <Page pageIndex={1} width={this.state.width} />
-            </Document>
-          </div>
+        Sluiten
+      </Button>
+      <div
+        onKeyDown={(e: any) => console.log(e.keyCode)}
+        id="row"
+        style={{
+          height: "100%",
+          width: "100%",
+          display: "flex",
+          "overflow-y": "auto",
+          "overflow-x": "hidden",
+        }}
+      >
+        <div id="pdfWrapper" style={{ width: "100%" }} ref={pdfWrapper}>
+          <Document
+            file={props.url}
+            onLoadSuccess={onDocumentLoadSuccess}
+          >
+            <Page pageIndex={pageNumber} width={width} />
+          </Document>
         </div>
-      </Resizable>
-    );
-  }
-}
+      </div>
+    </Resizable>
+  );
+};
 
 export default withRouter(PDFViewer);
