@@ -1,5 +1,29 @@
 @import 'shared';
 
+.Button {
+  -webkit-appearance: none;
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: .2rem .5rem;
+  color: $blue;
+  font-weight: bold;
+  border: solid 2px $blue;
+  border-radius: 5px;
+
+  &:hover {
+    background: white;
+  }
+
+  &__close {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    z-index: 2;
+    background-color: white;
+  }
+}
+
 .FilterBar {
   padding: 1rem;
   width: 26rem;
@@ -65,11 +89,15 @@
   flex-basis: (20rem);
 }
 
+.react-pdf__Document {
+  border-bottom: solid 1px $g1;
+  border-top: solid 1px $g1;
+}
+
 .ResourceBar {
   position: fixed;
   border-left: solid 1px $g2;
   flex: 100;
-  max-width: 70vw;
   top: 0;
   right: 0;
   bottom: 0;

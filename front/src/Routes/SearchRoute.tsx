@@ -2,6 +2,7 @@ import * as React from "react";
 import { withRouter, RouteComponentProps } from "react-router";
 import { History } from "history";
 
+import Button from "../Components/Button";
 import Filtersbar from "../Components/FiltersBar";
 import ResultsList from "../Components/ResultsList";
 import NavBar from "../Components/NavBar";
@@ -21,13 +22,6 @@ const SearchRoute = (props: RouteComponentProps) => {
     return showDocument;
   };
 
-  const closeDocument = () => {
-    const currentURL = new URL(window.location.href);
-    const params = new URLSearchParams(currentURL.search);
-    params.delete("showDocument");
-    props.history.push(`/search?${params.toString()}`);
-  };
-
   const currentDocument = getCurrentDocument(props.history);
 
   return (
@@ -44,11 +38,11 @@ const SearchRoute = (props: RouteComponentProps) => {
         </div>
         <div className="ResultsBar">
           <div className="Results">
-            <button
+            <Button
               onClick={() => setShowFilters(!showFilters)}
             >
               Filters {showFilters ? "verbergen" : "tonen"}
-            </button>
+            </Button>
             <ResultsList/>
           </div>
           <div className="Widgets">
@@ -61,11 +55,6 @@ const SearchRoute = (props: RouteComponentProps) => {
         </div>
         {currentDocument &&
           <div className="ResourceBar">
-            <button
-              onClick={closeDocument}
-            >
-              Sluiten
-            </button>
             <PDFViewer
               url={currentDocument}
             />
