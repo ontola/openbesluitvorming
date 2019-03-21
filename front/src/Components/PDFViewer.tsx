@@ -136,8 +136,8 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
           height: "100%",
           width: "100%",
           display: "flex",
-          "overflow-y": "auto",
-          "overflow-x": "hidden",
+          overflowY: "auto",
+          overflowX: "hidden",
         }}
       >
         <div id="pdfWrapper" style={{ width: "100%" }} ref={pdfWrapper}>

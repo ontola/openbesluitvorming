@@ -26,3 +26,23 @@ export function usePersistedState<T>(key: string, initial: T):
 
   return [value, setPersistedValue];
 }
+
+import { History } from "history";
+
+export const getParams = (history: History) => {
+  const urlObject = new URL(window.location.href);
+  const params = new URLSearchParams(urlObject.search);
+  const currentDocumentBase = params.get("showDocument");
+  let currentDocument = null;
+  if (currentDocumentBase !== null) {
+    currentDocument = atob(currentDocumentBase);
+  }
+  let currentSearchTerm = params.get("searchbox");
+  if (currentSearchTerm) {
+    currentSearchTerm = currentSearchTerm.substr(1, currentSearchTerm.length - 2);
+  }
+  return {
+    currentDocument,
+    currentSearchTerm,
+  };
+};
