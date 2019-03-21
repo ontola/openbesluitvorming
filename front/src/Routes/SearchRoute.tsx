@@ -11,18 +11,28 @@ import PDFViewer from "../Components/PDFViewer";
 const SearchRoute = (props: RouteComponentProps) => {
   const [showFilters, setShowFilters] = React.useState(false);
 
-  const getCurrentDocument = (history: History) => {
+  const getParams = (history: History) => {
     const urlObject = new URL(window.location.href);
     const params = new URLSearchParams(urlObject.search);
-    const showDocumentBase = params.get("showDocument");
-    let showDocument = null;
-    if (showDocumentBase !== null) {
-      showDocument = atob(showDocumentBase);
+    const currentDocumentBase = params.get("showDocument");
+    let currentDocument = null;
+    if (currentDocumentBase !== null) {
+      currentDocument = atob(currentDocumentBase);
     }
-    return showDocument;
+    let currentSearchTerm = params.get("searchbox");
+    if (currentSearchTerm) {
+      currentSearchTerm = currentSearchTerm.substr(1, currentSearchTerm.length - 2);
+    }
+    return {
+      currentDocument,
+      currentSearchTerm,
+    };
   };
 
-  const currentDocument = getCurrentDocument(props.history);
+  const {
+    currentDocument,
+    currentSearchTerm,
+  } = getParams(props.history);
 
   return (
     <div className="SearchRoute">
@@ -57,6 +67,7 @@ const SearchRoute = (props: RouteComponentProps) => {
           <div className="ResourceBar">
             <PDFViewer
               url={currentDocument}
+              searchTerm={currentSearchTerm}
             />
           </div>
         }

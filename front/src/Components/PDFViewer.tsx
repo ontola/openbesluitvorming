@@ -3,12 +3,14 @@ import throttle from "lodash.throttle";
 import Resizable from "re-resizable";
 import Button from "./Button";
 import { withRouter, RouteComponentProps } from "react-router";
+import { usePersistedState } from "../helpers";
 const { Document, Page, pdfjs } = require("react-pdf");
 // tslint:disable-next-line:max-line-length
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.js`;
 
 export interface PDFViewerProps {
   url: string;
+  searchTerm: string | null;
 }
 
 export interface PDFViewerState {
@@ -23,10 +25,13 @@ interface OnLoadSuccessType {
   numPages: number;
 }
 
+interface TextLayerItem {
+  str: string;
+}
+
 const MARGIN_LEFT = 200;
 
 const calcMaxWidth = (windowWidth: number) => {
-  console.log(windowWidth);
   if (windowWidth > 800) {
     return windowWidth - MARGIN_LEFT;
   }
@@ -34,31 +39,19 @@ const calcMaxWidth = (windowWidth: number) => {
   return windowWidth;
 };
 
-function usePersistedState<T>(key: string, initial: T):
-  [T, React.Dispatch<React.SetStateAction<T>>] {
-
-  const [value, setValue] = React.useState<T>(() => {
-    const storageValue = sessionStorage.getItem(key);
-    if (storageValue) {
-      return JSON.parse(storageValue) || initial;
-    }
-
-    return initial;
-  });
-
-  const setPersistedValue = (next: T | React.SetStateAction<T>): void => {
-    sessionStorage.setItem(key, JSON.stringify(next));
-    setValue(next);
-  };
-
-  return [value, setPersistedValue];
-}
+const determineInitialWith = (windowWidth: number) => {
+  if (windowWidth < 800) {
+    return windowWidth;
+  }
+  return windowWidth - 600;
+};
 
 const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
   const [pageNumber] = React.useState<number>(1);
   const [, setNumPages] = React.useState<number>(0);
-  const [width, setWidth] = usePersistedState<number>("orisearch.pdfviewer.width", 300);
-  const [maxWidth, setMaxWidth] = React.useState<number>(calcMaxWidth(window.outerWidth));
+  const [width, setWidth] =
+    usePersistedState<number>("orisearch.pdfviewer.width", determineInitialWith(window.innerWidth));
+  const [maxWidth, setMaxWidth] = React.useState<number>(calcMaxWidth(window.innerWidth));
 
   const pdfWrapper = React.createRef<HTMLInputElement>();
 
@@ -66,7 +59,7 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
     const handleResize = () => {
       if (pdfWrapper.current) {
         setWidth(pdfWrapper.current.getBoundingClientRect().width);
-        setMaxWidth(calcMaxWidth(window.outerWidth));
+        setMaxWidth(calcMaxWidth(window.innerWidth));
       }
     };
 
@@ -86,6 +79,41 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
     params.delete("showDocument");
     props.history.push(`/search?${params.toString()}`);
   };
+
+  const highlightPattern = (text: string, pattern: string): React.ReactNode => {
+    const splitText = text.split(pattern);
+
+    if (splitText.length <= 1) {
+      return text;
+    }
+
+    const matches = text.match(pattern);
+
+    const whatever = splitText.reduce<React.ReactNode[]>(
+      (arr, element, index) => {
+        if (matches && matches[index]) {
+          return [
+            ...arr,
+            element,
+            <mark>
+              {matches[index]}
+            </mark>,
+          ];
+        }
+        return [...arr, element];
+      },
+      [],
+    );
+
+    return (
+      <React.Fragment>
+        {whatever}
+      </React.Fragment>
+    );
+  };
+
+  const makeTextRenderer = (searchText: string) =>
+    (textItem: TextLayerItem) => highlightPattern(textItem.str, searchText);
 
   return (
     <Resizable
@@ -117,7 +145,11 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
             file={props.url}
             onLoadSuccess={onDocumentLoadSuccess}
           >
-            <Page pageIndex={pageNumber} width={width} />
+            <Page
+              pageIndex={pageNumber}
+              width={width}
+              customTextRenderer={props.searchTerm && makeTextRenderer(props.searchTerm)}
+            />
           </Document>
         </div>
       </div>
