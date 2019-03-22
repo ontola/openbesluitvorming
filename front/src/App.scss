@@ -34,8 +34,9 @@
   padding: 0;
 
   &:focus {
+    // WARNING: make sure to add focus styling for a11y!
     outline: none;
-    color: $blue;
+    color: $blue_dark;
   }
 
   &:hover {
@@ -254,6 +255,7 @@
     border-bottom-left-radius: 5px;
   }
 
+  // Filter show / hide button
   &__button {
     background: $g1;
     border-top-right-radius: 5px;
@@ -262,6 +264,10 @@
     border-left: 0;
     padding-left: 1rem;
     padding-right: 1rem;
+
+    &:hover {
+      background: $g2;
+    }
   }
 }
 
