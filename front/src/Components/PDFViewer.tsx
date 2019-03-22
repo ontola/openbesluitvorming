@@ -66,7 +66,7 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
     const listener = throttle(handleResize, 500);
     window.addEventListener("resize", listener);
 
-    return () => window.removeEventListener("resize", listener)
+    return () => window.removeEventListener("resize", listener);
   });
 
   const onDocumentLoadSuccess = (e: OnLoadSuccessType) => {
