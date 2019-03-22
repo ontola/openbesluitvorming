@@ -1,32 +1,63 @@
 @import 'shared';
 
+::-webkit-scrollbar
+{
+  width: 6px;  /* for vertical scrollbars */
+  height: 6px; /* for horizontal scrollbars */
+}
+
+::-webkit-scrollbar-track
+{
+  background: rgba(0, 0, 0, 0);
+}
+
+::-webkit-scrollbar-thumb
+{
+  background: $blue_light;
+  border-radius: 99px;
+
+  &:hover {
+    background: $blue;
+  }
+}
+
 .Button {
   -webkit-appearance: none;
   border: none;
   background: none;
   cursor: pointer;
-  padding: .2rem .5rem;
-  color: $blue;
-  font-weight: bold;
-  border: solid 2px $blue;
-  border-radius: 5px;
 
   &:hover {
     background: white;
   }
 
+  &:disabled {
+    color: $g3;
+    border-color: $g3;
+    cursor: initial;
+  }
+
   &__close {
+    padding: .2rem .5rem;
+    color: $blue;
+    font-weight: bold;
+    border-radius: 5px;
     position: absolute;
     top: 1rem;
     right: 1rem;
     z-index: 2;
     background-color: white;
+
+    &:hover {
+      color: $blue_dark;
+    }
   }
 }
 
 .FilterBar {
   padding: 1rem;
   width: 26rem;
+  position: relative;
   border-right: solid 1px $g2;
 }
 
@@ -47,6 +78,7 @@
 .Logo {
   margin-left: 1rem;
   margin-right: 1rem;
+  color: $blue;
 
   &__first {
     color: $blue_dark;
@@ -54,8 +86,7 @@
 }
 
 .NavBar {
-  display: flex;
-  box-shadow: 1px 0px 10px rgba(0, 0, 0, 0.24);
+  border-bottom: solid 1px $g2;
   z-index: 1;
   height: $navbar-height;
   position: fixed;
@@ -63,19 +94,67 @@
   left: 0;
   right: 0;
   background-color: white;
+
+  &__bottom {
+    display: flex;
+    max-width: $result-width;
+    margin-left: 1rem;
+    margin-right: 1rem;
+  }
+
+  &__top {
+    height: 3rem;
+    display: flex;
+  }
+}
+
+.PDFViewer_number-input {
+  -webkit-appearance: none;
+  -moz-appearance:textfield;
+  border: none;
+  margin: 0;
+  width: 2rem;
+
+  &:-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    display: none;
+    margin: 0;
+  }
 }
 
 .ResultsBar {
   background-color: $g1;
-  padding-left: 1rem;
-  padding-top: 1rem;
-  overflow-y: scroll;
+
   display: flex;
+  position: relative;
   flex: 1;
+
+
 }
 
 .Results {
-  flex-basis: $result-width;
+  // flex-basis: $result-width;
+  width: 100%;
+  overflow: scroll;
+  padding-left: 1rem;
+  padding-right: 1rem;
+
+  @media only screen and (max-width: 530px) {
+    padding: 0;
+  }
+
+  &__loader {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    padding-left: 1rem;
+    padding-top: .8rem;
+    height: 2.5rem;
+    background-color: $g1;
+    transition: .2s all;
+    pointer-events: none;
+  }
 }
 
 .react-pdf__Document {
@@ -85,7 +164,7 @@
 
 .ResourceBar {
   position: fixed;
-  border-left: solid 1px $g2;
+  border-left: solid 1px $blue;
   flex: 100;
   top: 0;
   right: 0;
@@ -119,7 +198,6 @@
 
   &--active {
     border-color: $blue;
-    box-shadow: 0 2px 10px 0 rgba(0,0,0,.2);
 
     h2 {
       color: $blue !important;
@@ -152,7 +230,7 @@
 .SearchBar {
   flex: 1;
   display: flex;
-  margin-right: 1rem;
+  max-width: $result-width;
 
   > div {
     flex: 1;
@@ -161,7 +239,16 @@
 
   input {
     align-self: center;
-    border-radius: 5px;
+    border-top-left-radius: 5px;
+    border-bottom-left-radius: 5px;
+  }
+
+  &__button {
+    background: $g1;
+    border-top-right-radius: 5px;
+    border-bottom-right-radius: 5px;
+    border: solid 1px $g2;
+    border-left: 0;
   }
 }
 

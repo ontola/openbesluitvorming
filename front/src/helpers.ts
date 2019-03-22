@@ -30,8 +30,12 @@ export function usePersistedState<T>(key: string, initial: T):
 import { History } from "history";
 
 export const getParams = (history: History) => {
-  const urlObject = new URL(window.location.href);
-  const params = new URLSearchParams(urlObject.search);
+  // const urlObject = new URL(window.location.href);
+  // const searchObject = urlObject.search;
+  const searchObject = history.location.search;
+  console.log(history);
+  const params = new URLSearchParams(searchObject);
+  console.log(params);
   const currentDocumentBase = params.get("showDocument");
   let currentDocument = null;
   if (currentDocumentBase !== null) {
@@ -41,6 +45,7 @@ export const getParams = (history: History) => {
   if (currentSearchTerm) {
     currentSearchTerm = currentSearchTerm.substr(1, currentSearchTerm.length - 2);
   }
+  console.log(`getParams ${currentDocument} ${currentSearchTerm}`);
   return {
     currentDocument,
     currentSearchTerm,

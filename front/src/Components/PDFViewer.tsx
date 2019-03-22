@@ -1,4 +1,4 @@
-import React from "react";
+import React, { ChangeEvent } from "react";
 import throttle from "lodash.throttle";
 import Resizable from "re-resizable";
 import Button from "./Button";
@@ -47,8 +47,8 @@ const determineInitialWith = (windowWidth: number) => {
 };
 
 const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
-  const [pageNumber] = React.useState<number>(1);
-  const [, setNumPages] = React.useState<number>(0);
+  const [pageNumber, setPageNumber] = React.useState<number>(1);
+  const [numPages, setNumPages] = React.useState<number>(0);
   const [width, setWidth] =
     usePersistedState<number>("orisearch.pdfviewer.width", determineInitialWith(window.innerWidth));
   const [maxWidth, setMaxWidth] = React.useState<number>(calcMaxWidth(window.innerWidth));
@@ -129,8 +129,31 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
       >
         Sluiten
       </Button>
+      <Button
+        onClick={() => setPageNumber(pageNumber - 1)}
+        disabled={(pageNumber === 1)}
+      >
+        vorige pagina
+      </Button>
+      <input
+        onChange={(e: ChangeEvent<HTMLInputElement>) => {
+          const number = parseInt(e.target.value, 8);
+          if (number > 0 && number <= numPages) {
+            setPageNumber(number);
+          }
+        }}
+        type="number"
+        className="PDFViewer_number-input"
+        value={pageNumber}
+      />
+      <span>{`/ ${numPages}`}</span>
+      <Button
+        onClick={() => setPageNumber(pageNumber + 1)}
+        disabled={(pageNumber === (numPages))}
+      >
+        volgende pagina
+      </Button>
       <div
-        onKeyDown={(e: any) => console.log(e.keyCode)}
         id="row"
         style={{
           height: "100%",
@@ -146,7 +169,7 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
             onLoadSuccess={onDocumentLoadSuccess}
           >
             <Page
-              pageIndex={pageNumber}
+              pageIndex={pageNumber - 1}
               width={width}
               customTextRenderer={props.searchTerm && makeTextRenderer(props.searchTerm)}
             />

@@ -2,6 +2,7 @@ import * as React from "react";
 
 interface ButtonProps {
   onClick: React.MouseEventHandler<HTMLButtonElement>;
+  disabled?: boolean;
   children: React.ReactNode;
   className?: string;
 }
@@ -14,6 +15,7 @@ const Button: React.FunctionComponent<ButtonProps> = (props) => {
   return (
     <button
       className={className}
+      disabled={props.disabled}
       onClick={props.onClick}
     >
       {props.children}
