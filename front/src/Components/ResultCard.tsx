@@ -4,15 +4,15 @@ import { ORIItemType } from "../types";
 import { withRouter, RouteComponentProps } from "react-router";
 import { History } from "history";
 import { getParams } from "../helpers";
+import Button from "./Button";
 
 interface ResultCardProps extends ORIItemType {
 }
 
 const openDocument = (url :string, history: History) => {
   const currentURL = new URL(window.location.href);
-  const params = new URLSearchParams(currentURL.search);
-  params.set("showDocument", btoa(url));
-  history.push(`/search?${params.toString()}`);
+  currentURL.searchParams.set("showDocument", encodeURIComponent(url));
+  history.push(currentURL.toString().substring(currentURL.origin.length));
 };
 
 const ResultCard: React.FunctionComponent<ResultCardProps & RouteComponentProps> = (props) => {
@@ -30,11 +30,13 @@ const ResultCard: React.FunctionComponent<ResultCardProps & RouteComponentProps>
     (currentDocument === props.original_url) ? "ResultCard--active" : null }`;
   return (
     <div key={props._id} className={className}>
-      <h2
+      <Button
         onClick={() => openDocument(props.original_url, props.history)}
       >
-        {props.name}
-      </h2>
+        <h2>
+          {props.name}
+        </h2>
+      </Button>
       {props.highlight.text && props.highlight.text.map(
         ((text: string) => (
           <div key={text}>

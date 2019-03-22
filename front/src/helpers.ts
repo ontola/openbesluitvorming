@@ -39,7 +39,7 @@ export const getParams = (history: History) => {
   const currentDocumentBase = params.get("showDocument");
   let currentDocument = null;
   if (currentDocumentBase !== null) {
-    currentDocument = atob(currentDocumentBase);
+    currentDocument = decodeURIComponent(currentDocumentBase);
   }
   let currentSearchTerm = params.get("searchbox");
   if (currentSearchTerm) {

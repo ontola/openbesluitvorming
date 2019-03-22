@@ -71,6 +71,7 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
 
   const onDocumentLoadSuccess = (e: OnLoadSuccessType) => {
     setNumPages(e.numPages);
+    setPageNumber(1);
   };
 
   const closeDocument = () => {

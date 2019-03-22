@@ -19,11 +19,17 @@ const SearchRoute = (props: RouteComponentProps) => {
     currentSearchTerm,
   } = getParams(props.history);
 
+  const setSearchParams = (newURL: string) => {
+    const url = new URL(newURL);
+    props.history.push(url.toString().substring(url.origin.length));
+  };
+
   return (
     <ReactiveBase
       theme={theme}
       app="ori_*"
       url="http://localhost:8080/search/"
+      setSearchParams={setSearchParams as () => string}
     >
       <div className="SearchRoute">
         <div className="NavBar">
@@ -43,24 +49,27 @@ const SearchRoute = (props: RouteComponentProps) => {
               <span>github</span>
             </a>
           </div>
-          <div className="NavBar__bottom">        <SearchBar/>
-            <Button
+          <div className="NavBar__bottom">
+            <SearchBar/>
+            {currentSearchTerm && <Button
               className="SearchBar__button"
               onClick={() => setShowFilters(!showFilters)}
               >
               filters {showFilters ? "verbergen" : "tonen"}
-            </Button>
+            </Button>}
           </div>
         </div>
         <div className="Wrapper">
-          {showFilters &&
+          {currentSearchTerm && showFilters &&
             <Filtersbar setShowFilters={setShowFilters}/>
           }
-          <div className="ResultsBar">
-            <div className="Results" id="Results">
-              <ResultsList/>
+          {currentSearchTerm &&
+            <div className="ResultsBar">
+              <div className="Results" id="Results">
+                <ResultsList/>
+              </div>
             </div>
-          </div>
+          }
           {currentDocument &&
             <div className="ResourceBar">
               <PDFViewer
