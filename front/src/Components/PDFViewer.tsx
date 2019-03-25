@@ -119,6 +119,9 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
   return (
     <Resizable
       size={{ width, height: "100%" }}
+      handleClasses={{
+        left: "PDFViewer__resize-handle",
+      }}
       maxWidth={maxWidth}
       minWidth={200}
       onResizeStop={(_e, _direction, _ref, d) => setWidth(width + d.width)}
