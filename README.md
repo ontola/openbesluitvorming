@@ -1,5 +1,4 @@
 # Open Raadsinformatie Search
-[![Build Status](https://semaphoreci.com/api/v1/projects/9f55dbcb-3683-40e7-8f0c-293cea710d01/2575606/badge.svg)](https://semaphoreci.com/argu/ori-search)
 
 A webapplication that searches through meeting documents of many Dutch local governments by using [Open Raadsinformatie](http://openraadsinformatie.nl).
 
@@ -17,8 +16,9 @@ Check it out at [ori.argu.co](http://ori.)!
 
 ## Run using docker
 
-- Buid the docker image `docker build . -t ori_search:latest`
-- Run it `docker run -it -p 8080:8080 -e PORT=8080 ori_search:latest`
+- Buid the docker image `docker build . -t argu/ori-search`
+- ... Or pull it from [dockerhub](https://hub.docker.com/r/argu/ori-search): `docker pull argu/ori-search`
+- Run it `docker run -it -p 8080:8080 -e PORT=8080 argu/ori-search`
 - Visit `http://localhost:8080`
 
 ## Contributing
@@ -26,6 +26,7 @@ Check it out at [ori.argu.co](http://ori.)!
 Great, read [CONTRIBUTE.md](/CONTRIBUTE.md)!
 
 ## Deployment
+[![Build Status](https://semaphoreci.com/api/v1/argu/ori-search-2/branches/master/badge.svg)](https://semaphoreci.com/argu/ori-search-2)
 
 Semaphore tracks the master branch and deploys succesful builds to [docker hub](https://hub.docker.com/r/argu/ori-search).
 
