@@ -67,10 +67,16 @@
 }
 
 .FilterBar {
-  padding: 1rem;
-  width: 26rem;
   position: relative;
   border-right: solid 1px $g2;
+  width: 0;
+  transition: .2s all;
+  padding: 0;
+
+  &__visible {
+    width: 26rem;
+    padding: 1rem;
+  }
 }
 
 .Logo, .NavBar__link {
@@ -117,6 +123,18 @@
   &__top {
     height: 3rem;
     display: flex;
+  }
+}
+
+.PDFViewer__resize-handle {
+  transition: .2s all;
+
+  &:hover {
+    background-color: $blue_light;
+  }
+
+  &:active {
+    background-color: $blue;
   }
 }
 

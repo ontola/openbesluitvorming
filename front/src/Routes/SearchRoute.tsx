@@ -66,7 +66,7 @@ const SearchRoute = (props: RouteComponentProps) => {
         </div>
         <div className="Wrapper">
           <Filtersbar
-            display={(currentSearchTerm && showFilters) ? true : false}
+            display={!!(currentSearchTerm && showFilters)}
           />
           {currentSearchTerm &&
             <div className="ResultsBar">

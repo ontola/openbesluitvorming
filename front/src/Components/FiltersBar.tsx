@@ -16,10 +16,7 @@ const filterStyle = {
 const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
   return (
     <div
-      className="FilterBar"
-      style={{
-        display: `${props.display ? "none" : "block"}`,
-      }}
+      className={`FilterBar ${props.display ? "FilterBar__visible" : "FilterBar__hidden"}`}
     >
       <SelectedFilters
         clearAllLabel="Filters wissen"
