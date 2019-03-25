@@ -1,8 +1,8 @@
 # Open Raadsinformatie Search
 
-A webapplication that searches through meeting documents of many Dutch local governments by using [Open Raadsinformatie](http://openraadsinformatie.nl).
+Search through meeting documents of 100+ Dutch local governments. Powered by [Open Raadsinformatie](http://openraadsinformatie.nl).
 
-Check it out at [ori.argu.co](http://ori.)!
+Check it out at [ori.argu.co](http://ori.argu.co)!
 
 ## Run front-end
 
@@ -26,6 +26,7 @@ Check it out at [ori.argu.co](http://ori.)!
 Great, read [CONTRIBUTE.md](/CONTRIBUTE.md)!
 
 ## Deployment
+
 [![Build Status](https://semaphoreci.com/api/v1/argu/ori-search-2/branches/master/badge.svg)](https://semaphoreci.com/argu/ori-search-2)
 
 Semaphore tracks the master branch and deploys succesful builds to [docker hub](https://hub.docker.com/r/argu/ori-search).
@@ -34,7 +35,7 @@ Semaphore tracks the master branch and deploys succesful builds to [docker hub](
 
 The front-end is a typescript react application that uses [reactiveserach](https://github.com/appbaseio/reactivesearch/issues).
 
-The server is a node express application that serves as both a proxy and a static file server.
+The server is a node express application that serves as both a static file server and a proxy that forward elasticsearch queries to the elastic endpoint of open raadsinformatie.
 
 ## Thanks to
 
