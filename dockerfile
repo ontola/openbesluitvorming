@@ -25,7 +25,5 @@ RUN yarn install --production --frozen-lockfile
 COPY --from=builder /usr/src/app/server/dist/ /usr/src/app/
 COPY --from=builder /usr/src/app/front/build /usr/src/app/www/
 
-WORKDIR /usr/src/app/server/src
-
 EXPOSE 8080
 CMD ["node", "server.js"]
