@@ -1,5 +1,8 @@
 FROM node:11 as builder
+ENV NODE_ENV=production
+
 WORKDIR /usr/src/app
+
 
 COPY front/package.json front/yarn.lock ./front/
 COPY server/package.json server/yarn.lock ./server/
@@ -9,7 +12,7 @@ WORKDIR /usr/src/app/front
 RUN yarn --frozen-lockfile
 WORKDIR /usr/src/app/
 COPY ./front ./front
-COPY ./server ./server/
+COPY ./server ./server
 WORKDIR /usr/src/app/server
 RUN yarn run build
 WORKDIR /usr/src/app/front
@@ -17,6 +20,8 @@ RUN yarn run build
 
 # Production
 FROM node:11-alpine
+ENV NODE_ENV=production
+
 WORKDIR /usr/src/app
 
 COPY server/package.json server/yarn.lock ./

@@ -10,6 +10,7 @@ import { Link } from "react-router-dom";
 import SearchBar from "../Components/SearchBar";
 import { ReactiveBase } from "@appbaseio/reactivesearch";
 import theme from "../theme";
+import { PORT } from "../config";
 
 const SearchRoute = (props: RouteComponentProps) => {
   const [showFilters, setShowFilters] = React.useState(false);
@@ -24,11 +25,15 @@ const SearchRoute = (props: RouteComponentProps) => {
     props.history.push(url.toString().substring(url.origin.length));
   };
 
+  const apiURL = new URL(window.location.origin);
+  apiURL.port = PORT.toString();
+  apiURL.pathname = "/api";
+
   return (
     <ReactiveBase
       theme={theme}
       app="ori_*"
-      url="http://localhost:8080/search/"
+      url={apiURL.toString()}
       setSearchParams={setSearchParams as () => string}
     >
       <div className="SearchRoute">

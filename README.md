@@ -18,3 +18,7 @@ A search webapplication that uses [Open Raadsinformatie](http://openraadsinforma
 - Buid the docker image `docker build . -t ori_search:latest`
 - Run it `docker run -it -p 8080:8080 -e PORT=8080 ori_search:latest`
 - Visit `http://localhost:8080`
+
+## Deployment
+
+Semaphore tracks the master branch and deploys succesful builds to [docker hub](https://hub.docker.com/r/argu/ori-search).

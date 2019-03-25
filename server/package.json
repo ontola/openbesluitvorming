@@ -8,7 +8,13 @@
     "express": "^4.16.4",
     "http-proxy-middleware": "^0.19.1",
     "morgan": "^1.9.1",
-    "typescript": "^3.3.3"
+    "typescript": "^3.3.3",
+    "@types/cors": "^2.8.4",
+    "@types/express": "^4.16.1",
+    "@types/http-proxy-middleware": "^0.19.2",
+    "@types/morgan": "^1.7.35",
+    "@types/node": "^11.11.6",
+    "@types/radium": "^0.24.2"
   },
   "scripts": {
     "dev": "ts-node-dev ./src/server.ts",
@@ -30,12 +36,6 @@
     "not op_mini all"
   ],
   "devDependencies": {
-    "@types/cors": "^2.8.4",
-    "@types/express": "^4.16.1",
-    "@types/http-proxy-middleware": "^0.19.2",
-    "@types/morgan": "^1.7.35",
-    "@types/node": "^11.9.4",
-    "@types/radium": "^0.24.2",
     "ts-node-dev": "^1.0.0-pre.32",
     "tslint": "^5.12.1",
     "tslint-config-airbnb": "^5.11.1"

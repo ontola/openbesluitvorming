@@ -5,8 +5,8 @@ import express, { Response, Request } from "express";
 import httpProxyMiddleware from "http-proxy-middleware";
 import morgan from "morgan";
 
-const staticDir = process.env.WWW_DIR || "/usr/src/app/www/";
-const defaultPort = 8080;
+import { ES_URL, PORT, WWW_DIR } from "./config";
+
 const app = express();
 
 // Enable all CORS requests
@@ -15,19 +15,19 @@ app.use(cors());
 app.use(morgan("combined"));
 
 // Proxy search requests
-app.all("/search/*", httpProxyMiddleware({
+app.all("/api/*", httpProxyMiddleware({
   ws: true,
-  target: "https://api.openraadsinformatie.nl/v1/elastic/",
+  target: ES_URL,
   changeOrigin: true,
-  pathRewrite: { "^/search": "" },
+  pathRewrite: { "^/api": "" },
   logLevel: process.env.NODE_ENV === "production" ? "info" :  "debug",
 }));
 
 // Production, serve static files
-app.use(express.static(path.join(staticDir)));
+app.use(express.static(path.join(WWW_DIR)));
 
 app.get("*", (req: Request, res: Response) => {
-  res.sendFile(path.join(staticDir, "index.html"));
+  res.sendFile(path.join(WWW_DIR, "index.html"));
 });
 
-app.listen(process.env.PORT || defaultPort);
+app.listen(PORT);
