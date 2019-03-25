@@ -3,6 +3,8 @@
 
 A webapplication that searches through meeting documents of many Dutch local governments by using [Open Raadsinformatie](http://openraadsinformatie.nl).
 
+Check it out at [ori.argu.co](http://ori.)!
+
 ## Run front-end
 
 - `cd front`
