@@ -1,5 +1,6 @@
 import * as React from "react";
 import { withRouter, RouteComponentProps } from "react-router";
+import ReactCSSTransitionGroup from "react-addons-css-transition-group";
 
 import Button from "../Components/Button";
 import Filtersbar from "../Components/FiltersBar";
@@ -77,14 +78,20 @@ const SearchRoute = (props: RouteComponentProps) => {
               </div>
             </div>
           }
-          {currentDocument &&
-            <div className="ResourceBar">
-              <PDFViewer
-                url={currentDocument}
-                searchTerm={currentSearchTerm}
-              />
-            </div>
-          }
+          <ReactCSSTransitionGroup
+            transitionName="ResourceBar"
+            transitionEnterTimeout={200}
+            transitionLeaveTimeout={200}
+          >
+            {currentDocument &&
+              <div className="ResourceBar">
+                <PDFViewer
+                  url={currentDocument}
+                  searchTerm={currentSearchTerm}
+                />
+              </div>
+            }
+          </ReactCSSTransitionGroup>
         </div>
       </div>
     </ReactiveBase>

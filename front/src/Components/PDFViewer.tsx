@@ -2,6 +2,8 @@ import React, { ChangeEvent } from "react";
 import throttle from "lodash.throttle";
 import Resizable from "re-resizable";
 import Button from "./Button";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faArrowRight, faArrowLeft } from "@fortawesome/free-solid-svg-icons";
 import { withRouter, RouteComponentProps } from "react-router";
 import { usePersistedState } from "../helpers";
 const { Document, Page, pdfjs } = require("react-pdf");
@@ -45,6 +47,11 @@ const determineInitialWith = (windowWidth: number) => {
   }
   return windowWidth - 600;
 };
+
+const LoadingComponent = () =>
+  <div className="PDFViewer__loading">
+    <FontAwesomeIcon icon="spinner" size="6x" spin />
+  </div>;
 
 const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
   const [pageNumber, setPageNumber] = React.useState<number>(1);
@@ -128,16 +135,10 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
       enable={{ left: true }}
     >
       <Button
-        onClick={closeDocument}
-        className="Button__close"
-      >
-        Sluiten
-      </Button>
-      <Button
         onClick={() => setPageNumber(pageNumber - 1)}
         disabled={(pageNumber === 1)}
       >
-        vorige pagina
+        <FontAwesomeIcon icon={faArrowLeft} />
       </Button>
       <input
         onChange={(e: ChangeEvent<HTMLInputElement>) => {
@@ -155,7 +156,13 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
         onClick={() => setPageNumber(pageNumber + 1)}
         disabled={(pageNumber === (numPages))}
       >
-        volgende pagina
+        <FontAwesomeIcon icon={faArrowRight} />
+      </Button>
+      <Button
+        className="Button__close"
+        onClick={closeDocument}
+      >
+        Sluiten
       </Button>
       <div
         id="row"
@@ -163,6 +170,7 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
           height: "100%",
           width: "100%",
           display: "flex",
+          position: "relative",
           overflowY: "auto",
           overflowX: "hidden",
         }}
@@ -170,9 +178,11 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
         <div id="pdfWrapper" style={{ width: "100%" }} ref={pdfWrapper}>
           <Document
             file={props.url}
+            loading={<LoadingComponent/>}
             onLoadSuccess={onDocumentLoadSuccess}
           >
             <Page
+              loading={<LoadingComponent/>}
               pageIndex={pageNumber - 1}
               width={width}
               customTextRenderer={props.searchTerm && makeTextRenderer(props.searchTerm)}

@@ -50,14 +50,10 @@
   }
 
   &__close {
-    padding: .2rem .5rem;
     color: $blue;
     font-weight: bold;
     border-radius: 5px;
-    position: absolute;
-    top: 1rem;
-    right: 1rem;
-    z-index: 2;
+    float: right;
     background-color: white;
 
     &:hover {
@@ -136,6 +132,18 @@
   }
 }
 
+.PDFViewer__loading {
+  position: absolute;
+  background-color: white;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .PDFViewer__resize-handle {
   transition: .2s all;
 
@@ -211,6 +219,28 @@
   bottom: 0;
   z-index: 2;
   background-color: white;
+
+  &-enter {
+    opacity: 0;
+    right: -20%;
+  }
+
+  &-enter-active {
+    opacity: 1;
+    right: 0;
+    transition: right 200ms ease-in, opacity .2s;
+  }
+
+  &-leave {
+    opacity: 1;
+    right: 0;
+  }
+
+  &-leave-active {
+    opacity: 0;
+    right: -20%;
+    transition: right 200ms ease-in, opacity .2s;
+  }
 }
 
 .ResultCard {
