@@ -56,7 +56,7 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
         showFilter={true}
         URLParams={true}
         style={filterStyle}
-        className={"Filter"}
+        className="Filter"
         loader="Loading ..."
       />
       <MultiList
@@ -64,6 +64,7 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
         dataField="_type"
         filterLabel="Type"
         title="Type"
+        className="Filter"
         size={100}
         sortBy="count"
         queryFormat="or"

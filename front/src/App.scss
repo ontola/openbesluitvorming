@@ -66,6 +66,12 @@
   }
 }
 
+.Filter {
+  ul {
+    overflow-x: hidden;
+  }
+}
+
 .FilterBar {
   position: relative;
   border-right: solid 1px $g2;
