@@ -6,6 +6,7 @@ import {
 } from "@appbaseio/reactivesearch";
 
 interface FiltersbarProps {
+  display: boolean;
 }
 
 const filterStyle = {
@@ -14,7 +15,12 @@ const filterStyle = {
 
 const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
   return (
-    <div className="FilterBar">
+    <div
+      className="FilterBar"
+      style={{
+        display: `${props.display ? "none" : "block"}`,
+      }}
+    >
       <SelectedFilters
         clearAllLabel="Filters wissen"
       />
