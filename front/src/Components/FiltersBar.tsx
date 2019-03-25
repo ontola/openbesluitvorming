@@ -4,10 +4,8 @@ import {
   MultiList,
   SelectedFilters,
 } from "@appbaseio/reactivesearch";
-import Button from "./Button";
 
 interface FiltersbarProps {
-  setShowFilters: any;
 }
 
 const filterStyle = {
@@ -17,12 +15,6 @@ const filterStyle = {
 const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
   return (
     <div className="FilterBar">
-      <Button
-        onClick={() => props.setShowFilters(false)}
-        className="Button__close"
-      >
-        filters verbergen
-      </Button>
       <SelectedFilters
         clearAllLabel="Filters wissen"
       />

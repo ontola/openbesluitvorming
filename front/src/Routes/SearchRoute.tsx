@@ -66,7 +66,7 @@ const SearchRoute = (props: RouteComponentProps) => {
         </div>
         <div className="Wrapper">
           {currentSearchTerm && showFilters &&
-            <Filtersbar setShowFilters={setShowFilters}/>
+            <Filtersbar/>
           }
           {currentSearchTerm &&
             <div className="ResultsBar">
