@@ -26,7 +26,7 @@ const SearchRoute = (props: RouteComponentProps) => {
   };
 
   const apiURL = new URL(window.location.origin);
-  apiURL.port = PORT.toString();
+  apiURL.port = process.env.NODE_ENV === "production" ? "" : PORT.toString();
   apiURL.pathname = "/api";
 
   return (
