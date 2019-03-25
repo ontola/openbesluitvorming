@@ -19,6 +19,10 @@ A webapplication that searches through meeting documents of many Dutch local gov
 - Run it `docker run -it -p 8080:8080 -e PORT=8080 ori_search:latest`
 - Visit `http://localhost:8080`
 
+## Contributing
+
+Great, read [CONTRIBUTE.md](/CONTRIBUTE.md)!
+
 ## Deployment
 
 Semaphore tracks the master branch and deploys succesful builds to [docker hub](https://hub.docker.com/r/argu/ori-search).
