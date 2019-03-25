@@ -21,15 +21,15 @@ Check it out at [ori.argu.co](http://ori.argu.co)!
 - Run it `docker run -it -p 8080:8080 -e PORT=8080 argu/ori-search`
 - Visit `http://localhost:8080`
 
-## Contributing
+## Contribution guidelines
 
-Great, read [CONTRIBUTE.md](/CONTRIBUTE.md)!
+Read [contribute.md](/CONTRIBUTE.md)
 
 ## Deployment
 
 [![Build Status](https://semaphoreci.com/api/v1/argu/ori-search-2/branches/master/badge.svg)](https://semaphoreci.com/argu/ori-search-2)
 
-Semaphore tracks the master branch and deploys succesful builds to [docker hub](https://hub.docker.com/r/argu/ori-search).
+Semaphore tracks the master branch and deploys succesful builds to [docker hub](https://hub.docker.com/r/argu/ori-search).2
 
 ## Architecture
 
