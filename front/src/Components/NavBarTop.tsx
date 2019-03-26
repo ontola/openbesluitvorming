@@ -1,6 +1,5 @@
 import * as React from "react";
 import { Link } from "react-router-dom";
-import paths from "../paths";
 
 const Home = () => {
   return (
@@ -13,7 +12,7 @@ const Home = () => {
         <span className="Logo__first">Open</span>
         <span>Raadsinformatie</span>
       </Link>
-      <a
+      {/* <a
         href={paths.vngProject}
         title="Projectwebsite van VNG Realisatie"
         className="NavBar__link"
@@ -33,7 +32,7 @@ const Home = () => {
         title="Broncode van deze zoekmachine"
       >
         <span>github</span>
-      </a>
+      </a> */}
     </div>
   );
 };
