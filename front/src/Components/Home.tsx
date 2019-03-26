@@ -23,10 +23,21 @@ const Home = (props: HomeProps) => {
         <p>
           Dit project is gestart door de Open State Foundation en overgenomen door
           VNG Realisatie. De techniek wordt ontwikkeld door Argu en Ontola.
+          De broncode van zowel deze zoekmachine als de server van Open Raadsinformatie
+          staan open source beschikbaar op Github.
         </p>
-        <h2>Zoektips</h2>
+        <h2>Deelnemen</h2>
         <p>
-          Open de filters om per gemeente, categorie of datumbereik te zoeken.
+          Als je wil dat jouw gemeente aansluit op Open Raadsinformatie,
+          vraag dan de griffie van je gemeenteraad om een mail te sturen naar
+          {" "}
+          <a href="mailto:tom.kunzler@vng.nl">Tom Kunzler</a>.
+        </p>
+        <h2>Feedback</h2>
+        <p>
+          Technische vragen of suggesties over de API kunnen op de Issue tracker van de ORI
+          achterkant worden geplaatst.
+          Voor suggesties, problemen of vragen over deze zoekmachine, plaats een issue op Github.
         </p>
       </div>
     </div>
