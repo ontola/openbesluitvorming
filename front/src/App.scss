@@ -49,6 +49,7 @@
     color: $blue;
     font-weight: bold;
     border-radius: 5px;
+    padding: .5rem;
     position: absolute;
     top: 1rem;
     right: 1rem;
@@ -81,6 +82,25 @@
 
   &__hidden {
     visibility: hidden;
+  }
+}
+
+.Home {
+  background-color: $g0;
+  width: 100%;
+
+  &__wrapper {
+    padding: 1rem;
+    max-width: $result-width;
+  }
+
+  h2 {
+    color: $blue;
+    margin-bottom: .5rem;
+  }
+
+  p {
+    margin-top: 0;
   }
 }
 
@@ -210,35 +230,25 @@
 }
 
 .ResultsBar {
-  background-color: $g1;
-
+  background-color: $g0;
   display: flex;
   position: relative;
   flex: 1;
 }
 
 .Results {
-  // flex-basis: $result-width;
   width: 100%;
   overflow: scroll;
   padding-left: 1rem;
   padding-right: 1rem;
 
-  @media only screen and (max-width: 530px) {
-    padding: 0;
+  &__loader {
+    padding-top: 1rem;
+    padding-bottom: 1rem;
   }
 
-  &__loader {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    padding-left: 1rem;
-    padding-top: .8rem;
-    height: 2.5rem;
-    background-color: $g1;
-    transition: .2s all;
-    pointer-events: none;
+  @media only screen and (max-width: 530px) {
+    padding: 0;
   }
 }
 
@@ -352,7 +362,7 @@
 
   // Filter show / hide button
   &__button {
-    background: $g1;
+    background: $g0;
     border-top-right-radius: 5px;
     border-bottom-right-radius: 5px;
     border: solid 1px $g2;
@@ -361,6 +371,10 @@
     padding-right: 1rem;
 
     &:hover {
+      background: $g1;
+    }
+
+    &:active {
       background: $g2;
     }
   }

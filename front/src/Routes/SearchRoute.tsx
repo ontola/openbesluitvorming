@@ -4,10 +4,11 @@ import ReactCSSTransitionGroup from "react-addons-css-transition-group";
 
 import Button from "../Components/Button";
 import Filtersbar from "../Components/FiltersBar";
+import Home from "../Components/Home";
+import NavBarTop from "../Components/NavBarTop";
 import ResultsList from "../Components/ResultsList";
 import PDFViewer from "../Components/PDFViewer";
 import { getParams } from "../helpers";
-import { Link } from "react-router-dom";
 import SearchBar from "../Components/SearchBar";
 import { ReactiveBase } from "@appbaseio/reactivesearch";
 import theme from "../theme";
@@ -39,22 +40,7 @@ const SearchRoute = (props: RouteComponentProps) => {
     >
       <div className="SearchRoute">
         <div className="NavBar">
-          <div className="NavBar__top">
-            <Link to="/" className="Logo">
-              <span className="Logo__first">Open</span>
-              <span>Raadsinformatie</span>
-            </Link>
-            {/* tslint:disable-next-line:max-line-length */}
-            <a href="https://www.vngrealisatie.nl/producten/pilots-open-raadsinformatie" className="NavBar__link">
-              <span>over</span>
-            </a>
-            <a href="http://docs.openraadsinformatie.nl/" className="NavBar__link">
-              <span>docs</span>
-            </a>
-            <a href="https://github.com/openstate/open-raadsinformatie/" className="NavBar__link">
-              <span>github</span>
-            </a>
-          </div>
+          <NavBarTop />
           <div className="NavBar__bottom">
             <SearchBar/>
             {currentSearchTerm && <Button
@@ -77,6 +63,9 @@ const SearchRoute = (props: RouteComponentProps) => {
                 <ResultsList/>
               </div>
             </div>
+          }
+          {!currentSearchTerm &&
+            <Home />
           }
           <ReactCSSTransitionGroup
             transitionName="ResourceBar"

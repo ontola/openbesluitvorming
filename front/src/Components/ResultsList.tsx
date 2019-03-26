@@ -3,6 +3,8 @@ import { ReactiveList } from "@appbaseio/reactivesearch";
 
 import { allComponentIds } from "../helpers";
 import ResultCard from "../Components/ResultCard";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faSpinner } from "@fortawesome/free-solid-svg-icons";
 // import { string, any } from "prop-types";
 
 interface ResultsListProps {
@@ -21,7 +23,10 @@ const NoResults = () =>
   <div>Geen resultaten gevonden.</div>;
 
 const Loading = () =>
-  <div className="Results__loader">Laden...</div>;
+  <div className="Results__loader">
+    <FontAwesomeIcon icon={faSpinner} spin />
+    {" Laden.."}
+  </div>;
 
 // interface SortOption {
 //   label: string;
