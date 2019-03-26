@@ -132,6 +132,14 @@
   }
 }
 
+.react-pdf__Document {
+  height: 100%;
+}
+
+.react-pdf__Page {
+  height: 100%;
+}
+
 .PDFViewer__loading {
   position: absolute;
   background-color: white;
@@ -142,6 +150,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: .2s all;
 }
 
 .PDFViewer__resize-handle {
@@ -228,7 +237,7 @@
   &-enter-active {
     opacity: 1;
     right: 0;
-    transition: right 200ms ease-in, opacity .2s;
+    transition: right 200ms ease-out, opacity .2s;
   }
 
   &-leave {
@@ -239,7 +248,7 @@
   &-leave-active {
     opacity: 0;
     right: -20%;
-    transition: right 200ms ease-in, opacity .2s;
+    transition: right 200ms ease-in-out, opacity .2s;
   }
 }
 
