@@ -4,6 +4,7 @@ import {
   MultiList,
   SelectedFilters,
 } from "@appbaseio/reactivesearch";
+import { indexToMunicipality, typeToLabel } from "../helpers";
 
 interface FiltersbarProps {
   display: boolean;
@@ -12,6 +13,18 @@ interface FiltersbarProps {
 const filterStyle = {
   marginBottom: "10px",
 };
+
+const MunicipalityLabel = (label: string, count: number, isSelected: boolean) =>
+  <span>
+    <span>{indexToMunicipality(label)}</span>
+    <span>{count}</span>
+  </span>;
+
+const TypeLabel = (label: string, count: number, isSelected: boolean) =>
+  <span>
+    <span>{typeToLabel(label)}</span>
+    <span>{count}</span>
+  </span>;
 
 const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
   return (
@@ -58,6 +71,7 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
         style={filterStyle}
         className="Filter"
         loader="Loading ..."
+        renderItem={MunicipalityLabel}
       />
       <MultiList
         componentId="type"
@@ -68,6 +82,7 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
         size={100}
         sortBy="count"
         queryFormat="or"
+        renderItem={TypeLabel}
         showCheckbox={true}
         showCount={true}
         showSearch={false}

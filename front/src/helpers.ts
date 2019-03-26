@@ -46,3 +46,24 @@ export const getParams = (history: History) => {
     currentSearchTerm,
   };
 };
+
+// Turns ori_amsteram_215970157 into Amsterdam
+export const indexToMunicipality = (_index: string) => {
+  const parts = _index.split("_");
+  return parts
+    .slice(1, parts.length - 1)
+    .map(s => `${s.charAt(0).toLocaleUpperCase()}${s.substring(1)}`)
+    .join(" ");
+};
+
+// Turns media_object into Document
+export const typeToLabel = (_type: string) => {
+  switch (_type) {
+    case "media_object":
+      return "Document";
+    case "agenda_item":
+      return "Agendapunt";
+    case "media_object":
+      return "Document";
+  }
+};
