@@ -91,6 +91,8 @@
 .Home {
   background-color: $g0;
   width: 100%;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
 
   &__wrapper {
     padding: 1rem;
@@ -106,6 +108,8 @@
 
   p {
     margin-top: 0;
+    font-size: 1em;
+    line-height: 1.5rem;
   }
 
   a {
