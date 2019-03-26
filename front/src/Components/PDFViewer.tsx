@@ -9,6 +9,7 @@ import {
   faSpinner,
   faDownload,
   faExpand,
+  faGripHorizontal,
 } from "@fortawesome/free-solid-svg-icons";
 import { withRouter, RouteComponentProps } from "react-router";
 import { usePersistedState } from "../helpers";
@@ -53,6 +54,11 @@ const determineInitialWith = (windowWidth: number) => {
   }
   return windowWidth - 600;
 };
+
+const Handler = () =>
+  <div className="PDFViewer__handler">
+    <FontAwesomeIcon icon={faGripHorizontal} />
+  </div>;
 
 const LoadingComponent = () =>
   <div className="PDFViewer__loading">
@@ -150,6 +156,9 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
       handleClasses={{
         left: "PDFViewer__resize-handle",
       }}
+      handleComponent={{
+        left: () => <Handler />,
+      }}
       maxWidth={maxWidth}
       minWidth={200}
       onResizeStop={(_e, _direction, _ref, d) => setWidth(width + d.width)}
@@ -161,17 +170,7 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
       >
         Sluiten
       </Button>
-      <div
-        id="row"
-        style={{
-          height: "100%",
-          width: "100%",
-          display: "flex",
-          position: "relative",
-          overflowY: "auto",
-          overflowX: "hidden",
-        }}
-      >
+      <div className="PDFViewer__scroller">
         <div id="pdfWrapper" style={{ width: "100%" }} ref={pdfWrapper}>
           <Document
             file={props.url}

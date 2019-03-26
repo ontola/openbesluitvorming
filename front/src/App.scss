@@ -156,6 +156,33 @@
   position: relative;
 }
 
+.PDFViewer__handler {
+  background-color: white;
+  border-radius: 5px;
+  width: 1.5rem;
+  text-align: center;
+  position: absolute;
+  left: -0.45rem;
+  top: 50%;
+  border: solid 1px $blue;
+  color: $blue;
+  transition: .2s all;
+}
+
+.PDFViewer__resize-handle:hover .PDFViewer__handler,
+.PDFViewer__handler:hover {
+  background-color: $blue_light;
+  border-color: $blue_light;
+  color: white;
+}
+
+.PDFViewer__resize-handle:active .PDFViewer__handler,
+.PDFViewer__handler:active {
+  border-color: $blue;
+  color: white;
+  background-color: $blue;
+}
+
 .PDFViewer__button-bar {
   position: absolute;
   bottom: 0;
@@ -201,6 +228,17 @@
   align-items: center;
   justify-content: center;
   transition: .2s all;
+  color: $blue;
+}
+
+.PDFViewer__scroller {
+  height: 100%;
+  width: 100%;
+  display: flex;
+  position: relative;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 
 .PDFViewer__resize-handle {
@@ -240,6 +278,7 @@
 .Results {
   width: 100%;
   overflow: scroll;
+  -webkit-overflow-scrolling: touch;
   padding-left: 1rem;
   padding-right: 1rem;
 
@@ -356,7 +395,9 @@
   }
 
   input {
+    -webkit-appearance: none;
     align-self: center;
+    border-radius: 0;
     border-top-left-radius: 5px;
     border-bottom-left-radius: 5px;
   }
