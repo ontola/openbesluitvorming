@@ -1,8 +1,7 @@
-FROM node:11 as builder
+FROM node:11-alpine as builder
 ENV NODE_ENV=production
 
 WORKDIR /usr/src/app
-
 
 COPY front/package.json front/yarn.lock ./front/
 COPY server/package.json server/yarn.lock ./server/
