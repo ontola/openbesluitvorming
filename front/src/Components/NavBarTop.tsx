@@ -1,5 +1,6 @@
 import * as React from "react";
 import { Link } from "react-router-dom";
+import paths from "../paths";
 
 const Home = () => {
   return (
@@ -13,21 +14,21 @@ const Home = () => {
         <span>Raadsinformatie</span>
       </Link>
       <a
-        href="https://www.vngrealisatie.nl/producten/pilots-open-raadsinformatie"
+        href={paths.vngProject}
         title="Projectwebsite van VNG Realisatie"
         className="NavBar__link"
       >
         <span>over project</span>
       </a>
       <a
-        href="http://docs.openraadsinformatie.nl/"
+        href={paths.apiDocs}
         className="NavBar__link"
         title="Documentatie van de Open Raadsinformatie API"
         >
         <span>API docs</span>
       </a>
       <a
-        href="https://github.com/ontola/ori-search/"
+        href={paths.oriSearchGithub}
         className="NavBar__link"
         title="Broncode van deze zoekmachine"
       >
