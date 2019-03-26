@@ -3,7 +3,7 @@ import throttle from "lodash.throttle";
 import Resizable from "re-resizable";
 import Button from "./Button";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faArrowRight, faArrowLeft } from "@fortawesome/free-solid-svg-icons";
+import { faArrowRight, faArrowLeft, faSpinner } from "@fortawesome/free-solid-svg-icons";
 import { withRouter, RouteComponentProps } from "react-router";
 import { usePersistedState } from "../helpers";
 const { Document, Page, pdfjs } = require("react-pdf");
@@ -50,7 +50,7 @@ const determineInitialWith = (windowWidth: number) => {
 
 const LoadingComponent = () =>
   <div className="PDFViewer__loading">
-    <FontAwesomeIcon icon="spinner" size="6x" spin />
+    <FontAwesomeIcon icon={faSpinner} size="6x" spin />
   </div>;
 
 const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
