@@ -1,9 +1,7 @@
 import * as React from "react";
+import paths from "../paths";
 
-export interface HomeProps {
-}
-
-const Home = (props: HomeProps) => {
+const Home = () => {
   return (
     <div className="Home">
       <div className="Home__wrapper">
@@ -21,23 +19,35 @@ const Home = (props: HomeProps) => {
           deze vervolgens middels een API te ontsluiten op een gestandaardiseerde manier.
         </p>
         <p>
-          Dit project is gestart door de Open State Foundation en overgenomen door
-          VNG Realisatie. De techniek wordt ontwikkeld door Argu en Ontola.
-          De broncode van zowel deze zoekmachine als de server van Open Raadsinformatie
+          Dit project is gestart door
+          de <a href={paths.openstate}>Open State Foundation</a> en
+          overgenomen door <a href={paths.vngProject}>VNG Realisatie</a>.
+          De techniek wordt ontwikkeld
+          door <a href={paths.ontola}>Ontola</a>, het team dat
+          ook <a href={paths.argu}>Argu</a> heeft ontwikkeld.
+          De broncode van zowel deze <a href={paths.oriSearchGithub}>zoekmachine</a> als
+          de <a href={paths.oriBackEndGithub}>server</a> van Open Raadsinformatie
           staan open source beschikbaar op Github.
         </p>
-        <h2>Deelnemen</h2>
+        <h2>Data hergebruiken</h2>
         <p>
-          Als je wil dat jouw gemeente aansluit op Open Raadsinformatie,
+          Deze zoekmachine maakt gebruik van de Open Raadsinformatie API.
+          Je kunt hiermee
+        </p>
+        <h2>Jouw gemeente toevoegen</h2>
+        <p>
+          Als je wil dat jouw gemeente aangesloten wordt op Open Raadsinformatie,
           vraag dan de griffie van je gemeenteraad om een mail te sturen naar
           {" "}
-          <a href="mailto:tom.kunzler@vng.nl">Tom Kunzler</a>.
+          <a href={paths.projectMail}>Tom Kunzler</a>.
         </p>
         <h2>Feedback</h2>
         <p>
-          Technische vragen of suggesties over de API kunnen op de Issue tracker van de ORI
-          achterkant worden geplaatst.
-          Voor suggesties, problemen of vragen over deze zoekmachine, plaats een issue op Github.
+          Technische vragen of suggesties over de API kunnen op
+          de <a href={paths.oriBackEndGithub}>Issue tracker</a> van
+          de ORI achterkant worden geplaatst.
+          Voor suggesties, problemen of vragen over deze zoekmachine,
+          plaats een issue op <a href={paths.oriSearchGithub}>Github</a>.
         </p>
       </div>
     </div>
