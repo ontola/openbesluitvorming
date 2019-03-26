@@ -53,8 +53,11 @@
     color: $blue;
     font-weight: bold;
     border-radius: 5px;
-    float: right;
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
     background-color: white;
+    z-index: 1;
 
     &:hover {
       color: $blue_dark;
@@ -76,7 +79,7 @@
   padding: 0;
 
   &__visible {
-    width: 26rem;
+    width: 18rem;
     padding: 1rem;
   }
 
@@ -132,12 +135,42 @@
   }
 }
 
-.react-pdf__Document {
-  height: 100%;
+.PDFViewer {
+  position: relative;
 }
 
-.react-pdf__Page {
-  height: 100%;
+.PDFViewer__button-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 1;
+  text-align: center;
+
+  &-inner{
+    display: inline-block;
+    background: white;
+    margin: auto;
+    border-top-right-radius: 5px;
+    border-top-left-radius: 5px;
+
+    .Button {
+      padding: .5rem;
+      color: $blue;
+
+      &:hover {
+        color: $blue_dark;
+      }
+
+      &:active {
+        color: $g3;
+      }
+
+      &:disabled {
+        color: $g2;
+      }
+    }
+  }
 }
 
 .PDFViewer__loading {
@@ -155,6 +188,7 @@
 
 .PDFViewer__resize-handle {
   transition: .2s all;
+  z-index: 2;
 
   &:hover {
     background-color: $blue_light;
@@ -185,8 +219,6 @@
   display: flex;
   position: relative;
   flex: 1;
-
-
 }
 
 .Results {

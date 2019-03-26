@@ -1,4 +1,4 @@
-import React, { ChangeEvent } from "react";
+import React from "react";
 import throttle from "lodash.throttle";
 import Resizable from "re-resizable";
 import Button from "./Button";
@@ -126,6 +126,7 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
   return (
     <Resizable
       size={{ width, height: "100%" }}
+      className="PDFViewer"
       handleClasses={{
         left: "PDFViewer__resize-handle",
       }}
@@ -134,30 +135,6 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
       onResizeStop={(_e, _direction, _ref, d) => setWidth(width + d.width)}
       enable={{ left: true }}
     >
-      <Button
-        onClick={() => setPageNumber(pageNumber - 1)}
-        disabled={(pageNumber === 1)}
-      >
-        <FontAwesomeIcon icon={faArrowLeft} />
-      </Button>
-      <input
-        onChange={(e: ChangeEvent<HTMLInputElement>) => {
-          const number = parseInt(e.target.value, 8);
-          if (number > 0 && number <= numPages) {
-            setPageNumber(number);
-          }
-        }}
-        type="number"
-        className="PDFViewer_number-input"
-        value={pageNumber}
-      />
-      <span>{`/ ${numPages}`}</span>
-      <Button
-        onClick={() => setPageNumber(pageNumber + 1)}
-        disabled={(pageNumber === (numPages))}
-      >
-        <FontAwesomeIcon icon={faArrowRight} />
-      </Button>
       <Button
         className="Button__close"
         onClick={closeDocument}
@@ -188,6 +165,25 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
               customTextRenderer={props.searchTerm && makeTextRenderer(props.searchTerm)}
             />
           </Document>
+        </div>
+      </div>
+      <div className="PDFViewer__button-bar">
+        <div className="PDFViewer__button-bar-inner">
+          <Button
+            onClick={() => setPageNumber(pageNumber - 1)}
+            disabled={(pageNumber === 1)}
+            title="Vorige pagina"
+          >
+            <FontAwesomeIcon icon={faArrowLeft} />
+          </Button>
+          <span>{`${pageNumber} / ${numPages}`}</span>
+          <Button
+            onClick={() => setPageNumber(pageNumber + 1)}
+            disabled={(pageNumber === (numPages))}
+            title="Volgende pagina"
+          >
+            <FontAwesomeIcon icon={faArrowRight} />
+          </Button>
         </div>
       </div>
     </Resizable>

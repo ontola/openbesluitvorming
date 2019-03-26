@@ -5,6 +5,7 @@ interface ButtonProps {
   disabled?: boolean;
   children: React.ReactNode;
   className?: string;
+  title?: string;
 }
 
 const Button: React.FunctionComponent<ButtonProps> = (props) => {
@@ -17,6 +18,7 @@ const Button: React.FunctionComponent<ButtonProps> = (props) => {
       className={className}
       disabled={props.disabled}
       onClick={props.onClick}
+      title={props.title}
     >
       {props.children}
     </button>
