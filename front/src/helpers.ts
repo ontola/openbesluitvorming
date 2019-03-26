@@ -1,5 +1,6 @@
 export const allComponentIds = [
   "searchbox",
+  "gemeente",
   "gemeenten",
   "daterange",
   "type",
@@ -41,19 +42,26 @@ export const getParams = (history: History) => {
   if (currentSearchTerm) {
     currentSearchTerm = currentSearchTerm.substr(1, currentSearchTerm.length - 2);
   }
+  let gemeente = params.get("gemeente");
+  if (gemeente) {
+    gemeente = gemeente.substr(1, gemeente.length - 2);
+  }
   return {
     currentDocument,
     currentSearchTerm,
+    gemeente,
   };
 };
 
 // Turns ori_amsteram_215970157 into Amsterdam
 export const indexToMunicipality = (_index: string) => {
-  const parts = _index.split("_");
-  return parts
-    .slice(1, parts.length - 1)
-    .map(s => `${s.charAt(0).toLocaleUpperCase()}${s.substring(1)}`)
-    .join(" ");
+  if (_index) {
+    const parts = _index.split("_");
+    return parts
+      .slice(1, parts.length - 1)
+      .map(s => `${s.charAt(0).toLocaleUpperCase()}${s.substring(1)}`)
+      .join(" ");
+  }
 };
 
 // Turns media_object into Document

@@ -41,7 +41,7 @@ const ResultCard: React.FunctionComponent<ResultCardProps & RouteComponentProps>
         )))
       }
       <div className="ResultCard__details">
-        <div className="ResultCard__detail" >{indexToMunicipality(props._index)}</div>
+      <div className="ResultCard__detail" >{indexToMunicipality(props._index)}</div>
         <div className="ResultCard__detail" >{typeToLabel(props._type)}</div>
         {props.content_type &&
           <div className="ResultCard__detail" >{props.content_type}</div>

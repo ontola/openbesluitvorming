@@ -20,7 +20,12 @@ const SearchRoute = (props: RouteComponentProps) => {
   const {
     currentDocument,
     currentSearchTerm,
+    gemeente,
   } = getParams(props.history);
+
+  const showResults = () => {
+    return (currentSearchTerm || gemeente);
+  };
 
   const setSearchParams = (newURL: string) => {
     const url = new URL(newURL);
@@ -38,12 +43,12 @@ const SearchRoute = (props: RouteComponentProps) => {
       url={apiURL.toString()}
       setSearchParams={setSearchParams as () => string}
     >
-      <div className={`SearchRoute ${currentSearchTerm ? "" : "SearchRoute--home"}`}>
+      <div className={`SearchRoute ${showResults() ? "" : "SearchRoute--home"}`}>
         <div className="NavBar">
           <NavBarTop />
           <div className="NavBar__bottom">
             <SearchBar/>
-            {currentSearchTerm && <Button
+            {showResults() && <Button
               className="SearchBar__button"
               onClick={() => setShowFilters(!showFilters)}
               >
@@ -52,19 +57,19 @@ const SearchRoute = (props: RouteComponentProps) => {
           </div>
         </div>
         <div className="Wrapper">
-          {currentSearchTerm &&
+          {showResults() &&
             <Filtersbar
               display={showFilters}
             />
           }
-          {currentSearchTerm &&
+          {showResults() &&
             <div className="ResultsBar">
               <div className="Results" id="Results">
                 <ResultsList/>
               </div>
             </div>
           }
-          {!currentSearchTerm &&
+          {!showResults() &&
             <Home />
           }
           <ReactCSSTransitionGroup

@@ -1,5 +1,7 @@
 import * as React from "react";
 import paths from "../paths";
+import { SingleList } from "@appbaseio/reactivesearch";
+import { filterStyle, MunicipalityLabel } from "./FiltersBar";
 
 const Home = () => {
   return (
@@ -10,6 +12,25 @@ const Home = () => {
           Met deze app zoek je snel door alle openbare raadsinformatie van
           meer dan 100 deelnemende gemeenten
         </p>
+        <h2>Doet jouw gemeente al mee?</h2>
+        <SingleList
+          componentId="gemeente"
+          dataField="_index"
+          filterLabel="Gemeenten"
+          size={100}
+          sortBy="count"
+          showRadio={false}
+          showCount={true}
+          showSearch={true}
+          placeholder="Zoek gemeente..."
+          showFilter={true}
+          URLParams={true}
+          style={filterStyle}
+          className="Filter"
+          loader="Loading ..."
+          renderItem={MunicipalityLabel}
+          renderError={(error: any) => <div>{error}</div>}
+        />
         <h2>Over Open Raadsinformatie</h2>
         <p>
           Open Raadsinformatie is een initiatief om de besluitvorming van Nederlandse gemeenten
