@@ -40,10 +40,16 @@ const ResultCard: React.FunctionComponent<ResultCardProps & RouteComponentProps>
       }
       <div className="ResultCard__details">
         <div className="ResultCard__detail" >{indexToMunicipality(props._index)}</div>
-        <a className="ResultCard__detail" href={props.original_url}>download</a>
+        {props.original_url &&
+          <a className="ResultCard__detail" href={props.original_url}>download</a>
+        }
         <div className="ResultCard__detail" >{typeToLabel(props._type)}</div>
-        <div className="ResultCard__detail" >{props.content_type}</div>
-        <div className="ResultCard__detail" >{date.toLocaleDateString()}</div>
+        {props.content_type &&
+          <div className="ResultCard__detail" >{props.content_type}</div>
+        }
+        {props.date_modified &&
+          <div className="ResultCard__detail" >{date.toLocaleDateString()}</div>
+        }
       </div>
     </div>
   );
