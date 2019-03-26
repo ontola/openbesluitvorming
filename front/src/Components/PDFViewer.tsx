@@ -132,7 +132,11 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
       const doc = PDFelements[0];
       const docRatio = doc.clientWidth / doc.clientHeight;
       const newWidth =  window.innerHeight * docRatio;
-      setWidth(newWidth);
+      if (newWidth < maxWidth) {
+        setWidth(newWidth);
+      } else {
+        setWidth(maxWidth);
+      }
     }
   };
 
