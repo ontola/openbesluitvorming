@@ -3,7 +3,13 @@ import throttle from "lodash.throttle";
 import Resizable from "re-resizable";
 import Button from "./Button";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faArrowRight, faArrowLeft, faSpinner } from "@fortawesome/free-solid-svg-icons";
+import {
+  faArrowRight,
+  faArrowLeft,
+  faSpinner,
+  faDownload,
+  faExpand,
+} from "@fortawesome/free-solid-svg-icons";
 import { withRouter, RouteComponentProps } from "react-router";
 import { usePersistedState } from "../helpers";
 const { Document, Page, pdfjs } = require("react-pdf");
@@ -120,6 +126,16 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
     );
   };
 
+  const setFillWidth = () => {
+    const PDFelements = document.getElementsByClassName("react-pdf__Page__canvas");
+    if (PDFelements[0]) {
+      const doc = PDFelements[0];
+      const docRatio = doc.clientWidth / doc.clientHeight;
+      const newWidth =  window.innerHeight * docRatio;
+      setWidth(newWidth);
+    }
+  };
+
   const makeTextRenderer = (searchText: string) =>
     (textItem: TextLayerItem) => highlightPattern(textItem.str, searchText);
 
@@ -159,7 +175,7 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
             onLoadSuccess={onDocumentLoadSuccess}
           >
             <Page
-              loading={<LoadingComponent/>}
+              loading={null}
               pageIndex={pageNumber - 1}
               width={width}
               customTextRenderer={props.searchTerm && makeTextRenderer(props.searchTerm)}
@@ -183,6 +199,18 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
             title="Volgende pagina"
           >
             <FontAwesomeIcon icon={faArrowRight} />
+          </Button>
+          <Button
+            onClick={() => window.open(props.url)}
+            title="Download bestand"
+          >
+            <FontAwesomeIcon icon={faDownload} />
+          </Button>
+          <Button
+            onClick={setFillWidth}
+            title="Scherm vullen"
+          >
+            <FontAwesomeIcon icon={faExpand} />
           </Button>
         </div>
       </div>
