@@ -32,6 +32,7 @@
   cursor: pointer;
   text-align: left;
   padding: 0;
+  margin: 0;
 
   &:focus {
     // WARNING: make sure to add focus styling for a11y!
@@ -498,5 +499,16 @@
     background: white;
     bottom: 0;
     top: 0;
+  }
+}
+
+// Detect touch devices
+@media (pointer:coarse) {
+  .PDFViewer__button-bar {
+    transform: scale(1.2);
+  }
+
+  .PDFViewer__handler {
+    transform: scale(1.2);
   }
 }
