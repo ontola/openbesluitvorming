@@ -142,9 +142,7 @@
 }
 
 .Logo {
-  margin-left: 1rem;
-  margin-right: 1rem;
-  color: $blue;
+    color: $blue;
 
   &__first {
     color: $blue_dark;
@@ -169,6 +167,8 @@
   }
 
   &__top {
+    margin-left: 1rem;
+    margin-right: 1rem;
     max-width: $result-width;
     height: 3rem;
     display: flex;
@@ -390,6 +390,10 @@
     }
   }
 
+  &__highlight {
+    margin-bottom: .3rem;
+  }
+
   &__details{
     display: flex;
     flex-wrap: wrap;
@@ -449,6 +453,11 @@
       background: $g2;
     }
   }
+
+  // When the filter button is hidden, round the corners
+  .SearchRoute--home & input{
+    border-radius: 5px
+  }
 }
 
 .Wrapper {
@@ -460,6 +469,10 @@
 
 // Make
 @media only screen and (min-width: 600px) {
+  .Home__wrapper {
+    padding: 0;
+  }
+
   .SearchRoute--home {
     .NavBar__top,
     .NavBar__bottom {

@@ -5,6 +5,8 @@ import { withRouter, RouteComponentProps } from "react-router";
 import { History } from "history";
 import { getParams, indexToMunicipality, typeToLabel } from "../helpers";
 import Button from "./Button";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faDownload } from "@fortawesome/free-solid-svg-icons";
 
 interface ResultCardProps extends ORIItemType {
 }
@@ -33,22 +35,24 @@ const ResultCard: React.FunctionComponent<ResultCardProps & RouteComponentProps>
       </Button>
       {props.highlight.text && props.highlight.text.map(
         ((text: string) => (
-          <div key={text}>
+          <div key={text} className="ResultCard__highlight">
             <span dangerouslySetInnerHTML={{ __html: `${text}...` }}/>
           </div>
         )))
       }
       <div className="ResultCard__details">
         <div className="ResultCard__detail" >{indexToMunicipality(props._index)}</div>
-        {props.original_url &&
-          <a className="ResultCard__detail" href={props.original_url}>download</a>
-        }
         <div className="ResultCard__detail" >{typeToLabel(props._type)}</div>
         {props.content_type &&
           <div className="ResultCard__detail" >{props.content_type}</div>
         }
         {props.date_modified &&
           <div className="ResultCard__detail" >{date.toLocaleDateString()}</div>
+        }
+        {props.original_url &&
+          <a className="ResultCard__detail" href={props.original_url} title="Download bestand">
+            <FontAwesomeIcon icon={faDownload}/>
+          </a>
         }
       </div>
     </div>
