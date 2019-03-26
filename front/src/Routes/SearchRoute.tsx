@@ -38,7 +38,7 @@ const SearchRoute = (props: RouteComponentProps) => {
       url={apiURL.toString()}
       setSearchParams={setSearchParams as () => string}
     >
-      <div className="SearchRoute">
+      <div className={`SearchRoute ${currentSearchTerm ? "" : "SearchRoute--home"}`}>
         <div className="NavBar">
           <NavBarTop />
           <div className="NavBar__bottom">
