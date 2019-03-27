@@ -8,20 +8,24 @@ const Home = () => {
       <h1 className="Home__header">Doorzoek vergaderstukken van gemeenteraden</h1>
         <p>
           Met deze app zoek je snel door de openbare vergaderingen, agendapunten, moties en
-          documenten van meer dan 100 deelnemende gemeenten.
+          documenten van meer dan 100 deelnemende gemeenten en vijf provincies.
         </p>
         <p>
           Open Raadsinformatie is een initiatief om de besluitvorming van Nederlandse gemeenten
           transparanter te maken.
           Dit wordt gedaan door automatisch uit de bestaande vergadersoftware
-          (raadsinformatiesystemen) van gemeenten de vergaderingen en documenten te halen en
+          (zoals raadsinformatiesystemen van gemeenten) de vergaderingen en documenten te halen en
           deze vervolgens middels een API te ontsluiten op een gestandaardiseerde manier.
         </p>
         <h2>Door wie</h2>
         <p>
-          Dit project is gestart door
-          de <a href={paths.openstate}>Open State Foundation</a> en
-          overgenomen door <a href={paths.vngProject}>VNG Realisatie</a>.
+          Vanuit het <a href={paths.actieplan}>actieplan open overheid</a>{" "}
+          werkt <a href={paths.vngRealisatie}>VNG Realisatie</a> in samenwerking met
+          de <a href={paths.openstate}>Open State Foundation</a> aan
+          het openstellen van besluitvorming van gemeenten en provincies als open data.
+          Lees <a href={paths.vngProject}>hier</a> meer over het project.
+        </p>
+        <p>
           De techniek wordt ontwikkeld
           door <a href={paths.ontola}>Ontola</a>; het team
           achter <a href={paths.argu}>Argu</a>.
@@ -40,7 +44,7 @@ const Home = () => {
           Als je wil dat ook jouw gemeente aangesloten wordt op Open Raadsinformatie,
           vraag dan de griffie van je gemeenteraad om een mail te sturen naar
           {" "}
-          <a href={paths.projectMail}>Tom Kunzler</a>.
+          <a href={paths.projectMail}>Sander Bakker</a>.
         </p>
         <h2>Feedback</h2>
         <p>
