@@ -151,7 +151,12 @@
 }
 
 .Logo {
-    color: $blue;
+  color: $blue;
+  transition: .5s font-size;
+
+  .SearchRoute--home & {
+    font-size: 2rem;
+  }
 
   &__first {
     color: $blue_dark;
@@ -167,6 +172,11 @@
   left: 0;
   right: 0;
   background-color: white;
+  transition: .5s all;
+
+  .SearchRoute--home & {
+    height: $navbar-height-big;
+  }
 
   &__bottom {
     display: flex;
@@ -181,11 +191,15 @@
     max-width: $result-width;
     height: 3rem;
     display: flex;
+
+    .SearchRoute--home & {
+      height: 6rem;
+    }
   }
 
   &__top,
   &__bottom {
-    transition: .5s margin;
+    transition: .5s all;
   }
 }
 
@@ -424,6 +438,11 @@
   flex-direction: column;
   height: 100vh;
   overflow: hidden;
+  transition: .5s padding-top;
+
+  &.SearchRoute--home {
+    padding-top: $navbar-height-big;
+  }
 }
 
 .SearchBar {
@@ -462,12 +481,12 @@
       background: $g2;
     }
   }
-
   // When the filter button is hidden, round the corners
   .SearchRoute--home & input{
     border-radius: 5px
   }
 }
+
 
 .Wrapper {
   display: flex;
