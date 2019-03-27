@@ -204,6 +204,17 @@ body {
     transition: .5s all;
     margin-left: calc(50% - #{$result-width / 2});
   }
+
+  &__vng-logo {
+    transition: .5s all;
+    margin-left: auto;
+    width: 3rem;
+    margin-right: .2rem;
+
+    .SearchRoute--search & {
+      width: 2rem;
+    }
+  }
 }
 
 .PDFViewer {
@@ -332,6 +343,7 @@ body {
   bottom: 0;
   -webkit-overflow-scrolling: touch;
   transition: .2s all;
+  min-height: calc(100vh - #{$navbar-height});
 
   .SearchRoute--show-filters & {
     margin-left: $filter-bar-width;
@@ -531,14 +543,6 @@ body {
 
   .Results {
     margin-left: $big-screen-padding - 1rem;
-  }
-
-  .FilterBar {
-    position: absolute;
-    z-index: 2;
-    background: white;
-    bottom: 0;
-    top: 0;
   }
 }
 

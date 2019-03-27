@@ -1,5 +1,6 @@
 import * as React from "react";
 import { Link } from "react-router-dom";
+import vngLogo from "../vnglogo.svg";
 
 const Home = () => {
   return (
@@ -33,6 +34,10 @@ const Home = () => {
       >
         <span>github</span>
       </a> */}
+      <img
+        className="NavBar__vng-logo"
+        src={vngLogo}
+      />
     </div>
   );
 };
