@@ -62,10 +62,8 @@ const SearchRoute = (props: RouteComponentProps) => {
             />
           }
           {currentSearchTerm &&
-            <div className="ResultsBar">
-              <div className="Results" id="Results">
-                <ResultsList/>
-              </div>
+            <div className="Results">
+              <ResultsList/>
             </div>
           }
           {!currentSearchTerm &&

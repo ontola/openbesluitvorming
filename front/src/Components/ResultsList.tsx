@@ -54,7 +54,6 @@ const ResultsList: React.FunctionComponent<ResultsListProps> = (props) => {
       onNoResults={<NoResults/>}
       onResultStats={props => <ResultStats {...props}/>}
       loader={<Loading/>}
-      scrollTarget={"Results"}
       // sortOptions={sortOptions}
       react={{
         // When these components change, update the results

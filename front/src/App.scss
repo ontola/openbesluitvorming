@@ -85,6 +85,7 @@ body {
   left: 0;
   top: $navbar-height;
   bottom: 0;
+  overflow: hidden;
 
   &__visible {
     opacity: 1;
@@ -98,10 +99,6 @@ body {
 }
 
 .Home {
-  width: 100%;
-  // overflow: auto;
-  // -webkit-overflow-scrolling: touch;
-
   &__wrapper {
     padding: 1rem;
     padding-top: 0;
@@ -325,24 +322,20 @@ body {
   }
 }
 
-.ResultsBar {
-  background-color: $g0;
-  display: flex;
-  position: relative;
-  flex: 1;
-  transition: .2s padding;
-
-  .SearchRoute--show-filters & {
-    padding-left: $filter-bar-width;
-  }
-}
-
 .Results {
-  width: 100%;
-  // overflow: scroll;
-  // -webkit-overflow-scrolling: touch;
   padding-left: 1rem;
   padding-right: 1rem;
+  overflow-y: scroll;
+  top: $navbar-height;
+  right: 0;
+  left: 0;
+  bottom: 0;
+  -webkit-overflow-scrolling: touch;
+  transition: .2s all;
+
+  .SearchRoute--show-filters & {
+    margin-left: $filter-bar-width;
+  }
 
   &__loader {
     padding-top: 1rem;
@@ -443,8 +436,6 @@ body {
 }
 
 .SearchRoute {
-  flex-direction: column;
-  // overflow: hidden;
   transition: .5s padding-top;
   padding-top: $navbar-height-big;
 
