@@ -25,6 +25,10 @@
   }
 }
 
+body {
+  background-color: $g0;
+}
+
 .Button {
   -webkit-appearance: none;
   border: none;
@@ -52,8 +56,8 @@
     border-radius: 5px;
     padding: .5rem;
     position: absolute;
-    top: 1rem;
-    right: 1rem;
+    top: .5rem;
+    right: .5rem;
     background-color: white;
     z-index: 1;
 
@@ -70,29 +74,33 @@
 }
 
 .FilterBar {
-  position: relative;
+  position: fixed;
   border-right: solid 1px $g2;
-  width: 0;
   transition: .2s all;
   padding: 0;
+  z-index: 1;
+  background-color: white;
+  width: $filter-bar-width;
+  padding: 1rem;
+  left: 0;
+  top: $navbar-height;
+  bottom: 0;
 
   &__visible {
-    width: 18rem;
-    padding: 1rem;
     opacity: 1;
   }
 
   &__hidden {
     opacity: 0;
+    left: -$filter-bar-width;
     visibility: hidden;
   }
 }
 
 .Home {
-  background-color: $g0;
   width: 100%;
-  overflow: auto;
-  -webkit-overflow-scrolling: touch;
+  // overflow: auto;
+  // -webkit-overflow-scrolling: touch;
 
   &__wrapper {
     padding: 1rem;
@@ -153,9 +161,10 @@
 .Logo {
   color: $blue;
   transition: .5s font-size;
+  font-size: 2rem;
 
-  .SearchRoute--home & {
-    font-size: 2rem;
+  .SearchRoute--search & {
+    font-size: 1rem;
   }
 
   &__first {
@@ -166,40 +175,37 @@
 .NavBar {
   border-bottom: solid 1px $g2;
   z-index: 1;
-  height: $navbar-height;
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   background-color: white;
   transition: .5s all;
+  height: $navbar-height-big;
 
-  .SearchRoute--home & {
-    height: $navbar-height-big;
+  .SearchRoute--search & {
+    height: $navbar-height;
   }
 
   &__bottom {
     display: flex;
     max-width: $result-width;
-    margin-left: 1rem;
-    margin-right: 1rem;
   }
 
   &__top {
-    margin-left: 1rem;
-    margin-right: 1rem;
     max-width: $result-width;
-    height: 3rem;
     display: flex;
+    height: 6rem;
 
-    .SearchRoute--home & {
-      height: 6rem;
+    .SearchRoute--search & {
+      height: 3rem;
     }
   }
 
   &__top,
   &__bottom {
     transition: .5s all;
+    margin-left: calc(50% - #{$result-width / 2});
   }
 }
 
@@ -324,12 +330,17 @@
   display: flex;
   position: relative;
   flex: 1;
+  transition: .2s padding;
+
+  .SearchRoute--show-filters & {
+    padding-left: $filter-bar-width;
+  }
 }
 
 .Results {
   width: 100%;
-  overflow: scroll;
-  -webkit-overflow-scrolling: touch;
+  // overflow: scroll;
+  // -webkit-overflow-scrolling: touch;
   padding-left: 1rem;
   padding-right: 1rem;
 
@@ -432,16 +443,13 @@
 }
 
 .SearchRoute {
-  padding-top: $navbar-height;
-  min-height: 100vh;
-  display: flex;
   flex-direction: column;
-  height: 100vh;
-  overflow: hidden;
+  // overflow: hidden;
   transition: .5s padding-top;
+  padding-top: $navbar-height-big;
 
-  &.SearchRoute--home {
-    padding-top: $navbar-height-big;
+  &.SearchRoute--search {
+    padding-top: $navbar-height;
   }
 }
 
@@ -458,9 +466,7 @@
   input {
     -webkit-appearance: none;
     align-self: center;
-    border-radius: 0;
-    border-top-left-radius: 5px;
-    border-bottom-left-radius: 5px;
+    border-radius: 5px
   }
 
   // Filter show / hide button
@@ -482,16 +488,15 @@
     }
   }
   // When the filter button is hidden, round the corners
-  .SearchRoute--home & input{
-    border-radius: 5px
+  .SearchRoute--search & input{
+    border-radius: 0;
+    border-top-left-radius: 5px;
+    border-bottom-left-radius: 5px;
   }
 }
 
 
 .Wrapper {
-  display: flex;
-  min-height: 100%;
-  flex: 1;
   position: relative;
 }
 
@@ -501,10 +506,11 @@
     padding: 0;
   }
 
-  .SearchRoute--home {
+  .SearchRoute--search {
     .NavBar__top,
     .NavBar__bottom {
-      margin-left: calc(50% - #{$result-width / 2});
+      margin-left: 1rem;
+      margin-right: 1rem;
     }
   }
 }

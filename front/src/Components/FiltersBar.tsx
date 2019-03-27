@@ -59,7 +59,7 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
         size={100}
         sortBy="count"
         queryFormat="or"
-        showCheckbox={true}
+        showCheckbox={false}
         showCount={true}
         showSearch={true}
         placeholder="Zoek gemeente..."
@@ -83,7 +83,7 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
         sortBy="count"
         queryFormat="or"
         renderItem={TypeLabel}
-        showCheckbox={true}
+        showCheckbox={false}
         showCount={true}
         showSearch={false}
         placeholder="Zoek type..."
