@@ -492,7 +492,7 @@ body {
 }
 
 // Make
-@media only screen and (min-width: 600px) {
+@media only screen and (min-width: 560px) {
   .Home__wrapper {
     padding: 0;
   }
@@ -506,6 +506,20 @@ body {
   }
 }
 
+@media only screen and (max-width: 400px) {
+  .Logo {
+    font-size: 1.5rem
+  }
+}
+
+@media only screen and (max-width: 560px) {
+  .NavBar__top,
+  .NavBar__bottom {
+    margin-left: 1rem;
+    margin-right: 1rem;
+  }
+}
+
 // Add some major padding for big screens
 @media only screen and (min-width: 1800px) {
   .SearchRoute--search {
@@ -516,7 +530,7 @@ body {
   }
 
   .Results {
-    padding-left: $big-screen-padding;
+    margin-left: $big-screen-padding - 1rem;
   }
 
   .FilterBar {
