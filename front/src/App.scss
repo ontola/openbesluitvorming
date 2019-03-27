@@ -517,9 +517,11 @@ body {
 
 // Add some major padding for big screens
 @media only screen and (min-width: 1800px) {
-  .NavBar__top,
-  .NavBar__bottom {
-    margin-left: $big-screen-padding;
+  .SearchRoute--search {
+    .NavBar__top,
+    .NavBar__bottom {
+      margin-left: $big-screen-padding;
+    }
   }
 
   .Results {
