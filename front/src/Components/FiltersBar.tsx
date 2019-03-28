@@ -10,10 +10,6 @@ interface FiltersbarProps {
   display: boolean;
 }
 
-const filterStyle = {
-  marginBottom: "10px",
-};
-
 const MunicipalityLabel = (label: string, count: number, isSelected: boolean) =>
   <span>
     <span>{indexToMunicipality(label)}</span>
@@ -32,11 +28,13 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
       className={`FilterBar ${props.display ? "FilterBar__visible" : "FilterBar__hidden"}`}
     >
       <SelectedFilters
-        clearAllLabel="Filters wissen"
+        showClearAll={false}
+        className="Filter Filter__current"
       />
       <DateRange
         componentId="daterange"
         dataField="date_modified"
+        className="Filter"
         title="Datum"
         placeholder={{
           start: "Van...",
@@ -49,7 +47,6 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
         showFilter={true}
         filterLabel="Date"
         URLParams={true}
-        style={filterStyle}
       />
       <MultiList
         componentId="gemeenten"
@@ -68,7 +65,6 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
         }}
         showFilter={true}
         URLParams={true}
-        style={filterStyle}
         className="Filter"
         loader="Loading ..."
         renderItem={MunicipalityLabel}
@@ -91,7 +87,6 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
           and: ["searchbox", "daterange", "daterange", "gemeenten"],
         }}
         showFilter={true}
-        style={filterStyle}
         URLParams={true}
         loader="Loading ..."
       />

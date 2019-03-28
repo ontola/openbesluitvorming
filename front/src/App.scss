@@ -68,6 +68,14 @@ body {
 }
 
 .Filter {
+  margin-bottom: 1rem !important;
+
+  &__current {
+    a {
+      max-width: 100%;
+    }
+  }
+
   ul {
     overflow-x: hidden;
   }
@@ -85,7 +93,8 @@ body {
   left: 0;
   top: $navbar-height;
   bottom: 0;
-  overflow: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 
   &__visible {
     opacity: 1;
