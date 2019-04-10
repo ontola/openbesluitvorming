@@ -46,7 +46,7 @@ const ResultsList: React.FunctionComponent<ResultsListProps> = (props) => {
   return (
     <ReactiveList
       componentId="ResultList01"
-      dataField="date_modified"
+      dataField="_score"
       stream={false}
       sortBy="desc"
       size={10}
