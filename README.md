@@ -7,11 +7,13 @@ Check it out at [ori.argu.co](http://ori.argu.co)!
 ## Run front-end
 
 - `cd front`
+- `yarn`
 - `yarn start`
 
 ## Run server
 
 - `cd server`
+- `yarn`
 - `yarn dev`
 
 ## Run using docker
