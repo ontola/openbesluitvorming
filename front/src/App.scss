@@ -402,6 +402,10 @@ body {
   }
 }
 
+mark {
+  background-color: $blue-mark;
+}
+
 .ResultCard {
   background-color: white;
   max-width: $result-width;
@@ -419,6 +423,9 @@ body {
     margin-top: 0;
     margin-bottom: .2rem;
     font-size: 1rem;
+  }
+
+  button h2 {
     cursor: pointer;
 
     &:hover {
