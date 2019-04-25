@@ -52,14 +52,14 @@ const ResultsList: React.FunctionComponent<ResultsListProps> = (props) => {
       size={10}
       pagination={false}
       onNoResults={<NoResults/>}
-      onResultStats={props => <ResultStats {...props}/>}
+      renderResultStats={props => <ResultStats {...props}/>}
       loader={<Loading/>}
       // sortOptions={sortOptions}
       react={{
         // When these components change, update the results
         and: allComponentIds,
       }}
-      renderData={props => <ResultCard {...props} />}
+      renderItem={props => <ResultCard {...props} />}
     />
   );
 };
