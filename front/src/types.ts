@@ -7,17 +7,13 @@ export interface ORIItemType {
   _source: any;
   _version?: number;
   _explanation?: any;
-  content_type: string;
-  date_modified: string;
   fields?: any;
   highlight?: any;
   hightlight: string;
+  name?: string;
+  had_primary_source: string;
+  original_url?: string;
   inner_hits?: any;
   matched_queries?: string[];
-  name: string;
-  original_url: string;
-  size_in_bytes: string;
   sort?: string[];
-  text: string;
-  title: string;
 }

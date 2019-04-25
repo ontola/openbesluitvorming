@@ -11,18 +11,20 @@ const SearchBar: React.FunctionComponent<SearchBarProps> = (props) => {
       componentId="searchbox"
       debounce={400}
       showFilter={false}
-      dataField={["text", "title", "description"]}
+      dataField={["text", "title", "description", "name"]}
       highlight
       autosuggest={false}
       placeholder="Zoek in 109 gemeenten.."
       URLParams={true}
       customHighlight={() => ({
         highlight: {
-          pre_tags: ["<b>"],
-          post_tags: ["</b>"],
+          pre_tags: ["<mark>"],
+          post_tags: ["</mark>"],
           fields: {
             text: {},
             title: {},
+            name: {},
+            description: {},
           },
           fragment_size: 100,
           number_of_fragments: 3,
