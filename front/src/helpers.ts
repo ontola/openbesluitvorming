@@ -63,7 +63,15 @@ export const typeToLabel = (_type: string) => {
       return "Document";
     case "agenda_item":
       return "Agendapunt";
-    case "media_object":
-      return "Document";
+    case "meeting":
+      return "Vergadering";
+    case "membership":
+      return "Lidmaatschap";
+    case "person":
+      return "Persoon";
+    case "creative_work":
+      return "Stuk";
+    case "organization":
+      return "Organisatie";
   }
 };
