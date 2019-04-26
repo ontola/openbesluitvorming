@@ -4,17 +4,19 @@
   "private": true,
   "homepage": "https://raadstalk.vngrealisatie.nl",
   "dependencies": {
-    "cors": "^2.8.5",
-    "express": "^4.16.4",
-    "http-proxy-middleware": "^0.19.1",
-    "morgan": "^1.9.1",
-    "typescript": "^3.3.3",
     "@types/cors": "^2.8.4",
     "@types/express": "^4.16.1",
     "@types/http-proxy-middleware": "^0.19.2",
     "@types/morgan": "^1.7.35",
     "@types/node": "^11.11.6",
-    "@types/radium": "^0.24.2"
+    "@types/radium": "^0.24.2",
+    "cors": "^2.8.5",
+    "express": "^4.16.4",
+    "http-proxy-middleware": "^0.19.1",
+    "morgan": "^1.9.1",
+    "typescript": "^3.3.3",
+    "tslint": "^5.16.0",
+    "tslint-config-airbnb": "^5.11.1"
   },
   "scripts": {
     "dev": "ts-node-dev ./src/server.ts",
@@ -36,9 +38,7 @@
     "not op_mini all"
   ],
   "devDependencies": {
-    "ts-node-dev": "^1.0.0-pre.32",
-    "tslint": "^5.12.1",
-    "tslint-config-airbnb": "^5.11.1"
+    "ts-node-dev": "^1.0.0-pre.32"
   },
   "proxy": "http://localhost:8080"
 }
