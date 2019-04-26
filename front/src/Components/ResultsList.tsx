@@ -44,7 +44,7 @@ const Loading = () =>
 //     dataField: "date_modified",
 //     sortBy: "desc",
 //   },
-// ]
+// ];
 
 const ResultsList: React.FunctionComponent<ResultsListProps> = (props) => {
   return (

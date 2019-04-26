@@ -64,6 +64,7 @@ const Document: React.FunctionComponent<DocumentProps & RouteComponentProps> = (
           )))
         }
       </p>
+      <p>text: {props.text}</p>
     </React.Fragment>
   );
 };

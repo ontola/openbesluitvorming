@@ -146,8 +146,10 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
     }
   };
 
-  const makeTextRenderer = (searchText: string) =>
-    (textItem: TextLayerItem) => highlightPattern(textItem.str, searchText);
+  const makeTextRenderer =
+    (searchText: string) =>
+    (textItem: TextLayerItem) =>
+    highlightPattern(textItem.str, searchText);
 
   return (
     <Resizable
