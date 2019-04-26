@@ -73,5 +73,7 @@ export const typeToLabel = (_type: string) => {
       return "Stuk";
     case "organization":
       return "Organisatie";
+    default:
+      return _type || "Geen type";
   }
 };
