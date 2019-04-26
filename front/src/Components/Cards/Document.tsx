@@ -8,6 +8,7 @@ import { faDownload } from "@fortawesome/free-solid-svg-icons";
 import DetailType from "../Details/DetailType";
 import Button from "../Button";
 import { History } from "history";
+import DetailJSON from "../Details/DetailJSON";
 
 interface DocumentProps extends ORIItemType {
   content_type?: string;
@@ -38,16 +39,10 @@ const Document: React.FunctionComponent<DocumentProps & RouteComponentProps> = (
       >
         <h2 dangerouslySetInnerHTML={{ __html: `${props.name}` }}/>
       </Button>
-      {props.highlight.text && props.highlight.text.map(
-        ((text: string) => (
-          <div key={text} className="ResultCard__highlight">
-            <span dangerouslySetInnerHTML={{ __html: `${text}...` }}/>
-          </div>
-        )))
-      }
       <div className="ResultCard__details">
         <div className="ResultCard__detail" >{indexToMunicipality(props._index)}</div>
         <DetailType type={props._type} />
+        <DetailJSON {...props} />
         {props.content_type &&
           <div className="ResultCard__detail" >{props.content_type}</div>
         }
@@ -60,6 +55,15 @@ const Document: React.FunctionComponent<DocumentProps & RouteComponentProps> = (
           </a>
         }
       </div>
+      <p>
+        {props.highlight.text && props.highlight.text.map(
+          ((text: string) => (
+            <div key={text} className="ResultCard__highlight">
+              <span dangerouslySetInnerHTML={{ __html: `${text}...` }}/>
+            </div>
+          )))
+        }
+      </p>
     </React.Fragment>
   );
 };

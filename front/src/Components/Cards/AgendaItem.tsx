@@ -3,6 +3,8 @@ import * as React from "react";
 import { ORIItemType } from "../../types";
 import { indexToMunicipality } from "../../helpers";
 import DetailType from "../Details/DetailType";
+import DetailJSON from "../Details/DetailJSON";
+import DetailHighlight from "../Details/DetailHighlight";
 
 interface AgendaItemProps extends ORIItemType {
   committee?: string;
@@ -35,8 +37,10 @@ const AgendaItem: React.FunctionComponent<AgendaItemProps> = (props) => {
         {date &&
           <div className="ResultCard__detail" >{date.toLocaleDateString()}</div>
         }
+        <DetailJSON {...props} />
       </div>
-      <p>Parent {props.parent}</p>
+      <DetailHighlight textArray={props.highlight.description} />
+      <p>Parent: {props.parent}</p>
     </React.Fragment>
   );
 };
