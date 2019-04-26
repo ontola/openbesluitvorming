@@ -5,19 +5,23 @@ import { allComponentIds } from "../helpers";
 import ResultCard from "../Components/ResultCard";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSpinner } from "@fortawesome/free-solid-svg-icons";
-// import { string, any } from "prop-types";
 
 interface ResultsListProps {
 }
 
 interface ResultsType {
-  total_results: number;
+  numberOfResults: number;
+  numberOfPages: number;
+  currentPage: number;
+  time: number;
+  displayedResults: number;
 }
 
-const ResultStats = ({
-  total_results,
-}: ResultsType) =>
-  <div>{total_results}</div>;
+const ResultStats = (props: ResultsType) =>
+  <div className="bottom-margin">
+    {props.numberOfResults} resultaten gevonden
+    in {props.time}ms
+  </div>;
 
 const NoResults = () =>
   <div>Geen resultaten gevonden.</div>;
@@ -55,6 +59,12 @@ const ResultsList: React.FunctionComponent<ResultsListProps> = (props) => {
       renderResultStats={props => <ResultStats {...props}/>}
       loader={<Loading/>}
       // sortOptions={sortOptions}
+      renderError={(error: any) => (
+        <div>
+            Something went wrong!<br/>Error details<br/>{error}
+        </div>
+       )
+      }
       react={{
         // When these components change, update the results
         and: allComponentIds,
