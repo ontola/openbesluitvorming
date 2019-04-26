@@ -8,6 +8,7 @@ import Meeting from "./Cards/Meeting";
 import AgendaItem from "./Cards/AgendaItem";
 import CreativeWork from "./Cards/CreativeWork";
 import Organization from "./Cards/Organization";
+import Person from "./Cards/Person";
 
 interface ResultCardProps extends ORIItemType {
 }
@@ -24,6 +25,8 @@ const renderComponent = (props: ORIItemType) => {
       return <CreativeWork {...props} />;
     case "organization":
       return <Organization {...props} />;
+    case "person":
+      return <Person {...props} />;
     default:
       return <p>No component</p>;
   }
