@@ -8,7 +8,7 @@ Check it out at [ori.argu.co](http://ori.argu.co)!
 
 - `cd front`
 - `yarn`
-- `yarn start`
+- `yarn dev`
 
 ## Run server
 

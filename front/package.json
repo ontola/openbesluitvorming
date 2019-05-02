@@ -34,8 +34,7 @@
     "typescript": "3.3.3333"
   },
   "scripts": {
-    "start": "react-scripts start",
-    "server": "react-scripts start",
+    "dev": "react-scripts start",
     "build": "react-scripts build",
     "lint": "tslint -c tslint.json 'src/**/*.{ts,tsx}'",
     "test": "react-scripts test",
