@@ -33,7 +33,7 @@ const Meeting: React.FunctionComponent<MeetingProps> = (props) => {
       }
       <div className="ResultCard__details">
         <div className="ResultCard__detail" >{indexToMunicipality(props._index)}</div>
-        <DetailType type={props._type} />
+        <DetailType type={props["@type"]} />
         <DetailJSON {...props} />
         {date &&
           <div className="ResultCard__detail" >{date.toLocaleDateString()}</div>

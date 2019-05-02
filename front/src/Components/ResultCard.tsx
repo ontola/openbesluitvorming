@@ -14,7 +14,7 @@ interface ResultCardProps extends ORIItemType {
 }
 
 const renderComponent = (props: ORIItemType) => {
-  switch (props._type) {
+  switch (props["@type"]) {
     case "media_object":
       return <Document {...props} />;
     case "meeting":

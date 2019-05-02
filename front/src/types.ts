@@ -2,7 +2,7 @@ export interface ORIItemType {
   _id: string;
   _score: number;
   _index: string;
-  _type: string;
+  "@type": string;
   // TODO: specify?
   _source: any;
   _version?: number;

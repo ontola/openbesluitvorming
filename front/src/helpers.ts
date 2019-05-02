@@ -57,8 +57,8 @@ export const indexToMunicipality = (_index: string) => {
 };
 
 // Turns media_object into Document
-export const typeToLabel = (_type: string) => {
-  switch (_type) {
+export const typeToLabel = (type: string) => {
+  switch (type) {
     case "media_object":
       return "Document";
     case "agenda_item":
@@ -74,6 +74,6 @@ export const typeToLabel = (_type: string) => {
     case "organization":
       return "Organisatie";
     default:
-      return _type || "Geen type";
+      return type || "Geen type";
   }
 };

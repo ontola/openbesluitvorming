@@ -71,7 +71,7 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
       />
       <MultiList
         componentId="type"
-        dataField="_type"
+        dataField="@type"
         filterLabel="Type"
         title="Type"
         className="Filter"

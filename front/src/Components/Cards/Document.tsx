@@ -41,7 +41,7 @@ const Document: React.FunctionComponent<DocumentProps & RouteComponentProps> = (
       </Button>
       <div className="ResultCard__details">
         <div className="ResultCard__detail" >{indexToMunicipality(props._index)}</div>
-        <DetailType type={props._type} />
+        <DetailType type={props["@type"]} />
         <DetailJSON {...props} />
         {props.content_type &&
           <div className="ResultCard__detail" >{props.content_type}</div>
