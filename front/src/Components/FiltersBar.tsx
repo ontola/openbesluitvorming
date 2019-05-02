@@ -10,6 +10,8 @@ interface FiltersbarProps {
   display: boolean;
 }
 
+const showTypeFilter = false;
+
 const MunicipalityLabel = (label: string, count: number, isSelected: boolean) =>
   <span>
     <span>{indexToMunicipality(label)}</span>
@@ -69,7 +71,7 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
         loader="Loading ..."
         renderItem={MunicipalityLabel}
       />
-      <MultiList
+      {showTypeFilter && <MultiList
         componentId="type"
         dataField="@type"
         filterLabel="Type"
@@ -89,7 +91,7 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
         showFilter={true}
         URLParams={true}
         loader="Loading ..."
-      />
+      />}
   </div>
   );
 };
