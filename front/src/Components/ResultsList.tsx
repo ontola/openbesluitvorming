@@ -10,7 +10,10 @@ interface ResultsListProps {
 }
 
 interface ResultsType {
-  numberOfResults: number;
+  numberOfResults: {
+    value: number,
+    relation: string,
+  };
   numberOfPages: number;
   currentPage: number;
   time: number;
@@ -19,7 +22,7 @@ interface ResultsType {
 
 const ResultStats = (props: ResultsType) =>
   <div className="bottom-margin">
-    {props.numberOfResults} resultaten gevonden
+    {props.numberOfResults.value} resultaten gevonden
     in {props.time}ms
   </div>;
 
@@ -59,9 +62,9 @@ const ResultsList: React.FunctionComponent<ResultsListProps> = (props) => {
       renderResultStats={props => <ResultStats {...props}/>}
       loader={<Loading/>}
       // sortOptions={sortOptions}
-      renderError={(error: any) => (
+      renderError={(error: Error) => (
         <div>
-            Something went wrong!<br/>Error details<br/>{error}
+            Something went wrong!<br/>Error details<br/>{error.message}
         </div>
        )
       }
