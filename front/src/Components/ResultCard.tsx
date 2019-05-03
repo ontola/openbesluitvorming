@@ -15,17 +15,17 @@ interface ResultCardProps extends ORIItemType {
 
 const renderComponent = (props: ORIItemType) => {
   switch (props["@type"]) {
-    case "media_object":
+    case "MediaObject":
       return <Document {...props} />;
-    case "meeting":
+    case "Meeting":
       return <Meeting {...props} />;
-    case "agenda_item":
+    case "AgendaItem":
       return <AgendaItem {...props} />;
-    case "creative_work":
+    case "CreativeWork":
       return <CreativeWork {...props} />;
-    case "organization":
+    case "Organization":
       return <Organization {...props} />;
-    case "person":
+    case "Person":
       return <Person {...props} />;
     default:
       return <p>No component</p>;
