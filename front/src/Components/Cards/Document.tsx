@@ -33,7 +33,7 @@ const Document: React.FunctionComponent<DocumentProps & RouteComponentProps> = (
   };
 
   return (
-    <React.Fragment>
+    <React.Fragment key={props._id}>
       <Button
         onClick={() => openDocument((props.original_url || ""), props.history)}
       >
@@ -67,4 +67,15 @@ const Document: React.FunctionComponent<DocumentProps & RouteComponentProps> = (
     </React.Fragment>
   );
 };
-export default withRouter(Document);
+
+const hoc = (Comp: any) => {
+  return function (props: DocumentProps) {
+    return (
+      <React.Fragment key={props._id}>
+        <Comp {...props} />
+      </React.Fragment>
+    );
+  }
+};
+
+export default hoc(withRouter(Document));

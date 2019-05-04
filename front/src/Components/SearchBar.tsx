@@ -1,10 +1,7 @@
 import * as React from "react";
 import { DataSearch } from "@appbaseio/reactivesearch";
 
-interface SearchBarProps {
-}
-
-const SearchBar: React.FunctionComponent<SearchBarProps> = (props) => {
+const SearchBar: React.FunctionComponent = () => {
   return (
     <DataSearch
       className="SearchBar"
