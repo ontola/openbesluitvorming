@@ -1,4 +1,4 @@
-// import { LinkedResourceContainer } from "link-redux";
+import { LinkedResourceContainer } from "link-redux";
 import { NamedNode } from "rdflib";
 import * as React from "react";
 
@@ -9,7 +9,7 @@ interface ResourceProps {
 const Resource: React.FunctionComponent<ResourceProps> = (props) => {
   return (
     <div className="Resource">
-      {/* <LinkedResourceContainer subject={NamedNode.find(props.url)} /> */}
+      <LinkedResourceContainer subject={NamedNode.find(props.url)} />
     </div>
   );
 };
