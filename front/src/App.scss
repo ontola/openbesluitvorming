@@ -230,11 +230,11 @@ body {
   }
 }
 
-.PDFViewer {
+.SideDrawer {
   position: relative;
 }
 
-.PDFViewer__handler {
+.SideDrawer__handler {
   background-color: white;
   border-radius: 5px;
   width: 1.5rem;
@@ -247,15 +247,15 @@ body {
   transition: .2s all ease-in-out;
 }
 
-.PDFViewer__resize-handle:hover .PDFViewer__handler,
-.PDFViewer__handler:hover {
+.SideDrawer__resize-handle:hover .SideDrawer__handler,
+.SideDrawer__handler:hover {
   background-color: $blue_light;
   border-color: $blue_light;
   color: white;
 }
 
-.PDFViewer__resize-handle:active .PDFViewer__handler,
-.PDFViewer__handler:active {
+.SideDrawer__resize-handle:active .SideDrawer__handler,
+.SideDrawer__handler:active {
   border-color: $blue;
   color: white;
   background-color: $blue;
@@ -319,7 +319,7 @@ body {
   -webkit-overflow-scrolling: touch;
 }
 
-.PDFViewer__resize-handle {
+.SideDrawer__resize-handle {
   transition: .2s all;
   z-index: 2;
 
@@ -405,6 +405,10 @@ body {
     right: -20%;
     transition: right 200ms ease-in-out, opacity .2s;
   }
+}
+
+.Resource {
+  background-color: red;
 }
 
 mark {

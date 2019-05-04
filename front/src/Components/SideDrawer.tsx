@@ -31,7 +31,7 @@ const determineInitialWith = (windowWidth: number) => {
 };
 
 const Handler = () =>
-  <div className="PDFViewer__handler">
+  <div className="SideDrawer__handler">
     <FontAwesomeIcon icon={faGripHorizontal} />
   </div>;
 
@@ -67,9 +67,9 @@ const SideDrawer = (props: SideDrawerProps & RouteComponentProps) => {
     <div className="ResourceBar">
       <Resizable
         size={{ width, height: "100%" }}
-        className="PDFViewer"
+        className="SideDrawer"
         handleClasses={{
-          left: "PDFViewer__resize-handle",
+          left: "SideDrawer__resize-handle",
         }}
         handleComponent={{
           left: () => <Handler />,
