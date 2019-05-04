@@ -32,17 +32,26 @@ import { History } from "history";
 export const getParams = (history: History) => {
   const searchObject = history.location.search;
   const params = new URLSearchParams(searchObject);
+
   const currentDocumentBase = params.get("showDocument");
   let currentDocument = null;
   if (currentDocumentBase !== null) {
     currentDocument = decodeURIComponent(currentDocumentBase);
   }
+
+  const currentResourceBase = params.get("showResource");
+  let currentResource = "http://id.openraadsinformatie.nl/243815.ttl";
+  if (currentResourceBase !== null) {
+    currentResource = decodeURIComponent(currentResourceBase);
+  }
+
   let currentSearchTerm = params.get("searchbox");
   if (currentSearchTerm) {
     currentSearchTerm = currentSearchTerm.substr(1, currentSearchTerm.length - 2);
   }
   return {
     currentDocument,
+    currentResource,
     currentSearchTerm,
   };
 };

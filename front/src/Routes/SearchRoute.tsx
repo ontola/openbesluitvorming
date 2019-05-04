@@ -13,12 +13,15 @@ import SearchBar from "../Components/SearchBar";
 import { ReactiveBase } from "@appbaseio/reactivesearch";
 import theme from "../theme";
 import { PORT } from "../config";
+import Resource from "../Components/Resource";
+import SideDrawer from "../Components/SideDrawer";
 
 const SearchRoute = (props: RouteComponentProps) => {
   const [showFilters, setShowFilters] = React.useState(false);
 
   const {
     currentDocument,
+    currentResource,
     currentSearchTerm,
   } = getParams(props.history);
 
@@ -74,6 +77,11 @@ const SearchRoute = (props: RouteComponentProps) => {
             transitionEnterTimeout={200}
             transitionLeaveTimeout={200}
           >
+            {currentResource &&
+              <SideDrawer>
+                <Resource url={currentResource} />
+              </SideDrawer>
+            }
             {currentDocument &&
               <div className="ResourceBar">
                 <PDFViewer
