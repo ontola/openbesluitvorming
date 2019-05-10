@@ -83,12 +83,16 @@ const SearchRoute = (props: RouteComponentProps) => {
               </SideDrawer>
             }
             {currentDocument &&
-              <div className="ResourceBar">
-                <PDFViewer
-                  url={currentDocument}
-                  searchTerm={currentSearchTerm}
-                />
-              </div>
+              <SideDrawer>
+                {(width: number, setWidth: Function) => (
+                  <PDFViewer
+                    url={currentDocument}
+                    searchTerm={currentSearchTerm}
+                    width={width}
+                    setWidth={setWidth}
+                  />
+                )}
+              </SideDrawer>
             }
           </ReactCSSTransitionGroup>
         </div>

@@ -85,7 +85,7 @@ const SideDrawer = (props: SideDrawerProps & RouteComponentProps) => {
         >
           Sluiten
         </Button>
-        {props.children}
+        {typeof props.children === "function" ? props.children(width, setWidth) : props.children}
       </Resizable>
     </div>
   );

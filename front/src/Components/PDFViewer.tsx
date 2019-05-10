@@ -1,6 +1,4 @@
 import React from "react";
-import throttle from "lodash.throttle";
-import Resizable from "re-resizable";
 import Button from "./Button";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -9,10 +7,8 @@ import {
   faSpinner,
   faDownload,
   faExpand,
-  faGripHorizontal,
 } from "@fortawesome/free-solid-svg-icons";
 import { withRouter, RouteComponentProps } from "react-router";
-import { usePersistedState } from "../helpers";
 const { Document, Page, pdfjs } = require("react-pdf");
 // tslint:disable-next-line:max-line-length
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.js`;
@@ -20,12 +16,13 @@ pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/$
 export interface PDFViewerProps {
   url: string;
   searchTerm: string | null;
+  width: number;
+  setWidth: Function;
 }
 
 export interface PDFViewerState {
   numPages: null | number;
   pageNumber: number;
-  width: number;
   // Should equal 70vw on desktops, 100vw on mobile
   maxWidth: number;
 }
@@ -48,18 +45,6 @@ const calcMaxWidth = (windowWidth: number) => {
   return windowWidth;
 };
 
-const determineInitialWith = (windowWidth: number) => {
-  if (windowWidth < 800) {
-    return windowWidth;
-  }
-  return windowWidth - 600;
-};
-
-const Handler = () =>
-  <div className="PDFViewer__handler">
-    <FontAwesomeIcon icon={faGripHorizontal} />
-  </div>;
-
 const LoadingComponent = () =>
   <div className="PDFViewer__loading">
     <FontAwesomeIcon icon={faSpinner} size="6x" spin />
@@ -68,25 +53,9 @@ const LoadingComponent = () =>
 const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
   const [pageNumber, setPageNumber] = React.useState<number>(1);
   const [numPages, setNumPages] = React.useState<number>(0);
-  const [width, setWidth] =
-    usePersistedState<number>("orisearch.pdfviewer.width", determineInitialWith(window.innerWidth));
-  const [maxWidth, setMaxWidth] = React.useState<number>(calcMaxWidth(window.innerWidth));
+  const [maxWidth] = React.useState<number>(calcMaxWidth(window.innerWidth));
 
   const pdfWrapper = React.createRef<HTMLInputElement>();
-
-  React.useLayoutEffect(() => {
-    const handleResize = () => {
-      if (pdfWrapper.current) {
-        setWidth(pdfWrapper.current.getBoundingClientRect().width);
-        setMaxWidth(calcMaxWidth(window.innerWidth));
-      }
-    };
-
-    const listener = throttle(handleResize, 500);
-    window.addEventListener("resize", listener);
-
-    return () => window.removeEventListener("resize", listener);
-  });
 
   const onDocumentLoadSuccess = (e: OnLoadSuccessType) => {
     setNumPages(e.numPages);
@@ -139,9 +108,9 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
       const docRatio = doc.clientWidth / doc.clientHeight;
       const newWidth =  window.innerHeight * docRatio;
       if (newWidth < maxWidth) {
-        setWidth(newWidth);
+        props.setWidth(newWidth);
       } else {
-        setWidth(maxWidth);
+        props.setWidth(maxWidth);
       }
     }
   };
@@ -150,20 +119,7 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
     (textItem: TextLayerItem) => highlightPattern(textItem.str, searchText);
 
   return (
-    <Resizable
-      size={{ width, height: "100%" }}
-      className="PDFViewer"
-      handleClasses={{
-        left: "PDFViewer__resize-handle",
-      }}
-      handleComponent={{
-        left: () => <Handler />,
-      }}
-      maxWidth={maxWidth}
-      minWidth={200}
-      onResizeStop={(_e, _direction, _ref, d) => setWidth(width + d.width)}
-      enable={{ left: true }}
-    >
+    <React.Fragment>
       <Button
         className="Button__close"
         onClick={closeDocument}
@@ -180,7 +136,7 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
             <Page
               loading={null}
               pageIndex={pageNumber - 1}
-              width={width}
+              width={props.width}
               customTextRenderer={props.searchTerm && makeTextRenderer(props.searchTerm)}
             />
           </Document>
@@ -217,7 +173,7 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
           </Button>
         </div>
       </div>
-    </Resizable>
+    </React.Fragment>
   );
 };
 
