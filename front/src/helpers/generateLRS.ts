@@ -30,6 +30,8 @@ export default function generateLRS() {
   const LRS = createStore<ReactType>({ report: handle }, middleware);
   // (LRS as any).bulkFetch = true;
 
+  (LRS as any).api.fetcher.__proto__.constructor.withCredentials = function() { return false };
+
   transformers(LRS).forEach((t) =>
 // @ts-ignore TS2341
           LRS.api.registerTransformer(t.transformer, t.mediaTypes, t.acceptValue),
