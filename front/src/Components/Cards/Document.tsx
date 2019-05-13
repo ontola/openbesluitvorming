@@ -2,13 +2,12 @@ import * as React from "react";
 import { RouteComponentProps, withRouter } from "react-router";
 
 import { ORIItemType } from "../../types";
-import { indexToMunicipality } from "../../helpers";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faDownload } from "@fortawesome/free-solid-svg-icons";
 import DetailType from "../Details/DetailType";
-import Button from "../Button";
-import { History } from "history";
 import DetailJSON from "../Details/DetailJSON";
+
+import { indexToMunicipality } from "../../helpers";
 
 interface DocumentProps extends ORIItemType {
   content_type?: string;
@@ -26,19 +25,8 @@ const Document: React.FunctionComponent<DocumentProps & RouteComponentProps> = (
     date = new Date(props.date_modified);
   }
 
-  const openDocument = (url :string, history: History) => {
-    const currentURL = new URL(window.location.href);
-    currentURL.searchParams.set("showDocument", encodeURIComponent(url));
-    history.push(currentURL.toString().substring(currentURL.origin.length));
-  };
-
   return (
     <React.Fragment key={props._id}>
-      <Button
-        onClick={() => openDocument((props.original_url || ""), props.history)}
-      >
-        <h2 dangerouslySetInnerHTML={{ __html: `${props.name}` }}/>
-      </Button>
       <div className="ResultCard__details">
         <div className="ResultCard__detail" >{indexToMunicipality(props._index)}</div>
         <DetailType type={props["@type"]} />
@@ -75,7 +63,7 @@ const hoc = (Comp: any) => {
         <Comp {...props} />
       </React.Fragment>
     );
-  }
+  };
 };
 
 export default hoc(withRouter(Document));

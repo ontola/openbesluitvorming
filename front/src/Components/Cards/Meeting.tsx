@@ -10,7 +10,6 @@ interface MeetingProps extends ORIItemType {
   description?: string;
   end_date?: string;
   organization?: string;
-  ori_identifier?: string;
   start_date?: string;
   status?: string;
 }

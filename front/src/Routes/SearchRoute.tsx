@@ -7,7 +7,6 @@ import Filtersbar from "../Components/FiltersBar";
 import Home from "../Components/Home";
 import NavBarTop from "../Components/NavBarTop";
 import ResultsList from "../Components/ResultsList";
-import PDFViewer from "../Components/PDFViewer";
 import { getParams } from "../helpers";
 import SearchBar from "../Components/SearchBar";
 import { ReactiveBase } from "@appbaseio/reactivesearch";
@@ -20,7 +19,6 @@ const SearchRoute = (props: RouteComponentProps) => {
   const [showFilters, setShowFilters] = React.useState(false);
 
   const {
-    currentDocument,
     currentResource,
     currentSearchTerm,
   } = getParams(props.history);
@@ -79,14 +77,9 @@ const SearchRoute = (props: RouteComponentProps) => {
           >
             {currentResource &&
               <SideDrawer>
-                <Resource url={currentResource} />
-              </SideDrawer>
-            }
-            {currentDocument &&
-              <SideDrawer>
                 {(width: number, setWidth: Function) => (
-                  <PDFViewer
-                    url={currentDocument}
+                  <Resource
+                    url={currentResource}
                     searchTerm={currentSearchTerm}
                     width={width}
                     setWidth={setWidth}

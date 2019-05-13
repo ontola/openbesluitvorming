@@ -10,7 +10,6 @@ interface AgendaItemProps extends ORIItemType {
   committee?: string;
   description?: string;
   end_date?: string;
-  ori_identifier?: string;
   start_date?: string;
   parent?: string;
 }
@@ -23,12 +22,11 @@ const AgendaItem: React.FunctionComponent<AgendaItemProps> = (props) => {
 
   return (
     <React.Fragment>
-      <h2 dangerouslySetInnerHTML={{ __html: `${props.name}` }}/>
       {props.highlight.text && props.highlight.text.map(
         ((text: string) => (
           <div key={text} className="ResultCard__highlight">
             <span dangerouslySetInnerHTML={{ __html: `${text}...` }}/>
-          </div>
+        </div>
         )))
       }
       <div className="ResultCard__details">

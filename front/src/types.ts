@@ -16,4 +16,5 @@ export interface ORIItemType {
   inner_hits?: any;
   matched_queries?: string[];
   sort?: string[];
+  ori_identifier: string;
 }

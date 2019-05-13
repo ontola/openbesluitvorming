@@ -33,14 +33,9 @@ export const getParams = (history: History) => {
   const searchObject = history.location.search;
   const params = new URLSearchParams(searchObject);
 
-  const currentDocumentBase = params.get("showDocument");
-  let currentDocument = null;
-  if (currentDocumentBase !== null) {
-    currentDocument = decodeURIComponent(currentDocumentBase);
-  }
-
   const currentResourceBase = params.get("showResource");
-  let currentResource = "http://id.openraadsinformatie.nl/243815.ttl";
+  // let currentResource = "https://id.openraadsinformatie.nl/243606";
+  let currentResource = null;
   if (currentResourceBase !== null) {
     currentResource = decodeURIComponent(currentResourceBase);
   }
@@ -50,7 +45,6 @@ export const getParams = (history: History) => {
     currentSearchTerm = currentSearchTerm.substr(1, currentSearchTerm.length - 2);
   }
   return {
-    currentDocument,
     currentResource,
     currentSearchTerm,
   };
@@ -63,6 +57,13 @@ export const indexToMunicipality = (_index: string) => {
     .slice(1, parts.length - 1)
     .map(s => `${s.charAt(0).toLocaleUpperCase()}${s.substring(1)}`)
     .join(" ");
+};
+
+// Sets the URL to the selected resource
+export const openResource = (url :string, history: History) => {
+  const currentURL = new URL(window.location.href);
+  currentURL.searchParams.set("showResource", encodeURIComponent(url));
+  history.push(currentURL.toString().substring(currentURL.origin.length));
 };
 
 // Turns MediaObject into Document

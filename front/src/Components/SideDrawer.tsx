@@ -59,7 +59,7 @@ const SideDrawer = (props: SideDrawerProps & RouteComponentProps) => {
   const closeDocument = () => {
     const currentURL = new URL(window.location.href);
     const params = new URLSearchParams(currentURL.search);
-    params.delete("showDocument");
+    params.delete("showResource");
     props.history.push(`/search?${params.toString()}`);
   };
 
