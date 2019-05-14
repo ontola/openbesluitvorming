@@ -102,8 +102,15 @@ export default function generateLRS() {
   ];
 
   LRS.addOntologySchematics(ontologicalPropertyData);
-// @ts-ignore TS2341
+  // @ts-ignore TS2341
   LRS.store.addStatements(ontologicalPropertyData);
+
+  const r = NamedNode.find("https://id.openraadsinformatie.nl/42037");
+  // @ts-ignore TS2341
+  LRS.store.addStatements([
+    new Statement(r, NS.rdf("type"), NS.schema("Thing")),
+  ]);
+  (LRS as any).broadcast()
 
   return {
     LRS,

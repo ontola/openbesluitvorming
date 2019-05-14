@@ -64,7 +64,8 @@ const ResultsList: React.FunctionComponent<ResultsListProps> = (props) => {
       // sortOptions={sortOptions}
       renderError={(error: Error) => (
         <div>
-            Something went wrong!<br/>Error details<br/>{error.message}
+            Something went wrong!<br/>
+            {error.message}
         </div>
        )
       }

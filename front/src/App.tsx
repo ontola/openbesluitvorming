@@ -6,6 +6,7 @@ import { Router } from "react-router";
 import SearchRoute from "./Routes/SearchRoute";
 import "./App.scss";
 import LRS from "./LRS";
+import "./Components/Views";
 
 class App extends Component {
   render() {
