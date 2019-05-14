@@ -22,7 +22,6 @@ const Meeting: React.FunctionComponent<MeetingProps> = (props) => {
 
   return (
     <React.Fragment>
-      <h2 dangerouslySetInnerHTML={{ __html: `${props.name}` }}/>
       {props.highlight.text && props.highlight.text.map(
         ((text: string) => (
           <div key={text} className="ResultCard__highlight">
