@@ -112,7 +112,8 @@ export default function generateLRS() {
   LRS.store.addStatements([
     new Statement(r, NS.rdf("type"), NS.schema("Thing")),
   ]);
-  (LRS as any).broadcast()
+  (LRS as any).broadcast();
+  (window as any).LRS = LRS;
 
   return {
     LRS,
