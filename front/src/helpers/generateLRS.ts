@@ -51,6 +51,8 @@ export default function generateLRS() {
   LRS.namespaces.org = Namespace("http://www.w3.org/ns/org#");
   LRS.namespaces.person = Namespace("http://www.w3.org/ns/person#");
   LRS.namespaces.fa4 = Namespace("http://fontawesome.io/icon/");
+  LRS.namespaces.prov = Namespace("http://www.w3.org/ns/prov#");
+  LRS.namespaces.dcterms = Namespace("http://purl.org/dc/terms/p");
 
   const NS = LRS.namespaces;
 

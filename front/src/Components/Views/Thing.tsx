@@ -8,8 +8,11 @@ class ThingPage extends PureComponent {
 
   render() {
     return (
-      // @ts-ignore
-      <Property label={NS.schema("name")} />
+      <React.Fragment>
+        <Property label={[NS.schema("name"), NS.schema("label")]} />
+        <Property label={NS.schema("dateModified")} />
+        <Property label={NS.prov("hadPrimarySo")} />
+      </React.Fragment>
     );
   }
 }
