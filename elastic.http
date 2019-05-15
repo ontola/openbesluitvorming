@@ -1,0 +1,137 @@
+### simple_query_string
+#   ~90ms
+
+POST https://api.openraadsinformatie.nl/v1/elastic/ori_*/_search? HTTP/1.1
+content-type: application/json
+
+{
+  "query": {
+    "simple_query_string": {
+      "fields": ["text", "title", "description", "name"],
+      "default_operator": "or",
+      "query": "impressie keuzen schets"
+    }
+  },
+  "highlight": {
+    "pre_tags": [
+      "<mark>"
+    ],
+    "post_tags": [
+      "</mark>"
+    ],
+    "fields": {
+      "text": {},
+      "title": {},
+      "name": {},
+      "description": {}
+    },
+    "fragment_size": 100,
+    "number_of_fragments": 3
+  },
+    "size": 10,
+  "_source": {
+    "includes": [
+      "*"
+    ],
+    "excludes": []
+  },
+  "from": 0,
+  "sort": [
+    {
+      "_score": {
+        "order": "desc"
+      }
+    }
+  ]
+}
+
+### multi_match with bools
+#   ~200ms
+POST https://api.openraadsinformatie.nl/v1/elastic/ori_*/_search? HTTP/1.1
+content-type: application/json
+
+{
+  "query": {
+    "bool": {
+      "must": [
+        {
+          "bool": {
+            "must": [
+              {
+                "bool": {
+                  "should": [
+                    {
+                      "multi_match": {
+                        "query": "impressie keuzen schets",
+                        "fields": [
+                          "text",
+                          "title",
+                          "description",
+                          "name"
+                        ],
+                        "type": "best_fields",
+                        "operator": "or",
+                        "fuzziness": 0
+                      }
+                    },
+                    {
+                      "multi_match": {
+                        "query": "impressie keuzen schets",
+                        "fields": [
+                          "text",
+                          "title",
+                          "description",
+                          "name"
+                        ],
+                        "type": "phrase_prefix",
+                        "operator": "or"
+                      }
+                    }
+                  ],
+                  "minimum_should_match": "1"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "highlight": {
+    "pre_tags": [
+      "<mark>"
+    ],
+    "post_tags": [
+      "</mark>"
+    ],
+    "fields": {
+      "text": {},
+      "title": {},
+      "name": {},
+      "description": {}
+    },
+    "fragment_size": 100,
+    "number_of_fragments": 3
+  },
+  "size": 10,
+  "_source": {
+    "includes": [
+      "*"
+    ],
+    "excludes": []
+  },
+  "from": 0,
+  "sort": [
+    {
+      "_score": {
+        "order": "desc"
+      }
+    }
+  ]
+}
+
+### ORI API
+#   ~
+
+GET http://id.openraadsinformatie.nl/62297 HTTP/1.1
+content-type: application/json
