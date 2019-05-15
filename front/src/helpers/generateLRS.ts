@@ -53,6 +53,7 @@ export default function generateLRS() {
   LRS.namespaces.fa4 = Namespace("http://fontawesome.io/icon/");
   LRS.namespaces.prov = Namespace("http://www.w3.org/ns/prov#");
   LRS.namespaces.dcterms = Namespace("http://purl.org/dc/terms/p");
+  LRS.namespaces.rdfs = Namespace("http://www.w3.org/1999/02/22-rdf-syntax-ns#");
 
   const NS = LRS.namespaces;
 
