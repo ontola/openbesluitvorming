@@ -37,6 +37,7 @@ const Home = () => {
       <img
         className="NavBar__vng-logo"
         src={vngLogo}
+        alt="VNG logo"
       />
     </div>
   );

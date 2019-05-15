@@ -16,6 +16,7 @@ const DetailJSON: React.FunctionComponent<DetailJSONProps> = (props) => {
         encodeURIComponent(JSON.stringify(props, null, SpacingLevelJSON))
       }`}
       download={`${props._id}.json`}
+      // eslint-disable-next-line
       target="_blank"
       title="Download JSON"
     >
