@@ -1,10 +1,10 @@
-import LinkedRenderStore, { RENDER_CLASS_NAME } from "link-lib";
 import React from "react";
 import { FormattedMessage } from "react-intl";
 
 import ErrorButtonWithFeedback from "../ErrorButtonWithFeedback";
 
 import { NS } from "../../LRS";
+import { register } from "link-redux";
 
 // const propTypes = {
 //   caughtError: PropTypes.instanceOf(Error),
@@ -23,10 +23,10 @@ const ErrorCardComp = (props: any) => {
 
   return (
     <div>
+      ERROR!
         <h2>
-          {linkRequestStatus}
+          {linkRequestStatus.status}
         </h2>
-        <p>{linkRequestStatus}</p>
         <ErrorButtonWithFeedback theme="box" {...props}>
           <FormattedMessage
             defaultMessage="Try again"
@@ -37,10 +37,6 @@ const ErrorCardComp = (props: any) => {
   );
 };
 
-export default [
-  LinkedRenderStore.registerRenderer(
-    ErrorCardComp,
-    NS.ll("ErrorResource"),
-    RENDER_CLASS_NAME,
-  ),
-];
+ErrorCardComp.type = NS.ll("ErrorResource");
+
+export default register(ErrorCardComp);

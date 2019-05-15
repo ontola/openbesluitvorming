@@ -5,9 +5,11 @@ import LRS from "../../LRS";
  * Please properly include each file when access to the code is needed.
  */
 import Thing from "./Thing";
+import ErrorComp from "./Error";
 
 function register() {
   LRS.registerAll(
+    ...ErrorComp,
     ...Thing,
   );
 }
