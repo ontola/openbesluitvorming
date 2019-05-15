@@ -1,11 +1,12 @@
+import React from "react";
+import { History } from "history";
+
 export const allComponentIds = [
   "searchbox",
   "gemeenten",
   "daterange",
   "type",
 ];
-
-import React from "react";
 
 export function usePersistedState<T>(key: string, initial: T):
 [T, React.Dispatch<React.SetStateAction<T>>] {
@@ -26,8 +27,6 @@ export function usePersistedState<T>(key: string, initial: T):
 
   return [value, setPersistedValue];
 }
-
-import { History } from "history";
 
 export const getParams = (history: History) => {
   const searchObject = history.location.search;
