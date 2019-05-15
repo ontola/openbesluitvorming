@@ -5,6 +5,7 @@ import { allComponentIds } from "../helpers";
 import ResultCard from "../Components/ResultCard";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSpinner } from "@fortawesome/free-solid-svg-icons";
+import { handle, printAndHandle } from "../helpers/logging";
 
 interface ResultsListProps {
 }
@@ -62,13 +63,15 @@ const ResultsList: React.FunctionComponent<ResultsListProps> = (props) => {
       renderResultStats={props => <ResultStats {...props}/>}
       loader={<Loading/>}
       // sortOptions={sortOptions}
-      renderError={(error: Error) => (
-        <div>
-            Something went wrong!<br/>
-            {error.message}
-        </div>
-       )
-      }
+      renderError={(error: Error) => {
+        handle(error);
+        return (
+          <div>
+              Something went wrong!<br/>
+              {printAndHandle(error)}
+          </div>
+        );
+      }}
       react={{
         // When these components change, update the results
         and: allComponentIds,
