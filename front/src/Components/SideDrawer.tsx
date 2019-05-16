@@ -65,7 +65,10 @@ const SideDrawer = (props: SideDrawerProps & RouteComponentProps) => {
 
   return (
     <SideDrawerContext.Provider
-      value={{ width }}
+      value={{
+        width,
+        setWidth,
+      }}
     >
       <div className="ResourceBar">
         <Resizable
@@ -97,10 +100,12 @@ const SideDrawer = (props: SideDrawerProps & RouteComponentProps) => {
 
 export interface SideDrawerContextType {
   width: number;
+  setWidth: Function;
 }
 
 export const SideDrawerContext = React.createContext<SideDrawerContextType>({
   width: 250,
+  setWidth: () => console.log("sorry"),
 });
 
 export default withRouter(SideDrawer);

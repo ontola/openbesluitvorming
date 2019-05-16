@@ -20,12 +20,7 @@ class PdfProp extends React.Component<PdfProps> {
     const { linkedProp } = this.props;
 
     return (
-      <PDFViewer
-        searchTerm="string"
-        width={123}
-        setWidth={() => { console.log("setWidth"); }}
-        url={linkedProp.value}
-        />
+      <PDFViewer url={linkedProp.value} />
     );
   }
 }

@@ -9,16 +9,14 @@ import {
   faExpand,
 } from "@fortawesome/free-solid-svg-icons";
 import { withRouter, RouteComponentProps } from "react-router";
-import { SideDrawerContext } from './SideDrawer';
+import { SideDrawerContext } from "./SideDrawer";
+import { getParams } from "../helpers";
 const { Document, Page, pdfjs } = require("react-pdf");
 // tslint:disable-next-line:max-line-length
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.js`;
 
 export interface PDFViewerProps {
   url: string;
-  searchTerm: string | null;
-  width: number;
-  setWidth: Function;
 }
 
 export interface PDFViewerState {
@@ -58,6 +56,10 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
   const drawer = React.useContext(SideDrawerContext);
 
   const pdfWrapper = React.createRef<HTMLInputElement>();
+
+  const {
+    currentSearchTerm,
+  } = getParams(props.history);
 
   const onDocumentLoadSuccess = (e: OnLoadSuccessType) => {
     setNumPages(e.numPages);
@@ -110,9 +112,9 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
       const docRatio = doc.clientWidth / doc.clientHeight;
       const newWidth =  window.innerHeight * docRatio;
       if (newWidth < maxWidth) {
-        props.setWidth(newWidth);
+        drawer.setWidth(newWidth);
       } else {
-        props.setWidth(maxWidth);
+        drawer.setWidth(maxWidth);
       }
     }
   };
@@ -139,7 +141,7 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
               loading={null}
               pageIndex={pageNumber - 1}
               width={drawer.width}
-              customTextRenderer={props.searchTerm && makeTextRenderer(props.searchTerm)}
+              customTextRenderer={currentSearchTerm && makeTextRenderer(currentSearchTerm)}
             />
           </Document>
         </div>
