@@ -66,13 +66,6 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
     setPageNumber(1);
   };
 
-  const closeDocument = () => {
-    const currentURL = new URL(window.location.href);
-    const params = new URLSearchParams(currentURL.search);
-    params.delete("showResource");
-    props.history.push(`/search?${params.toString()}`);
-  };
-
   const highlightPattern = (text: string, pattern: string): React.ReactNode => {
     const splitText = text.split(pattern);
 
@@ -123,13 +116,7 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
     (textItem: TextLayerItem) => highlightPattern(textItem.str, searchText);
 
   return (
-    <React.Fragment>
-      <Button
-        className="Button__close"
-        onClick={closeDocument}
-      >
-        Sluiten
-      </Button>
+    <div className="PDFViewer">
       <div className="PDFViewer__scroller">
         <div id="pdfWrapper" style={{ width: "100%" }} ref={pdfWrapper}>
           <Document
@@ -177,7 +164,7 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
           </Button>
         </div>
       </div>
-    </React.Fragment>
+    </div>
   );
 };
 

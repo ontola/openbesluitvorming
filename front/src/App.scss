@@ -259,6 +259,10 @@ body {
   background-color: $blue;
 }
 
+.PDFViewer {
+  position: relative;
+}
+
 .PDFViewer__button-bar {
   position: absolute;
   bottom: 0;

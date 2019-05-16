@@ -13,8 +13,8 @@ import { ReactiveBase } from "@appbaseio/reactivesearch";
 import theme from "../theme";
 import { PORT } from "../config";
 import SideDrawer from "../Components/SideDrawer";
-import { LinkedResourceContainer } from 'link-redux';
-import { NamedNode } from 'rdflib';
+import { LinkedResourceContainer } from "link-redux";
+import { NamedNode } from "rdflib";
 
 const SearchRoute = (props: RouteComponentProps) => {
   const [showFilters, setShowFilters] = React.useState(false);
