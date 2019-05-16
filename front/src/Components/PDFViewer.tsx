@@ -53,6 +53,7 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
   const [pageNumber, setPageNumber] = React.useState<number>(1);
   const [numPages, setNumPages] = React.useState<number>(0);
   const [maxWidth] = React.useState<number>(calcMaxWidth(window.innerWidth));
+  const [showButtons, setShowButtons] = React.useState<boolean>(false);
   const drawer = React.useContext(SideDrawerContext);
 
   const pdfWrapper = React.createRef<HTMLInputElement>();
@@ -64,6 +65,7 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
   const onDocumentLoadSuccess = (e: OnLoadSuccessType) => {
     setNumPages(e.numPages);
     setPageNumber(1);
+    setShowButtons(true);
   };
 
   const highlightPattern = (text: string, pattern: string): React.ReactNode => {
@@ -133,37 +135,39 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
           </Document>
         </div>
       </div>
-      <div className="PDFViewer__button-bar">
-        <div className="PDFViewer__button-bar-inner">
-          <Button
-            onClick={() => setPageNumber(pageNumber - 1)}
-            disabled={(pageNumber === 1)}
-            title="Vorige pagina"
-          >
-            <FontAwesomeIcon icon={faArrowLeft} />
-          </Button>
-          <span>{`${pageNumber} / ${numPages}`}</span>
-          <Button
-            onClick={() => setPageNumber(pageNumber + 1)}
-            disabled={(pageNumber === (numPages))}
-            title="Volgende pagina"
-          >
-            <FontAwesomeIcon icon={faArrowRight} />
-          </Button>
-          <Button
-            onClick={() => window.open(props.url)}
-            title="Download bestand"
-          >
-            <FontAwesomeIcon icon={faDownload} />
-          </Button>
-          <Button
-            onClick={setFillWidth}
-            title="Scherm vullen"
-          >
-            <FontAwesomeIcon icon={faExpand} />
-          </Button>
+      {showButtons &&
+        <div className="PDFViewer__button-bar">
+          <div className="PDFViewer__button-bar-inner">
+            <Button
+              onClick={() => setPageNumber(pageNumber - 1)}
+              disabled={(pageNumber === 1)}
+              title="Vorige pagina"
+            >
+              <FontAwesomeIcon icon={faArrowLeft} />
+            </Button>
+            <span>{`${pageNumber} / ${numPages}`}</span>
+            <Button
+              onClick={() => setPageNumber(pageNumber + 1)}
+              disabled={(pageNumber === (numPages))}
+              title="Volgende pagina"
+            >
+              <FontAwesomeIcon icon={faArrowRight} />
+            </Button>
+            <Button
+              onClick={() => window.open(props.url)}
+              title="Download bestand"
+            >
+              <FontAwesomeIcon icon={faDownload} />
+            </Button>
+            <Button
+              onClick={setFillWidth}
+              title="Scherm vullen"
+            >
+              <FontAwesomeIcon icon={faExpand} />
+            </Button>
+          </div>
         </div>
-      </div>
+      }
     </div>
   );
 };
