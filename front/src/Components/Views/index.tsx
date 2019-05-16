@@ -6,10 +6,13 @@ import LRS from "../../LRS";
  */
 import Thing from "./Thing";
 import ErrorComp from "./Error";
-import Properties from '../Properties';
+import MediaObject from "./MediaObject";
+
+import Properties from "../Properties";
 
 function register() {
   LRS.registerAll(
+    ...MediaObject,
     ...ErrorComp,
     ...Thing,
     ...Properties,

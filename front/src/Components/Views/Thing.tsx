@@ -8,18 +8,14 @@ class ThingPage extends PureComponent {
 
   render() {
     return (
-      <React.Fragment>
-        name: <br />
-        <Property label={[NS.schema("name"), NS.schema("label")]} /><br />
+      <div className="Resource">
         type: <br />
         <Property label={NS.rdfs("type")} /><br />
         date modified: <br />
         <Property label={NS.schema("dateModified")} /><br />
         hadPrimarySo: <br />
         <Property label={NS.prov("hadPrimarySo")} /><br />
-        isBasedOn: <br />
-        <Property label={NS.schema("isBasedOn")} /><br />
-      </React.Fragment>
+      </div>
     );
   }
 }
