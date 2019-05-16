@@ -90,6 +90,9 @@ export default function generateLRS() {
     new Statement(NS.schema("Thing"), NS.rdfs("subClassOf"), NS.rdfs("Resource")),
     new Statement(NS.owl("Thing"), NS.owl("sameAs"), NS.schema("Thing")),
 
+
+    new Statement(NS.schema("MediaObject"), NS.rdfs("subClassOf"), NS.schema("Thing")),
+
     new Statement(NS.schema("Thing"), NS.rdf("type"), NS.rdfs("Class")),
     new Statement(NS.schema("Thing"), NS.rdfs("comment"), Literal.find("The most generic type of item.")),
     new Statement(NS.schema("Thing"), NS.rdfs("label"), Literal.find("Thing", languages.en)),

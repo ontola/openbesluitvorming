@@ -6,11 +6,13 @@ import LRS from "../../LRS";
  */
 import Thing from "./Thing";
 import ErrorComp from "./Error";
+import Properties from '../Properties';
 
 function register() {
   LRS.registerAll(
     ...ErrorComp,
     ...Thing,
+    ...Properties,
   );
 }
 
