@@ -1,15 +1,16 @@
-import { register, LinkedPropType } from "link-redux";
+import { register } from "link-redux";
 import React from "react";
 
 import { NS } from "../../LRS";
+import { StringLiteral } from "@babel/types";
 
 interface TitleProps {
-  name: LinkedPropType;
+  name: StringLiteral;
 }
 
 class Title extends React.Component<TitleProps> {
 
-  static type = NS.rdfs("Resource");
+  static type = NS.schema("Thing");
 
   static property = [
     NS.schema("name"),
@@ -30,7 +31,7 @@ class Title extends React.Component<TitleProps> {
 
     return (
       <h1>
-        {name}
+        {name.value}
       </h1>
     );
   }
