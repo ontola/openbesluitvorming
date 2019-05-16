@@ -12,8 +12,9 @@ import SearchBar from "../Components/SearchBar";
 import { ReactiveBase } from "@appbaseio/reactivesearch";
 import theme from "../theme";
 import { PORT } from "../config";
-import Resource from "../Components/Resource";
 import SideDrawer from "../Components/SideDrawer";
+import { LinkedResourceContainer } from 'link-redux';
+import { NamedNode } from 'rdflib';
 
 const SearchRoute = (props: RouteComponentProps) => {
   const [showFilters, setShowFilters] = React.useState(false);
@@ -77,14 +78,7 @@ const SearchRoute = (props: RouteComponentProps) => {
           >
             {currentResource &&
               <SideDrawer>
-                {(width: number, setWidth: Function) => (
-                  <Resource
-                    url={currentResource}
-                    searchTerm={currentSearchTerm}
-                    width={width}
-                    setWidth={setWidth}
-                  />
-                )}
+                <LinkedResourceContainer subject={NamedNode.find(currentResource)} />
               </SideDrawer>
             }
           </ReactCSSTransitionGroup>
