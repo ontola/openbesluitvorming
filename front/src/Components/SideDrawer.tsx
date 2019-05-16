@@ -64,31 +64,43 @@ const SideDrawer = (props: SideDrawerProps & RouteComponentProps) => {
   };
 
   return (
-    <div className="ResourceBar">
-      <Resizable
-        size={{ width, height: "100%" }}
-        className="SideDrawer"
-        handleClasses={{
-          left: "SideDrawer__resize-handle",
-        }}
-        handleComponent={{
-          left: () => <Handler />,
-        }}
-        maxWidth={maxWidth}
-        minWidth={200}
-        onResizeStop={(_e, _direction, _ref, d) => setWidth(width + d.width)}
-        enable={{ left: true }}
-      >
-        <Button
-          className="Button__close"
-          onClick={closeDocument}
+    <SideDrawerContext.Provider
+      value={{ width }}
+    >
+      <div className="ResourceBar">
+        <Resizable
+          size={{ width, height: "100%" }}
+          className="SideDrawer"
+          handleClasses={{
+            left: "SideDrawer__resize-handle",
+          }}
+          handleComponent={{
+            left: () => <Handler />,
+          }}
+          maxWidth={maxWidth}
+          minWidth={200}
+          onResizeStop={(_e, _direction, _ref, d) => setWidth(width + d.width)}
+          enable={{ left: true }}
         >
-          Sluiten
-        </Button>
-        {typeof props.children === "function" ? props.children(width, setWidth) : props.children}
-      </Resizable>
-    </div>
+          <Button
+            className="Button__close"
+            onClick={closeDocument}
+          >
+            Sluiten
+          </Button>
+          {typeof props.children === "function" ? props.children(width, setWidth) : props.children}
+        </Resizable>
+      </div>
+    </SideDrawerContext.Provider>
   );
 };
+
+export interface SideDrawerContextType {
+  width: number;
+}
+
+export const SideDrawerContext = React.createContext<SideDrawerContextType>({
+  width: 250,
+});
 
 export default withRouter(SideDrawer);

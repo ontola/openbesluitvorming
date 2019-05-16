@@ -9,6 +9,7 @@ import {
   faExpand,
 } from "@fortawesome/free-solid-svg-icons";
 import { withRouter, RouteComponentProps } from "react-router";
+import { SideDrawerContext } from './SideDrawer';
 const { Document, Page, pdfjs } = require("react-pdf");
 // tslint:disable-next-line:max-line-length
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.js`;
@@ -54,6 +55,7 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
   const [pageNumber, setPageNumber] = React.useState<number>(1);
   const [numPages, setNumPages] = React.useState<number>(0);
   const [maxWidth] = React.useState<number>(calcMaxWidth(window.innerWidth));
+  const drawer = React.useContext(SideDrawerContext);
 
   const pdfWrapper = React.createRef<HTMLInputElement>();
 
@@ -136,7 +138,7 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
             <Page
               loading={null}
               pageIndex={pageNumber - 1}
-              width={props.width}
+              width={drawer.width}
               customTextRenderer={props.searchTerm && makeTextRenderer(props.searchTerm)}
             />
           </Document>
