@@ -5,8 +5,10 @@
  */
 import Title from "./Title";
 import PDF from "./pdf";
+import DateModified from "./dateModified";
 
 export default [
   ...PDF,
   ...Title,
+  ...DateModified,
 ];
