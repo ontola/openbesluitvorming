@@ -20,6 +20,7 @@ import logging from "../middleware/logging";
 (Fetcher as any).crossSiteProxyTemplate = `${FRONTEND_URL}proxy?iri={uri}`;
 
 export default function generateLRS() {
+// tslint:disable-next-line: prefer-array-literal
   const middleware: Array<MiddlewareFn<any>> = [
     logging(),
     appMiddleware(),
@@ -30,9 +31,9 @@ export default function generateLRS() {
   const LRS = createStore<ReactType>({ report: handle }, middleware);
   // (LRS as any).bulkFetch = true;
 
-  (LRS as any).api.fetcher.__proto__.constructor.withCredentials = function() { return false };
+  (LRS as any).api.fetcher.__proto__.constructor.withCredentials = function () { return false; };
 
-  transformers(LRS).forEach((t) =>
+  transformers(LRS).forEach(t =>
 // @ts-ignore TS2341
           LRS.api.registerTransformer(t.transformer, t.mediaTypes, t.acceptValue),
   );
@@ -89,7 +90,6 @@ export default function generateLRS() {
   const ontologicalClassData = [
     new Statement(NS.schema("Thing"), NS.rdfs("subClassOf"), NS.rdfs("Resource")),
     new Statement(NS.owl("Thing"), NS.owl("sameAs"), NS.schema("Thing")),
-
 
     new Statement(NS.schema("MediaObject"), NS.rdfs("subClassOf"), NS.schema("Thing")),
 
