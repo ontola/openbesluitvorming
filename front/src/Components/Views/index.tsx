@@ -7,12 +7,14 @@ import LRS from "../../LRS";
 import Thing from "./Thing";
 import ErrorComp from "./Error";
 import MediaObject from "./MediaObject";
+import Loading from "./Loading";
 
 import Properties from "../Properties";
 
 function register() {
   LRS.registerAll(
     ...MediaObject,
+    ...Loading,
     ...ErrorComp,
     ...Thing,
     ...Properties,

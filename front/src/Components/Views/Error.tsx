@@ -22,8 +22,8 @@ const ErrorCardComp = (props: any) => {
   const { linkRequestStatus } = props;
 
   return (
-    <div>
-      ERROR!
+    <div className="Resource">
+      Oeps, er is iets mis gegaan.
         <h2>
           {linkRequestStatus.status}
         </h2>
