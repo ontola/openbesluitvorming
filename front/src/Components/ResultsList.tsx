@@ -30,7 +30,7 @@ const ResultStats = (props: ResultsType) =>
 const NoResults = () =>
   <div>Geen resultaten gevonden.</div>;
 
-const Loading = () =>
+export const LoadingWithSpinner = () =>
   <div className="Results__loader">
     <FontAwesomeIcon icon={faSpinner} spin />
     {" Laden.."}
@@ -61,7 +61,7 @@ const ResultsList: React.FunctionComponent<ResultsListProps> = (props) => {
       pagination={false}
       onNoResults={<NoResults/>}
       renderResultStats={props => <ResultStats {...props}/>}
-      loader={<Loading/>}
+      loader={<LoadingWithSpinner/>}
       // sortOptions={sortOptions}
       renderError={(error: Error) => {
         handle(error);
