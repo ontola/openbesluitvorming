@@ -11,12 +11,13 @@
     "@types/node": "^11.11.6",
     "@types/radium": "^0.24.2",
     "cors": "^2.8.5",
+    "dotenv": "^8.0.0",
     "express": "^4.16.4",
     "http-proxy-middleware": "^0.19.1",
     "morgan": "^1.9.1",
-    "typescript": "^3.3.3",
     "tslint": "^5.16.0",
-    "tslint-config-airbnb": "^5.11.1"
+    "tslint-config-airbnb": "^5.11.1",
+    "typescript": "^3.3.3"
   },
   "scripts": {
     "dev": "ts-node-dev ./src/server.ts",
