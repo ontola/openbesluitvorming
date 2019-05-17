@@ -33,7 +33,6 @@ export const getParams = (history: History) => {
   const params = new URLSearchParams(searchObject);
 
   const currentResourceBase = params.get("showResource");
-  // let currentResource = "https://id.openraadsinformatie.nl/243606";
   let currentResource = null;
   if (currentResourceBase !== null) {
     currentResource = decodeURIComponent(currentResourceBase);
