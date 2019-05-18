@@ -16,17 +16,19 @@ import { FRONTEND_ACCEPT, FRONTEND_URL } from "../config";
 import transformers from "./transformers";
 import { appMiddleware, website } from "../middleware/app";
 import logging from "../middleware/logging";
+import { handle } from "./logging";
 
 (Fetcher as any).crossSiteProxyTemplate = `${FRONTEND_URL}proxy?iri={uri}`;
 
 export default function generateLRS() {
-// tslint:disable-next-line: prefer-array-literal
+  // tslint:disable-next-line: prefer-array-literal
   const middleware: Array<MiddlewareFn<any>> = [
     logging(),
     appMiddleware(),
   ];
 
-  const handle = console.log;
+  // @ts-ignore TS2341
+  LRS.api.accept.default = "application/n-quads";
 
   const LRS = createStore<ReactType>({ report: handle }, middleware);
   // (LRS as any).bulkFetch = true;
@@ -34,7 +36,7 @@ export default function generateLRS() {
   (LRS as any).api.fetcher.__proto__.constructor.withCredentials = function () { return false; };
 
   transformers(LRS).forEach(t =>
-// @ts-ignore TS2341
+  // @ts-ignore TS2341
           LRS.api.registerTransformer(t.transformer, t.mediaTypes, t.acceptValue),
   );
 
