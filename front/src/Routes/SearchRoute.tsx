@@ -72,7 +72,7 @@ const SearchRoute = (props: RouteComponentProps) => {
             <Home />
           }
           <ReactCSSTransitionGroup
-            transitionName="ResourceBar"
+            transitionName="SideDrawer__wrapper"
             transitionEnterTimeout={200}
             transitionLeaveTimeout={200}
           >

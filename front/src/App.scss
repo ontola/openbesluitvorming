@@ -247,6 +247,10 @@ body {
   transition: .2s all ease-in-out;
 }
 
+.SideDrawer__scroller {
+  overflow-y: scroll;
+}
+
 .SideDrawer__resize-handle:hover .SideDrawer__handler,
 .SideDrawer__handler:hover {
   background-color: $blue_light;
@@ -259,6 +263,40 @@ body {
   border-color: $blue;
   color: white;
   background-color: $blue;
+}
+
+
+.SideDrawer__wrapper {
+  position: fixed;
+  border-left: solid 1px $blue;
+  flex: 100;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  background-color: white;
+
+  &-enter {
+    opacity: 0;
+    right: -20%;
+  }
+
+  &-enter-active {
+    opacity: 1;
+    right: 0;
+    transition: right 200ms ease-out, opacity .2s;
+  }
+
+  &-leave {
+    opacity: 1;
+    right: 0;
+  }
+
+  &-leave-active {
+    opacity: 0;
+    right: -20%;
+    transition: right 200ms ease-in-out, opacity .2s;
+  }
 }
 
 .PDFViewer {
@@ -376,39 +414,6 @@ body {
 .react-pdf__Document {
   border-bottom: solid 1px $g1;
   border-top: solid 1px $g1;
-}
-
-.ResourceBar {
-  position: fixed;
-  border-left: solid 1px $blue;
-  flex: 100;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 2;
-  background-color: white;
-
-  &-enter {
-    opacity: 0;
-    right: -20%;
-  }
-
-  &-enter-active {
-    opacity: 1;
-    right: 0;
-    transition: right 200ms ease-out, opacity .2s;
-  }
-
-  &-leave {
-    opacity: 1;
-    right: 0;
-  }
-
-  &-leave-active {
-    opacity: 0;
-    right: -20%;
-    transition: right 200ms ease-in-out, opacity .2s;
-  }
 }
 
 .Resource {

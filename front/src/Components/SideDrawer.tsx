@@ -70,7 +70,7 @@ const SideDrawer = (props: SideDrawerProps & RouteComponentProps) => {
         setWidth,
       }}
     >
-      <div className="ResourceBar">
+      <div className="SideDrawer__wrapper">
         <Resizable
           size={{ width, height: "100%" }}
           className="SideDrawer"
@@ -91,7 +91,9 @@ const SideDrawer = (props: SideDrawerProps & RouteComponentProps) => {
           >
             Sluiten
           </Button>
-          {typeof props.children === "function" ? props.children(width, setWidth) : props.children}
+          <div className="SideDrawer__scroller">
+           {typeof props.children === "function" ? props.children(width, setWidth) : props.children}
+          </div>
         </Resizable>
       </div>
     </SideDrawerContext.Provider>
