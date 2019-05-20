@@ -31,6 +31,10 @@ export default function generateLRS() {
 
   (LRS as any).api.fetcher.__proto__.constructor.withCredentials = function () { return false; };
 
+  // Temp fix for performance improvement
+  const broadcast = (LRS as any).broadcast;
+  (LRS as any).broadcast = () => broadcast(false, 0);
+
   transformers(LRS).forEach(t =>
     // @ts-ignore TS2341
     LRS.api.registerTransformer(t.transformer, t.mediaTypes, t.acceptValue),
