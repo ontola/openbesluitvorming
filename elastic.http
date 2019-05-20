@@ -135,9 +135,3 @@ content-type: application/json
 
 GET http://id.openraadsinformatie.nl/62297 HTTP/1.1
 content-type: application/json
-
-### ES via front-end
-#   ~
-
-GET http://ori.argu.co/api/ori_*/_msearch? HTTP/1.1
-content-type: application/json

@@ -20,7 +20,7 @@
     "cors": "^2.8.5",
     "eslint": "^5.16.0",
     "http-status-codes": "^1.3.2",
-    "link-lib": "=1.0.0-rc1-20190520T102247",
+    "link-lib": "=1.0.0-rc1-20190515T091246",
     "link-rdflib": "npm:link-rdflib@0.19.1-20190515T091246",
     "link-redux": "=1.0.0-rc2-20190515T091246",
     "lodash.throttle": "^4.1.1",
