@@ -5,6 +5,7 @@ import {
   SelectedFilters,
 } from "@appbaseio/reactivesearch";
 import { indexToMunicipality, typeToLabel } from "../helpers";
+import { LoadingWithSpinner } from "./ResultsList";
 
 interface FiltersbarProps {
   display: boolean;
@@ -66,7 +67,7 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
         showFilter={true}
         URLParams={true}
         className="Filter"
-        loader="Loading ..."
+        loader={<LoadingWithSpinner/>}
         renderItem={MunicipalityLabel}
       />
       <MultiList
@@ -88,7 +89,7 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
         }}
         showFilter={true}
         URLParams={true}
-        loader="Loading ..."
+        loader={<LoadingWithSpinner/>}
       />
   </div>
   );
