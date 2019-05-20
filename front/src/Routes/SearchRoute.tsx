@@ -11,7 +11,7 @@ import { getParams } from "../helpers";
 import SearchBar from "../Components/SearchBar";
 import { ReactiveBase } from "@appbaseio/reactivesearch";
 import theme from "../theme";
-import { PORT } from "../config";
+import { SERVER_PORT } from "../config";
 import SideDrawer from "../Components/SideDrawer";
 import { LinkedResourceContainer } from "link-redux";
 import { NamedNode } from "rdflib";
@@ -30,7 +30,7 @@ const SearchRoute = (props: RouteComponentProps) => {
   };
 
   const apiURL = new URL(window.location.origin);
-  apiURL.port = PORT.toString();
+  apiURL.port = SERVER_PORT.toString();
   apiURL.pathname = "/api";
 
   return (

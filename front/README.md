@@ -15,8 +15,10 @@ Use `yarn build`, and serve the static files using the `../server` app.
 
 ## Envs
 
+The default envs are set for production. For local development,
+
 ``` env
-PORT=Port of the server
+SERVER_PORT=Port of the `../server`, 8080 locally and 80 in production.
 FRONTEND_URL=Link to where this front-end application should run
 FRONTEND_ACCEPT=MIME format
 ```
