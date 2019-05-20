@@ -27,24 +27,27 @@ export default function generateLRS() {
     appMiddleware(),
   ];
 
-  // @ts-ignore TS2341
-  LRS.api.accept.default = "application/n-quads";
-
   const LRS = createStore<ReactType>({ report: handle }, middleware);
   // (LRS as any).bulkFetch = true;
+
+  // Fix for content negotation compatibility of rails
+  // @ts-ignore TS2341
+  LRS.api.accept.default = "application/n-quads";
+  // @ts-ignore TS2341
+  LRS.api.setAcceptForHost("https://id.openraadsinformatie.nl", "application/n-quads");
 
   (LRS as any).api.fetcher.__proto__.constructor.withCredentials = function () { return false; };
 
   transformers(LRS).forEach(t =>
-  // @ts-ignore TS2341
-          LRS.api.registerTransformer(t.transformer, t.mediaTypes, t.acceptValue),
+    // @ts-ignore TS2341
+    LRS.api.registerTransformer(t.transformer, t.mediaTypes, t.acceptValue),
   );
 
   if (!website) {
     handle(new Error("No website in head"));
   }
 
-// @ts-ignore TS2341
+  // @ts-ignore TS2341
   LRS.api.accept.default = FRONTEND_ACCEPT;
 
   LRS.namespaces.aod = Namespace("https://argu.co/ns/od#");
@@ -72,7 +75,7 @@ export default function generateLRS() {
     NS.link("Document"),
   ];
 
-// @ts-ignore TS2341
+  // @ts-ignore TS2341
   LRS.store.store.newPropertyAction(NS.rdf("type"), (
       _: Formula,
       __: SomeTerm,
@@ -88,7 +91,7 @@ export default function generateLRS() {
     return false;
   });
 
-// tslint:disable max-line-length
+  // tslint:disable max-line-length
   const ontologicalClassData = [
     new Statement(NS.schema("Thing"), NS.rdfs("subClassOf"), NS.rdfs("Resource")),
     new Statement(NS.owl("Thing"), NS.owl("sameAs"), NS.schema("Thing")),
@@ -99,10 +102,10 @@ export default function generateLRS() {
     new Statement(NS.schema("Thing"), NS.rdfs("comment"), Literal.find("The most generic type of item.")),
     new Statement(NS.schema("Thing"), NS.rdfs("label"), Literal.find("Thing", languages.en)),
   ];
-// tslint:enable max-line-length
+  // tslint:enable max-line-length
 
   LRS.addOntologySchematics(ontologicalClassData);
-// @ts-ignore TS2341
+  // @ts-ignore TS2341
   LRS.store.addStatements(ontologicalClassData);
 
   const ontologicalPropertyData = [
