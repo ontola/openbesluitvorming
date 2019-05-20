@@ -419,6 +419,11 @@ body {
   border-top: solid 1px $g1;
 }
 
+// Fix overflow of annotationlayer
+.react-pdf__Page {
+  overflow: hidden;
+}
+
 .Resource {
   padding: 1rem;
   flex: 1;
