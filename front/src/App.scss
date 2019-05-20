@@ -230,6 +230,8 @@ body {
 
 .SideDrawer {
   position: relative;
+  display: flex;
+  flex-direction: column;
 }
 
 .SideDrawer__handler {
@@ -411,6 +413,7 @@ body {
 
 .Resource {
   padding: 1rem;
+  flex: 1;
 }
 
 mark {
