@@ -5,7 +5,6 @@ import { ORIItemType } from "../../types";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faDownload } from "@fortawesome/free-solid-svg-icons";
 import DetailType from "../Details/DetailType";
-import DetailJSON from "../Details/DetailJSON";
 
 import { indexToMunicipality } from "../../helpers";
 
@@ -30,10 +29,6 @@ const Document: React.FunctionComponent<DocumentProps & RouteComponentProps> = (
       <div className="ResultCard__details">
         <div className="ResultCard__detail" >{indexToMunicipality(props._index)}</div>
         <DetailType type={props["@type"]} />
-        <DetailJSON {...props} />
-        {props.content_type &&
-          <div className="ResultCard__detail" >{props.content_type}</div>
-        }
         {date &&
           <div className="ResultCard__detail" >{date.toLocaleDateString()}</div>
         }

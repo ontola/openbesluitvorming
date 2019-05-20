@@ -29,7 +29,7 @@ class Box extends TopologyProvider<TopologyProviderProps> {
       <Button
         onClick={(e) => {
           e.preventDefault();
-          this.props.lrs.actions.app.showResource(subject);
+          // this.props.lrs.actions.app.showResource(subject);
         }}
         className="Box"
       >

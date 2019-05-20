@@ -3,7 +3,6 @@ import * as React from "react";
 import { ORIItemType } from "../../types";
 import { indexToMunicipality } from "../../helpers";
 import DetailType from "../Details/DetailType";
-import DetailJSON from "../Details/DetailJSON";
 
 interface CreativeWorkProps extends ORIItemType {
   classification?: string;
@@ -23,7 +22,6 @@ const CreativeWork: React.FunctionComponent<CreativeWorkProps> = (props) => {
       <div className="ResultCard__details">
         <div className="ResultCard__detail" >{indexToMunicipality(props._index)}</div>
         <DetailType type={props["@type"]} />
-        <DetailJSON {...props} />
       </div>
       <p>Classification: {props.classification}</p>
     </React.Fragment>
