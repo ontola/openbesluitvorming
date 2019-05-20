@@ -78,7 +78,7 @@ const SearchRoute = (props: RouteComponentProps) => {
             transitionEnterTimeout={200}
             transitionLeaveTimeout={200}
           >
-            {currentResource &&
+            {currentResource && currentSearchTerm &&
               <SideDrawer>
                 <LinkedResourceContainer subject={NamedNode.find(currentResource)} />
               </SideDrawer>
