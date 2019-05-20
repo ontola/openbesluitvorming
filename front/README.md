@@ -4,7 +4,14 @@
 
 `$ yarn`
 
-`$ yarn dev` starts a local development server uses react-scripts. This has a built-in proxy.
+`$ yarn dev` starts a local development server uses react-scripts.
+This has a built-in proxy, which forwards all /api request to the `../server` app at :8080.
+
+Visit localhost:3000
+
+## Build
+
+Use `yarn build`, and serve the static files using the `../server` app.
 
 ## Envs
 
