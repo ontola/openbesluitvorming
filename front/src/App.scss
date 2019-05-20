@@ -249,6 +249,9 @@ body {
 
 .SideDrawer__scroller {
   overflow-y: scroll;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
 }
 
 .SideDrawer__resize-handle:hover .SideDrawer__handler,
