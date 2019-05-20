@@ -2,6 +2,7 @@ import { Property, register } from "link-redux";
 import React, { PureComponent } from "react";
 
 import { NS } from "../../LRS";
+import Resource from "../Topologies/ResourceTopology";
 
 // Mostly PDF objects
 class MediaObject extends PureComponent {
@@ -10,12 +11,11 @@ class MediaObject extends PureComponent {
   render() {
     return (
       <React.Fragment>
-        <div className="Resource">
+        <Resource>
           <Property label={[NS.schema("name"), NS.schema("label")]} /><br />
           PDF document <br/>
-          date modified: <br />
           <Property label={NS.schema("dateModified")} /><br />
-        </div>
+        </Resource>
         <Property label={NS.schema("isBasedOn")} />
       </React.Fragment>
     );

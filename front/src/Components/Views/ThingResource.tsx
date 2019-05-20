@@ -4,6 +4,7 @@ import React from "react";
 import { NS } from "../../LRS";
 import { resourceTopology } from "../Topologies/ResourceTopology";
 import Box from "../Topologies/BoxTopology";
+import { labelsTopology } from "../Topologies/LabelsTopology";
 
 const ThingResource = () => {
   return (
@@ -14,6 +15,6 @@ const ThingResource = () => {
 };
 
 ThingResource.type = NS.schema("Thing");
-ThingResource.topology = resourceTopology;
+ThingResource.topology = [resourceTopology, labelsTopology];
 
 export default register(ThingResource);

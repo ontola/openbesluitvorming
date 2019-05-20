@@ -4,6 +4,7 @@ import React from "react";
 import { NS } from "../../LRS";
 import DownloadResource from "../DownloadResource";
 import { StringLiteral } from "@babel/types";
+import Resource from "../Topologies/ResourceTopology";
 
 interface ThingProps {
   subject: StringLiteral;
@@ -11,7 +12,7 @@ interface ThingProps {
 
 const Thing = (props: ThingProps) => {
   return (
-    <div className="Resource">
+    <Resource>
       <Property label={[NS.schema("name"), NS.schema("label")]} /><br />
       type: <br />
       <Property label={NS.rdfs("type")} /><br />
@@ -20,7 +21,7 @@ const Thing = (props: ThingProps) => {
       hadPrimarySo: <br />
       <Property label={NS.prov("hadPrimarySo")} />
       <DownloadResource url={props.subject.value} />
-    </div>
+    </Resource>
   );
 };
 
