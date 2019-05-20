@@ -1,11 +1,11 @@
 import { unstable, LinkReduxLRSType } from "link-redux";
-import { NamedNode } from "rdflib";
+// import { NamedNode } from "rdflib";
 import React from "react";
-import {
-  INTERNAL_SERVER_ERROR,
-  PROXY_AUTHENTICATION_REQUIRED,
-  TOO_MANY_REQUESTS,
-} from "http-status-codes";
+// import {
+  // INTERNAL_SERVER_ERROR,
+//   PROXY_AUTHENTICATION_REQUIRED,
+//   TOO_MANY_REQUESTS,
+// } from "http-status-codes";
 import { FormattedMessage } from "react-intl";
 
 import Button from "./Button";
@@ -24,10 +24,10 @@ interface ErrorButtonProps {
   reset: Function;
 }
 
-const RETRYABLE_ERRORS = [
-  PROXY_AUTHENTICATION_REQUIRED,
-  TOO_MANY_REQUESTS,
-];
+// const RETRYABLE_ERRORS = [
+//   PROXY_AUTHENTICATION_REQUIRED,
+//   TOO_MANY_REQUESTS,
+// ];
 
 class ErrorButtonWithFeedback extends React.Component<ErrorButtonProps> {
   static contextType = unstable.LRSCtx;
@@ -63,16 +63,16 @@ class ErrorButtonWithFeedback extends React.Component<ErrorButtonProps> {
         return disable();
       });
 
-    return this
-      .context
-      .lrs
-      .api
-      .statusMap
-      .forEach((s: any, i: any) => {
-        if (s && (s.status >= INTERNAL_SERVER_ERROR || RETRYABLE_ERRORS.includes(s.status))) {
-          this.context.lrs.queueEntity(NamedNode.findByStoreIndex(i), { reload: true });
-        }
-      });
+    // return this
+    //   .context
+    //   .lrs
+    //   .api
+    //   .statusMap
+    //   .forEach((s: any, i: any) => {
+    //     if (s && (s.status >= INTERNAL_SERVER_ERROR || RETRYABLE_ERRORS.includes(s.status))) {
+    //       this.context.lrs.queueEntity(NamedNode.findByStoreIndex(i), { reload: true });
+    //     }
+    //   });
   }
 
   render() {
