@@ -5,11 +5,11 @@ import { NS } from "../../LRS";
 import { StringLiteral } from "@babel/types";
 import { resourceTopology } from "../Topologies/ResourceTopology";
 
-interface TitleProps {
+interface TitleBoxProps {
   name: StringLiteral;
 }
 
-class Title extends React.Component<TitleProps> {
+class TitleBox extends React.Component<TitleBoxProps> {
 
   static type = NS.schema("Thing");
 
@@ -30,11 +30,11 @@ class Title extends React.Component<TitleProps> {
     const { name } = this.props;
 
     return (
-      <h1>
+      <h2>
         {name.value}
-      </h1>
+      </h2>
     );
   }
 }
 
-export default register(Title);
+export default register(TitleBox);

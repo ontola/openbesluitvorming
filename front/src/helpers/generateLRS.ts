@@ -17,6 +17,7 @@ import transformers from "./transformers";
 import { appMiddleware, website } from "../middleware/app";
 import logging from "../middleware/logging";
 import { handle } from "./logging";
+import history from "./history";
 
 (Fetcher as any).crossSiteProxyTemplate = `${FRONTEND_URL}proxy?iri={uri}`;
 
@@ -24,7 +25,7 @@ export default function generateLRS() {
   // tslint:disable-next-line: prefer-array-literal
   const middleware: Array<MiddlewareFn<any>> = [
     logging(),
-    appMiddleware(),
+    appMiddleware(history),
   ];
 
   const LRS = createStore<ReactType>({ report: handle }, middleware);
