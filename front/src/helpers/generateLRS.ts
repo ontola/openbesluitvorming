@@ -28,13 +28,6 @@ export default function generateLRS() {
   ];
 
   const LRS = createStore<ReactType>({ report: handle }, middleware);
-  // (LRS as any).bulkFetch = true;
-
-  // Fix for content negotation compatibility of rails
-  // @ts-ignore TS2341
-  LRS.api.accept.default = "application/n-quads";
-  // @ts-ignore TS2341
-  LRS.api.setAcceptForHost("https://id.openraadsinformatie.nl", "application/n-quads");
 
   (LRS as any).api.fetcher.__proto__.constructor.withCredentials = function () { return false; };
 
