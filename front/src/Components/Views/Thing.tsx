@@ -14,7 +14,7 @@ class ThingPage extends PureComponent {
         date modified: <br />
         <Property label={NS.schema("dateModified")} /><br />
         hadPrimarySo: <br />
-        <Property label={NS.prov("hadPrimarySo")} /><br />
+        <Property label={NS.prov("hadPrimarySo")} />
       </div>
     );
   }

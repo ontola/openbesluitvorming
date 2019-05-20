@@ -16,7 +16,7 @@ class MediaObject extends PureComponent {
           date modified: <br />
           <Property label={NS.schema("dateModified")} /><br />
         </div>
-        <Property label={NS.schema("isBasedOn")} /><br />
+        <Property label={NS.schema("isBasedOn")} />
       </React.Fragment>
     );
   }
