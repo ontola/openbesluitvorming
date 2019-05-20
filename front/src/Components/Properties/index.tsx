@@ -4,11 +4,13 @@
  * Please properly include each file when access to the code is needed.
  */
 import Title from "./Title";
-import PDF from "./pdf";
-import DateModified from "./dateModified";
+import PDF from "./PDF";
+import Type from "./Type";
+import DateModified from "./DateModified";
 
 export default [
   ...PDF,
   ...Title,
+  ...Type,
   ...DateModified,
 ];
