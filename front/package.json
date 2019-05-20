@@ -18,6 +18,7 @@
     "@types/react-router": "^4.4.5",
     "@types/react-router-dom": "^4.3.1",
     "cors": "^2.8.5",
+    "eslint": "^5.16.0",
     "http-status-codes": "^1.3.2",
     "link-lib": "=1.0.0-rc1-20190515T091246",
     "link-rdflib": "npm:link-rdflib@0.19.1-20190515T091246",
@@ -41,7 +42,7 @@
     "typescript": "3.3.3333"
   },
   "scripts": {
-    "dev": "react-scripts start",
+    "dev": "BROWSER=none react-scripts start",
     "build": "react-scripts build",
     "lint": "tslint -c tslint.json 'src/**/*.{ts,tsx}'",
     "test": "react-scripts test",
@@ -55,5 +56,13 @@
     "not dead",
     "not ie <= 11",
     "not op_mini all"
-  ]
+  ],
+  "devDependencies": {
+    "husky": "^2.3.0"
+  },
+  "husky": {
+    "hooks": {
+      "pre-push": "yarn lint"
+    }
+  }
 }

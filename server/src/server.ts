@@ -5,7 +5,7 @@ import express, { Response, Request } from "express";
 import httpProxyMiddleware from "http-proxy-middleware";
 import morgan from "morgan";
 
-require('dotenv').config()
+require("dotenv").config();
 
 import { ES_URL, PORT, WWW_DIR } from "./config";
 
