@@ -24,7 +24,6 @@ interface ResultsType {
 const ResultStats = (props: ResultsType) =>
   <div className="bottom-margin">
     {props.numberOfResults.value} resultaten gevonden
-    in {props.time}ms
   </div>;
 
 const NoResults = () =>

@@ -49,6 +49,9 @@ export const LoadingComponent = () =>
     <FontAwesomeIcon icon={faSpinner} size="6x" spin />
   </div>;
 
+const PDFErrorComponent = () =>
+  <div className="PDFViewer__error">De PDF kan niet worden geladen.</div>;
+
 const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
   const [pageNumber, setPageNumber] = React.useState<number>(1);
   const [docRef, setDocRef] = React.useState<any>(null);
@@ -128,6 +131,7 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
       <div className="PDFViewer__scroller">
         <div id="pdfWrapper" style={{ width: "100%" }} ref={pdfWrapper}>
           <Document
+            error={<PDFErrorComponent/>}
             file={props.url}
             loading={<LoadingComponent/>}
             inputRef={(ref: any) => { setDocRef(ref); }}
@@ -135,6 +139,7 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
           >
             <Page
               loading={<LoadingComponent/>}
+              error={<PDFErrorComponent/>}
               pageIndex={pageNumber - 1}
               width={drawer.width}
               customTextRenderer={currentSearchTerm && makeTextRenderer(currentSearchTerm)}
