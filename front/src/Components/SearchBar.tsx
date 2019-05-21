@@ -19,6 +19,7 @@ const fields = ["text", "title", "description", "name"];
 const SearchBar: React.FunctionComponent = () => {
   return (
     <DataSearch
+      autoFocus
       className="SearchBar"
       componentId="searchbox"
       debounce={1200}

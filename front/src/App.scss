@@ -398,13 +398,14 @@ body {
   padding-top: 1rem;
   padding-right: 1rem;
   // overflow-y: scroll;
-  top: $navbar-height;
   right: 0;
   left: 0;
   bottom: 0;
   -webkit-overflow-scrolling: touch;
   transition: .2s all;
   min-height: calc(100vh - #{$navbar-height});
+  position: relative;
+  padding-bottom: 3rem;
 
   .SearchRoute--show-filters & {
     margin-left: $filter-bar-width;
@@ -413,6 +414,33 @@ body {
   &__loader {
     padding-top: 1rem;
     padding-bottom: 1rem;
+  }
+}
+
+.Results__dual-loader {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+}
+
+.Results__dual-loader-top {
+  position: absolute;
+  top: 0;
+}
+
+.Results__dual-loader-bottom {
+  position: absolute;
+  bottom: 0;
+}
+
+.Results {
+  .Results__loader {
+    background-color: $g0;
+    width: $result-width;
+
+    span {
+      margin-left: 1rem;
+    }
   }
 }
 

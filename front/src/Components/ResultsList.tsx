@@ -35,6 +35,16 @@ export const LoadingWithSpinner = () =>
     {" Laden.."}
   </div>;
 
+const DualLoader = () =>
+  <div className="Results__dual-loader">
+    <div className="Results__dual-loader-top">
+      <LoadingWithSpinner/>
+    </div>
+    <div className="Results__dual-loader-bottom">
+      <LoadingWithSpinner/>
+    </div>
+  </div>;
+
 // interface SortOption {
 //   label: string;
 //   dataField:any;
@@ -56,11 +66,11 @@ const ResultsList: React.FunctionComponent<ResultsListProps> = (props) => {
       dataField="_score"
       stream={false}
       sortBy="desc"
-      size={10}
+      size={20}
       pagination={false}
       onNoResults={<NoResults/>}
       renderResultStats={props => <ResultStats {...props}/>}
-      loader={<LoadingWithSpinner/>}
+      loader={<DualLoader/>}
       // sortOptions={sortOptions}
       renderError={(error: Error) => {
         handle(error);
