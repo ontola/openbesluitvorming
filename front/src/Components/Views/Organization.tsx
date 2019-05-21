@@ -7,32 +7,27 @@ import { SomeNode } from "link-lib";
 import DownloadResource from "../DownloadResource";
 import Labels from "../Topologies/LabelsTopology";
 
-interface MeetingProps {
+interface OrganizationProps {
   subject: SomeNode;
   attachment: SomeNode;
 }
 
-const Meeting = (props: MeetingProps) => {
+const Organization = (props: OrganizationProps) => {
   return (
     <ResourceTopology>
-      <Property label={NS.schema("name")} /><br />
-      Vergadering<br />
+      <Property label={NS.skos("preflabel")} /><br />
+      Organisatie<br />
       <DownloadResource url={props.subject.value} />
       <Labels>
-        <Property label={NS.schema("description")} />
+        <Property label={NS.org("subOrganizationOf")} />
         <Property label={NS.schema("startDate")} />
-        <Property label={NS.ncal("categories")} />
-        <Property label={NS.meeting("committee")} />
+        <Property label={NS.schema("superEvent")} />
         <Property label={NS.meeting("attachment")} limit={100}/>
-        <Property label={NS.meeting("agenda")} limit={100}/>
       </Labels>
     </ResourceTopology>
   );
 };
 
-Meeting.mapDataToProps = [
-  NS.meeting("attachment"),
-];
-Meeting.type = NS.meeting("Meeting");
+Organization.type = NS.org("Organization");
 
-export default register(Meeting);
+export default register(Organization);

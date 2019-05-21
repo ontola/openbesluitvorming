@@ -10,6 +10,7 @@ import ErrorComp from "./Error";
 import Loading from "./Loading";
 import MediaObject from "./MediaObject";
 import Meeting from "./Meeting";
+import Organization from "./Organization";
 import Predicate from "./Predicate";
 import Properties from "../Properties";
 import Thing from "./Thing";
@@ -22,6 +23,7 @@ function register() {
     ...Loading,
     ...MediaObject,
     ...Meeting,
+    ...Organization,
     ...Predicate,
     ...Properties,
     ...Thing,

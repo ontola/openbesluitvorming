@@ -16,7 +16,7 @@ const Predicate = (props: PredicateProps) => {
     <div>
       <p>
         {label && Array.isArray(label) ? label[0].term : label.term}
-        {":   "}
+        <br/>
         {props.children}
       </p>
     </div>

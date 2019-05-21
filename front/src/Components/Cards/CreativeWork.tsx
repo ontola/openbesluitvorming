@@ -23,7 +23,6 @@ const CreativeWork: React.FunctionComponent<CreativeWorkProps> = (props) => {
         <div className="ResultCard__detail" >{indexToMunicipality(props._index)}</div>
         <DetailType type={props["@type"]} />
       </div>
-      <p>Classification: {props.classification}</p>
     </React.Fragment>
   );
 };

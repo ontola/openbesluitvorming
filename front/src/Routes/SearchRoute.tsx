@@ -80,7 +80,7 @@ const SearchRoute = (props: RouteComponentProps) => {
           >
             {currentResource && currentSearchTerm &&
               <SideDrawer>
-                <LinkedResourceContainer subject={NamedNode.find(currentResource)} />
+                <LinkedResourceContainer forceRender subject={NamedNode.find(currentResource)} />
               </SideDrawer>
             }
           </ReactCSSTransitionGroup>

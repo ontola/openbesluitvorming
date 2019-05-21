@@ -59,6 +59,7 @@ export default function generateLRS() {
   LRS.namespaces.dcterms = Namespace("http://purl.org/dc/terms/p");
   LRS.namespaces.rdfs = Namespace("http://www.w3.org/1999/02/22-rdf-syntax-ns#");
   LRS.namespaces.ncal = Namespace("http://www.semanticdesktop.org/ontologies/2007/04/02/ncal#");
+  LRS.namespaces.skos = Namespace("http://www.w3.org/2004/02/skos/core#");
 
   const NS = LRS.namespaces;
 

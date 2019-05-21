@@ -36,7 +36,6 @@ const AgendaItem: React.FunctionComponent<AgendaItemProps> = (props) => {
         }
       </div>
       <DetailHighlight textArray={props.highlight.description} />
-      <p>Parent: {props.parent}</p>
     </React.Fragment>
   );
 };

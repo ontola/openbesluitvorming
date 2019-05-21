@@ -6,6 +6,7 @@ import { resourceTopology } from "../Topologies/ResourceTopology";
 import Box from "../Topologies/BoxTopology";
 import { labelsTopology } from "../Topologies/LabelsTopology";
 
+// A Thing inside the Resource or Labels topology
 const ThingResource = () => {
   return (
     <Box>
