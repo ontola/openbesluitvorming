@@ -28,7 +28,7 @@ content-type: application/json
     "fragment_size": 100,
     "number_of_fragments": 3
   },
-    "size": 10,
+  "size": 10,
   "_source": {
     "includes": [
       "*"

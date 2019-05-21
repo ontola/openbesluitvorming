@@ -29,7 +29,7 @@ const MediaObject = (props: MediaObjectProps) => {
       <Property label={NS.schema("isBasedOn")} />
     </React.Fragment>
   );
-}
+};
 
 MediaObject.type = NS.schema("MediaObject");
 
