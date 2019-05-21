@@ -88,7 +88,7 @@ body {
   border-right: solid 1px $g2;
   transition: .2s all;
   padding: 0;
-  z-index: 1;
+  z-index: 2;
   background-color: white;
   width: $filter-bar-width;
   padding: 1rem;
@@ -407,10 +407,6 @@ body {
   position: relative;
   padding-bottom: 3rem;
 
-  .SearchRoute--show-filters & {
-    margin-left: $filter-bar-width;
-  }
-
   &__loader {
     padding-top: 1rem;
     padding-bottom: 1rem;
@@ -503,6 +499,9 @@ mark {
   @media only screen and (max-width: 530px) {
     margin-left: -1rem;
     margin-right: -1rem;
+    border-left: none;
+    border-right: none;
+    border-radius: 0;
   }
 
   h2 {
@@ -619,6 +618,10 @@ mark {
       margin-right: 1rem;
     }
   }
+
+  .SearchRoute--show-filters .Results {
+    margin-left: $filter-bar-width;
+  }
 }
 
 @media only screen and (max-width: 400px) {
@@ -627,7 +630,7 @@ mark {
   }
 }
 
-@media only screen and (max-width: 560px) {
+@media only screen and (max-width: 700px) {
   .NavBar__top,
   .NavBar__bottom {
     margin-left: 1rem;
