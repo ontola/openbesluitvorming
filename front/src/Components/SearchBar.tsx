@@ -22,7 +22,7 @@ const SearchBar: React.FunctionComponent = () => {
       autoFocus
       className="SearchBar"
       componentId="searchbox"
-      debounce={1200}
+      debounce={200}
       showFilter={false}
       dataField={fields}
       highlight
