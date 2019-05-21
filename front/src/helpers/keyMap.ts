@@ -4,13 +4,15 @@ export const keyMap = {
   PREVIOUS: "left",
   NEXT: "right",
   SEARCH: "/",
+  FULLSCREEN: "f",
+  CLOSE: ["escape", "esc"],
 };
 
 configure({
   /**
    * The level of logging of its own behaviour React HotKeys should perform.
    */
-  logLevel: "verbose",
+  // logLevel: "verbose",
 
   /**
    * Default key event key maps are bound to (keydown|keypress|keyup)

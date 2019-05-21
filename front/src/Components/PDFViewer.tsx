@@ -74,11 +74,6 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
     setPageNumber(pageNumber + 1);
   };
 
-  const keyHandlers = {
-    PREVIOUS: handlePreviousPage,
-    NEXT: handleNextPage,
-  };
-
   useLayoutEffect(
     () => {
       focusOnViewer();
@@ -86,8 +81,8 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
   );
 
   function focusOnViewer() {
-    if (docRef !== null) {
-      docRef.focus();
+    if (pdfWrapper.current !== null) {
+      pdfWrapper.current.focus();
     }
   }
 
@@ -167,6 +162,12 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
   const makeTextRenderer = (searchText: string) =>
     (textItem: TextLayerItem) => highlightPattern(textItem.str, searchText);
 
+  const keyHandlers = {
+    PREVIOUS: handlePreviousPage,
+    NEXT: handleNextPage,
+    FULLSCREEN: setFillWidth,
+  };
+
   return (
     <HotKeys
       allowChanges={true}
@@ -204,7 +205,7 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
               <Button
                 onClick={handlePreviousPage}
                 disabled={(pageNumber === 1)}
-                title="Vorige pagina"
+                title="Vorige pagina (←)"
               >
                 <FontAwesomeIcon icon={faArrowLeft} />
               </Button>
@@ -212,19 +213,19 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
               <Button
                 onClick={handleNextPage}
                 disabled={(pageNumber === (numPages))}
-                title="Volgende pagina"
+                title="Volgende pagina (→)"
               >
                 <FontAwesomeIcon icon={faArrowRight} />
               </Button>
               <Button
                 onClick={() => window.open(props.url)}
-                title="Download bestand"
+                title="Download bestand (D)"
               >
                 <FontAwesomeIcon icon={faDownload} />
               </Button>
               <Button
                 onClick={setFillWidth}
-                title="Scherm vullen"
+                title="Scherm vullen (F)"
               >
                 <FontAwesomeIcon icon={faExpand} />
               </Button>

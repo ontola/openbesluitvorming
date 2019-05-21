@@ -20,6 +20,8 @@ const SearchBar: React.FunctionComponent = () => {
   return (
     <DataSearch
       autoFocus
+      // TODO: Focus on bar on SEARCH hotkey
+      // myForwardedRef={(e: any) => { console.log("DATA", e); }}
       className="SearchBar"
       componentId="searchbox"
       debounce={200}

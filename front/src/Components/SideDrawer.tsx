@@ -8,6 +8,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { withRouter, RouteComponentProps } from "react-router";
 import { usePersistedState } from "../helpers";
+import { HotKeys } from "react-hotkeys";
 
 interface SideDrawerProps {
   children: React.ReactNode;
@@ -63,6 +64,10 @@ const SideDrawer = (props: SideDrawerProps & RouteComponentProps) => {
     props.history.push(`/search?${params.toString()}`);
   };
 
+  const keyHandlers = {
+    CLOSE: closeDocument,
+  };
+
   return (
     <SideDrawerContext.Provider
       value={{
@@ -70,7 +75,10 @@ const SideDrawer = (props: SideDrawerProps & RouteComponentProps) => {
         setWidth,
       }}
     >
-      <div className="SideDrawer__wrapper">
+      <HotKeys
+        handlers={keyHandlers}
+        className="SideDrawer__wrapper"
+      >
         <Resizable
           size={{ width, height: "100%" }}
           className="SideDrawer"
@@ -92,10 +100,12 @@ const SideDrawer = (props: SideDrawerProps & RouteComponentProps) => {
             Sluiten
           </Button>
           <div className="SideDrawer__scroller">
-           {typeof props.children === "function" ? props.children(width, setWidth) : props.children}
+          {typeof props.children === "function" ?
+            props.children(width, setWidth) : props.children
+          }
           </div>
         </Resizable>
-      </div>
+      </HotKeys>
     </SideDrawerContext.Provider>
   );
 };
