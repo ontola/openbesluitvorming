@@ -11,6 +11,7 @@ import {
 import { withRouter, RouteComponentProps } from "react-router";
 import { SideDrawerContext } from "./SideDrawer";
 import { getParams } from "../helpers";
+import { handle } from "../helpers/logging";
 const { Document, Page, pdfjs } = require("react-pdf");
 // tslint:disable-next-line:max-line-length
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.js`;
@@ -49,9 +50,6 @@ export const LoadingComponent = () =>
     <FontAwesomeIcon icon={faSpinner} size="6x" spin />
   </div>;
 
-const PDFErrorComponent = () =>
-  <div className="PDFViewer__error">De PDF kan niet worden geladen.</div>;
-
 const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
   const [pageNumber, setPageNumber] = React.useState<number>(1);
   const [docRef, setDocRef] = React.useState<any>(null);
@@ -70,6 +68,18 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
     setNumPages(e.numPages);
     setPageNumber(1);
     setShowButtons(true);
+  };
+
+  const PDFErrorComponent = (error: any) => {
+    handle(error);
+    return (
+      <div className="PDFViewer__error">
+        <p>
+          De PDF kan niet worden geladen.
+        </p>
+        <a href={props.url} download >Download het bestand.</a>
+      </div>
+    );
   };
 
   const highlightPattern = (text: string, pattern: string): React.ReactNode => {
