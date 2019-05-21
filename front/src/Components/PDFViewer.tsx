@@ -51,6 +51,7 @@ export const LoadingComponent = () =>
 
 const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
   const [pageNumber, setPageNumber] = React.useState<number>(1);
+  const [docRef, setDocRef] = React.useState<any>(null);
   const [numPages, setNumPages] = React.useState<number>(0);
   const [maxWidth] = React.useState<number>(calcMaxWidth(window.innerWidth));
   const [showButtons, setShowButtons] = React.useState<boolean>(false);
@@ -101,16 +102,21 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
   };
 
   const setFillWidth = () => {
-    const PDFelements = document.getElementsByClassName("react-pdf__Page__canvas");
-    if (PDFelements[0]) {
-      const doc = PDFelements[0];
-      const docRatio = doc.clientWidth / doc.clientHeight;
+    if (docRef !== null) {
+      const docRatio = docRef.clientWidth / docRef.clientHeight;
       const newWidth =  window.innerHeight * docRatio;
       if (newWidth < maxWidth) {
         drawer.setWidth(newWidth);
       } else {
         drawer.setWidth(maxWidth);
       }
+      setTimeout(
+        () => docRef.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        }),
+        100,
+      );
     }
   };
 
@@ -124,6 +130,7 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
           <Document
             file={props.url}
             loading={<LoadingComponent/>}
+            inputRef={(ref: any) => { setDocRef(ref); }}
             onLoadSuccess={onDocumentLoadSuccess}
           >
             <Page
