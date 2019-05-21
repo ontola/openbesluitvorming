@@ -302,10 +302,6 @@ body {
   }
 }
 
-.PDFViewer {
-  position: relative;
-}
-
 .PDFViewer__button-bar {
   position: absolute;
   bottom: 0;
@@ -341,7 +337,7 @@ body {
 }
 
 .PDFViewer__loading {
-  position: absolute;
+  position: relative;
   background-color: white;
   top: 0;
   bottom: 0;
@@ -352,6 +348,7 @@ body {
   justify-content: center;
   transition: .2s all;
   color: $blue;
+  height: 100vh;
 }
 
 .PDFViewer__scroller {

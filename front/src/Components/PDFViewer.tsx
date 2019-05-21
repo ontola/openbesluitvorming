@@ -44,7 +44,7 @@ const calcMaxWidth = (windowWidth: number) => {
   return windowWidth;
 };
 
-const LoadingComponent = () =>
+export const LoadingComponent = () =>
   <div className="PDFViewer__loading">
     <FontAwesomeIcon icon={faSpinner} size="6x" spin />
   </div>;
@@ -127,7 +127,7 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
             onLoadSuccess={onDocumentLoadSuccess}
           >
             <Page
-              loading={null}
+              loading={<LoadingComponent/>}
               pageIndex={pageNumber - 1}
               width={drawer.width}
               customTextRenderer={currentSearchTerm && makeTextRenderer(currentSearchTerm)}

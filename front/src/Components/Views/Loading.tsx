@@ -2,13 +2,13 @@ import React from "react";
 import { register } from "link-redux";
 
 import { NS } from "../../LRS";
-import { LoadingWithSpinner } from "../ResultsList";
+import { LoadingComponent } from "../PDFViewer";
 
 const Loading = (props: any) => {
 
   return (
     <div className="Resource">
-      <LoadingWithSpinner />
+      <LoadingComponent />
     </div>
   );
 };
