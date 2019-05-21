@@ -15,6 +15,14 @@ import { SERVER_PORT, NODE_ENV } from "../config";
 import SideDrawer from "../Components/SideDrawer";
 import { LinkedResourceContainer } from "link-redux";
 import { NamedNode } from "rdflib";
+import { HotKeys } from "react-hotkeys";
+
+import { keyMap } from "../helpers/keyMap";
+
+const globalKeyHandlers = {
+  // TODO: Focus on search
+  SEARCH: () => console.log("search!"),
+};
 
 const SearchRoute = (props: RouteComponentProps) => {
   const [showFilters, setShowFilters] = React.useState(false);
@@ -36,57 +44,62 @@ const SearchRoute = (props: RouteComponentProps) => {
   }
 
   return (
-    <ReactiveBase
-      theme={theme}
-      app="ori_*"
-      url={apiURL.toString()}
-      setSearchParams={setSearchParams as () => string}
+    <HotKeys
+      keyMap={keyMap}
+      handlers={globalKeyHandlers}
     >
-      <div className={
-        `SearchRoute ${currentSearchTerm ? "SearchRoute--search" : ""}
-        ${showFilters ? "SearchRoute--show-filters" : ""}
-        `
-      }>
-        <div className="NavBar">
-          <NavBarTop />
-          <div className="NavBar__bottom">
-            <SearchBar/>
-            {currentSearchTerm && <Button
-              className="SearchBar__button"
-              onClick={() => setShowFilters(!showFilters)}
-              >
-              filters {showFilters ? "verbergen" : "tonen"}
-            </Button>}
+      <ReactiveBase
+        theme={theme}
+        app="ori_*"
+        url={apiURL.toString()}
+        setSearchParams={setSearchParams as () => string}
+      >
+        <div className={
+          `SearchRoute ${currentSearchTerm ? "SearchRoute--search" : ""}
+          ${showFilters ? "SearchRoute--show-filters" : ""}
+          `
+        }>
+          <div className="NavBar">
+            <NavBarTop />
+            <div className="NavBar__bottom">
+              <SearchBar/>
+              {currentSearchTerm && <Button
+                className="SearchBar__button"
+                onClick={() => setShowFilters(!showFilters)}
+                >
+                filters {showFilters ? "verbergen" : "tonen"}
+              </Button>}
+            </div>
+          </div>
+          <div className="Wrapper">
+            {currentSearchTerm &&
+              <Filtersbar
+                display={showFilters}
+              />
+            }
+            {currentSearchTerm &&
+              <div className="Results">
+                <ResultsList/>
+              </div>
+            }
+            {!currentSearchTerm &&
+              <Home />
+            }
+            <ReactCSSTransitionGroup
+              transitionName="SideDrawer__wrapper"
+              transitionEnterTimeout={200}
+              transitionLeaveTimeout={200}
+            >
+              {currentResource && currentSearchTerm &&
+                <SideDrawer>
+                  <LinkedResourceContainer forceRender subject={NamedNode.find(currentResource)} />
+                </SideDrawer>
+              }
+            </ReactCSSTransitionGroup>
           </div>
         </div>
-        <div className="Wrapper">
-          {currentSearchTerm &&
-            <Filtersbar
-              display={showFilters}
-            />
-          }
-          {currentSearchTerm &&
-            <div className="Results">
-              <ResultsList/>
-            </div>
-          }
-          {!currentSearchTerm &&
-            <Home />
-          }
-          <ReactCSSTransitionGroup
-            transitionName="SideDrawer__wrapper"
-            transitionEnterTimeout={200}
-            transitionLeaveTimeout={200}
-          >
-            {currentResource && currentSearchTerm &&
-              <SideDrawer>
-                <LinkedResourceContainer forceRender subject={NamedNode.find(currentResource)} />
-              </SideDrawer>
-            }
-          </ReactCSSTransitionGroup>
-        </div>
-      </div>
-    </ReactiveBase>
+      </ReactiveBase>
+    </HotKeys>
   );
 };
 
