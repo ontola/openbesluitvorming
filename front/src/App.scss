@@ -60,7 +60,7 @@ body {
     position: absolute;
     top: .5rem;
     right: .5rem;
-    background-color: white;
+    background-color: transparentize(white, .1);
     z-index: 1;
 
     &:hover {
@@ -430,6 +430,7 @@ body {
 
   h1 {
     margin: 0;
+    font-size: 1.4rem;;
   }
 }
 

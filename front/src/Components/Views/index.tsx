@@ -9,6 +9,7 @@ import AgendaItem from "./AgendaItem";
 import ErrorComp from "./Error";
 import Loading from "./Loading";
 import MediaObject from "./MediaObject";
+import Meeting from "./Meeting";
 import Predicate from "./Predicate";
 import Properties from "../Properties";
 import Thing from "./Thing";
@@ -20,6 +21,7 @@ function register() {
     ...ErrorComp,
     ...Loading,
     ...MediaObject,
+    ...Meeting,
     ...Predicate,
     ...Properties,
     ...Thing,
