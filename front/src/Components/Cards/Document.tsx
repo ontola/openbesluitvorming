@@ -38,15 +38,13 @@ const Document: React.FunctionComponent<DocumentProps & RouteComponentProps> = (
           </a>
         }
       </div>
-      <p>
-        {props.highlight.text && props.highlight.text.map(
-          ((text: string) => (
-            <div key={text} className="ResultCard__highlight">
-              <span dangerouslySetInnerHTML={{ __html: `${text}...` }}/>
-            </div>
-          )))
-        }
-      </p>
+      {props.highlight.text && props.highlight.text.map(
+        ((text: string) => (
+          <div key={text} className="ResultCard__highlight">
+            <span dangerouslySetInnerHTML={{ __html: `${text}...` }}/>
+          </div>
+        )))
+      }
     </React.Fragment>
   );
 };

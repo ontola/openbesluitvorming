@@ -182,7 +182,7 @@ body {
 
 .NavBar {
   border-bottom: solid 1px $g2;
-  z-index: 1;
+  z-index: 2;
   position: fixed;
   top: 0;
   left: 0;
@@ -439,14 +439,30 @@ body {
 }
 
 mark {
-  background-color: $blue-mark;
+  position: relative;
+  z-index: 1;
+  // box-shadow: 0px 0 2px red;
+  background-color: transparent;
+
+  &:before{
+    width: 100%;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: .2rem;
+    display: block;
+    z-index: -2;
+    position: absolute;
+    content: "";
+    background-color: $blue-mark;
+  }
 }
 
 .ResultCard {
   background-color: white;
   max-width: $result-width;
   margin-bottom: 1rem;
-  padding: .5rem 1rem;
+  padding: .5rem 1rem 0;
   border-radius: 5px;
   border: solid 1px $g2;
 
@@ -482,12 +498,13 @@ mark {
   }
 
   &__highlight {
-    margin-bottom: .3rem;
+    margin-bottom: .5rem;
   }
 
   &__details{
     display: flex;
     flex-wrap: wrap;
+    margin-bottom: .5rem;
 
     & .ResultCard__detail {
       display: inline;
