@@ -8,7 +8,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { withRouter, RouteComponentProps } from "react-router";
 import { usePersistedState } from "../helpers";
-import { HotKeys } from "react-hotkeys";
+import { GlobalHotKeys } from "react-hotkeys";
 
 interface SideDrawerProps {
   children: React.ReactNode;
@@ -75,8 +75,10 @@ const SideDrawer = (props: SideDrawerProps & RouteComponentProps) => {
         setWidth,
       }}
     >
-      <HotKeys
+      <GlobalHotKeys
         handlers={keyHandlers}
+      />
+      <div
         className="SideDrawer__wrapper"
       >
         <Resizable
@@ -105,7 +107,7 @@ const SideDrawer = (props: SideDrawerProps & RouteComponentProps) => {
           }
           </div>
         </Resizable>
-      </HotKeys>
+      </div>
     </SideDrawerContext.Provider>
   );
 };
