@@ -6,6 +6,8 @@ import { StringLiteral } from "@babel/types";
 import { resourceTopology } from "../Topologies/ResourceTopology";
 
 interface TitleProps {
+  label: StringLiteral;
+  prefLabel: StringLiteral;
   name: StringLiteral;
 }
 
@@ -20,6 +22,7 @@ class Title extends React.Component<TitleProps> {
     NS.as("name"),
     NS.rdfs("label"),
     NS.foaf("name"),
+    NS.skos("prefLabel"),
   ];
 
   static mapDataToProps = [
@@ -27,11 +30,12 @@ class Title extends React.Component<TitleProps> {
   ];
 
   render() {
-    const { name } = this.props;
+    const { name, label, prefLabel } = this.props;
+    const printValue = name.value || label.value || prefLabel.value;
 
     return (
       <h1>
-        {name.value}
+        {printValue}
       </h1>
     );
   }

@@ -15,7 +15,7 @@ interface OrganizationProps {
 const Organization = (props: OrganizationProps) => {
   return (
     <ResourceTopology>
-      <Property label={[NS.skos("preflabel")]} />
+      <Property label={NS.skos("prefLabel")} />
       <div className="Resource__details">
         Organisatie
         {" - "}

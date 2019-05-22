@@ -21,7 +21,12 @@ const AgendaItem = (props: AgendaItemProps) => {
         {" - "}
         <DownloadResource url={props.subject.value} />
       </div>
-      Besproken in: <Property label={NS.schema("superEvent")} /><br/>
+      <div className="LabelItem">
+        <div className="LabelItem__label">
+          Besproken in
+        </div>
+        <div><Property label={NS.schema("superEvent")} /><br/></div>
+      </div>
       <Labels>
         <Property label={NS.schema("description")} />
         <Property label={NS.schema("startDate")} />
