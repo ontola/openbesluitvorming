@@ -12,7 +12,7 @@ import { withRouter, RouteComponentProps } from "react-router";
 import { SideDrawerContext } from "./SideDrawer";
 import { getParams } from "../helpers";
 import { handle } from "../helpers/logging";
-import { HotKeys } from "react-hotkeys";
+import { GlobalHotKeys } from "react-hotkeys";
 const { Document, Page, pdfjs } = require("react-pdf");
 // tslint:disable-next-line:max-line-length
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.js`;
@@ -169,7 +169,7 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
   };
 
   return (
-    <HotKeys
+    <GlobalHotKeys
       allowChanges={true}
       handlers={keyHandlers}
       ref={() => pdfWrapper}
@@ -233,7 +233,7 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
           </div>
         }
       </div>
-    </HotKeys>
+    </GlobalHotKeys>
   );
 };
 

@@ -25,7 +25,6 @@ const SearchBar: React.FunctionComponent = () => {
       const wrapper = document.getElementsByClassName("SearchBar")[0];
       // @ts-ignore
       const inputElement = wrapper.getElementsByTagName("input")[0];
-      console.log(inputElement);
       if (e !== undefined) {
         e.preventDefault();
       }

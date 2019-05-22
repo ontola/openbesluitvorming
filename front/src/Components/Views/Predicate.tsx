@@ -13,12 +13,11 @@ interface PredicateProps {
 const Predicate = (props: PredicateProps) => {
   const { label } = props;
   return (
-    <div>
-      <p>
+    <div className="LabelItem">
+      <div className="LabelItem__label">
         {label && Array.isArray(label) ? label[0].term : label.term}
-        <br/>
-        {props.children}
-      </p>
+      </div>
+      <div>{props.children}</div>
     </div>
   );
 };

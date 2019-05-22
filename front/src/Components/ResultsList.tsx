@@ -23,7 +23,7 @@ interface ResultsType {
 
 const ResultStats = (props: ResultsType) =>
   <div className="bottom-margin">
-    {props.numberOfResults.value} resultaten gevonden
+    {props.numberOfResults} resultaten gevonden
   </div>;
 
 const NoResults = () =>

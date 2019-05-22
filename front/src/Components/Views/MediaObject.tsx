@@ -21,9 +21,8 @@ const MediaObject = (props: MediaObjectProps) => {
         <DownloadResource url={props.subject.value} />
         <Labels>
           <Property label={NS.schema("dateModified")} />
-          <Property label={NS.schema("fileSize")} />
-          <Property label={NS.schema("encodingFormat")} />
-          <Property label={NS.schema("contentUrl")} />
+          {/* <Property label={NS.schema("fileSize")} />
+          <Property label={NS.schema("encodingFormat")} /> */}
         </Labels>
       </Resource>
       {/* TODO: Resolve PDFs, use contentURL */}
