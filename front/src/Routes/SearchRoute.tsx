@@ -15,13 +15,11 @@ import { SERVER_PORT, NODE_ENV } from "../config";
 import SideDrawer from "../Components/SideDrawer";
 import { LinkedResourceContainer } from "link-redux";
 import { NamedNode } from "rdflib";
-import { HotKeys } from "react-hotkeys";
+import { GlobalHotKeys } from "react-hotkeys";
 
 import { keyMap } from "../helpers/keyMap";
 
 const globalKeyHandlers = {
-  // TODO: Focus on search
-  SEARCH: () => console.log("search!"),
 };
 
 const SearchRoute = (props: RouteComponentProps) => {
@@ -44,7 +42,7 @@ const SearchRoute = (props: RouteComponentProps) => {
   }
 
   return (
-    <HotKeys
+    <GlobalHotKeys
       keyMap={keyMap}
       handlers={globalKeyHandlers}
     >
@@ -99,7 +97,7 @@ const SearchRoute = (props: RouteComponentProps) => {
           </div>
         </div>
       </ReactiveBase>
-    </HotKeys>
+    </GlobalHotKeys>
   );
 };
 
