@@ -32,7 +32,9 @@ const NoResults = () =>
 export const LoadingWithSpinner = () =>
   <div className="Results__loader">
     <FontAwesomeIcon icon={faSpinner} spin />
-    {" Laden.."}
+    <span>
+      {" Laden.."}
+    </span>
   </div>;
 
 const DualLoader = () =>

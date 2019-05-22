@@ -432,10 +432,11 @@ body {
 .Results {
   .Results__loader {
     background-color: $g0;
-    width: $result-width;
+    max-width: 100%;
+    display: flex;
 
     span {
-      margin-left: 1rem;
+      margin-left: .4rem;
     }
   }
 }
