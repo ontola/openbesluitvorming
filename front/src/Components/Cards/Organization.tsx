@@ -17,8 +17,9 @@ const Organization: React.FunctionComponent<OrgProps> = (props) => {
         <div className="ResultCard__detail" >{indexToMunicipality(props._index)}</div>
         <DetailType type={props["@type"]} />
       </div>
-      <p>Classification: {props.classification}</p>
-      <p>Parent: {props.parent}</p>
+      {props.classification &&
+        <p>Soort: {props.classification}</p>
+      }
     </React.Fragment>
   );
 };

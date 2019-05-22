@@ -15,13 +15,16 @@ interface AgendaItemProps {
 const AgendaItem = (props: AgendaItemProps) => {
   return (
     <ResourceTopology>
-      <Property label={NS.schema("name")} /><br />
-      AgendaPunt<br />
-      <DownloadResource url={props.subject.value} />
+      <Property label={NS.schema("name")} />
+      <div className="Resource__details">
+        AgendaPunt
+        {" - "}
+        <DownloadResource url={props.subject.value} />
+      </div>
+      Besproken in: <Property label={NS.schema("superEvent")} /><br/>
       <Labels>
         <Property label={NS.schema("description")} />
         <Property label={NS.schema("startDate")} />
-        <Property label={NS.schema("superEvent")} />
         <Property label={NS.meeting("attachment")} limit={100}/>
       </Labels>
     </ResourceTopology>

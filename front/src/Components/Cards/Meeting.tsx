@@ -35,9 +35,9 @@ const Meeting: React.FunctionComponent<MeetingProps> = (props) => {
           <div className="ResultCard__detail" >{date.toLocaleDateString()}</div>
         }
       </div>
-      <p>{props.description}</p>
-      <p>Commissie: {props.committee}</p>
-      <p>Status: {props.status}</p>
+      {props.description &&
+        <p>{props.description}</p>
+      }
     </React.Fragment>
   );
 };

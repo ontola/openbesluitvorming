@@ -15,13 +15,17 @@ interface MeetingProps {
 const Meeting = (props: MeetingProps) => {
   return (
     <ResourceTopology>
-      <Property label={NS.schema("name")} /><br />
-      Vergadering<br />
-      <DownloadResource url={props.subject.value} />
+      <Property label={NS.schema("name")} />
+        <div className="Resource__details">
+        Vergadering
+        {" - "}
+        <DownloadResource url={props.subject.value} />
+      </div>
       <Labels>
         <Property label={NS.schema("description")} />
         <Property label={NS.schema("startDate")} />
-        <Property label={NS.ncal("categories")} />
+        {/* TODO: List support */}
+        {/* <Property label={NS.ncal("categories")} /> */}
         <Property label={NS.meeting("committee")} />
         <Property label={NS.meeting("attachment")} limit={100}/>
         <Property label={NS.meeting("agenda")} limit={100}/>

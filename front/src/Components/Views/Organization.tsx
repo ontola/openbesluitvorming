@@ -15,12 +15,15 @@ interface OrganizationProps {
 const Organization = (props: OrganizationProps) => {
   return (
     <ResourceTopology>
-      <Property label={NS.skos("preflabel")} /><br />
-      Organisatie<br />
-      <DownloadResource url={props.subject.value} />
+      <Property label={[NS.skos("preflabel")]} />
+      <div className="Resource__details">
+        Organisatie
+        {" - "}
+        <DownloadResource url={props.subject.value} />
+      </div>
       <Labels>
         <Property label={NS.org("subOrganizationOf")} />
-        <Property label={NS.schema("startDate")} />
+        <Property label={NS.ncal("categories")} />
         <Property label={NS.schema("superEvent")} />
         <Property label={NS.meeting("attachment")} limit={100}/>
       </Labels>

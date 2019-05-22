@@ -16,9 +16,12 @@ const MediaObject = (props: MediaObjectProps) => {
   return (
     <React.Fragment>
       <Resource>
-        <Property label={[NS.schema("name"), NS.schema("label")]} /><br />
-        PDF document <br/>
-        <DownloadResource url={props.subject.value} />
+        <Property label={[NS.schema("name"), NS.schema("label")]} />
+        <div className="Resource__details">
+          PDF document
+          {" - "}
+          <DownloadResource url={props.subject.value} />
+        </div>
         <Labels>
           <Property label={NS.schema("dateModified")} />
           {/* <Property label={NS.schema("fileSize")} />

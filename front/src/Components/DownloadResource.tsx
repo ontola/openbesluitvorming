@@ -9,7 +9,7 @@ const DownloadResource: React.FunctionComponent<DownloadResourceProps> = (props)
   const [extension, setExtension] = useState("ttl");
 
   return (
-    <div>
+    <div className="Downloader">
       <a href={`${props.url}.${extension}`} download>
         Download data
       </a>

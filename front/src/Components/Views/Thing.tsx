@@ -15,7 +15,9 @@ const Thing = (props: ThingProps) => {
   return (
     <Resource>
       <Property label={[NS.schema("name"), NS.schema("label")]} /><br />
-      <DownloadResource url={props.subject.value} />
+      <div className="Resource__details">
+        <DownloadResource url={props.subject.value} />
+      </div>
       <Labels>
         <Property label={NS.rdfs("type")} /><br />
         <Property label={NS.schema("dateModified")} /><br />

@@ -74,6 +74,30 @@ p {
   }
 }
 
+.Downloader {
+  display: inline;
+  a {
+    color: $blue_dark;
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+
+  select {
+    color: $blue_dark;
+    -webkit-appearance: none;
+    outline: none;
+    background: none;
+    border: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}
+
 .Filter {
   margin-bottom: 1rem !important;
 
@@ -474,14 +498,25 @@ p {
   h1 {
     margin: 0;
     font-size: 1.4rem;;
+    color: $blue;
   }
 }
 
+.Resource__details {
+  margin-bottom: 1rem;
+}
+
 .Box {
-  border: solid 1px grey;
+  // border: solid 1px $blue_light;
+  color: $blue_dark;
+  font-weight: bold;
   display: block;
-  padding: .2rem;
+  // padding: .2rem;
   border-radius: 5px;
+
+  &:hover {
+    text-decoration: underline;
+  }
 }
 
 mark {
