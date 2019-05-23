@@ -2,7 +2,7 @@ import * as React from "react";
 import { Link } from "react-router-dom";
 import vngLogo from "../vnglogo.svg";
 
-const Home = () => {
+const NavBarTop = () => {
   return (
     <div className="NavBar__top">
       <Link
@@ -43,4 +43,4 @@ const Home = () => {
   );
 };
 
-export default Home;
+export default NavBarTop;
