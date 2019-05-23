@@ -10,7 +10,11 @@ const DownloadResource: React.FunctionComponent<DownloadResourceProps> = (props)
 
   return (
     <div className="Downloader">
-      <a href={`${props.url}.${extension}`} download>
+      <a
+        href={`${props.url}.${extension}`}
+        target="_blank"
+        download
+      >
         Download data
       </a>
       <span> als </span>
