@@ -1,4 +1,4 @@
-### simple_query_string
+# simple_query_string
 #   ~90ms
 
 POST https://api.openraadsinformatie.nl/v1/elastic/ori_*/_search? HTTP/1.1
@@ -45,7 +45,7 @@ content-type: application/json
   ]
 }
 
-### multi_match with bools
+# multi_match with bools
 #   ~200ms
 POST https://api.openraadsinformatie.nl/v1/elastic/ori_*/_search? HTTP/1.1
 content-type: application/json
@@ -130,14 +130,59 @@ content-type: application/json
   ]
 }
 
-### ORI API
-#   ~
+# ORI API N-Quads
 
-GET http://id.openraadsinformatie.nl/62297 HTTP/1.1
+GET https://id.openraadsinformatie.nl/44477 HTTP/1.1
+content-type: application/n-quads
+
+# ES search in municipality using terms filter
+
+GET http://ori.argu.co/api/ori_*/_search? HTTP/1.1
 content-type: application/json
 
-### ES via front-end
-#   ~
+{
+  "query": {
+    "bool": {
+      "must": [
+        [
+          {
+            "simple_query_string": {
+              "fields": [
+                "text",
+                "title",
+                "description",
+                "name"
+              ],
+              "default_operator": "or",
+              "query": "zoeken"
+            }
+          }
+        ],
+        {
+          "terms": {
+            "_index": [
+              "ori_alkmaar_20190507105200"
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "size": 10
+}
 
-GET http://ori.argu.co/api/ori_*/_msearch? HTTP/1.1
+# ES single Municipality using index in URL
+
+GET http://ori.argu.co/api/ori_alkmaar_20190507105200/_search? HTTP/1.1
 content-type: application/json
+
+{
+  "query": {
+      "simple_query_string": {
+      "fields": ["text", "title", "description", "name"],
+      "default_operator": "or",
+      "query": "zoek"
+    }
+  },
+  "size": 10
+}
