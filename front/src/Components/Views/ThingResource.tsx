@@ -10,7 +10,12 @@ import { labelsTopology } from "../Topologies/LabelsTopology";
 const ThingResource = () => {
   return (
     <Box>
-      <Property label={[NS.schema("name"), NS.schema("label"), NS.skos("prefLabel")]} />
+      <Property label={[
+        NS.schema("name"),
+        NS.rdfs("label"),
+        NS.schema("label"),
+        NS.skos("prefLabel"),
+      ]} />
     </Box>
   );
 };

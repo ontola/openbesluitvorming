@@ -55,12 +55,12 @@ interface SortOption {
 
 const sortOptions: SortOption[] = [
   {
-    label: "Relevantie",
+    label: "Meest relevant",
     dataField: "_score",
     sortBy: "desc",
   },
   {
-    label: "Datum",
+    label: "Nieuwste",
     dataField: "date_modified",
     sortBy: "desc",
   },

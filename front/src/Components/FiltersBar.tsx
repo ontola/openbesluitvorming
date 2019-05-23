@@ -4,12 +4,14 @@ import {
   MultiList,
   SelectedFilters,
 } from "@appbaseio/reactivesearch";
-import { indexToMunicipality, typeToLabel } from "../helpers";
+import { indexToMunicipality, typeToLabel, ids, capitalize } from "../helpers";
 import { LoadingWithSpinner } from "./ResultsList";
 
 interface FiltersbarProps {
   display: boolean;
 }
+
+const startDate = new Date(2000, 1);
 
 const MunicipalityLabel = (label: string, count: number, isSelected: boolean) =>
   <span>
@@ -32,46 +34,8 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
         showClearAll={false}
         className="Filter Filter__current"
       />
-      <DateRange
-        componentId="daterange"
-        dataField="date_modified"
-        className="Filter"
-        title="Datum"
-        placeholder={{
-          start: "Van...",
-          end: "Tot...",
-        }}
-        numberOfMonths={2}
-        queryFormat="date"
-        autoFocusEnd={true}
-        showClear={true}
-        showFilter={true}
-        filterLabel="Date"
-        URLParams={true}
-      />
       <MultiList
-        componentId="gemeenten"
-        dataField="_index"
-        title="Gemeenten"
-        filterLabel="Gemeenten"
-        size={100}
-        sortBy="count"
-        queryFormat="or"
-        showCheckbox={false}
-        showCount={true}
-        showSearch={true}
-        placeholder="Zoek gemeente..."
-        react={{
-          and: ["searchbox", "daterange", "type"],
-        }}
-        showFilter={true}
-        URLParams={true}
-        className="Filter"
-        loader={<LoadingWithSpinner/>}
-        renderItem={MunicipalityLabel}
-      />
-      <MultiList
-        componentId="type"
+        componentId={ids.type}
         dataField="@type"
         filterLabel="Type"
         title="Type"
@@ -85,11 +49,56 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
         showSearch={false}
         placeholder="Zoek type..."
         react={{
-          and: ["searchbox", "daterange", "daterange", "gemeenten"],
+          and: [
+            ids.searchbox,
+            ids.daterange,
+            "gemeenten"],
         }}
         showFilter={true}
         URLParams={true}
         loader={<LoadingWithSpinner/>}
+      />
+      <DateRange
+        componentId={ids.daterange}
+        dataField="date_modified"
+        className="Filter"
+        title={capitalize(ids.daterange)}
+        placeholder={{
+          start: "Van...",
+          end: "Tot...",
+        }}
+        defaultValue={{
+          start: startDate,
+          end: new Date(Date.now()),
+        }}
+        numberOfMonths={2}
+        queryFormat="date"
+        autoFocusEnd={false}
+        showClear={false}
+        showFilter={true}
+        filterLabel={capitalize(ids.daterange)}
+        URLParams={true}
+      />
+      <MultiList
+        componentId="gemeenten"
+        dataField="_index"
+        title={capitalize(ids.gemeenten)}
+        filterLabel={capitalize(ids.gemeenten)}
+        size={100}
+        sortBy="count"
+        queryFormat="or"
+        showCheckbox={false}
+        showCount={true}
+        showSearch={true}
+        placeholder="Zoek gemeente..."
+        react={{
+          and: [ids.searchbox, ids.daterange, ids.type],
+        }}
+        showFilter={true}
+        URLParams={true}
+        className="Filter"
+        loader={<LoadingWithSpinner/>}
+        renderItem={MunicipalityLabel}
       />
   </div>
   );

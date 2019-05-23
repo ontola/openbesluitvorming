@@ -1,12 +1,19 @@
 import React from "react";
 import { History } from "history";
 
-export const allComponentIds = [
-  "searchbox",
-  "gemeenten",
-  "daterange",
-  "type",
-];
+// Mapping for consistent component Ids
+export const ids = {
+  searchbox: "zoekterm",
+  gemeenten: "gemeenten",
+  daterange: "datums",
+  type: "type",
+};
+
+export const capitalize = (s: string) => {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+};
+
+export const allComponentIds = Object.values(ids);
 
 export function usePersistedState<T>(key: string, initial: T):
 [T, React.Dispatch<React.SetStateAction<T>>] {
@@ -38,7 +45,7 @@ export const getParams = (history: History) => {
     currentResource = decodeURIComponent(currentResourceBase);
   }
 
-  let currentSearchTerm = params.get("searchbox");
+  let currentSearchTerm = params.get(ids.searchbox);
   if (currentSearchTerm) {
     currentSearchTerm = currentSearchTerm.substr(1, currentSearchTerm.length - 2);
   }

@@ -1,6 +1,7 @@
 import * as React from "react";
 import { DataSearch } from "@appbaseio/reactivesearch";
 import { GlobalHotKeys } from "react-hotkeys";
+import { ids } from "../helpers";
 
 export const queryGenerator = (searchTerm: string) => {
   const query = {
@@ -42,7 +43,7 @@ const SearchBar: React.FunctionComponent = () => {
         // TODO: Focus on bar on SEARCH hotkey
         // ref={(r: HTMLElement) => { setRef(r); }}
         className="SearchBar"
-        componentId="searchbox"
+        componentId={ids.searchbox}
         debounce={200}
         showFilter={false}
         dataField={fields}

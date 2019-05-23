@@ -74,6 +74,12 @@ p {
   }
 }
 
+.DayPickerInput {
+  input {
+    background-color: $g0 !important;
+  }
+}
+
 .Downloader {
   display: inline;
   a {
@@ -472,7 +478,7 @@ p {
 
 .Results__dual-loader-top {
   position: absolute;
-  top: 0;
+  top: .5rem;
 }
 
 .Results__dual-loader-bottom {
@@ -731,7 +737,7 @@ mark {
     transform: scale(1.2);
   }
 
-  .PDFViewer__handler {
-    transform: scale(1.2);
+  .SideDrawer__handler {
+    transform: scale(1.4);
   }
 }

@@ -98,6 +98,12 @@ export default function generateLRS() {
 
     new Statement(NS.schema("MediaObject"), NS.rdfs("subClassOf"), NS.schema("Thing")),
 
+    new Statement(NS.schema("CreativeWork"), NS.rdfs("label"), Literal.find("Stuk", languages.nl)),
+    new Statement(NS.schema("CreativeWork"), NS.schema("description"), Literal.find("Kan van alles zijn.", languages.en)),
+
+    new Statement(NS.meeting("Meeting"), NS.rdfs("label"), Literal.find("Vergadering", languages.nl)),
+    new Statement(NS.meeting("Meeting"), NS.schema("description"), Literal.find("A meeting is an event where people discuss things and make decisions.", languages.en)),
+
     new Statement(NS.schema("Thing"), NS.rdf("type"), NS.rdfs("Class")),
     new Statement(NS.schema("Thing"), NS.rdfs("comment"), Literal.find("The most generic type of item.")),
     new Statement(NS.schema("Thing"), NS.rdfs("label"), Literal.find("Thing", languages.en)),
