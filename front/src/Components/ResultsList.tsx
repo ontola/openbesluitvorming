@@ -47,19 +47,24 @@ const DualLoader = () =>
     </div>
   </div>;
 
-// interface SortOption {
-//   label: string;
-//   dataField:any;
-//   sortBy: string;
-// }
+interface SortOption {
+  label: string;
+  dataField:any;
+  sortBy: string;
+}
 
-// const sortOptions: SortOption[] = [
-//   {
-//     label: "datum",
-//     dataField: "date_modified",
-//     sortBy: "desc",
-//   },
-// ]
+const sortOptions: SortOption[] = [
+  {
+    label: "Relevantie",
+    dataField: "_score",
+    sortBy: "desc",
+  },
+  {
+    label: "Datum",
+    dataField: "date_modified",
+    sortBy: "desc",
+  },
+];
 
 const ResultsList: React.FunctionComponent<ResultsListProps> = (props) => {
   return (
@@ -73,7 +78,7 @@ const ResultsList: React.FunctionComponent<ResultsListProps> = (props) => {
       onNoResults={<NoResults/>}
       renderResultStats={props => <ResultStats {...props}/>}
       loader={<DualLoader/>}
-      // sortOptions={sortOptions}
+      sortOptions={sortOptions}
       renderError={(error: Error) => {
         handle(error);
         return (
