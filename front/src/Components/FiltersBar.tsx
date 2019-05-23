@@ -11,7 +11,7 @@ interface FiltersbarProps {
   display: boolean;
 }
 
-const startDate = new Date(2000, 1);
+// const startDate = new Date(2000, 1);
 
 const MunicipalityLabel = (label: string, count: number, isSelected: boolean) =>
   <span>
@@ -67,10 +67,10 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
           start: "Van...",
           end: "Tot...",
         }}
-        defaultValue={{
-          start: startDate,
-          end: new Date(Date.now()),
-        }}
+        // defaultValue={{
+        //   start: startDate,
+        //   end: new Date(Date.now()),
+        // }}
         numberOfMonths={2}
         queryFormat="date"
         autoFocusEnd={false}
