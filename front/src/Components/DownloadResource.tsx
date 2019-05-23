@@ -13,6 +13,7 @@ const DownloadResource: React.FunctionComponent<DownloadResourceProps> = (props)
       <a
         href={`${props.url}.${extension}`}
         target="_blank"
+        rel="noopener noreferrer"
         download
       >
         Download data
