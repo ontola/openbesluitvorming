@@ -457,6 +457,7 @@ p {
     padding-bottom: 1rem;
   }
 
+  // sort-options selector
   select {
     -webkit-appearance: none;
     padding: 0;
@@ -467,6 +468,7 @@ p {
     padding-left: 0.6rem;
     border-radius: $border-radius;
     border: $border;
+    background-color: white;
   }
 }
 
