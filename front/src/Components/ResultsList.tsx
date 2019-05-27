@@ -53,7 +53,7 @@ interface SortOption {
   sortBy: string;
 }
 
-const sortOptions: SortOption[] = [
+export const sortOptions: SortOption[] = [
   {
     label: "Meest relevant",
     dataField: "_score",
@@ -78,7 +78,7 @@ const ResultsList: React.FunctionComponent<ResultsListProps> = (props) => {
       onNoResults={<NoResults/>}
       renderResultStats={props => <ResultStats {...props}/>}
       loader={<DualLoader/>}
-      sortOptions={sortOptions}
+      // sortOptions={sortOptions}
       renderError={(error: Error) => {
         handle(error);
         return (
