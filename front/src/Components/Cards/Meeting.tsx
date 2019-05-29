@@ -36,7 +36,7 @@ const Meeting: React.FunctionComponent<MeetingProps> = (props) => {
         }
       </div>
       {props.description &&
-        <p>{props.description}</p>
+        <p dangerouslySetInnerHTML={{ __html: `${props.description}...` }}/>
       }
     </React.Fragment>
   );
