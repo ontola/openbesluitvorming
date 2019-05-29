@@ -1,0 +1,142 @@
+### ORI API Get Resource as N-Quads
+
+GET https://id.openraadsinformatie.nl/44477 HTTP/1.1
+content-type: application/n-quads
+
+### ORI API Get Resource as Turtle
+
+GET https://id.openraadsinformatie.nl/44477 HTTP/1.1
+content-type: text/turtle
+
+### Elastic simple request
+
+POST https://api.openraadsinformatie.nl/v1/elastic/ori_*/_search? HTTP/1.1
+content-type: application/json
+
+{
+  "query": {
+    "simple_query_string": {
+      "fields": ["text", "title", "description", "name"],
+      "default_operator": "or",
+      "query": "zoek"
+    }
+  },
+  "size": 10,
+  "_source": {
+    "includes": [
+      "*"
+    ],
+    "excludes": []
+  },
+  "from": 0,
+  "sort": [
+    {
+      "_score": {
+        "order": "desc"
+      }
+    }
+  ]
+}
+
+### ES - Filter Municipality using terms
+
+GET http://ori.argu.co/api/ori_*/_search? HTTP/1.1
+content-type: application/json
+
+{
+  "query": {
+    "bool": {
+      "must": [
+        [
+          {
+            "simple_query_string": {
+              "fields": [
+                "text",
+                "title",
+                "description",
+                "name"
+              ],
+              "default_operator": "or",
+              "query": "zoeken"
+            }
+          }
+        ],
+        {
+          "terms": {
+            "_index": [
+              "ori_alkmaar_20190507105200"
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "size": 10
+}
+
+### ES - single Municipality using index with wildcard in URL
+
+GET http://ori.argu.co/api/ori_alkmaar_*/_search? HTTP/1.1
+content-type: application/json
+
+{
+  "query": {
+      "simple_query_string": {
+      "fields": ["text", "title", "description", "name"],
+      "default_operator": "or",
+      "query": "zoek"
+    }
+  },
+  "size": 10
+}
+
+### ES - filter by date
+
+POST https://api.openraadsinformatie.nl/v1/elastic/ori_*/_search? HTTP/1.1
+content-type: application/json
+
+{
+  "query": {
+    "bool": {
+      "must": [
+        [
+          {
+            "simple_query_string": {
+              "fields": [
+                "text",
+                "title",
+                "description",
+                "name"
+              ],
+              "default_operator": "or",
+              "query": "zoek"
+            }
+          }
+        ],
+        {
+          "range": {
+            "date_modified": {
+              "gte": "2019-01-01",
+              "lte": "2019-05-24"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "size": 10,
+  "_source": {
+    "includes": [
+      "*"
+    ],
+    "excludes": []
+  },
+  "from": 0,
+  "sort": [
+    {
+      "_score": {
+        "order": "desc"
+      }
+    }
+  ]
+}
