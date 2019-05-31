@@ -10,7 +10,6 @@ The ORI API has several endpoints for different goals:
 
 - the **REST API** for fetching individual resources: `https://id.openraadsinformatie.nl`
 - an **Elastic** endpoint for full-text search: `https://api.openraadsinformatie.nl/v1/elastic/`
-- a **NEO4j** endpoint for graph search `https://api.openraadsinformatie.nl/v1/neo/`
 
 If you want to know how to query these endpoints, check out [`example_requests.http`](/example_requests.http).
 
@@ -30,11 +29,6 @@ Elastic has powerful full-text search capabilities.
 
 The repo for this API can be found [here](https://github.com/openstate/open-raadsinformatie).
 Read the [Elastic v7.0](https://www.elastic.co/guide/en/elasticsearch/reference/7.0/index.html) docs for more information
-
-### NEO4j (Cypher / Gremlin)
-
-If you need specific graph query questions, you can use the NEO4j endpoint.
-Get in touch with
 
 ## FAQ
 
