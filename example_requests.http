@@ -140,3 +140,7 @@ content-type: application/json
     }
   ]
 }
+
+### ES - get version
+
+GET https://api.openraadsinformatie.nl/v1/elastic/ HTTP/1.1

@@ -4,6 +4,10 @@ Search through meeting documents of 100+ Dutch local governments. Powered by [Op
 
 Check it out at [ori.argu.co](http://ori.argu.co)!
 
+## Using the ORI API
+
+Check out the [API docs](/docs.md) and the [example requests](/example_requests.http).
+
 ## Run front-end
 
 - `cd front`
@@ -38,10 +42,6 @@ Semaphore tracks the master branch and deploys succesful builds to a public [doc
 The [front-end](/front) is a typescript react application that uses [reactiveserach](https://github.com/appbaseio/reactivesearch) for elasticsearch and [link-redux](https://github.com/fletcher91/link-redux) for linked data (RDF) rendering.
 
 The [server](/server) is a node express application that serves as both a static file server and a proxy that forward elasticsearch queries to the elastic endpoint of open raadsinformatie.
-
-## Using the ORI API
-
-Check out the `example_requests.http` file for API usage.
 
 ## Credits
 
