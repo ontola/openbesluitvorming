@@ -1,4 +1,6 @@
-# Open Raadsinformatie Zoekmachine
+# ORI-search front
+
+This is the front-end react typescript application.
 
 ## Usage
 
