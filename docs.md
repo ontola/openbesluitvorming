@@ -12,30 +12,29 @@ The ORI API has several endpoints for different goals:
 - an **Elastic** endpoint for full-text search: `https://api.openraadsinformatie.nl/v1/elastic/`
 - a **NEO4j** endpoint for graph search `https://api.openraadsinformatie.nl/v1/neo/`
 
+If you want to know how to query these endpoints, check out [`example_requests.http`](/example_requests.http).
+
 ### REST API
 
 The ORI REST API is hosted at the `id.openraadsinformatie.nl` subdomain.
-Use this to get individual meetings / motions / agenda items / persons / etc.
+Use this to get individual meetings / motions / agenda items / persons / etc, such as [`https://id.openraadsinformatie.nl/243815`](https://id.openraadsinformatie.nl/243815).
 It is by far the most performant API for ORI, as it stores the various representations (TTL, RDF/XML, N3, N-Triples, JSON-LD) as static files.
 Since this API serves RDF, it might be a good idea to [get familiar with linked data](https://ontola.io/what-is-linked-data/).
 
-Read more about the REST API in its [github repo](https://github.com/ontola/ori_api).
+Read more about the REST API in its [github repo](https://github.com/ontola/ori_api) and its [documentation](https://id.openraadsinformatie.nl/)..
 
 ### Elastic
 
-This is an ElasticSearch v7.0 endpoint.
+This is an ElasticSearch endpoint.
 Elastic has powerful full-text search capabilities.
 
-The repo for this API can be found [here](https://github.com/openstate/open-raadsinformatie)
+The repo for this API can be found [here](https://github.com/openstate/open-raadsinformatie).
+Read the [Elastic v7.0](https://www.elastic.co/guide/en/elasticsearch/reference/7.0/index.html) docs for more information
 
 ### NEO4j (Cypher / Gremlin)
 
 If you need specific graph query questions, you can use the NEO4j endpoint.
 Get in touch with
-
-## Example requests
-
-If you want to know how to query the endpoints, see some examples in [`example_requests.http`](/example_requests.http).
 
 ## FAQ
 
