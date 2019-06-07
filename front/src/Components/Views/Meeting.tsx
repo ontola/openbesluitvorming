@@ -23,9 +23,13 @@ const Meeting = (props: MeetingProps) => {
       </div>
       <Labels>
         <Property label={NS.schema("description")} />
+        <Property label={NS.vcard("hasOrganizationName")} />
+        <Property label={NS.schema("location")} />
         <Property label={NS.schema("startDate")} />
+        <Property label={NS.schema("endDate")} />
         {/* TODO: List support */}
         {/* <Property label={NS.ncal("categories")} /> */}
+        <Property label={NS.schema("organizer")} />
         <Property label={NS.meeting("committee")} />
         <Property label={NS.meeting("attachment")} limit={100}/>
         <Property label={NS.meeting("agenda")} limit={100}/>

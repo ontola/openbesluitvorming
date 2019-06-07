@@ -22,8 +22,10 @@ const Organization = (props: OrganizationProps) => {
         <DownloadResource url={props.subject.value} />
       </div>
       <Labels>
+        <Property label={NS.dcterms("description")} />
         <Property label={NS.org("subOrganizationOf")} />
         <Property label={NS.ncal("categories")} />
+        <Property label={NS.meta("collection")} />
         <Property label={NS.schema("superEvent")} />
         <Property label={NS.meeting("attachment")} limit={100}/>
       </Labels>
