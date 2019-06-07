@@ -25,17 +25,20 @@ class Title extends React.Component<TitleProps> {
     NS.skos("prefLabel"),
   ];
 
-  static mapDataToProps = [
-    NS.schema("name"),
-  ];
+  static mapDataToProps = {
+    name: [
+      NS.schema("name"),
+      NS.as("name"),
+      NS.rdfs("label"),
+      NS.foaf("name"),
+      NS.skos("prefLabel"),
+    ],
+  };
 
   render() {
-    const { name, label, prefLabel } = this.props;
-    const printValue = name.value || label.value || prefLabel.value;
-
     return (
       <h1>
-        {printValue}
+        {this.props.name.value}
       </h1>
     );
   }
