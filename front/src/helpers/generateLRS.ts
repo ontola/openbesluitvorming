@@ -9,6 +9,7 @@ import {
   SomeTerm,
   Statement,
   Fetcher,
+  SomeNode,
 } from "rdflib";
 import { ReactType } from "react";
 
@@ -41,6 +42,21 @@ export default function generateLRS() {
     LRS.api.registerTransformer(t.transformer, t.mediaTypes, t.acceptValue),
   );
 
+  // Give RDF Lists explicit type (Class) statements
+  (LRS as any).store.store.newPropertyAction(
+    LRS.namespaces.rdf("first"),
+    (
+        _formula: Formula | undefined,
+        subj: SomeNode,
+        _pred: NamedNode,
+        obj?: SomeTerm,
+        _why?: Node,
+    ) => {
+      (LRS as any).store.store.add(subj, NS.rdf.type, NS.rdf.List);
+      return false;
+    },
+  );
+
   if (!website) {
     handle(new Error("No website in head"));
   }
@@ -49,17 +65,19 @@ export default function generateLRS() {
   LRS.api.accept.default = FRONTEND_ACCEPT;
 
   LRS.namespaces.aod = Namespace("https://argu.co/ns/od#");
+  LRS.namespaces.dcterms = Namespace("http://purl.org/dc/terms/");
+  LRS.namespaces.fa4 = Namespace("http://fontawesome.io/icon/");
   LRS.namespaces.meeting = Namespace("https://argu.co/ns/meeting/");
-  LRS.namespaces.sh = Namespace("http://www.w3.org/ns/shacl#");
+  LRS.namespaces.meta = Namespace("https://argu.co/ns/meta#");
+  LRS.namespaces.ncal = Namespace("http://www.semanticdesktop.org/ontologies/2007/04/02/ncal#");
   LRS.namespaces.opengov = Namespace("http://www.w3.org/ns/opengov#");
   LRS.namespaces.org = Namespace("http://www.w3.org/ns/org#");
   LRS.namespaces.person = Namespace("http://www.w3.org/ns/person#");
-  LRS.namespaces.fa4 = Namespace("http://fontawesome.io/icon/");
   LRS.namespaces.prov = Namespace("http://www.w3.org/ns/prov#");
-  LRS.namespaces.dcterms = Namespace("http://purl.org/dc/terms/p");
   LRS.namespaces.rdfs = Namespace("http://www.w3.org/1999/02/22-rdf-syntax-ns#");
-  LRS.namespaces.ncal = Namespace("http://www.semanticdesktop.org/ontologies/2007/04/02/ncal#");
+  LRS.namespaces.sh = Namespace("http://www.w3.org/ns/shacl#");
   LRS.namespaces.skos = Namespace("http://www.w3.org/2004/02/skos/core#");
+  LRS.namespaces.vcard = Namespace("http://www.w3.org/2006/vcard/ns#");
 
   const NS = LRS.namespaces;
 

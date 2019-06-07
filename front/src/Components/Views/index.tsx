@@ -14,6 +14,7 @@ import Meeting from "./Meeting";
 import Organization from "./Organization";
 import Predicate from "./Predicate";
 import Properties from "../Properties";
+import RDFList from "./RDFList";
 import Thing from "./Thing";
 import ThingResource from "./ThingResource";
 
@@ -28,6 +29,7 @@ function register() {
     ...Organization,
     ...Predicate,
     ...Properties,
+    ...RDFList,
     ...Thing,
     ...ThingResource,
   );
