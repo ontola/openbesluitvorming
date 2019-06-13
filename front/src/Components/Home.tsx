@@ -5,10 +5,10 @@ const Home = () => {
   return (
     <div className="Home">
       <div className="Home__wrapper">
-      <h1 className="Home__header">Doorzoek vergaderstukken van gemeenteraden</h1>
+      <h1 className="Home__header">Doorzoek vergaderstukken van gemeenten en provincies</h1>
         <p>
           Met deze app zoek je snel door de openbare vergaderingen, agendapunten, moties en
-          documenten van meer dan 100 deelnemende gemeenten en vijf provincies.
+          documenten van meer dan 110 deelnemende gemeenten en vijf provincies.
         </p>
         <p>
           Open Raadsinformatie is een initiatief om de besluitvorming van Nederlandse gemeenten
@@ -39,9 +39,9 @@ const Home = () => {
           Als je zelf ook gebruik wil maken van deze data, lees dan
           de <a href={paths.apiDocs}>documentatie</a>.
         </p>
-        <h2>Gemeente toevoegen</h2>
+        <h2>Jouw gemeente of provincie toevoegen</h2>
         <p>
-          Als je wil dat ook jouw gemeente aangesloten wordt op Open Raadsinformatie,
+          Als je wil dat ook jouw lokale overheid aangesloten wordt op Open Raadsinformatie,
           vraag dan de griffie van je gemeenteraad om een mail te sturen naar
           {" "}
           <a href={paths.projectMail}>Sander Bakker</a>.
