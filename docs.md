@@ -1,4 +1,4 @@
-# Open Raadsinforamtie API docs
+# Open Raadsinformatie API docs
 
 Open Raadsinformatie (ORI) aims to make governmental decision making more transparent
 by aggregating and standardizing meeting & decision data.
