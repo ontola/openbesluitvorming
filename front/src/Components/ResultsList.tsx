@@ -11,10 +11,7 @@ interface ResultsListProps {
 }
 
 interface ResultsType {
-  numberOfResults: {
-    value: number,
-    relation: string,
-  };
+  numberOfResults: number;
   numberOfPages: number;
   currentPage: number;
   time: number;
@@ -23,7 +20,8 @@ interface ResultsType {
 
 const ResultStats = (props: ResultsType) =>
   <div className="bottom-margin">
-    {props.numberOfResults} resultaten gevonden
+    {(props.numberOfResults === 10000) ? "meer dan 10.000" : props.numberOfResults}
+    {" resultaten gevonden"}
   </div>;
 
 const NoResults = () =>
@@ -78,7 +76,7 @@ const ResultsList: React.FunctionComponent<ResultsListProps> = (props) => {
       onNoResults={<NoResults/>}
       renderResultStats={props => <ResultStats {...props}/>}
       loader={<DualLoader/>}
-      // sortOptions={sortOptions}
+      sortOptions={sortOptions}
       renderError={(error: Error) => {
         handle(error);
         return (
