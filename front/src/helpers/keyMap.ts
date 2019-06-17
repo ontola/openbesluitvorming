@@ -3,7 +3,9 @@ import { configure } from "react-hotkeys";
 export const keyMap = {
   PREVIOUS: "left",
   NEXT: "right",
+  // Set focus to the search bar
   SEARCH: "/",
+  // Make PDF fit the screen
   FULLSCREEN: "f",
   CLOSE: ["escape", "esc"],
 };

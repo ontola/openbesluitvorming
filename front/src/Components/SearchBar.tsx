@@ -2,6 +2,7 @@ import * as React from "react";
 import { DataSearch } from "@appbaseio/reactivesearch";
 import { GlobalHotKeys } from "react-hotkeys";
 import { ids } from "../helpers";
+import { keyMap } from "../helpers/keyMap";
 
 export const queryGenerator = (searchTerm: string) => {
   const query = {
@@ -35,6 +36,7 @@ const SearchBar: React.FunctionComponent = () => {
 
   return (
     <GlobalHotKeys
+      keyMap={keyMap}
       className="SearchBar__wrapper"
       handlers={handlers}
     >
@@ -49,7 +51,7 @@ const SearchBar: React.FunctionComponent = () => {
         dataField={fields}
         highlight
         autosuggest={false}
-        placeholder="Zoek in 109 gemeenten.."
+        placeholder="Zoeken..."
         URLParams={true}
         customQuery={queryGenerator}
         customHighlight={() => ({

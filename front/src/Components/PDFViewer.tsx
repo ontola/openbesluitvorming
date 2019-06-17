@@ -12,7 +12,8 @@ import { withRouter, RouteComponentProps } from "react-router";
 import { SideDrawerContext } from "./SideDrawer";
 import { getParams } from "../helpers";
 import { handle } from "../helpers/logging";
-import { GlobalHotKeys } from "react-hotkeys";
+import { HotKeys } from "react-hotkeys";
+import { keyMap } from "../helpers/keyMap";
 const { Document, Page, pdfjs } = require("react-pdf");
 // tslint:disable-next-line:max-line-length
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.js`;
@@ -169,13 +170,15 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
   };
 
   return (
-    <GlobalHotKeys
+    <HotKeys
       allowChanges={true}
+      keyMap={keyMap}
       handlers={keyHandlers}
       ref={() => pdfWrapper}
     >
       <div className="PDFViewer">
         <div className="PDFViewer__scroller">
+          {/* This component catches focus on Opening and deals with keys */}
           <div
             id="pdfWrapper"
             tabIndex={-1}
@@ -233,7 +236,7 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
           </div>
         }
       </div>
-    </GlobalHotKeys>
+    </HotKeys>
   );
 };
 
