@@ -568,6 +568,7 @@ mark {
   padding: .5rem 1rem 0;
   border-radius: $border-radius;
   border: $border;
+  word-break: break-word;
 
   @media only screen and (max-width: 530px) {
     margin-left: -1rem;
