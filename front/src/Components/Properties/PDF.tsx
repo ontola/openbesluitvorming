@@ -14,7 +14,7 @@ interface PdfProps {
 class PdfProp extends React.Component<PdfProps> {
   static type = NS.schema.Thing;
 
-  static property = NS.schema.isBasedOn;
+  static property = NS.schema.contentUrl;
 
   render() {
     const { linkedProp } = this.props;

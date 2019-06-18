@@ -32,7 +32,7 @@ const MediaObject = (props: MediaObjectProps) => {
       </Resource>
       {/* TODO: Resolve PDFs, use contentURL */}
       {/* <Property label={NS.schema("contentUrl")} /> */}
-      <Property label={NS.schema("isBasedOn")} />
+      <Property label={NS.schema("contentUrl")} />
     </React.Fragment>
   );
 };
