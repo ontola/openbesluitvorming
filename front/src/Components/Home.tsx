@@ -11,7 +11,7 @@ const Home = () => {
           documenten van meer dan 110 deelnemende gemeenten en vijf provincies.
         </p>
         <p>
-          Open Raadsinformatie is een initiatief om de besluitvorming van Nederlandse gemeenten
+          Open Raadsinformatie is een initiatief om de besluitvorming van Nederlandse overheden
           transparanter te maken.
           Dit wordt gedaan door automatisch uit de bestaande vergadersoftware
           (zoals raadsinformatiesystemen van gemeenten) de vergaderingen en documenten te halen en
