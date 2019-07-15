@@ -16,7 +16,9 @@ const Thing = (props: ThingProps) => {
     <Resource>
       <Property label={[NS.schema("name"), NS.schema("label")]} /><br />
       <div className="Resource__details">
-        <DownloadResource url={props.subject.value} />
+        {props.subject &&
+          <DownloadResource url={props.subject.value} />
+        }
       </div>
       <Labels>
         <Property label={NS.rdfs("type")} /><br />
