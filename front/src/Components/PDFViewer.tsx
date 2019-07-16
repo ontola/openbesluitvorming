@@ -14,6 +14,8 @@ import { getParams } from "../helpers";
 import { handle } from "../helpers/logging";
 import { HotKeys } from "react-hotkeys";
 import { keyMap } from "../helpers/keyMap";
+import { Property } from "link-redux";
+import { NS } from "../LRS";
 const { Document, Page, pdfjs } = require("react-pdf");
 // tslint:disable-next-line:max-line-length
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.js`;
@@ -105,6 +107,8 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
           De PDF kan niet worden geladen.
         </p>
         <a href={props.url} download >Download het bestand.</a>
+        {/* If the PDF does not render, show the plaintext */}
+        <Property label={NS.schema("text")} />
       </div>
     );
   };
@@ -177,6 +181,7 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
       ref={() => pdfWrapper}
     >
       <div className="PDFViewer">
+        <Property label={NS.schema("text")} />
         <div className="PDFViewer__scroller">
           {/* This component catches focus on Opening and deals with keys */}
           <div
