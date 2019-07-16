@@ -1,5 +1,6 @@
 import React from "react";
 import { History } from "history";
+import { NS } from "./LRS";
 
 // Mapping for consistent component Ids
 export const ids = {
@@ -92,3 +93,44 @@ export const typeToLabel = (type: string) => {
       return type || "Geen type";
   }
 };
+
+// Turns an RDF list in to a JS Array
+export function listToArr(lrs: any, acc: any, rest: any) {
+  if (Array.isArray(rest)) {
+    return rest;
+  }
+  if (!rest || rest === NS.rdf("nil")) {
+    return acc;
+  }
+
+  let first;
+  if (rest.termType === "BlankNode") {
+    const firstStatement = lrs.store.anyStatementMatching(rest, NS.rdf("first"));
+    first = firstStatement && firstStatement.object;
+  } else {
+    first = lrs.getResourceProperty(rest, NS.rdf("first"));
+
+    if (!first) {
+      console.log("rest", rest);
+      return lrs.getEntity(rest);
+    }
+  }
+  acc.push(first);
+  listToArr(lrs, acc, lrs.store.anyStatementMatching(rest, NS.rdf("rest")).object);
+
+  return acc;
+}
+
+export function propertyToArr(lrs: any, acc: any, rest: any) {
+  if (Array.isArray(rest)) {
+    return rest;
+  }
+  if (typeof rest === "undefined" || rest === null) {
+    return [];
+  }
+  if (Object.hasOwnProperty.call(rest, "termType") && rest.termType === "Literal") {
+    return [rest];
+  }
+
+  return listToArr(lrs, acc, rest);
+}
