@@ -34,7 +34,7 @@
     "react-dom": "16.8.6",
     "react-hotkeys": "^2.0.0-pre9",
     "react-intl": "^2.8.0",
-    "react-pdf": "^4.0.5",
+    "react-pdf": "^4.1.0",
     "react-router": "^5.0.0",
     "react-router-dom": "^5.0.0",
     "react-scripts": "^3.0.1",
