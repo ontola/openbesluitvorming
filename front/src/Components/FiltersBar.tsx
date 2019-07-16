@@ -19,7 +19,7 @@ const MunicipalityLabel = (label: string, count: number, isSelected: boolean) =>
     <span>{count}</span>
   </span>;
 
-const TypeLabel = (label: string, count: number, isSelected: boolean) =>
+export const TypeLabel = (label: string, count: number, isSelected: boolean) =>
   <span>
     <span>{typeToLabel(label)}</span>
     <span>{count}</span>
@@ -36,7 +36,7 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
       />
       <MultiList
         componentId={ids.type}
-        dataField="@type"
+        dataField="@type.keyword"
         filterLabel="Type"
         title="Type"
         className="Filter"
@@ -52,7 +52,8 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
           and: [
             ids.searchbox,
             ids.daterange,
-            "gemeenten"],
+            ids.gemeenten,
+          ],
         }}
         showFilter={true}
         URLParams={true}
@@ -80,7 +81,7 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
         URLParams={true}
       />
       <MultiList
-        componentId="gemeenten"
+        componentId={ids.gemeenten}
         dataField="_index"
         title={capitalize(ids.gemeenten)}
         filterLabel={capitalize(ids.gemeenten)}
