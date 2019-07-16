@@ -181,7 +181,6 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
       ref={() => pdfWrapper}
     >
       <div className="PDFViewer">
-        <Property label={NS.schema("text")} />
         <div className="PDFViewer__scroller">
           {/* This component catches focus on Opening and deals with keys */}
           <div
