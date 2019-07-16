@@ -15,7 +15,7 @@ interface SideDrawerProps {
   children: React.ReactNode;
 }
 
-const MARGIN_LEFT = 200;
+const MARGIN_LEFT = 50;
 
 const calcMaxWidth = (windowWidth: number) => {
   if (windowWidth > 800) {
