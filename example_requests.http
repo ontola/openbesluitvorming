@@ -38,7 +38,55 @@ content-type: application/json
   ]
 }
 
-### ES - Filter Municipality using terms
+
+### Elastic with highlights
+
+POST https://api.openraadsinformatie.nl/v1/elastic/ori_*/_search? HTTP/1.1
+content-type: application/json
+
+{
+  "query": {
+    "simple_query_string": {
+      "fields": ["text", "title", "description", "name"],
+      "default_operator": "or",
+      "query": "politie"
+    }
+  },
+  "highlight": {
+    "pre_tags": [
+      "<mark>"
+    ],
+    "post_tags": [
+      "</mark>"
+    ],
+    "fields": {
+      "text": {},
+      "title": {},
+      "name": {},
+      "description": {}
+    },
+    "fragment_size": 100,
+    "number_of_fragments": 3
+  },
+  "size": 10,
+  "_source": {
+    "includes": [
+      "*"
+    ],
+    "excludes": []
+  },
+  "from": 0,
+  "sort": [
+    {
+      "_score": {
+        "order": "desc"
+      }
+    }
+  ]
+}
+
+
+### Elastic Filter Municipality using terms
 
 GET http://ori.argu.co/api/ori_*/_search? HTTP/1.1
 content-type: application/json
@@ -74,7 +122,7 @@ content-type: application/json
   "size": 10
 }
 
-### ES - single Municipality using index with wildcard in URL
+### Elastic single Municipality using index with wildcard in URL
 
 GET http://ori.argu.co/api/ori_alkmaar_*/_search? HTTP/1.1
 content-type: application/json
@@ -90,7 +138,7 @@ content-type: application/json
   "size": 10
 }
 
-### ES - filter by date
+### Elastic filter by date
 
 POST https://api.openraadsinformatie.nl/v1/elastic/ori_*/_search? HTTP/1.1
 content-type: application/json
@@ -140,7 +188,3 @@ content-type: application/json
     }
   ]
 }
-
-### ES - get version
-
-GET https://api.openraadsinformatie.nl/v1/elastic/ HTTP/1.1
