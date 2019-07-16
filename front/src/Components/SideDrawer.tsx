@@ -26,10 +26,14 @@ const calcMaxWidth = (windowWidth: number) => {
 };
 
 const determineInitialWith = (windowWidth: number) => {
-  if (windowWidth < 800) {
-    return windowWidth;
+  if (windowWidth > 1800) {
+    return windowWidth - 600;
   }
-  return windowWidth - 600;
+
+  if (windowWidth > 800) {
+    return windowWidth - 600;
+  }
+  return windowWidth;
 };
 
 const Handler = () =>
@@ -92,7 +96,13 @@ const SideDrawer = (props: SideDrawerProps & RouteComponentProps) => {
           }}
           maxWidth={maxWidth}
           minWidth={200}
-          onResizeStop={(_e, _direction, _ref, d) => setWidth(width + d.width)}
+          onResizeStop={(
+            event: MouseEvent | TouchEvent,
+            direction: any,
+            refToElement: HTMLDivElement,
+            delta: any,
+          ) =>
+            setWidth(width + delta.width)}
           enable={{ left: true }}
         >
           <Button
@@ -101,7 +111,10 @@ const SideDrawer = (props: SideDrawerProps & RouteComponentProps) => {
           >
             Sluiten
           </Button>
-          <div className="SideDrawer__scroller">
+          <div
+            className="SideDrawer__scroller"
+            ref={pdfWrapper}
+          >
           {typeof props.children === "function" ?
             props.children(width, setWidth) : props.children
           }
