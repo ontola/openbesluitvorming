@@ -20,7 +20,7 @@ export const queryGenerator = (searchTerm: string) => {
 const fields = ["text", "title", "description", "name"];
 
 const SearchBar: React.FunctionComponent = () => {
-  // const [ref, setRef] = React.useState<HTMLElement | null>(null);
+  const [query, setQuery] = React.useState<string>("");
   const handlers = {
     // SEARCH: () => ref && ref.focus(),
     SEARCH: (e: KeyboardEvent | undefined) => {
@@ -32,6 +32,12 @@ const SearchBar: React.FunctionComponent = () => {
       }
       inputElement.focus();
     },
+  };
+
+  const handleKey = (e: KeyboardEvent, triggerQuery: Function) => {
+    if (e.key === "Enter") {
+      triggerQuery();
+    }
   };
 
   return (
@@ -46,12 +52,15 @@ const SearchBar: React.FunctionComponent = () => {
         // ref={(r: HTMLElement) => { setRef(r); }}
         className="SearchBar"
         componentId={ids.searchbox}
-        debounce={200}
+        debounce={3000}
+        onKeyPress={handleKey}
+        onChange={setQuery}
         showFilter={false}
         dataField={fields}
         highlight
         autosuggest={false}
         placeholder="Zoeken..."
+        value={query}
         URLParams={true}
         customQuery={queryGenerator}
         customHighlight={() => ({
