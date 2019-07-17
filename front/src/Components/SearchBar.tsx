@@ -4,17 +4,50 @@ import { GlobalHotKeys } from "react-hotkeys";
 import { ids } from "../helpers";
 import { keyMap } from "../helpers/keyMap";
 
+const simpleQueryStringChars = [
+  "\"",
+  "+",
+  ",",
+  "|",
+  "*",
+  "~",
+  "(",
+  ")",
+];
+
 export const queryGenerator = (searchTerm: string) => {
-  const query = {
+  if (searchTerm === undefined) {
+    return null;
+  }
+
+  if (simpleQueryStringChars.some(substring => searchTerm.includes(substring))) {
+    return {
+      query: {
+        simple_query_string: {
+          fields,
+          default_operator: "or",
+          query: searchTerm,
+        },
+      },
+    };
+  }
+
+  return {
     query: {
-      simple_query_string: {
-        fields,
-        default_operator: "or",
-        query: searchTerm,
+      bool: {
+        must: [
+          {
+            multi_match: {
+              fields,
+              // default_operator: "or",
+              query: searchTerm,
+              fuzziness: 2,
+            },
+          },
+        ],
       },
     },
   };
-  return query;
 };
 
 const fields = ["text", "title", "description", "name"];

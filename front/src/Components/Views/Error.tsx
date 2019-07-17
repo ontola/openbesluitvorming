@@ -24,15 +24,15 @@ const ErrorCardComp = (props: any) => {
   return (
     <div className="Resource">
       Oeps, er is iets mis gegaan.
-        <h2>
-          {linkRequestStatus.status}
-        </h2>
-        <ErrorButtonWithFeedback theme="box" {...props}>
-          <FormattedMessage
-            defaultMessage="Try again"
-            id="https://app.argu.co/i18n/errors/retryButton/label"
-          />
-        </ErrorButtonWithFeedback>
+      <h2>
+        {linkRequestStatus.status}
+      </h2>
+      <ErrorButtonWithFeedback theme="box" {...props}>
+        <FormattedMessage
+          defaultMessage="Try again"
+          id="https://app.argu.co/i18n/errors/retryButton/label"
+        />
+      </ErrorButtonWithFeedback>
     </div>
   );
 };

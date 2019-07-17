@@ -7,6 +7,7 @@ export const keyMap = {
   SEARCH: "/",
   // Make PDF fit the screen
   FULLSCREEN: "f",
+  // Close the sideDrawer
   CLOSE: ["escape", "esc"],
 };
 
