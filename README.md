@@ -50,3 +50,4 @@ The [server](/server) is a node express application that serves as both a static
 - [Open State Foundation](https://openstate.eu/nl/) for providing useful feedback on this project and starting Open Raadsinformatie.
 - Software developed by @joepio from [Argu](https://argu.co) / [Ontola](https://ontola.io).
 - Feedback from @breyten, @aolieman, @fletcher91, @jurrian
+- Various open source projects that we're using, most notably ReactiveSearch and Link-Lib. Check out the `package.json` files to see which projects were used.
