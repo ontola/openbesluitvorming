@@ -4,7 +4,7 @@ import { register } from "link-redux";
 import { NS } from "../../LRS";
 import { LoadingComponent } from "../PDFViewer";
 
-const Loading = (props: any) => {
+const Loading = () => {
 
   return (
     <div className="Resource">

@@ -66,7 +66,7 @@ export const indexToMunicipality = (_index: string) => {
 };
 
 // Sets the URL to the selected resource
-export const openResource = (url :string, history: History) => {
+export const openResource = (url: string, history: History) => {
   const currentURL = new URL(window.location.href);
   currentURL.searchParams.set("showResource", encodeURIComponent(url));
   history.push(currentURL.toString().substring(currentURL.origin.length));
@@ -111,7 +111,6 @@ export function listToArr(lrs: any, acc: any, rest: any) {
     first = lrs.getResourceProperty(rest, NS.rdf("first"));
 
     if (!first) {
-      console.log("rest", rest);
       return lrs.getEntity(rest);
     }
   }

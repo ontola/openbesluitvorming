@@ -9,7 +9,7 @@ interface ButtonProps {
 }
 
 const Button: React.FunctionComponent<ButtonProps> = (props) => {
-  let className: string = "Button";
+  let className = "Button";
   if (props.className !== undefined) {
     className += ` ${props.className}`;
   }

@@ -16,6 +16,7 @@ import { HotKeys } from "react-hotkeys";
 import { keyMap } from "../helpers/keyMap";
 import { Property } from "link-redux";
 import { NS } from "../LRS";
+// eslint-disable-next-line
 const { Document, Page, pdfjs } = require("react-pdf");
 // tslint:disable-next-line:max-line-length
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.js`;
@@ -77,17 +78,17 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
     setPageNumber(pageNumber + 1);
   };
 
-  useLayoutEffect(
-    () => {
-      focusOnViewer();
-    },
-  );
-
   function focusOnViewer() {
     if (pdfWrapper.current !== null) {
       pdfWrapper.current.focus();
     }
   }
+
+  useLayoutEffect(
+    () => {
+      focusOnViewer();
+    },
+  );
 
   const {
     currentSearchTerm,
@@ -128,7 +129,7 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
           return [
             ...arr,
             element,
-            <mark>
+            <mark key={`mark-${index}`}>
               {matches[index]}
             </mark>,
           ];

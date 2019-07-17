@@ -4,7 +4,7 @@ import { register, Property } from "link-redux";
 import { NS } from "../../LRS";
 import { labelsTopology } from "../Topologies/LabelsTopology";
 
-const RDFList = (props: any) => {
+const RDFList = () => {
 
   return (
     <React.Fragment>

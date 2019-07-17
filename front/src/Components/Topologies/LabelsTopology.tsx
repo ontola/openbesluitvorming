@@ -16,7 +16,7 @@ class Labels extends TopologyProvider {
   static topology = labelsTopology;
 
   render() {
-    return this.wrap(subject => (
+    return this.wrap(() => (
       <div
         className={"Labels"}
       >

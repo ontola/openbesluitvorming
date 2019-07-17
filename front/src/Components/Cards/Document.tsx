@@ -54,7 +54,7 @@ const Document: React.FunctionComponent<DocumentProps & RouteComponentProps> = (
 };
 
 const hoc = (Comp: any) => {
-  return function (props: DocumentProps) {
+  return function DocumentWithProps (props: DocumentProps) {
     return (
       <React.Fragment key={props._id}>
         <Comp {...props} />

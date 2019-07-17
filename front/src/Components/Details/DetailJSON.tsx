@@ -3,12 +3,9 @@ import { ORIItemType } from "../../types";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCode } from "@fortawesome/free-solid-svg-icons";
 
-interface DetailJSONProps extends ORIItemType {
-}
-
 const SpacingLevelJSON = 2;
 
-const DetailJSON: React.FunctionComponent<DetailJSONProps> = (props) => {
+const DetailJSON: React.FunctionComponent<ORIItemType> = (props) => {
   return (
     <a
       className="ResultCard__detail"
@@ -18,6 +15,7 @@ const DetailJSON: React.FunctionComponent<DetailJSONProps> = (props) => {
       download={`${props._id}.json`}
       // eslint-disable-next-line
       target="_blank"
+      rel="noopener noreferrer"
       title="Download JSON"
     >
       <FontAwesomeIcon icon={faCode}/>

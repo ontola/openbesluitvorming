@@ -5,6 +5,7 @@ import { NamedNode } from "rdflib";
 const logging = () => (store: LinkReduxLRSType): MiddlewareWithBoundLRS => {
   (store as any).actions = {};
 
+  /* eslint-disable no-console */
   return (next: MiddlewareActionHandler) => (iri: NamedNode, opts: any): Promise<any> => {
     console.log("Link action:", iri, opts);
 

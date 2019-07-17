@@ -1,4 +1,5 @@
 export const handle = (e: Error) => {
+  // eslint-disable-next-line
   console.log(e);
 };
 

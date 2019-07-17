@@ -5,7 +5,7 @@ import { NS } from "../../LRS";
 import { labelsTopology } from "../Topologies/LabelsTopology";
 
 // Smaller loading component
-const LoadingLabel = (props: any) => {
+const LoadingLabel = () => {
 
   return (
     <span>Laden...<br/></span>

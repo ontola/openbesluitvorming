@@ -64,7 +64,7 @@ const SearchRoute = (props: RouteComponentProps) => {
               {currentSearchTerm && <Button
                 className="SearchBar__button"
                 onClick={() => setShowFilters(!showFilters)}
-                >
+              >
                 filters {showFilters ? "verbergen" : "tonen"}
               </Button>}
             </div>

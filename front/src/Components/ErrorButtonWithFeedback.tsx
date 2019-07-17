@@ -2,7 +2,7 @@ import { unstable, LinkReduxLRSType } from "link-redux";
 // import { NamedNode } from "rdflib";
 import React from "react";
 // import {
-  // INTERNAL_SERVER_ERROR,
+// INTERNAL_SERVER_ERROR,
 //   PROXY_AUTHENTICATION_REQUIRED,
 //   TOO_MANY_REQUESTS,
 // } from "http-status-codes";

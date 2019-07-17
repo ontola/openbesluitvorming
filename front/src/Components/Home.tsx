@@ -5,7 +5,7 @@ const Home = () => {
   return (
     <div className="Home">
       <div className="Home__wrapper">
-      <h1 className="Home__header">Doorzoek vergaderstukken van gemeenten en provincies</h1>
+        <h1 className="Home__header">Doorzoek vergaderstukken van gemeenten en provincies</h1>
         <p>
           Met deze app zoek je snel door de openbare vergaderingen, agendapunten, moties en
           documenten van meer dan 110 deelnemende gemeenten en vijf provincies.

@@ -92,7 +92,7 @@ const SideDrawer = (props: SideDrawerProps & RouteComponentProps) => {
             left: "SideDrawer__resize-handle",
           }}
           handleComponent={{
-            left: () => <Handler />,
+            left: Handler,
           }}
           maxWidth={maxWidth}
           minWidth={200}
@@ -115,9 +115,9 @@ const SideDrawer = (props: SideDrawerProps & RouteComponentProps) => {
             className="SideDrawer__scroller"
             ref={pdfWrapper}
           >
-          {typeof props.children === "function" ?
-            props.children(width, setWidth) : props.children
-          }
+            {typeof props.children === "function" ?
+              props.children(width, setWidth) : props.children
+            }
           </div>
         </Resizable>
       </HotKeys>
@@ -132,7 +132,7 @@ export interface SideDrawerContextType {
 
 export const SideDrawerContext = React.createContext<SideDrawerContextType>({
   width: 250,
-  setWidth: () => console.log("sorry"),
+  setWidth: () => null,
 });
 
 export default withRouter(SideDrawer);

@@ -1,5 +1,5 @@
 {
-  "eslint.enable": false,
+  "eslint.enable": true,
   "atlascode.jira.workingSite": {
     "baseUrlSuffix": "atlassian.net"
   }

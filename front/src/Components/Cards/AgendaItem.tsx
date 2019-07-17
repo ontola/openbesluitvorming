@@ -25,7 +25,7 @@ const AgendaItem: React.FunctionComponent<AgendaItemProps> = (props) => {
         ((text: string) => (
           <div key={text} className="ResultCard__highlight">
             <span dangerouslySetInnerHTML={{ __html: `${text}...` }}/>
-        </div>
+          </div>
         )))
       }
       <div className="ResultCard__details">

@@ -7,9 +7,6 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSpinner } from "@fortawesome/free-solid-svg-icons";
 import { handle, printAndHandle } from "../helpers/logging";
 
-interface ResultsListProps {
-}
-
 interface ResultsType {
   numberOfResults: number;
   numberOfPages: number;
@@ -47,7 +44,7 @@ const DualLoader = () =>
 
 interface SortOption {
   label: string;
-  dataField:any;
+  dataField: any;
   sortBy: string;
 }
 
@@ -64,7 +61,7 @@ export const sortOptions: SortOption[] = [
   },
 ];
 
-const ResultsList: React.FunctionComponent<ResultsListProps> = (props) => {
+const ResultsList: React.FunctionComponent = () => {
   return (
     <ReactiveList
       componentId="ResultList01"
@@ -82,7 +79,7 @@ const ResultsList: React.FunctionComponent<ResultsListProps> = (props) => {
         return (
           <div>
               Something went wrong!<br/>
-              {printAndHandle(error)}
+            {printAndHandle(error)}
           </div>
         );
       }}

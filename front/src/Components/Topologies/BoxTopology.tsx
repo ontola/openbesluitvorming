@@ -23,8 +23,6 @@ class Box extends TopologyProvider<TopologyProviderProps> {
 
   render() {
 
-    console.log("actions", this.props.lrs.actions);
-
     return this.wrap(subject => (
       <Button
         onClick={(e) => {

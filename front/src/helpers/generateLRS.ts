@@ -24,7 +24,7 @@ import history from "./history";
 
 export default function generateLRS() {
   // tslint:disable-next-line: prefer-array-literal
-  const middleware: Array<MiddlewareFn<any>> = [
+  const middleware: MiddlewareFn<any>[] = [
     logging(),
     appMiddleware(history),
   ];
@@ -42,15 +42,17 @@ export default function generateLRS() {
     LRS.api.registerTransformer(t.transformer, t.mediaTypes, t.acceptValue),
   );
 
+  const NS = LRS.namespaces;
+
   // Give RDF Lists explicit type (Class) statements
   (LRS as any).store.store.newPropertyAction(
     LRS.namespaces.rdf("first"),
     (
-        _formula: Formula | undefined,
-        subj: SomeNode,
-        _pred: NamedNode,
-        obj?: SomeTerm,
-        _why?: Node,
+      _formula: Formula | undefined,
+      subj: SomeNode,
+      _pred: NamedNode,
+      _obj?: SomeTerm,
+      _why?: Node,
     ) => {
       (LRS as any).store.store.add(subj, NS.rdf.type, NS.rdf.List);
       return false;
@@ -79,8 +81,6 @@ export default function generateLRS() {
   LRS.namespaces.skos = Namespace("http://www.w3.org/2004/02/skos/core#");
   LRS.namespaces.vcard = Namespace("http://www.w3.org/2006/vcard/ns#");
 
-  const NS = LRS.namespaces;
-
   const languages = {
     en: "en",
     nl: "nl",
@@ -95,11 +95,11 @@ export default function generateLRS() {
 
   // @ts-ignore TS2341
   LRS.store.store.newPropertyAction(NS.rdf("type"), (
-      _: Formula,
-      __: SomeTerm,
-      ___: NamedNode,
-      obj: SomeTerm,
-      ____: Node,
+    _: Formula,
+    __: SomeTerm,
+    ___: NamedNode,
+    obj: SomeTerm,
+    ____: Node,
   ): boolean => {
     if (THING_TYPES.includes(obj as NamedNode)) {
       return false;

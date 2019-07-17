@@ -13,13 +13,13 @@ interface FiltersbarProps {
 
 // const startDate = new Date(2000, 1);
 
-const MunicipalityLabel = (label: string, count: number, isSelected: boolean) =>
+const MunicipalityLabel = (label: string, count: number) =>
   <span>
     <span>{indexToMunicipality(label)}</span>
     <span>{count}</span>
   </span>;
 
-export const TypeLabel = (label: string, count: number, isSelected: boolean) =>
+export const TypeLabel = (label: string, count: number) =>
   <span>
     <span>{typeToLabel(label)}</span>
     <span>{count}</span>
@@ -101,7 +101,7 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
         loader={<LoadingWithSpinner/>}
         renderItem={MunicipalityLabel}
       />
-  </div>
+    </div>
   );
 };
 

@@ -16,7 +16,7 @@ const Meeting = (props: MeetingProps) => {
   return (
     <ResourceTopology>
       <Property label={NS.schema("name")} />
-        <div className="Resource__details">
+      <div className="Resource__details">
         Vergadering
         {" - "}
         <DownloadResource url={props.subject.value} />

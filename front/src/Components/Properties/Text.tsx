@@ -26,7 +26,7 @@ const Text = (props: TextProps) => {
   return (
     <React.Fragment>
       {propertyToArr(LRS, [], props.text).map(
-        (item: string, i: number) => <Page item={item} number={i + 1} />,
+        (item: string, i: number) => <Page key={`page${i + 1}`} item={item} number={i + 1} />,
       )}
     </React.Fragment>
   );

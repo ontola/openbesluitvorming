@@ -10,7 +10,7 @@ import { FRONTEND_URL } from "../config";
 import { History } from "history";
 
 export const website = FRONTEND_URL;
-export const frontendIRI = NamedNode.find(website!);
+export const frontendIRI = NamedNode.find(website);
 export const frontendIRIStr = frontendIRI.value;
 export const frontendPathname = new URL(frontendIRIStr).pathname;
 export const frontendOrigin = new URL(frontendIRIStr).origin;
@@ -65,6 +65,7 @@ export const appMiddleware = (history: History) =>
         const resource = new URL(iri.value).searchParams.get("location");
 
         const currentURL = new URL(currentPath(), frontendOrigin);
+        // eslint-disable-next-line
         currentURL.searchParams.set("showResource", encodeURIComponent(resource!));
         history.push(retrievePath(currentURL.toString()));
       }
