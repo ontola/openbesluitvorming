@@ -2,16 +2,20 @@ import * as React from "react";
 import {
   DateRange,
   MultiList,
+  RangeSlider,
   SelectedFilters,
 } from "@appbaseio/reactivesearch";
 import { indexToMunicipality, typeToLabel, ids, capitalize } from "../helpers";
 import { LoadingWithSpinner } from "./ResultsList";
+import Button from './Button';
 
 interface FiltersbarProps {
   display: boolean;
 }
 
-// const startDate = new Date(2000, 1);
+const startDate = new Date(2018, 1);
+
+const dateLabel = (date: Date) => `${date.getFullYear()}-${date.getMonth()}`
 
 const MunicipalityLabel = (label: string, count: number) =>
   <span>
@@ -25,7 +29,17 @@ export const TypeLabel = (label: string, count: number) =>
     <span>{count}</span>
   </span>;
 
+export const DateToolTip = (data: string) =>
+  <div
+    style={{
+      whiteSpace: "nowrap",
+    }}
+  >{dateLabel(new Date(data))}</div>
+
 const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
+
+  const [showDateRange, setShowDateRange] = React.useState(false);
+
   return (
     <div
       className={`FilterBar ${props.display ? "FilterBar__visible" : "FilterBar__hidden"}`}
@@ -59,7 +73,27 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
         URLParams={true}
         loader={<LoadingWithSpinner/>}
       />
-      <DateRange
+      <Button
+        onClick={() => setShowDateRange(!showDateRange)}
+      >{showDateRange ? "Velden tonen" : "Histogram tonen" }</Button>
+      {showDateRange && <RangeSlider
+        componentId={ids.daterange}
+        dataField="date_modified"
+        title="Datum"
+        className="Filter"
+        tooltipTrigger="hover"
+        renderTooltipData={DateToolTip}
+        URLParams={true}
+        rangeLabels={{
+          "start": dateLabel(startDate),
+          "end": dateLabel(new Date),
+        }}
+        range={{
+          "start": startDate.getTime(),
+          "end": Date.now(),
+        }}
+      />}
+      {!showDateRange && <DateRange
         componentId={ids.daterange}
         dataField="date_modified"
         className="Filter"
@@ -68,10 +102,6 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
           start: "Van...",
           end: "Tot...",
         }}
-        // defaultValue={{
-        //   start: startDate,
-        //   end: new Date(Date.now()),
-        // }}
         numberOfMonths={2}
         queryFormat="date"
         autoFocusEnd={false}
@@ -79,7 +109,7 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
         showFilter={true}
         filterLabel={capitalize(ids.daterange)}
         URLParams={true}
-      />
+      />}
       <MultiList
         componentId={ids.gemeenten}
         dataField="_index"
