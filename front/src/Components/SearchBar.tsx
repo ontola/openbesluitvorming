@@ -19,8 +19,21 @@ export const queryGenerator = (searchTerm: string) => {
 
 const fields = ["text", "title", "description", "name"];
 
+// How many ms it takes before search is triggered after changing the query value.
+const debounce = 1000;
+
 const SearchBar: React.FunctionComponent = () => {
   const [query, setQuery] = React.useState<string>("");
+  const [timer, setTimer] = React.useState<number>();
+
+  React.useEffect(
+    () => () => {
+      // When the component unmounts, remove the timer.
+      clearTimeout(timer);
+    },
+    [],
+  );
+
   const handlers = {
     // SEARCH: () => ref && ref.focus(),
     SEARCH: (e: KeyboardEvent | undefined) => {
@@ -37,7 +50,15 @@ const SearchBar: React.FunctionComponent = () => {
   const handleKey = (e: KeyboardEvent, triggerQuery: Function) => {
     if (e.key === "Enter") {
       triggerQuery();
+      // Reset the timer for debouncing.
+      clearTimeout(timer);
     }
+  };
+
+  const handleChange = (value: string, triggerQuery: Function) => {
+    setQuery(value);
+    // Set a timer for debouncing, if it's passed, call triggerQuery.
+    setTimer(setTimeout(triggerQuery, debounce));
   };
 
   return (
@@ -52,9 +73,9 @@ const SearchBar: React.FunctionComponent = () => {
         // ref={(r: HTMLElement) => { setRef(r); }}
         className="SearchBar"
         componentId={ids.searchbox}
-        debounce={3000}
+        debounce={debounce}
         onKeyPress={handleKey}
-        onChange={setQuery}
+        onChange={handleChange}
         showFilter={false}
         dataField={fields}
         highlight
