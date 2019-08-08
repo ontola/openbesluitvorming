@@ -44,6 +44,10 @@ It's a typescript react application that uses [reactiveserach](https://github.co
 
 The [server](/server) is a node express application that serves as both a static file server and a proxy that forward elasticsearch queries to the elastic endpoint of open raadsinformatie.
 
+## Connecting with Elasticsearch
+
+Make sure ES has the [correct proxy settings](https://opensource.appbase.io/reactive-manual/getting-started/reactivebase.html#connect-to-elasticsearch).
+
 ## Credits
 
 - [VNG Realisatie](https://vngrealisatie.nl) for funding.
