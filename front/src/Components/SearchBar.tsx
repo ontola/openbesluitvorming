@@ -45,7 +45,7 @@ export const queryGenerator = (searchTerm: string) => {
               fields,
               // default_operator: "or",
               query: searchTerm,
-              fuzziness: 2,
+              fuzziness: 1,
             },
           },
         ],
