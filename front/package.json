@@ -49,7 +49,7 @@
     "typescript": "3.5.3"
   },
   "scripts": {
-    "dev": "BROWSER=none react-scripts start",
+    "dev": "BROWSER=none PORT=4000 react-scripts start",
     "build": "react-scripts build",
     "lint": "eslint --ext .js,.jsx,.ts,.tsx ./src --cache --cache-location \"/tmp/.eslintcache/\"",
     "test": "react-scripts test",

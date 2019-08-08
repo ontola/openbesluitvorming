@@ -9,7 +9,7 @@ This is the front-end react typescript application.
 `$ yarn dev` starts a local development server uses react-scripts.
 This has a built-in proxy, which forwards all /api request to the `../server` app at :8080.
 
-Visit localhost:3000
+Visit [localhost:4000](http://localhost:4000/)
 
 ## Build
 
