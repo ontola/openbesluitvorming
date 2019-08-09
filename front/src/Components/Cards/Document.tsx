@@ -25,7 +25,7 @@ const Document: React.FunctionComponent<DocumentProps & RouteComponentProps> = (
   }
 
   return (
-    <React.Fragment key={props._id}>
+    <React.Fragment key={props["@id"]}>
       <div className="ResultCard__details">
         <div className="ResultCard__detail" >{indexToMunicipality(props._index)}</div>
         <DetailType type={props["@type"]} />
@@ -56,7 +56,7 @@ const Document: React.FunctionComponent<DocumentProps & RouteComponentProps> = (
 const hoc = (Comp: any) => {
   return function DocumentWithProps (props: DocumentProps) {
     return (
-      <React.Fragment key={props._id}>
+      <React.Fragment key={props["@id"]}>
         <Comp {...props} />
       </React.Fragment>
     );

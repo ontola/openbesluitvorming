@@ -41,14 +41,14 @@ const ResultCard: React.FunctionComponent<ResultCardProps & RouteComponentProps>
     currentResource,
   } = getParams(props.history);
   const className = `ResultCard ${
-    (props.id && (currentResource === props.id))
+    (props["@id"] && (currentResource === props["@id"]))
       ? "ResultCard--active" : "" }`;
 
   const header = props.name || props.label || props.title || "";
   return (
-    <div key={props._id} className={className}>
+    <div key={props["@id"]} className={className}>
       <Button
-        onClick={() => openResource((`${paths.oriIdBase}/${props.id}` || ""), props.history)}
+        onClick={() => openResource((paths.oriId(props["@id"]) || ""), props.history)}
       >
         <h2 dangerouslySetInnerHTML={{ __html: `${header}` }}/>
       </Button>

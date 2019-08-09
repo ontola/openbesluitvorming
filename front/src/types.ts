@@ -2,13 +2,13 @@ export interface ORIItemType {
   _id: string;
   _score: number;
   _index: string;
+  // Ori ID, without the base
+  "@id": string;
   "@type": string;
   // TODO: specify?
   _source: any;
   _version?: number;
   _explanation?: any;
-  // Ori ID, without the base
-  id: string;
   fields?: any;
   highlight?: any;
   hightlight: string;

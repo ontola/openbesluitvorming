@@ -2,6 +2,7 @@ import * as React from "react";
 import { ORIItemType } from "../../types";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCode } from "@fortawesome/free-solid-svg-icons";
+import paths from "../../paths";
 
 const SpacingLevelJSON = 2;
 
@@ -12,7 +13,7 @@ const DetailJSON: React.FunctionComponent<ORIItemType> = (props) => {
       href={`data:application/json;charset=utf-8,${
         encodeURIComponent(JSON.stringify(props, null, SpacingLevelJSON))
       }`}
-      download={`${props._id}.json`}
+      download={`${paths.oriId(props["@id"])}.json`}
       // eslint-disable-next-line
       target="_blank"
       rel="noopener noreferrer"
