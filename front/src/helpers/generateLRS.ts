@@ -69,6 +69,7 @@ export default function generateLRS() {
   LRS.namespaces.aod = Namespace("https://argu.co/ns/od#");
   LRS.namespaces.dcterms = Namespace("http://purl.org/dc/terms/");
   LRS.namespaces.fa4 = Namespace("http://fontawesome.io/icon/");
+  LRS.namespaces.foaf = Namespace("http://xmlns.com/foaf/0.1/");
   LRS.namespaces.meeting = Namespace("https://argu.co/ns/meeting/");
   LRS.namespaces.meta = Namespace("https://argu.co/ns/meta#");
   LRS.namespaces.ncal = Namespace("http://www.semanticdesktop.org/ontologies/2007/04/02/ncal#");

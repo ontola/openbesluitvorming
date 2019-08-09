@@ -12,6 +12,7 @@ import LoadingLabel from "./LoadingLabel";
 import MediaObject from "./MediaObject";
 import Meeting from "./Meeting";
 import Organization from "./Organization";
+import Person from "./Person";
 import Predicate from "./Predicate";
 import Properties from "../Properties";
 import RDFList from "./RDFList";
@@ -27,6 +28,7 @@ function register() {
     ...MediaObject,
     ...Meeting,
     ...Organization,
+    ...Person,
     ...Predicate,
     ...Properties,
     ...RDFList,
