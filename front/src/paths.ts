@@ -9,6 +9,7 @@ const paths = {
   projectMail: "mailto:sander.bakker@vng.nl",
   vngProject: "https://www.vngrealisatie.nl/producten/pilots-open-raadsinformatie",
   vngRealisatie: "https://www.vngrealisatie.nl/",
+  oriIdBase: "https://id.openraadsinformatie.nl/",
 };
 
 export default paths;

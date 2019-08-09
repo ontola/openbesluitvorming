@@ -3,6 +3,7 @@ import * as React from "react";
 import { ORIItemType } from "../types";
 import { RouteComponentProps, withRouter } from "react-router";
 import { getParams, openResource } from "../helpers";
+import paths from "../paths";
 import Document from "./Cards/Document";
 import Meeting from "./Cards/Meeting";
 import AgendaItem from "./Cards/AgendaItem";
@@ -40,14 +41,14 @@ const ResultCard: React.FunctionComponent<ResultCardProps & RouteComponentProps>
     currentResource,
   } = getParams(props.history);
   const className = `ResultCard ${
-    (props.ori_identifier && (currentResource === props.ori_identifier))
+    (props.id && (currentResource === props.id))
       ? "ResultCard--active" : "" }`;
 
   const header = props.name || props.label || props.title || "";
   return (
     <div key={props._id} className={className}>
       <Button
-        onClick={() => openResource((props.ori_identifier || ""), props.history)}
+        onClick={() => openResource((`${paths.oriIdBase}/${props.id}` || ""), props.history)}
       >
         <h2 dangerouslySetInnerHTML={{ __html: `${header}` }}/>
       </Button>

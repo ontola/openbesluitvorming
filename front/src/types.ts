@@ -7,6 +7,8 @@ export interface ORIItemType {
   _source: any;
   _version?: number;
   _explanation?: any;
+  // Ori ID, without the base
+  id: string;
   fields?: any;
   highlight?: any;
   hightlight: string;
