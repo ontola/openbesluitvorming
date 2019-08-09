@@ -86,7 +86,7 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
         URLParams={true}
         rangeLabels={{
           "start": dateLabel(startDate),
-          "end": dateLabel(new Date),
+          "end": dateLabel(new Date()),
         }}
         range={{
           "start": startDate.getTime(),
