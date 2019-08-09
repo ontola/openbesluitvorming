@@ -11,6 +11,7 @@ import Loading from "./Loading";
 import LoadingLabel from "./LoadingLabel";
 import MediaObject from "./MediaObject";
 import Meeting from "./Meeting";
+import Membership from "./Membership";
 import Organization from "./Organization";
 import Person from "./Person";
 import Predicate from "./Predicate";
@@ -27,6 +28,7 @@ function register() {
     ...LoadingLabel,
     ...MediaObject,
     ...Meeting,
+    ...Membership,
     ...Organization,
     ...Person,
     ...Predicate,

@@ -6,7 +6,8 @@ import { resourceTopology } from "../Topologies/ResourceTopology";
 import Box from "../Topologies/BoxTopology";
 import { labelsTopology } from "../Topologies/LabelsTopology";
 
-// A Thing inside the Resource or Labels topology
+/** A Thing inside the Resource or Labels topology */
+// TODO: Render a link if there is no property value
 const ThingResource = () => {
   return (
     <Box>
