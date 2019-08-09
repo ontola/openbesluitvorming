@@ -1,6 +1,14 @@
 {
-  "name": "my-app",
-  "version": "0.1.0",
+  "name": "ori-search",
+  "version": "1.0.0",
+  "author": {
+    "name": "Joep Meindertsma",
+    "email": "joep@ontola.io"
+  },
+  "bugs": "https://github.com/ontola/ori-search/issues",
+  "homepage": "https://ori.argu.co",
+  "repository": "github:ontola/ori-search",
+  "description": "Search interface for Open Raadsinformatie",
   "private": true,
   "dependencies": {
     "@appbaseio/reactivesearch": "^3.0.0-rc.20",
