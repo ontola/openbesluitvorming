@@ -1,6 +1,6 @@
 import React from "react";
 import throttle from "lodash.throttle";
-import Resizable from "re-resizable";
+import { Resizable } from "re-resizable";
 import Button from "./Button";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -92,7 +92,7 @@ const SideDrawer = (props: SideDrawerProps & RouteComponentProps) => {
             left: "SideDrawer__resize-handle",
           }}
           handleComponent={{
-            left: Handler,
+            left: <Handler />,
           }}
           maxWidth={maxWidth}
           minWidth={200}
