@@ -1,5 +1,5 @@
 /* eslint no-console: 0 */
-import { createStore, MiddlewareFn } from "link-lib";
+import { createStore, MiddlewareFn, RDFStore } from "link-lib";
 import {
   Formula,
   Literal,
@@ -19,6 +19,8 @@ import { appMiddleware, website } from "../middleware/app";
 import logging from "../middleware/logging";
 import { handle } from "./logging";
 import history from "./history";
+import { DataProcessor } from "link-lib/dist/typings/processor/DataProcessor";
+import { RequestInitGenerator } from "link-lib/dist/typings/processor/RequestInitGenerator";
 
 (Fetcher as any).crossSiteProxyTemplate = `${FRONTEND_URL}proxy?iri={uri}`;
 
@@ -29,7 +31,21 @@ export default function generateLRS() {
     appMiddleware(history),
   ];
 
-  const LRS = createStore<ReactType>({ report: handle }, middleware);
+  const store = new RDFStore()
+  const LRS = createStore<ReactType>({
+    api: new DataProcessor({
+      requestInitGenerator: new RequestInitGenerator({
+        credentials: "omit",
+        csrfFieldName: "csrf-token",
+        mode: "cors",
+        xRequestedWith: "XMLHttpRequest"
+      }),
+      report: handle,
+      store,
+    }),
+    report: handle,
+    store,
+  }, middleware);
 
   (LRS as any).api.fetcher.__proto__.constructor.withCredentials = function () { return false; };
 
