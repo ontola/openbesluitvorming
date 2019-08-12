@@ -11,10 +11,10 @@
     redux "^4.0.0"
     redux-thunk "^2.3.0"
 
-"@appbaseio/reactivesearch@^3.0.0-rc.20":
-  version "3.0.0-rc.20"
-  resolved "https://registry.yarnpkg.com/@appbaseio/reactivesearch/-/reactivesearch-3.0.0-rc.20.tgz#aa1c0dfaa0b852d40ae13a0c3c88250edfa7f7c2"
-  integrity sha512-g5abRKR0J7B/ShYg1+3mnownzJNH7iEw/v5ygAKA4h7RT3pja1MCSES66d4L7noMmYJ5gn/p53ugg7srfx9tew==
+"@appbaseio/reactivesearch@^3.0.0-rc.23":
+  version "3.0.0-rc.23"
+  resolved "https://registry.yarnpkg.com/@appbaseio/reactivesearch/-/reactivesearch-3.0.0-rc.23.tgz#d3d0b3303082fa3a714ec3ca4537d435150ee1b2"
+  integrity sha512-ZLfOW6PZGHqptewJgHOmrPASPDkoTUkjd4DcWswR4gjhTNPaNBIRobdaw3Q+p/SqqAgkV1bkYE43Lz1JVXgC1Q==
   dependencies:
     "@appbaseio/reactivecore" "8.2.9"
     appbase-js "^4.0.2-beta.06"
