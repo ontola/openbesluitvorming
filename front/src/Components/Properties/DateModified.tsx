@@ -5,6 +5,7 @@ import React from "react";
 import { NamedNode } from "rdflib";
 
 import { NS } from "../../LRS";
+import allTopologies from "../Topologies/allTopologies";
 
 interface DateModifiedProps {
   linkedProp: NamedNode;
@@ -13,7 +14,11 @@ interface DateModifiedProps {
 class DateModified extends React.Component<DateModifiedProps> {
   static type = NS.schema.Thing;
 
-  static property = NS.schema.dateModified;
+  static property = [
+    NS.schema.dateModified,
+    NS.schema.startDate,
+  ];
+  static topology = allTopologies;
 
   render() {
     const { linkedProp } = this.props;
@@ -21,7 +26,7 @@ class DateModified extends React.Component<DateModifiedProps> {
     const date = new Date(linkedProp.value);
 
     return (
-      <span title={date.toISOString()}>{date.toDateString()}</span>
+      <span title={date.toISOString()}>{date.toLocaleDateString('nl-NL')}</span>
     );
   }
 }
