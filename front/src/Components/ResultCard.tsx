@@ -40,8 +40,9 @@ const ResultCard: React.FunctionComponent<ResultCardProps & RouteComponentProps>
   const {
     currentResource,
   } = getParams(props.history);
+
   const className = `ResultCard ${
-    (props["@id"] && (currentResource === props["@id"]))
+    (props["@id"] && (currentResource === paths.oriId(props["@id"])))
       ? "ResultCard--active" : "" }`;
 
   const header = props.name || props.label || props.title || "";
