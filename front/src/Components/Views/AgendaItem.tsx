@@ -31,9 +31,6 @@ const AgendaItem = (props: AgendaItemProps) => {
   );
 };
 
-AgendaItem.mapDataToProps = [
-  NS.meeting("attachment"),
-];
 AgendaItem.type = NS.meeting("AgendaItem");
 
 export default register(AgendaItem);
