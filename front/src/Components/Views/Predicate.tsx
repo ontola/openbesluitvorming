@@ -5,6 +5,7 @@ import { NS } from "../../LRS";
 import { labelsTopology } from "../Topologies/LabelsTopology";
 import { NamedNode } from "rdflib";
 import PredicateLabel from "../Topologies/PredicateLabel";
+import PropertyValue from "../Topologies/PropertyValueTopology";
 
 interface PredicateProps {
   children: React.ReactNode;
@@ -22,7 +23,9 @@ const Predicate = (props: PredicateProps) => {
       <PredicateLabel>
         <LinkedResourceContainer subject={singleLabel}/>
       </PredicateLabel>
-      <div>{props.children}</div>
+      <PropertyValue>
+        {props.children}
+      </PropertyValue>
     </div>
   );
 };

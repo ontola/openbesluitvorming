@@ -142,10 +142,15 @@ export default function generateLRS() {
     new Statement(NS.meeting("agenda"), NS.rdfs("label"), Literal.find("Agendapunten", languages.nl)),
     new Statement(NS.meeting("committee"), NS.rdfs("label"), Literal.find("Commissie", languages.nl)),
 
+    new Statement(NS.meta("collection"), NS.rdfs("label"), Literal.find("Collectie", languages.nl)),
+
+    new Statement(NS.ncal("categories"), NS.rdfs("label"), Literal.find("Categorieën", languages.nl)),
+
     new Statement(NS.org("memberOf"), NS.rdfs("label"), Literal.find("Lid van", languages.nl)),
     new Statement(NS.org("member"), NS.rdfs("label"), Literal.find("Lid", languages.nl)),
     new Statement(NS.org("role"), NS.rdfs("label"), Literal.find("Rol", languages.nl)),
     new Statement(NS.org("organization"), NS.rdfs("label"), Literal.find("Organisatie", languages.nl)),
+    new Statement(NS.org("subOrganizationOf"), NS.rdfs("label"), Literal.find("Valt onder", languages.nl)),
 
     new Statement(NS.rdfs("first"), NS.rdfs("label"), Literal.find("Eerste van de lijst", languages.nl)),
     new Statement(NS.rdfs("rest"), NS.rdfs("label"), Literal.find("Rest van de lijst", languages.nl)),

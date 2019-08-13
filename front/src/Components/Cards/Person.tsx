@@ -23,8 +23,6 @@ const Meeting: React.FunctionComponent<MeetingProps> = (props) => {
         <div className="ResultCard__detail" >{indexToMunicipality(props._index)}</div>
         <DetailType type={props["@type"]} />
       </div>
-      <p>Email: {props.email}</p>
-      <p>Gender: {props.gender}</p>
     </React.Fragment>
   );
 };

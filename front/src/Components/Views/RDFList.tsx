@@ -2,10 +2,9 @@ import React from "react";
 import { register, Property } from "link-redux";
 
 import { NS } from "../../LRS";
-import { labelsTopology } from "../Topologies/LabelsTopology";
+import allTopologies from "../Topologies/allTopologies";
 
 const RDFList = () => {
-
   return (
     <React.Fragment>
       <Property label={NS.rdf("first")}/>
@@ -15,6 +14,6 @@ const RDFList = () => {
 };
 
 RDFList.type = NS.rdf("List");
-RDFList.topology = labelsTopology;
+RDFList.topology = allTopologies;
 
 export default register(RDFList);

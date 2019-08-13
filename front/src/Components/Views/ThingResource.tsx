@@ -7,6 +7,7 @@ import Box from "../Topologies/BoxTopology";
 import { labelsTopology } from "../Topologies/LabelsTopology";
 import { ThingProps } from "./Thing";
 import { SomeTerm } from "rdflib";
+import { propertyValueTopology } from "../Topologies/PropertyValueTopology";
 
 interface ThingResourceProps extends ThingProps {
   name: SomeTerm;
@@ -32,6 +33,7 @@ const ThingResource = (props: ThingResourceProps) => {
 ThingResource.type = NS.schema("Thing");
 ThingResource.topology = [
   resourceTopology,
+  propertyValueTopology,
   labelsTopology,
 ];
 ThingResource.mapDataToProps = {
