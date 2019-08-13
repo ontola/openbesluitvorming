@@ -22,8 +22,8 @@ const Meeting = (props: MeetingProps) => {
         <DownloadResource url={props.subject.value} />
       </div>
       <Labels>
-        <Property label={NS.schema("description")} />
         <Property label={NS.vcard("hasOrganizationName")} />
+        <Property label={NS.schema("description")} />
         <Property label={NS.schema("location")} />
         <Property label={NS.schema("startDate")} />
         <Property label={NS.schema("endDate")} />

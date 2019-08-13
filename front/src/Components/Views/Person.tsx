@@ -21,9 +21,9 @@ const Person = (props: PersonProps) => {
         <DownloadResource url={props.subject.value} />
       </div>
       <Labels>
+        <Property label={NS.vcard("hasOrganizationName")} />
         <Property label={NS.org("memberOf")} />
         <Property label={NS.foaf("gender")} />
-        <Property label={NS.vcard("hasOrganizationName")} />
       </Labels>
     </ResourceTopology>
   );

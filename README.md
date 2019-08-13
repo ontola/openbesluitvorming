@@ -1,5 +1,7 @@
 # Open Raadsinformatie Search
 
+[![Build Status](https://semaphoreci.com/api/v1/argu/ori-search-2/branches/master/badge.svg)](https://semaphoreci.com/argu/ori-search-2)
+
 Search through meeting documents of 100+ Dutch local governments. Powered by [Open Raadsinformatie](http://openraadsinformatie.nl).
 
 Check it out at [ori.argu.co](http://ori.argu.co)!
@@ -32,8 +34,6 @@ Check out the [API docs](/docs.md) and the [example requests](/example_requests.
 Read [contribute.md](/CONTRIBUTE.md)
 
 ## Deployment
-
-[![Build Status](https://semaphoreci.com/api/v1/argu/ori-search-2/branches/master/badge.svg)](https://semaphoreci.com/argu/ori-search-2)
 
 Semaphore tracks the master branch and deploys succesful builds to a public [docker hub](https://hub.docker.com/r/argu/ori-search) repository.
 

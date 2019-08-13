@@ -23,6 +23,7 @@ const MediaObject = (props: MediaObjectProps) => {
           <DownloadResource url={props.subject.value} />
         </div>
         <Labels>
+          <Property label={NS.vcard("hasOrganizationName")} />
           <Property label={NS.dcterms("isReferencedBy")} />
           <Property label={NS.schema("dateModified")} />
           {/* <Property label={NS.schema("fileSize")} />

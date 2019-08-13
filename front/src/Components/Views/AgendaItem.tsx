@@ -22,6 +22,7 @@ const AgendaItem = (props: AgendaItemProps) => {
         <DownloadResource url={props.subject.value} />
       </div>
       <Labels>
+        <Property label={NS.vcard("hasOrganizationName")} />
         <Property label={NS.schema("superEvent")} />
         <Property label={NS.schema("description")} />
         <Property label={NS.schema("startDate")} />

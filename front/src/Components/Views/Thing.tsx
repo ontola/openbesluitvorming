@@ -21,6 +21,7 @@ const Thing = (props: ThingProps) => {
         }
       </div>
       <Labels>
+        <Property label={NS.vcard("hasOrganizationName")} />
         <Property label={NS.rdfs("type")} /><br />
         <Property label={NS.schema("dateModified")} /><br />
         <Property label={NS.prov("hadPrimarySo")} />

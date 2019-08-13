@@ -142,6 +142,11 @@ export default function generateLRS() {
     new Statement(NS.meeting("agenda"), NS.rdfs("label"), Literal.find("Agendapunten", languages.nl)),
     new Statement(NS.meeting("committee"), NS.rdfs("label"), Literal.find("Commissie", languages.nl)),
 
+    new Statement(NS.org("memberOf"), NS.rdfs("label"), Literal.find("Lid van", languages.nl)),
+    new Statement(NS.org("member"), NS.rdfs("label"), Literal.find("Lid", languages.nl)),
+    new Statement(NS.org("role"), NS.rdfs("label"), Literal.find("Rol", languages.nl)),
+    new Statement(NS.org("organization"), NS.rdfs("label"), Literal.find("Organisatie", languages.nl)),
+
     new Statement(NS.rdfs("first"), NS.rdfs("label"), Literal.find("Eerste van de lijst", languages.nl)),
     new Statement(NS.rdfs("rest"), NS.rdfs("label"), Literal.find("Rest van de lijst", languages.nl)),
 
@@ -154,14 +159,15 @@ export default function generateLRS() {
 
     new Statement(NS.schema("startDate"), NS.rdfs("label"), Literal.find("Startdatum", languages.nl)),
     new Statement(NS.schema("endDate"), NS.rdfs("label"), Literal.find("Einddatum", languages.nl)),
+    new Statement(NS.schema("dateModified"), NS.rdfs("label"), Literal.find("Bewerkt op", languages.nl)),
     new Statement(NS.schema("eventStatus"), NS.rdfs("label"), Literal.find("Status", languages.nl)),
     new Statement(NS.schema("location"), NS.rdfs("label"), Literal.find("Locatie", languages.nl)),
     new Statement(NS.schema("name"), NS.rdfs("label"), Literal.find("Naam", languages.nl)),
-    new Statement(NS.schema("organizer"), NS.rdfs("label"), Literal.find("Organisator", languages.nl)),
+    new Statement(NS.schema("organizer"), NS.rdfs("label"), Literal.find("Georganiseerd door", languages.nl)),
     new Statement(NS.schema("description"), NS.rdfs("label"), Literal.find("Beschrijving", languages.nl)),
     new Statement(NS.schema("superEvent"), NS.rdfs("label"), Literal.find("Besproken in", languages.nl)),
 
-    new Statement(NS.vcard("hasOrganizationName"), NS.rdfs("label"), Literal.find("Heeft organisatie naam", languages.en)),
+    new Statement(NS.vcard("hasOrganizationName"), NS.rdfs("label"), Literal.find("Organisatie", languages.en)),
   ];
   // tslint:enable max-line-length
 

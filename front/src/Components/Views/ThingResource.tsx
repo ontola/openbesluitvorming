@@ -37,6 +37,7 @@ ThingResource.topology = [
 ThingResource.mapDataToProps = {
   name: [
     NS.schema("name"),
+    NS.foaf("name"),
     NS.rdfs("label"),
     NS.schema("label"),
     NS.skos("prefLabel"),

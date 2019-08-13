@@ -21,8 +21,8 @@ const Membership = (props: MembershipProps) => {
       </div>
       <Labels>
         <Property label={NS.org("member")} />
-        <Property label={NS.org("organization")} />
         <Property label={NS.org("role")} />
+        <Property label={NS.org("organization")} />
       </Labels>
     </ResourceTopology>
   );
