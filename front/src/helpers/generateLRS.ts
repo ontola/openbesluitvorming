@@ -128,20 +128,40 @@ export default function generateLRS() {
 
   // tslint:disable max-line-length
   const ontologicalClassData = [
+    // Everything is a thing. Are these still necessary?
     new Statement(NS.schema("Thing"), NS.rdfs("subClassOf"), NS.rdfs("Resource")),
     new Statement(NS.owl("Thing"), NS.owl("sameAs"), NS.schema("Thing")),
-
     new Statement(NS.schema("MediaObject"), NS.rdfs("subClassOf"), NS.schema("Thing")),
 
-    new Statement(NS.schema("CreativeWork"), NS.rdfs("label"), Literal.find("Stuk", languages.nl)),
-    new Statement(NS.schema("CreativeWork"), NS.schema("description"), Literal.find("Kan van alles zijn.", languages.en)),
+    new Statement(NS.dcterms("isReferencedBy"), NS.rdfs("label"), Literal.find("Besproken in", languages.nl)),
 
     new Statement(NS.meeting("Meeting"), NS.rdfs("label"), Literal.find("Vergadering", languages.nl)),
     new Statement(NS.meeting("Meeting"), NS.schema("description"), Literal.find("A meeting is an event where people discuss things and make decisions.", languages.en)),
 
+    new Statement(NS.meeting("attachment"), NS.rdfs("label"), Literal.find("Bijlage", languages.nl)),
+    new Statement(NS.meeting("agenda"), NS.rdfs("label"), Literal.find("Agendapunten", languages.nl)),
+    new Statement(NS.meeting("committee"), NS.rdfs("label"), Literal.find("Commissie", languages.nl)),
+
+    new Statement(NS.rdfs("first"), NS.rdfs("label"), Literal.find("Eerste van de lijst", languages.nl)),
+    new Statement(NS.rdfs("rest"), NS.rdfs("label"), Literal.find("Rest van de lijst", languages.nl)),
+
     new Statement(NS.schema("Thing"), NS.rdf("type"), NS.rdfs("Class")),
     new Statement(NS.schema("Thing"), NS.rdfs("comment"), Literal.find("The most generic type of item.")),
     new Statement(NS.schema("Thing"), NS.rdfs("label"), Literal.find("Thing", languages.en)),
+
+    new Statement(NS.schema("CreativeWork"), NS.rdfs("label"), Literal.find("Stuk", languages.nl)),
+    new Statement(NS.schema("CreativeWork"), NS.schema("description"), Literal.find("Kan van alles zijn.", languages.en)),
+
+    new Statement(NS.schema("startDate"), NS.rdfs("label"), Literal.find("Startdatum", languages.nl)),
+    new Statement(NS.schema("endDate"), NS.rdfs("label"), Literal.find("Einddatum", languages.nl)),
+    new Statement(NS.schema("eventStatus"), NS.rdfs("label"), Literal.find("Status", languages.nl)),
+    new Statement(NS.schema("location"), NS.rdfs("label"), Literal.find("Locatie", languages.nl)),
+    new Statement(NS.schema("name"), NS.rdfs("label"), Literal.find("Naam", languages.nl)),
+    new Statement(NS.schema("organizer"), NS.rdfs("label"), Literal.find("Organisator", languages.nl)),
+    new Statement(NS.schema("description"), NS.rdfs("label"), Literal.find("Beschrijving", languages.nl)),
+    new Statement(NS.schema("superEvent"), NS.rdfs("label"), Literal.find("Besproken in", languages.nl)),
+
+    new Statement(NS.vcard("hasOrganizationName"), NS.rdfs("label"), Literal.find("Heeft organisatie naam", languages.en)),
   ];
   // tslint:enable max-line-length
 

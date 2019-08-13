@@ -7,7 +7,7 @@ import { StringLiteral } from "@babel/types";
 import Resource from "../Topologies/ResourceTopology";
 import Labels from "../Topologies/LabelsTopology";
 
-interface ThingProps {
+export interface ThingProps {
   subject: StringLiteral;
 }
 

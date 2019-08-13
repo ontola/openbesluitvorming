@@ -19,6 +19,7 @@ import Properties from "../Properties";
 import RDFList from "./RDFList";
 import Thing from "./Thing";
 import ThingResource from "./ThingResource";
+import ThingPredicateLabel from "./ThingPredicateLabel";
 
 function register() {
   LRS.registerAll(
@@ -36,6 +37,7 @@ function register() {
     ...RDFList,
     ...Thing,
     ...ThingResource,
+    ...ThingPredicateLabel,
   );
 }
 

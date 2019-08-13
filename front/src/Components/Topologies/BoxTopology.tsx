@@ -10,6 +10,9 @@ interface TopologyProviderProps {
   elementProps?: object;
 }
 
+/**
+ * Box - A clickable item that opens the resource of the item in the sidebar
+ */
 class Box extends TopologyProvider<TopologyProviderProps> {
   constructor(props: TopologyProviderProps) {
     super(props);

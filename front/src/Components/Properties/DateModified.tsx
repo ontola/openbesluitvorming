@@ -17,6 +17,7 @@ class DateModified extends React.Component<DateModifiedProps> {
   static property = [
     NS.schema.dateModified,
     NS.schema.startDate,
+    NS.schema.endDate,
   ];
   static topology = allTopologies;
 

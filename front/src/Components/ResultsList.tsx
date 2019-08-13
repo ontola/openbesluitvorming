@@ -78,7 +78,7 @@ const ResultsList: React.FunctionComponent = () => {
         handle(error);
         return (
           <div>
-              Something went wrong!<br/>
+            Something went wrong!<br/>
             {printAndHandle(error)}
           </div>
         );

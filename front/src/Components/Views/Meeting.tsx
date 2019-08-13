@@ -39,9 +39,6 @@ const Meeting = (props: MeetingProps) => {
   );
 };
 
-Meeting.mapDataToProps = [
-  NS.meeting("attachment"),
-];
 Meeting.type = NS.meeting("Meeting");
 
 export default register(Meeting);
