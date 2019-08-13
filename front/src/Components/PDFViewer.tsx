@@ -16,6 +16,8 @@ import { HotKeys } from "react-hotkeys";
 import { keyMap } from "../helpers/keyMap";
 import { Property } from "link-redux";
 import { NS } from "../LRS";
+import Glossarium from './Glossarium';
+
 // eslint-disable-next-line
 const { Document, Page, pdfjs } = require("react-pdf");
 // tslint:disable-next-line:max-line-length
@@ -241,6 +243,7 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
           </div>
         }
       </div>
+      <Glossarium/>
     </HotKeys>
   );
 };
