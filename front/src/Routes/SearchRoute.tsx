@@ -81,7 +81,9 @@ const SearchRoute = (props: RouteComponentProps) => {
                   showClearAll={false}
                   className="Filter Filter__current"
                 />
-                <ResultsList/>
+                <div className="ResultsListWrapper">
+                  <ResultsList/>
+                </div>
               </div>
             }
             {!currentSearchTerm &&

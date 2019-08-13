@@ -472,6 +472,10 @@ p {
   }
 }
 
+.ResultsListWrapper {
+  position: relative;
+}
+
 .Results__dual-loader {
   position: absolute;
   top: 0;
@@ -480,7 +484,7 @@ p {
 
 .Results__dual-loader-top {
   position: absolute;
-  top: .5rem;
+  top: -.5rem;
 }
 
 .Results__dual-loader-bottom {
