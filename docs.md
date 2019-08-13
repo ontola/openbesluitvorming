@@ -17,12 +17,14 @@ If you want to know how to query these endpoints, check out [`example_requests.h
 
 Endpoint: `https://id.openraadsinformatie.nl`
 
-The ORI REST API is hosted at the `id.openraadsinformatie.nl` subdomain.
+The ORI REST API is hofsted at the `id.openraadsinformatie.nl` subdomain.
 Use this to get individual meetings / motions / agenda items / persons / etc, such as [`https://id.openraadsinformatie.nl/243815`](https://id.openraadsinformatie.nl/243815).
 It is by far the most performant API for ORI, as it stores the various representations (TTL, RDF/XML, N3, N-Triples, JSON-LD) as static files.
 Since this API serves RDF, it might be a good idea to [get familiar with linked data](https://ontola.io/what-is-linked-data/).
 
-Read more about the REST API in its [github repo](https://github.com/ontola/ori_api) and its [documentation](https://id.openraadsinformatie.nl/)..
+There is a special endpoint for getting all organizations: [`https://api.openraadsinformatie.nl/v1/organizations`](https://api.openraadsinformatie.nl/v1/organizations)
+
+Read more about the REST API in its [github repo](https://github.com/ontola/ori_api) and its [documentation](https://id.openraadsinformatie.nl/).
 
 ### Elastic
 
