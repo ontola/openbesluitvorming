@@ -9,7 +9,7 @@ import NavBarTop from "../Components/NavBarTop";
 import ResultsList from "../Components/ResultsList";
 import { getParams } from "../helpers";
 import SearchBar from "../Components/SearchBar";
-import { ReactiveBase } from "@appbaseio/reactivesearch";
+import { ReactiveBase, SelectedFilters } from "@appbaseio/reactivesearch";
 import theme from "../theme";
 import { SERVER_PORT, NODE_ENV } from "../config";
 import SideDrawer from "../Components/SideDrawer";
@@ -48,7 +48,7 @@ const SearchRoute = (props: RouteComponentProps) => {
     >
       <ReactiveBase
         theme={theme}
-        app="ori_*"
+        app="*"
         url={apiURL.toString()}
         setSearchParams={setSearchParams as () => string}
       >
@@ -77,6 +77,10 @@ const SearchRoute = (props: RouteComponentProps) => {
             }
             {currentSearchTerm &&
               <div className="Results">
+                <SelectedFilters
+                  showClearAll={false}
+                  className="Filter Filter__current"
+                />
                 <ResultsList/>
               </div>
             }

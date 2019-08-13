@@ -57,7 +57,7 @@ export const queryGenerator = (searchTerm: string) => {
 // eslint-enable @typescript-eslint/camelcase
 
 // How many ms it takes before search is triggered after changing the query value.
-const debounce = 1000;
+const debounce = 2500;
 
 const SearchBar: React.FunctionComponent = () => {
   const [query, setQuery] = React.useState<string>("");
