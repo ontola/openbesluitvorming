@@ -5,7 +5,7 @@ import { NS } from "./LRS";
 // Mapping for consistent component Ids
 export const ids = {
   searchbox: "zoekterm",
-  gemeenten: "gemeenten",
+  organisaties: "organisaties",
   daterange: "datums",
   type: "type",
 };
@@ -57,12 +57,20 @@ export const getParams = (history: History) => {
 };
 
 // Turns ori_amsteram_215970157 into Amsterdam
-export const indexToMunicipality = (_index: string) => {
+// Should turn osi_utrecht into Provincie Utrecht
+export const indexToLabel = (_index: string) => {
   const parts = _index.split("_");
-  return parts
+  const stitchedName = parts
     .slice(1, parts.length - 1)
     .map(s => `${s.charAt(0).toLocaleUpperCase()}${s.substring(1)}`)
-    .join(" ");
+    .join(" ")
+  if (parts[0] === "osi") {
+    return `Provincie ${stitchedName}`
+  }
+  if (parts[0] === "ori") {
+    return `Gemeente ${stitchedName}`
+  }
+  return stitchedName;
 };
 
 // Sets the URL to the selected resource

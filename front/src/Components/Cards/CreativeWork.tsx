@@ -1,7 +1,7 @@
 import * as React from "react";
 
 import { ORIItemType } from "../../types";
-import { indexToMunicipality } from "../../helpers";
+import { indexToLabel } from "../../helpers";
 import DetailType from "../Details/DetailType";
 
 interface CreativeWorkProps extends ORIItemType {
@@ -20,7 +20,7 @@ const CreativeWork: React.FunctionComponent<CreativeWorkProps> = (props) => {
         )))
       }
       <div className="ResultCard__details">
-        <div className="ResultCard__detail" >{indexToMunicipality(props._index)}</div>
+        <div className="ResultCard__detail" >{indexToLabel(props._index)}</div>
         <DetailType type={props["@type"]} />
       </div>
     </React.Fragment>

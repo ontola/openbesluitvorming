@@ -6,7 +6,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faDownload } from "@fortawesome/free-solid-svg-icons";
 import DetailType from "../Details/DetailType";
 
-import { indexToMunicipality } from "../../helpers";
+import { indexToLabel } from "../../helpers";
 
 interface DocumentProps extends ORIItemType {
   content_type?: string;
@@ -27,7 +27,7 @@ const Document: React.FunctionComponent<DocumentProps & RouteComponentProps> = (
   return (
     <React.Fragment key={props["@id"]}>
       <div className="ResultCard__details">
-        <div className="ResultCard__detail" >{indexToMunicipality(props._index)}</div>
+        <div className="ResultCard__detail" >{indexToLabel(props._index)}</div>
         <DetailType type={props["@type"]} />
         {date &&
           <div className="ResultCard__detail" >{date.toLocaleDateString()}</div>
