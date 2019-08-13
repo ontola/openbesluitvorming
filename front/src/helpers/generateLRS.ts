@@ -167,6 +167,7 @@ export default function generateLRS() {
     new Statement(NS.schema("dateModified"), NS.rdfs("label"), Literal.find("Bewerkt op", languages.nl)),
     new Statement(NS.schema("eventStatus"), NS.rdfs("label"), Literal.find("Status", languages.nl)),
     new Statement(NS.schema("location"), NS.rdfs("label"), Literal.find("Locatie", languages.nl)),
+    new Statement(NS.schema("invitee"), NS.rdfs("label"), Literal.find("Genodigden", languages.nl)),
     new Statement(NS.schema("name"), NS.rdfs("label"), Literal.find("Naam", languages.nl)),
     new Statement(NS.schema("organizer"), NS.rdfs("label"), Literal.find("Georganiseerd door", languages.nl)),
     new Statement(NS.schema("description"), NS.rdfs("label"), Literal.find("Beschrijving", languages.nl)),
