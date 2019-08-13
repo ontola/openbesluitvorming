@@ -87,7 +87,7 @@ const ResultsList: React.FunctionComponent = () => {
         // When these components change, update the results
         and: allComponentIds,
       }}
-      renderItem={props => <ResultCard {...props} />}
+      renderItem={props => <ResultCard key={props['@id']} {...props} />}
     />
   );
 };
