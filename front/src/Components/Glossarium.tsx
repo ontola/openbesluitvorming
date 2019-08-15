@@ -35,9 +35,10 @@ class Glossarium extends React.PureComponent<{}, MState> {
   }
 
   updateSelection = () => {
-    let sel: Selection = {} as Selection;
+    // let sel: Selection = {};
+    let sel = {};
     
-    let selected = document.getSelection();
+    const selected = document.getSelection();
     if (selected !== null) {
       sel = selected;
     }
@@ -55,13 +56,10 @@ class Glossarium extends React.PureComponent<{}, MState> {
       <div>
         <div className="Glossarium">
           <h1>Huidige selectie</h1>
-          {/* <div className="container__selectedText"> */}
-            <input 
-              className="selectedText"
-              value={this.state.selectedText}
-              onChange={this.onChange}></input>
-          {/* </div> */}
-
+          <input 
+            className="selectedText"
+            value={this.state.selectedText}
+            onChange={this.onChange}></input>
           <Button
             className="evaluateSelection"
             onClick={this.evaluateSelection}>
