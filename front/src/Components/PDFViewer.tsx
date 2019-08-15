@@ -17,7 +17,6 @@ import { keyMap } from "../helpers/keyMap";
 import { Property } from "link-redux";
 import { NS } from "../LRS";
 import Glossarium from './Glossarium';
-import { usePersistedState } from '../helpers';
 
 // eslint-disable-next-line
 const { Document, Page, pdfjs } = require("react-pdf");

@@ -117,8 +117,8 @@ const SideDrawer = (props: SideDrawerProps & RouteComponentProps) => {
             onClick={toggleGloss}
           >
             {glossIsOpen ?
-            "Close Glossarium" :
-            "Open Glossarium"}
+              "Close Glossarium" :
+              "Open Glossarium"}
           </Button>
           <Button
             className="Button__close"

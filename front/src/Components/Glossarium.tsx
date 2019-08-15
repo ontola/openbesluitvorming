@@ -2,13 +2,11 @@ import * as React from "react";
 import Button from "./Button";
 
 interface MState {
-  selectedText?: string,
-  information?: string
+  selectedText?: string;
+  information?: string;
 }
 
-interface MProps {}
-
-class Glossarium extends React.PureComponent<MProps, MState> {
+class Glossarium extends React.PureComponent<{}, MState> {
   constructor(props: {}) {
     super(props);
     this.state = {
@@ -25,7 +23,7 @@ class Glossarium extends React.PureComponent<MProps, MState> {
     })
   }
 
-  onChange = (e:React.FormEvent<HTMLInputElement>) => {
+  onChange = (e: React.FormEvent<HTMLInputElement>) => {
     this.setState({
       selectedText: e.currentTarget.value
     })
@@ -37,9 +35,9 @@ class Glossarium extends React.PureComponent<MProps, MState> {
   }
 
   updateSelection = () => {
-    var sel:Selection = {} as Selection;
+    let sel: Selection = {} as Selection;
     
-    var selected = document.getSelection();
+    let selected = document.getSelection();
     if (selected !== null) {
       sel = selected;
     }
