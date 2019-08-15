@@ -10,13 +10,14 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { withRouter, RouteComponentProps } from "react-router";
 import { SideDrawerContext } from "./SideDrawer";
-import { getParams } from "../helpers";
+import { getParams, myPersistedState } from "../helpers";
 import { handle } from "../helpers/logging";
 import { HotKeys } from "react-hotkeys";
 import { keyMap } from "../helpers/keyMap";
 import { Property } from "link-redux";
 import { NS } from "../LRS";
 import Glossarium from './Glossarium';
+import { usePersistedState } from '../helpers';
 
 // eslint-disable-next-line
 const { Document, Page, pdfjs } = require("react-pdf");
@@ -65,6 +66,9 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
   const [showButtons, setShowButtons] = React.useState<boolean>(false);
   const drawer = React.useContext(SideDrawerContext);
   const pdfWrapper = React.createRef<HTMLInputElement>();
+
+  const glossIsOpen =
+    myPersistedState<boolean>("orisearch.pdfviewer.glossariumOpened", false);
 
   const handlePreviousPage = () => {
     if (pageNumber === 1) {
@@ -243,7 +247,7 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
           </div>
         }
       </div>
-      <Glossarium/>
+      {glossIsOpen && <Glossarium/>}
     </HotKeys>
   );
 };

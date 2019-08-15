@@ -18,7 +18,6 @@ export const allComponentIds = Object.values(ids);
 
 export function usePersistedState<T>(key: string, initial: T):
 [T, React.Dispatch<React.SetStateAction<T>>] {
-
   const [value, setValue] = React.useState<T>(() => {
     const storageValue = sessionStorage.getItem(key);
     if (storageValue) {
@@ -32,8 +31,15 @@ export function usePersistedState<T>(key: string, initial: T):
     sessionStorage.setItem(key, JSON.stringify(next));
     setValue(next);
   };
-
   return [value, setPersistedValue];
+}
+
+export function myPersistedState<T>(key: string, initial: T): T {
+  const storageValue = sessionStorage.getItem(key);
+  if (storageValue === null) {
+    return initial;
+  }
+  return JSON.parse(storageValue);
 }
 
 export const getParams = (history: History) => {

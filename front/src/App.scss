@@ -72,6 +72,21 @@ p {
       color: $blue_dark;
     }
   }
+
+  &__openGlossary {
+    color: $blue;
+    font-weight: bold;
+    border-radius: $border-radius;
+    padding: .5rem;
+    position: absolute;
+    top: .5rem;
+    right: 5rem;
+    background-color: transparentize(white, .1);
+    z-index: 1;
+    &:hover {
+      color: $blue_dark;
+    }
+  }
 }
 
 .DayPickerInput {
@@ -754,14 +769,51 @@ mark {
 
 
 .Glossarium {
-  width: 100%;
+  width: 400px;
   height: 100%;
   position: absolute;
+  right: 0;
   top: 0;
 
   // Get some visual feedback
-  background-color: rgba(0,0,0, 0.8);
+  background-color: rgba(0,0,0, 0.9);
   color: white;
   text-align: center;
-  padding-top: 30vh;
+  padding-top: 10vh;
+}
+
+
+.Glossarium > .container {
+  margin: 15px;
+  flex: 1 1 150px;
+  border: 1px solid white;
+  height: 60%;
+  max-height: 60%;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  padding: 5px;
+
+  &__selectedText {
+    height: 10%;
+    margin: 15px;
+    border: 1px solid white;
+    overflow: hidden;
+  }
+}
+
+.selectedText {
+  margin-right: 5px;
+  width: 70%;
+}
+
+.evaluateSelection {
+  color: $blue;
+  font-weight: bold;
+  border-radius: $border-radius;
+  padding: .5rem;
+  background-color: transparentize(white, .1);
+  z-index: 1;
+  &:hover {
+    color: $blue_dark;
+  }
 }

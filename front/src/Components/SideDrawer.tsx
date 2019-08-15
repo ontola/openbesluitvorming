@@ -44,6 +44,9 @@ const Handler = () =>
 const SideDrawer = (props: SideDrawerProps & RouteComponentProps) => {
   const [width, setWidth] =
     usePersistedState<number>("orisearch.pdfviewer.width", determineInitialWith(window.innerWidth));
+  
+  const [glossIsOpen, toggleGlossarium] = 
+    usePersistedState<boolean>("orisearch.pdfviewer.glossariumOpened", false);
   const [maxWidth, setMaxWidth] = React.useState<number>(calcMaxWidth(window.innerWidth));
 
   const pdfWrapper = React.createRef<HTMLInputElement>();
@@ -68,6 +71,10 @@ const SideDrawer = (props: SideDrawerProps & RouteComponentProps) => {
     params.delete("showResource");
     props.history.push(`/search?${params.toString()}`);
   };
+
+  const toggleGloss = () => {
+    toggleGlossarium(!glossIsOpen);
+  }
 
   const keyHandlers = {
     CLOSE: closeDocument,
@@ -105,6 +112,14 @@ const SideDrawer = (props: SideDrawerProps & RouteComponentProps) => {
             setWidth(width + delta.width)}
           enable={{ left: true }}
         >
+          <Button
+            className="Button__openGlossary"
+            onClick={toggleGloss}
+          >
+            {glossIsOpen ?
+            "Close Glossarium" :
+            "Open Glossarium"}
+          </Button>
           <Button
             className="Button__close"
             onClick={closeDocument}
