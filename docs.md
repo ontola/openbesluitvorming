@@ -11,11 +11,9 @@ The ORI API has several endpoints for different goals:
 - the **REST API** for fetching individual resources
 - an **Elastic** endpoint for full-text search
 
-If you want to know how to query these endpoints, check out [`example_requests.http`](/example_requests.http).
-
 ### REST API
 
-Endpoint: `https://id.openraadsinformatie.nl`
+Endpoint: [`https://id.openraadsinformatie.nl`](https://id.openraadsinformatie.nl)
 
 The ORI REST API is hofsted at the `id.openraadsinformatie.nl` subdomain.
 Use this to get individual meetings / motions / agenda items / persons / etc, such as [`https://id.openraadsinformatie.nl/243815`](https://id.openraadsinformatie.nl/243815).
@@ -25,6 +23,8 @@ Since this API serves RDF, it might be a good idea to [get familiar with linked 
 There is a special endpoint for getting all organizations: [`https://api.openraadsinformatie.nl/v1/organizations`](https://api.openraadsinformatie.nl/v1/organizations)
 
 Read more about the REST API in its [github repo](https://github.com/ontola/ori_api) and its [documentation](https://id.openraadsinformatie.nl/).
+
+If you want to see some examples of how to query this endpoint, check out [`example_requests.http`](/example_requests.http).
 
 ### Elastic
 
@@ -37,6 +37,8 @@ The repo for this API can be found [here](https://github.com/openstate/open-raad
 Read the [Elastic v7.0](https://www.elastic.co/guide/en/elasticsearch/reference/7.0/index.html) docs for more information.
 Only specific Elastic features (endpoints) are publicly available.
 This is to prevent (malicious or accidental) write / remove commands.
+
+If you want to see some examples of how to query this endpoint, check out [`example_requests.http`](/example_requests.http).
 
 ## FAQ
 
