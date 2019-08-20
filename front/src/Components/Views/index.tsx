@@ -9,6 +9,7 @@ import AgendaItem from "./AgendaItem";
 import ErrorComp from "./Error";
 import Loading from "./Loading";
 import LoadingLabel from "./LoadingLabel";
+import Location from "./Location";
 import MediaObject from "./MediaObject";
 import Meeting from "./Meeting";
 import Membership from "./Membership";
@@ -27,6 +28,7 @@ function register() {
     ...ErrorComp,
     ...Loading,
     ...LoadingLabel,
+    ...Location,
     ...MediaObject,
     ...Meeting,
     ...Membership,

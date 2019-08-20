@@ -91,6 +91,7 @@ export default function generateLRS() {
   LRS.namespaces.ncal = Namespace("http://www.semanticdesktop.org/ontologies/2007/04/02/ncal#");
   LRS.namespaces.opengov = Namespace("http://www.w3.org/ns/opengov#");
   LRS.namespaces.org = Namespace("http://www.w3.org/ns/org#");
+  LRS.namespaces.orid = Namespace("https://id.openraadsinformatie.nl/");
   LRS.namespaces.person = Namespace("http://www.w3.org/ns/person#");
   LRS.namespaces.prov = Namespace("http://www.w3.org/ns/prov#");
   LRS.namespaces.rdfs = Namespace("http://www.w3.org/1999/02/22-rdf-syntax-ns#");
@@ -174,6 +175,14 @@ export default function generateLRS() {
     new Statement(NS.schema("superEvent"), NS.rdfs("label"), Literal.find("Besproken in", languages.nl)),
 
     new Statement(NS.vcard("hasOrganizationName"), NS.rdfs("label"), Literal.find("Organisatie", languages.en)),
+
+    // new Statement(NS.orid("17508"), NS.schema.location, NS.app("location")),
+
+    new Statement(NS.app("location"), NS.rdf("type"), NS.schema("GeoCoordinates")),
+    new Statement(NS.app("location"), NS.schema("latitude"), Literal.fromNumber(51.505)),
+    new Statement(NS.app("location"), NS.schema("longitude"), Literal.fromNumber(-0.09)),
+    new Statement(NS.app("location"), NS.schema("name"), new Literal("Ergens in London")),
+    new Statement(NS.app("location"), NS.app("address"), new Literal("BeatleStreetWithTheZebra 69, London")),
   ];
   // tslint:enable max-line-length
 

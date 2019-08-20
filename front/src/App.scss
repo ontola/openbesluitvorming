@@ -297,6 +297,7 @@ p {
   display: flex;
   flex: 1;
   flex-direction: column;
+  z-index: 0;
 }
 
 .SideDrawer__resize-handle:hover .SideDrawer__handler,
@@ -538,6 +539,7 @@ p {
   display: block;
   // padding: .2rem;
   border-radius: $border-radius;
+  font-size: .8rem;
 
   &:hover {
     text-decoration: underline;

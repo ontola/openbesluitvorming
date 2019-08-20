@@ -1,4 +1,4 @@
-import { register, Property } from "link-redux";
+import { register, Property, LinkedResourceContainer } from "link-redux";
 import React from "react";
 
 import { NS } from "../../LRS";
@@ -22,6 +22,7 @@ const Meeting = (props: MeetingProps) => {
         <DownloadResource url={props.subject.value} />
       </div>
       <Labels>
+        <LinkedResourceContainer subject={NS.app("location")} />
         <Property label={NS.vcard("hasOrganizationName")} />
         <Property label={NS.schema("description")} />
         <Property label={NS.schema("location")} />
