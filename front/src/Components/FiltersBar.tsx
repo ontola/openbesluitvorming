@@ -5,7 +5,6 @@ import {
   RangeSlider,
 } from "@appbaseio/reactivesearch";
 import { indexToLabel, typeToLabel, ids, capitalize } from "../helpers";
-import { LoadingWithSpinner } from "./ResultsList";
 import Button from './Button';
 
 interface FiltersbarProps {
@@ -69,7 +68,6 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
         }}
         showFilter={true}
         URLParams={true}
-        loader={<LoadingWithSpinner/>}
       />
       <Button
         onClick={() => setShowDateRange(!showDateRange)}
@@ -131,7 +129,6 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
         showFilter={true}
         URLParams={true}
         className="Filter"
-        loader={<LoadingWithSpinner/>}
         renderItem={MunicipalityLabel}
       />
     </div>
