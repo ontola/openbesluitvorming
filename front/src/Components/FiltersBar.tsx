@@ -74,7 +74,7 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
       >{showDateRange ? "Velden tonen" : "Histogram tonen" }</Button>
       {showDateRange && <RangeSlider
         componentId={ids.daterange}
-        dataField="date_modified"
+        dataField="last_discussed_at"
         title="Datum"
         className="Filter"
         tooltipTrigger="hover"
@@ -96,7 +96,7 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
       />}
       {!showDateRange && <DateRange
         componentId={ids.daterange}
-        dataField="date_modified"
+        dataField="last_discussed_at"
         className="Filter"
         title={capitalize(ids.daterange)}
         placeholder={{
