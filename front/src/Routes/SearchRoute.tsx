@@ -7,11 +7,11 @@ import Filtersbar from "../Components/FiltersBar";
 import Home from "../Components/Home";
 import NavBarTop from "../Components/NavBarTop";
 import ResultsList from "../Components/ResultsList";
-import { getParams } from "../helpers";
+import { getParams, getApiURL } from "../helpers";
 import SearchBar from "../Components/SearchBar";
+import OrganizationSelector from "../Components/OrganizationSelector";
 import { ReactiveBase, SelectedFilters } from "@appbaseio/reactivesearch";
 import theme from "../theme";
-import { SERVER_PORT, NODE_ENV } from "../config";
 import SideDrawer from "../Components/SideDrawer";
 import { LinkedResourceContainer } from "link-redux";
 import { NamedNode } from "rdflib";
@@ -35,12 +35,6 @@ const SearchRoute = (props: RouteComponentProps) => {
     props.history.push(url.toString().substring(url.origin.length));
   };
 
-  const apiURL = new URL(window.location.origin);
-  apiURL.pathname = "/api";
-  if (NODE_ENV === "development") {
-    apiURL.port = SERVER_PORT.toString();
-  }
-
   return (
     <GlobalHotKeys
       keyMap={keyMap}
@@ -49,7 +43,7 @@ const SearchRoute = (props: RouteComponentProps) => {
       <ReactiveBase
         theme={theme}
         app="*"
-        url={apiURL.toString()}
+        url={getApiURL().toString()}
         setSearchParams={setSearchParams as () => string}
       >
         <div className={
@@ -60,13 +54,18 @@ const SearchRoute = (props: RouteComponentProps) => {
           <div className="NavBar">
             <NavBarTop />
             <div className="NavBar__bottom">
-              <SearchBar/>
-              {currentSearchTerm && <Button
-                className="SearchBar__button"
-                onClick={() => setShowFilters(!showFilters)}
-              >
-                filters {showFilters ? "verbergen" : "tonen"}
-              </Button>}
+              <div className="NavBar__searchbar">
+                <SearchBar/>
+                {currentSearchTerm && <Button
+                  className="SearchBar__button"
+                  onClick={() => setShowFilters(!showFilters)}
+                >
+                  filters {showFilters ? "verbergen" : "tonen"}
+                </Button>}
+              </div>
+              {!currentSearchTerm &&
+                <OrganizationSelector />
+              }
             </div>
           </div>
           <div className="Wrapper">

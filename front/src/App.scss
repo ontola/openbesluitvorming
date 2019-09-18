@@ -211,6 +211,12 @@ p {
   color: $blue_dark;
 }
 
+.NavBar__searchbar {
+  display: flex;
+  width: 100%;
+  margin-bottom: 1rem;
+}
+
 .Logo {
   color: $blue;
   transition: .5s font-size;
@@ -243,6 +249,7 @@ p {
   &__bottom {
     display: flex;
     max-width: $result-width;
+    flex-direction: column;
   }
 
   &__top {
