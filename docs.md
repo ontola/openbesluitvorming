@@ -40,6 +40,20 @@ This is to prevent (malicious or accidental) write / remove commands.
 
 If you want to see some examples of how to query this endpoint, check out [`example_requests.http`](/example_requests.http).
 
+## Changes from V0
+
+The previous API version, V0, was available at `https://api.openraadsinformatie.nl/v1/`.
+These things are different in V1 from V0:
+
+- ElasticSearch was upgraded from 5 to 7 ([upgrade guide](https://www.elastic.co/guide/en/cloud/current/ec-upgrading-v7.html))
+- Events are now split between "Meetings" and "AgendaItems"
+- The new REST API for performant Linked Data resource fetching
+- Documents are no longer nested under Events
+- PDF documents are cached, so now it's possible to query from sources that had no support for this (such as iBabs)
+- An `@context` json object was added in ElasticSearch for [RDF](https://www.w3.org/RDF/) / [JSON-LD](https://json-ld.org) compliance.
+- A `discussed_at` field is added to AgendaItems and Documents.
+- The available keys in the resources still adhere to Popolo where possible, so they have not changed.
+
 ## FAQ
 
 ### Who's behind this project?
