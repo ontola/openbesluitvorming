@@ -188,3 +188,29 @@ content-type: application/json
     }
   ]
 }
+
+### List all indexes, see all document counts per municipality / province
+
+GET https://api.openraadsinformatie.nl/v1/elastic/_cat/indices?v HTTP/1.1
+content-type: application/json
+
+### Get all municipalities
+
+POST https://api.openraadsinformatie.nl/v1/elastic/ori_*/_search? HTTP/1.1
+content-type: application/json
+
+{
+  "size": 500,
+  "query": {
+      "bool": {
+          "must": {
+              "match_all": {}
+          },
+          "filter": {
+              "terms": {
+                  "classification": ["municipality", "province"]
+              }
+          }
+      }
+  }
+}

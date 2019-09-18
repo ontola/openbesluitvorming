@@ -53,8 +53,17 @@ These things are different in V1 from V0:
 - An `@context` json object was added in ElasticSearch for [RDF](https://www.w3.org/RDF/) / [JSON-LD](https://json-ld.org) compliance.
 - A `discussed_at` field is added to AgendaItems and Documents.
 - The available keys in the resources still adhere to Popolo where possible, so they have not changed.
+- Text of extracted documents is now paginated, it's an array of pages.
 
 ## FAQ
+
+## How is your data standardized?
+
+Most of our data follows the international [Popolo](https://www.popoloproject.com) specification.
+We've added a couple of concepts, such as AgendaItems, which are namespaced under the Meeting ontology.
+This Meeting ontology is a [work in progress](https://github.com/openstate/open-raadsinformatie/issues/127).
+
+In the future, we hope to use the [VNG Open Raadsinformatie spec](https://github.com/VNG-Realisatie/Open-Raadsinformatie/) for serialization.
 
 ### Who's behind this project?
 
@@ -66,3 +75,13 @@ ORI was initiated by the [Open State Foundation](https://openstate.eu).
 
 For technical questions, please create an issue in the aforementioned Github repos.
 If you have general questions about Open Raadsinformatie, get in touch with project leader [Sander Bakker](mailto:sander.bakker@vng.nl)
+
+### Who uses ORI / these APIs?
+
+- [1848.nl](https://1848.nl) (contact: Lucas Benschop)
+- Semantic Analysis ORI (contact: Robert Goené)
+- [WaarOverheid](https://waaroverheid.nl/) (contact: Alex Olieman)
+- HierOverheid (in progress) (contact: Alex Olieman)
+- [Argu.co](https://argu.co) (contact: Joep Meindertsma)
+- Oberon Open Stateninformatie - Browser plugin (contact: Hans-Peter Harmsen)
+- Your app here? [Let us know](mailto:joep@ontola.io)!
