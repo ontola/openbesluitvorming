@@ -30,20 +30,16 @@ If you want to see some examples of how to query this endpoint, check out [`exam
 
 Endpoint: `https://api.openraadsinformatie.nl/v1/elastic/`
 
-This is an ElasticSearch endpoint.
-Elastic has powerful full-text search capabilities.
+This is an ElasticSearch endpoint, which offers powerful query and full-text search capabilities.
 
 The repo for this API can be found [here](https://github.com/openstate/open-raadsinformatie).
 Read the [Elastic v7.0](https://www.elastic.co/guide/en/elasticsearch/reference/7.0/index.html) docs for more information.
-Only specific Elastic features (endpoints) are publicly available.
+Only [specific Elastic endpoints](https://github.com/openstate/open-raadsinformatie/blob/master/deployment/endpoints/production.yaml) are publicly available.
 This is to prevent (malicious or accidental) write / remove commands.
 
 If you want to see some examples of how to query this endpoint, check out [`example_requests.http`](/example_requests.http).
 
 ## Changes from V0
-
-The previous API version, V0, was available at `https://api.openraadsinformatie.nl/v1/`.
-These things are different in V1 from V0:
 
 - ElasticSearch was upgraded from 5 to 7 ([upgrade guide](https://www.elastic.co/guide/en/cloud/current/ec-upgrading-v7.html))
 - Events are now split between "Meetings" and "AgendaItems"
@@ -57,9 +53,9 @@ These things are different in V1 from V0:
 
 ## FAQ
 
-## How is your data standardized?
+### How is the data standardized?
 
-Most of our data follows the international [Popolo](https://www.popoloproject.com) specification.
+Most of the ORI data follows the international [Popolo](https://www.popoloproject.com) specification.
 We've added a couple of concepts, such as AgendaItems, which are namespaced under the Meeting ontology.
 This Meeting ontology is a [work in progress](https://github.com/openstate/open-raadsinformatie/issues/127).
 
@@ -78,10 +74,10 @@ If you have general questions about Open Raadsinformatie, get in touch with proj
 
 ### Who uses ORI / these APIs?
 
-- [1848.nl](https://1848.nl) (contact: Lucas Benschop)
-- Semantic Analysis ORI (contact: Robert Goené)
-- [WaarOverheid](https://waaroverheid.nl/) (contact: Alex Olieman)
-- HierOverheid (in progress) (contact: Alex Olieman)
-- [Argu.co](https://argu.co) (contact: Joep Meindertsma)
+- [1848.nl](https://1848.nl), which features a notification system (contact: Lucas Benschop)
+- [WaarOverheid](https://waaroverheid.nl/), a location based app to navigate, search and subscribe to ORI data (contact: Alex Olieman)
+- [Argu.co](https://argu.co), an e-democracy platform for civic engagement (contact: [Joep Meindertsma](mailto:joep@argu.co))
+- Semantic Analysis of municipality data (contact: Robert Goené)
 - Oberon Open Stateninformatie - Browser plugin (contact: Hans-Peter Harmsen)
+- HierOverheid (in progress) (contact: Alex Olieman)
 - Your app here? [Let us know](mailto:joep@ontola.io)!
