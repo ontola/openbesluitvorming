@@ -22,15 +22,28 @@ export const queryGenerator = (searchTerm: string) => {
     return null;
   }
 
+  const mustNot = [{
+    match: {
+      "@type": "Membership"
+    }
+  }];
+
   // eslint-disable @typescript-eslint/camelcase
 
   if (simpleQueryStringChars.some(substring => searchTerm.includes(substring))) {
     return {
       query: {
-        simple_query_string: {
-          fields,
-          default_operator: "or",
-          query: searchTerm,
+        bool: {
+          must: [
+            {
+              simple_query_string: {
+                fields,
+                default_operator: "or",
+                query: searchTerm,
+              },
+            },
+          ],
+          must_not: mustNot
         },
       },
     };
@@ -49,6 +62,7 @@ export const queryGenerator = (searchTerm: string) => {
             },
           },
         ],
+        must_not: mustNot
       },
     },
   };

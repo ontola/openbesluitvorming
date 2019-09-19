@@ -32,7 +32,7 @@ Endpoint: `https://api.openraadsinformatie.nl/v1/elastic/`
 
 This is an ElasticSearch endpoint, which offers powerful query and full-text search capabilities.
 
-The repo for this API can be found [here](https://github.com/openstate/open-raadsinformatie).
+The repo and issue tracker for this API can be found [here](https://github.com/openstate/open-raadsinformatie).
 Read the [Elastic v7.0](https://www.elastic.co/guide/en/elasticsearch/reference/7.0/index.html) docs for more information.
 Only [specific Elastic endpoints](https://github.com/openstate/open-raadsinformatie/blob/master/deployment/endpoints/production.yaml) are publicly available.
 This is to prevent (malicious or accidental) write / remove commands.
@@ -67,11 +67,6 @@ ORI was initiated by the [Open State Foundation](https://openstate.eu).
 [VNG Realisatie](https://www.vngrealisatie.nl/producten/pilots-open-raadsinformatie) is the main funder.
 [Ontola](https://ontola.io) / [Argu](https://argu.co) is responsible for the technology.
 
-### I have feedback / question about one of the API's
-
-For technical questions, please create an issue in the aforementioned Github repos.
-If you have general questions about Open Raadsinformatie, get in touch with project leader [Sander Bakker](mailto:sander.bakker@vng.nl)
-
 ### Who uses ORI / these APIs?
 
 - [1848.nl](https://1848.nl), which features a notification system (contact: Lucas Benschop)
@@ -81,3 +76,8 @@ If you have general questions about Open Raadsinformatie, get in touch with proj
 - Oberon Open Stateninformatie - Browser plugin (contact: Hans-Peter Harmsen)
 - HierOverheid (in progress) (contact: Alex Olieman)
 - Your app here? [Let us know](mailto:joep@ontola.io)!
+
+### I have feedback / a different question
+
+For technical questions, please create an issue in the aforementioned Github repos.
+If you have general questions about Open Raadsinformatie, get in touch with project leader [Sander Bakker](mailto:sander.bakker@vng.nl).
