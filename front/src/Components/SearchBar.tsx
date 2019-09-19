@@ -17,16 +17,16 @@ const simpleQueryStringChars = [
 
 const fields = ["text", "title", "description", "name"];
 
+const mustNot = [{
+  match: {
+    "@type": "Membership"
+  }
+}];
+
 export const queryGenerator = (searchTerm: string) => {
   if (searchTerm === undefined) {
     return null;
   }
-
-  const mustNot = [{
-    match: {
-      "@type": "Membership"
-    }
-  }];
 
   // eslint-disable @typescript-eslint/camelcase
 
