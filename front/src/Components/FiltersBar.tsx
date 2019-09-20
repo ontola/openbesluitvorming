@@ -116,7 +116,7 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
         dataField="_index"
         title={capitalize(ids.organisaties)}
         filterLabel={capitalize(ids.organisaties)}
-        size={100}
+        size={500}
         sortBy="count"
         queryFormat="or"
         showCheckbox={false}

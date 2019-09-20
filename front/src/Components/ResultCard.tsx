@@ -45,7 +45,7 @@ const ResultCard: React.FunctionComponent<ResultCardProps & RouteComponentProps>
     (props["@id"] && (currentResource === paths.oriId(props["@id"])))
       ? "ResultCard--active" : "" }`;
 
-  const header = props.name || props.label || props.title || "";
+  const header = props.name || props.label || props.title || "Geen naam";
   return (
     <div key={props["@id"]} className={className}>
       <Button

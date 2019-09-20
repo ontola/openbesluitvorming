@@ -7,6 +7,7 @@
   /* opacity: 0; */
   font-family: "open sans", "arial", "sans-serif";
   transition: opacity 4s ease-in;
+  transition-delay: 2s;
   -webkit-animation: fadein 4s; /* Safari, Chrome and Opera > 12.1 */
    -ms-animation: fadein 4s; /* Internet Explorer */
        animation: fadein 4s;
