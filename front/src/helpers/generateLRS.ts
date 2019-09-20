@@ -156,6 +156,9 @@ export default function generateLRS() {
     new Statement(NS.org("organization"), NS.rdfs("label"), Literal.find("Organisatie", languages.nl)),
     new Statement(NS.org("subOrganizationOf"), NS.rdfs("label"), Literal.find("Valt onder", languages.nl)),
 
+    // RDF:nil is a List, and it should not render.
+    new Statement(NS.rdf("nil"), NS.rdf("type"), NS.rdf("List")),
+
     new Statement(NS.rdfs("first"), NS.rdfs("label"), Literal.find("Eerste van de lijst", languages.nl)),
     new Statement(NS.rdfs("rest"), NS.rdfs("label"), Literal.find("Rest van de lijst", languages.nl)),
 
