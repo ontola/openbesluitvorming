@@ -72,6 +72,37 @@ p {
       color: $blue_dark;
     }
   }
+
+  &__toggle {
+  color: $g4;
+  position: relative;
+  margin-bottom: 1rem;
+
+    h3 {
+      display: inline;
+    }
+
+    &:hover {
+      color: $blue;
+    }
+
+    &:active {
+      color: $blue_dark;
+    }
+
+    &:before {
+      content: "☐";
+      display: inline-block;
+      left: 0;
+      margin-right: .5rem;
+    }
+
+    &-on {
+      &:before {
+        content: "☑";
+      }
+    }
+  }
 }
 
 .DayPickerInput {

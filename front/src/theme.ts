@@ -6,10 +6,12 @@ const theme: any = {
     fontSize: "14px",
   },
   colors: {
-    textColor: "#424242",
+    // $g4
+    textColor: "#2F3936",
     primaryTextColor: "#fff",
     primaryColor: "#03A9F4",
-    titleColor: "#424242",
+    // $g4
+    titleColor: "#2F3936",
     alertColor: "#d9534f",
   },
 };

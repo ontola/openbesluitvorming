@@ -1,6 +1,5 @@
 import * as React from "react";
 import {
-  DateRange,
   MultiList,
   RangeSlider,
 } from "@appbaseio/reactivesearch";
@@ -71,11 +70,13 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
       />
       <Button
         onClick={() => setShowDateRange(!showDateRange)}
-      >{showDateRange ? "Velden tonen" : "Histogram tonen" }</Button>
+        className={`Button__toggle ${showDateRange? "Button__toggle-on" : "Button__toggle-off"}`}
+      >
+        <h3>Datum filter</h3>
+      </Button>
       {showDateRange && <RangeSlider
         componentId={ids.daterange}
         dataField="last_discussed_at"
-        title="Datum"
         className="Filter"
         tooltipTrigger="hover"
         showHistogram={true}
@@ -94,7 +95,8 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
           and: [ids.searchbox, ids.organisaties, ids.type],
         }}
       />}
-      {!showDateRange && <DateRange
+      {/* For now disable this #39 */}
+      {/* {!showDateRange && <DateRange
         componentId={ids.daterange}
         dataField="last_discussed_at"
         className="Filter"
@@ -110,7 +112,7 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
         showFilter={true}
         filterLabel={capitalize(ids.daterange)}
         URLParams={true}
-      />}
+      />} */}
       <MultiList
         componentId={ids.organisaties}
         dataField="_index"
