@@ -69,9 +69,11 @@ ORI was initiated by the [Open State Foundation](https://openstate.eu).
 
 ### Who uses ORI / these APIs?
 
+- [Ori-search](http://ori.argu.co), the official ORI search interface 
 - [1848.nl](https://1848.nl), which features a notification system (contact: Lucas Benschop)
 - [WaarOverheid](https://waaroverheid.nl/), a location based app to navigate, search and subscribe to ORI data (contact: Alex Olieman)
 - [Argu.co](https://argu.co), an e-democracy platform for civic engagement (contact: [Joep Meindertsma](mailto:joep@argu.co))
+- [Raadstalk](https://www.vngrealisatie.nl/producten/raadstalk), a widget that shows trending topics that municipalities discuss. (contact: [Joep Meindertsma](mailto:joep@argu.co), [repo](https://github.com/ontola/raadstalk))
 - Semantic Analysis of municipality data (contact: Robert Goené)
 - Oberon Open Stateninformatie - Browser plugin (contact: Hans-Peter Harmsen)
 - HierOverheid (in progress) (contact: Alex Olieman)
