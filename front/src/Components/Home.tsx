@@ -33,7 +33,6 @@ const Home = () => {
           de <a href={paths.oriBackEndGithub}>server</a> van Open Raadsinformatie
           staan open source beschikbaar op Github.
         </p>
-        <h2>Data</h2>
         <p>
           Deze zoekmachine maakt gebruik van de Open Raadsinformatie API.
           Als je zelf ook gebruik wil maken van deze data, lees dan
@@ -42,9 +41,7 @@ const Home = () => {
         <h2>Jouw gemeente of provincie toevoegen</h2>
         <p>
           Als je wil dat ook jouw lokale overheid aangesloten wordt op Open Raadsinformatie,
-          vraag dan de griffie van je gemeenteraad om een mail te sturen naar
-          {" "}
-          <a href={paths.projectMail}>Sander Bakker</a>.
+          vraag dan de griffie van je gemeenteraad <a href="https://formulieren.vngrealisatie.nl/deelname_openraadsinformatie">dit formulier</a> in te vullen.
         </p>
         <h2>Feedback</h2>
         <p>

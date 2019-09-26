@@ -83,3 +83,7 @@ ORI was initiated by the [Open State Foundation](https://openstate.eu).
 
 For technical questions, please create an issue in the aforementioned Github repos.
 If you have general questions about Open Raadsinformatie, get in touch with project leader [Sander Bakker](mailto:sander.bakker@vng.nl).
+
+### How can my municipality / government
+
+Ask your municipality to fill in [this form](https://formulieren.vngrealisatie.nl/deelname_openraadsinformatie)!
