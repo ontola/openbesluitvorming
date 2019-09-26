@@ -1,8 +1,9 @@
 
 import * as React from "react";
 import { getApiURL, useFetch } from '../helpers';
-import Select from "react-select";
+import Creatable from "react-select/creatable";
 import { withRouter, RouteComponentProps } from 'react-router-dom'
+import paths from "../paths";
 
 const query = {
   "size": 500,
@@ -50,47 +51,56 @@ const OrganizationSelector = (props: RouteComponentProps) => {
     body: JSON.stringify(query)
   });
 
-  if (!result.response) {
-    return <div>Loading...</div>
+  const handleCreateOption = () => {
+    window.location.href = paths.vngNewForm;
   }
 
   // Change the route to the filter of the organization
 
-  const onSelectOrg = (event: any) => {
-    console.log(event, props.history);
 
-    const municipalityIndex = event.value;
+  let totalCount = "124";
+  const options: any = [];
+  let onSelectOrg = (event: any) => {console.log(event)}
+  let isLoading = true;
 
-    const currentURL = new URL(window.location.href);
+  if (result.response != null) {
+    isLoading = false;
+    onSelectOrg = (event: any) => {
+      console.log(event, props.history);
 
-    const pathWithQueryParams = `search?zoekterm="*"&organisaties=%5B"${municipalityIndex}"%5D`;
-    const url = new URL(currentURL + pathWithQueryParams)
-    console.log(url)
-    props.history.push(pathWithQueryParams)
-  }
+      const municipalityIndex = event.value;
 
-  if (result.response !== undefined) {
+      const currentURL = new URL(window.location.href);
+
+      const pathWithQueryParams = `search?zoekterm="*"&organisaties=%5B"${municipalityIndex}"%5D`;
+      const url = new URL(currentURL + pathWithQueryParams)
+      console.log(url)
+      props.history.push(pathWithQueryParams)
+    }
+
     const hits = result.response.hits.hits;
-    const totalCount = result.response.hits.total.value;
+    totalCount = result.response.hits.total.value.toString();
 
-    const options: any = [];
     hits.map(function(h: Municipality) {
       options.push({
         label: h._source.name,
         value: h._index,
       })
     })
-    return (
-      <div className="OrganizationSelector">
-        <Select
-          options={options}
-          onChange={onSelectOrg}
-          placeholder={`Kies uit ${totalCount} gemeenten en provincies...`}
-        />
-      </div>
-    );
   }
-  return null;
+  return (
+    <div className="OrganizationSelector">
+      <Creatable
+        formatCreateLabel={(value: string) => `+ ${value} toevoegen`}
+        isLoading={isLoading}
+        options={options}
+        onChange={onSelectOrg}
+        placeholder={`Kies uit ${totalCount} gemeenten en provincies...`}
+        onCreateOption={handleCreateOption}
+      />
+    </div>
+  )
+  ;
 };
 
 export default withRouter(OrganizationSelector);
