@@ -56,9 +56,9 @@ export const queryGenerator = (searchTerm: string) => {
           {
             multi_match: {
               fields,
-              // default_operator: "or",
+              type: "phrase_prefix",
+              operator: "or",
               query: searchTerm,
-              fuzziness: 1,
             },
           },
         ],

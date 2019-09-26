@@ -15,7 +15,7 @@ const otherApps: AppType[] = [
   },
   {
     name: "WaarOverheid",
-    description: "Open Raadsinformatie op de Kaart.",
+    description: "Open Raadsinformatie op de kaart.",
     url: "https://waaroverheid.nl",
   },
   {
