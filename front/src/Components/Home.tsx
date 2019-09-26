@@ -1,6 +1,30 @@
 import * as React from "react";
 import paths from "../paths";
 
+interface AppType {
+  name: string;
+  description: string;
+  url: string;
+}
+
+const otherApps: AppType[] = [
+  {
+    name: "Raadstalk",
+    description: "Bekijk trends in wat gemeenten bespreken.",
+    url: "https://www.vngrealisatie.nl/producten/raadstalk",
+  },
+  {
+    name: "WaarOverheid",
+    description: "Open Raadsinformatie op de Kaart.",
+    url: "https://waaroverheid.nl",
+  },
+  {
+    name: "1848.nl",
+    description: "Volg thema's die worden besproken en ontvang meldingen.",
+    url: "https://1848.nl",
+  },
+]
+
 const Home = () => {
   return (
     <div className="Home">
@@ -41,8 +65,18 @@ const Home = () => {
         <h2>Jouw gemeente of provincie toevoegen</h2>
         <p>
           Als je wil dat ook jouw lokale overheid aangesloten wordt op Open Raadsinformatie,
-          vraag dan de griffie van je gemeenteraad <a href="https://formulieren.vngrealisatie.nl/deelname_openraadsinformatie">dit formulier</a> in te vullen.
+          vraag dan de griffie van je gemeenteraad <a href={paths.vngNewForm}>dit formulier</a> in te vullen.
         </p>
+        <h2>Andere apps</h2>
+        <ul>
+          {otherApps.map((app: AppType) => (
+            <li key={app.name}>
+              <a href={app.url}>{app.name}</a>
+              : <span>{app.description}</span>
+            </li>
+          ))}
+          <li>Jouw app hier? <a href={paths.devMail}>Mail ons!</a></li>
+        </ul>
         <h2>Feedback</h2>
         <p>
           Technische vragen of suggesties over de API kunnen op
