@@ -20,7 +20,7 @@ const Membership = (props: MembershipProps) => {
         <DownloadResource url={props.subject.value} />
       </div>
       <Labels>
-        <Property label={NS.org("member")} />
+        <Property label={NS.org("member")} limit={100} />
         <Property label={NS.org("role")} />
         <Property label={NS.org("organization")} />
       </Labels>
