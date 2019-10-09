@@ -17,6 +17,7 @@ const simpleQueryStringChars = [
 
 const fields = ["text", "title", "description", "name"];
 
+// https://github.com/ontola/ori-search/issues/72
 const mustNot = [{
   match: {
     "@type": "Membership"
@@ -38,7 +39,7 @@ export const queryGenerator = (searchTerm: string) => {
             {
               simple_query_string: {
                 fields,
-                default_operator: "or",
+                default_operator: "OR",
                 query: searchTerm,
               },
             },
@@ -56,8 +57,8 @@ export const queryGenerator = (searchTerm: string) => {
           {
             multi_match: {
               fields,
-              type: "phrase_prefix",
-              operator: "or",
+              type: "best_fields",
+              operator: "OR",
               query: searchTerm,
             },
           },
