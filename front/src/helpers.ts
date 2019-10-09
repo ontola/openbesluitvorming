@@ -39,6 +39,7 @@ export function usePersistedState<T>(key: string, initial: T):
 
 export const getParams = (history: History) => {
   const searchObject = history.location.search;
+  const hasParams = searchObject !== "";
   const params = new URLSearchParams(searchObject);
 
   const currentResourceBase = params.get("showResource");
@@ -54,6 +55,7 @@ export const getParams = (history: History) => {
   return {
     currentResource,
     currentSearchTerm,
+    hasParams,
   };
 };
 

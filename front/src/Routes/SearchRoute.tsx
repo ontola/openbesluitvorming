@@ -18,6 +18,7 @@ import { NamedNode } from "rdflib";
 import { GlobalHotKeys } from "react-hotkeys";
 
 import { keyMap } from "../helpers/keyMap";
+// import CustomSelectedFilters from '../Components/CustomSelectedFilters';
 
 const globalKeyHandlers = {
 };
@@ -27,7 +28,7 @@ const SearchRoute = (props: RouteComponentProps) => {
 
   const {
     currentResource,
-    currentSearchTerm,
+    hasParams,
   } = getParams(props.history);
 
   const setSearchParams = (newURL: string) => {
@@ -47,7 +48,7 @@ const SearchRoute = (props: RouteComponentProps) => {
         setSearchParams={setSearchParams as () => string}
       >
         <div className={
-          `SearchRoute ${currentSearchTerm ? "SearchRoute--search" : ""}
+          `SearchRoute ${hasParams ? "SearchRoute--search" : ""}
           ${showFilters ? "SearchRoute--show-filters" : ""}
           `
         }>
@@ -56,36 +57,37 @@ const SearchRoute = (props: RouteComponentProps) => {
             <div className="NavBar__bottom">
               <div className="NavBar__searchbar">
                 <SearchBar/>
-                {currentSearchTerm && <Button
+                {hasParams && <Button
                   className="SearchBar__button"
                   onClick={() => setShowFilters(!showFilters)}
                 >
                   filters {showFilters ? "verbergen" : "tonen"}
                 </Button>}
               </div>
-              {!currentSearchTerm &&
+              {!hasParams &&
                 <OrganizationSelector />
               }
             </div>
           </div>
           <div className="Wrapper">
-            {currentSearchTerm &&
+            {hasParams &&
               <Filtersbar
                 display={showFilters}
               />
             }
-            {currentSearchTerm &&
+            {hasParams &&
               <div className="Results">
                 <SelectedFilters
                   showClearAll={false}
                   className="Filter Filter__current"
+                  // render={CustomSelectedFilters}
                 />
                 <div className="ResultsListWrapper">
                   <ResultsList/>
                 </div>
               </div>
             }
-            {!currentSearchTerm &&
+            {!hasParams &&
               <Home />
             }
             <ReactCSSTransitionGroup
@@ -93,7 +95,7 @@ const SearchRoute = (props: RouteComponentProps) => {
               transitionEnterTimeout={200}
               transitionLeaveTimeout={200}
             >
-              {currentResource && currentSearchTerm &&
+              {currentResource && hasParams &&
                 <SideDrawer>
                   <LinkedResourceContainer subject={NamedNode.find(currentResource)} />
                 </SideDrawer>
