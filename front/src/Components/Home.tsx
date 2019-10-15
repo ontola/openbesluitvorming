@@ -75,7 +75,7 @@ const Home = () => {
               : <span>{app.description}</span>
             </li>
           ))}
-          <li>Jouw app hier? <a href={paths.devMail}>Mail ons!</a></li>
+          <li>Jouw app hier? <a href={paths.appList}>Dien een PR in!</a></li>
         </ul>
         <h2>Feedback</h2>
         <p>

@@ -1,5 +1,6 @@
 const paths = {
   actieplan: "https://www.open-overheid.nl/actieplan-open-overheid-2018-2020-open-moet-het-zijn/",
+  appList: "https://github.com/ontola/ori-search/edit/master/front/src/Components/Home.tsx#L10",
   apiDocs: "http://docs.openraadsinformatie.nl/",
   argu: "http://argu.co/",
   devMail: "mailto:joep@ontola.io",
