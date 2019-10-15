@@ -2,22 +2,22 @@
 # yarn lockfile v1
 
 
-"@appbaseio/reactivecore@8.2.13":
-  version "8.2.13"
-  resolved "https://registry.yarnpkg.com/@appbaseio/reactivecore/-/reactivecore-8.2.13.tgz#ab091902ed333875d54557df2e3144ce56e2eca4"
-  integrity sha512-jgZEQ2W6HuHgUOYhHY1yuf8+3OrKQjIKUGKZyLFIWm2fOD/tDlWxw7AFIEVj8SH1lOskBYtCu/IttBsE3uG4kg==
+"@appbaseio/reactivecore@8.2.14":
+  version "8.2.14"
+  resolved "https://registry.yarnpkg.com/@appbaseio/reactivecore/-/reactivecore-8.2.14.tgz#16900980c5f7d6ef47952628a229697bdc3e28e3"
+  integrity sha512-DUMvB2moZwOhvM2k6wRBbdaP6s5Zcy53KE0GfOn4jbvr3rRWopIvr3+NX7rYi5iE4JBFmAoh00vZx8FeCZlJvg==
   dependencies:
     cross-fetch "^3.0.4"
     prop-types "^15.6.0"
     redux "^4.0.0"
     redux-thunk "^2.3.0"
 
-"@appbaseio/reactivesearch@^3.0.2":
-  version "3.0.2"
-  resolved "https://registry.yarnpkg.com/@appbaseio/reactivesearch/-/reactivesearch-3.0.2.tgz#48eae01ac96ed8f35475be70fa5282722d66c8dc"
-  integrity sha512-RUlhToHiF5a3zPimbpEm702ra+GrwlnQ7INy83yHX2p6erCiJKg+9rtbvbpUYsaq6dyOu/9PfcwM462A/byCqA==
+"@appbaseio/reactivesearch@^3.0.3":
+  version "3.0.3"
+  resolved "https://registry.yarnpkg.com/@appbaseio/reactivesearch/-/reactivesearch-3.0.3.tgz#a70605ccfb5f22da3c35c9b08e3e44af09dafd76"
+  integrity sha512-KH7Qm0/W8nBX+tD61DbgLh/qXGd8gYNOZM2KiXdw0AtG+/3Kj9s+cJWIZnjbqVurDJMJAG/QcT/+h/6qOfze8g==
   dependencies:
-    "@appbaseio/reactivecore" "8.2.13"
+    "@appbaseio/reactivecore" "8.2.14"
     appbase-js "^4.0.2-beta.08"
     cross-env "^5.2.0"
     downshift "^1.31.2"

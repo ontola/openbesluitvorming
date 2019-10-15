@@ -11,7 +11,7 @@
   "description": "Search interface for Open Raadsinformatie",
   "private": true,
   "dependencies": {
-    "@appbaseio/reactivesearch": "^3.0.2",
+    "@appbaseio/reactivesearch": "^3.0.3",
     "@fortawesome/fontawesome-svg-core": "^1.2.17",
     "@fortawesome/free-solid-svg-icons": "^5.8.1",
     "@fortawesome/react-fontawesome": "^0.1.4",
