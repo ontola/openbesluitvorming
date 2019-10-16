@@ -206,7 +206,8 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
                 loading={<LoadingComponent/>}
                 error={<PDFErrorComponent/>}
                 pageIndex={pageNumber - 1}
-                width={drawer.width}
+                width={drawer.glossIsOpen ? drawer.width - 400 : drawer.width}
+                // width={drawer.width}
                 customTextRenderer={currentSearchTerm && makeTextRenderer(currentSearchTerm)}
               />
             </Document>

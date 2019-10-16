@@ -35,7 +35,6 @@ class Glossarium extends React.PureComponent<{}, MState> {
   }
 
   updateSelection = () => {
-    // let sel: Selection = {};
     let sel = {};
     
     const selected = document.getSelection();

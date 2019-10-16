@@ -26,13 +26,10 @@ const calcMaxWidth = (windowWidth: number) => {
 };
 
 const determineInitialWith = (windowWidth: number) => {
-  if (windowWidth > 1800) {
-    return windowWidth - 600;
-  }
-
   if (windowWidth > 800) {
     return windowWidth - 600;
   }
+
   return windowWidth;
 };
 
@@ -44,9 +41,10 @@ const Handler = () =>
 const SideDrawer = (props: SideDrawerProps & RouteComponentProps) => {
   const [width, setWidth] =
     usePersistedState<number>("orisearch.pdfviewer.width", determineInitialWith(window.innerWidth));
-  
+
   const [glossIsOpen, toggleGlossarium] = 
     usePersistedState<boolean>("orisearch.pdfviewer.glossariumOpened", false);
+    
   const [maxWidth, setMaxWidth] = React.useState<number>(calcMaxWidth(window.innerWidth));
 
   const pdfWrapper = React.createRef<HTMLInputElement>();
@@ -74,15 +72,28 @@ const SideDrawer = (props: SideDrawerProps & RouteComponentProps) => {
 
   const toggleGloss = () => {
     toggleGlossarium(!glossIsOpen);
+    if (!glossIsOpen) {
+      setWidth(width + 400);
+      uglyStyleSetting();
+    } else {
+      setWidth(width - 400);
+    }
   }
 
   const keyHandlers = {
     CLOSE: closeDocument,
   };
 
+  const uglyStyleSetting = () => {
+    // TODO: Dit is jammer maar het moet nou eenmaal. (component integratie)
+    const ugly = document.getElementsByClassName("react-pdf__Page__textContent")[0] as HTMLElement;
+    ugly.style.width = "100%";
+  }
+
   return (
     <SideDrawerContext.Provider
       value={{
+        glossIsOpen,
         width,
         setWidth,
       }}
@@ -108,8 +119,10 @@ const SideDrawer = (props: SideDrawerProps & RouteComponentProps) => {
             direction: any,
             refToElement: HTMLDivElement,
             delta: any,
-          ) =>
-            setWidth(width + delta.width)}
+          ) => {
+            setWidth(width + delta.width);
+            uglyStyleSetting();
+          }}
           enable={{ left: true }}
         >
           <Button
@@ -141,12 +154,14 @@ const SideDrawer = (props: SideDrawerProps & RouteComponentProps) => {
 };
 
 export interface SideDrawerContextType {
+  glossIsOpen: boolean;
   width: number;
   setWidth: Function;
 }
 
 export const SideDrawerContext = React.createContext<SideDrawerContextType>({
   width: 250,
+  glossIsOpen: false,
   setWidth: () => null,
 });
 

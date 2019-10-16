@@ -57,7 +57,8 @@
     "build": "react-scripts build",
     "lint": "eslint --ext .js,.jsx,.ts,.tsx ./src --cache --cache-location \"/tmp/.eslintcache/\"",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "deploy": "gh-pages -d build"
   },
   "browserslist": [
     ">0.2%",
@@ -66,6 +67,7 @@
     "not op_mini all"
   ],
   "devDependencies": {
+    "gh-pages": "^1.1.0",
     "husky": "^3.0.0"
   },
   "husky": {
