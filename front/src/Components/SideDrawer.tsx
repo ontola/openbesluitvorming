@@ -70,6 +70,12 @@ const SideDrawer = (props: SideDrawerProps & RouteComponentProps) => {
     props.history.push(`/search?${params.toString()}`);
   };
 
+  const uglyStyleSetting = () => {
+    // TODO: Dit is jammer maar het moet nou eenmaal. (component integratie)
+    const ugly = document.getElementsByClassName("react-pdf__Page__textContent")[0] as HTMLElement;
+    ugly.style.width = "100%";
+  }
+
   const toggleGloss = () => {
     toggleGlossarium(!glossIsOpen);
     if (!glossIsOpen) {
@@ -83,12 +89,6 @@ const SideDrawer = (props: SideDrawerProps & RouteComponentProps) => {
   const keyHandlers = {
     CLOSE: closeDocument,
   };
-
-  const uglyStyleSetting = () => {
-    // TODO: Dit is jammer maar het moet nou eenmaal. (component integratie)
-    const ugly = document.getElementsByClassName("react-pdf__Page__textContent")[0] as HTMLElement;
-    ugly.style.width = "100%";
-  }
 
   return (
     <SideDrawerContext.Provider
