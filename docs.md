@@ -58,6 +58,7 @@ If you want to see some examples of how to query this endpoint, check out [`exam
 Most of the ORI data follows the international [Popolo](https://www.popoloproject.com) specification.
 We've added a couple of concepts, such as AgendaItems, which are namespaced under the Meeting ontology.
 This Meeting ontology is a [work in progress](https://github.com/openstate/open-raadsinformatie/issues/127).
+You can find all the defintions of the various models incudling the properties [here](https://github.com/openstate/open-raadsinformatie/tree/master/ocd_backend/models/definitions).
 
 In the future, we hope to use the [VNG Open Raadsinformatie spec](https://github.com/VNG-Realisatie/Open-Raadsinformatie/) for serialization.
 
