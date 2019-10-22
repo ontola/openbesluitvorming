@@ -7,7 +7,7 @@ import ReactDOM from "react-dom";
 import "./index.css";
 import App from "./App";
 import * as serviceWorker from "./serviceWorker";
-(window as any).globalThis = require('globalthis/polyfill')()
+import '@ungap/global-this'
 
 ReactDOM.render(<App />, document.getElementById("root"));
 
