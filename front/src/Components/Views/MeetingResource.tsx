@@ -9,12 +9,13 @@ import { labelsTopology } from "../Topologies/LabelsTopology";
 import { ThingProps } from "./Thing";
 import { propertyValueTopology } from "../Topologies/PropertyValueTopology";
 
-interface ThingResourceProps extends ThingProps {
+interface MeetingResourceProps extends ThingProps {
   name: SomeTerm;
+  date: SomeTerm;
 }
 
 /** A Thing inside the Resource or Labels topology */
-const ThingResource = (props: ThingResourceProps) => {
+const ThingResource = (props: MeetingResourceProps) => {
 
   let labelString = props.subject.value;
 
@@ -23,14 +24,16 @@ const ThingResource = (props: ThingResourceProps) => {
     labelString = props.name.value;
   }
 
+  const date = new Date(props.date.value);
+
   return (
     <Box>
-      {labelString}
+      {`${labelString} - ${date.toLocaleDateString("nl-NL")}`}
     </Box>
   );
 };
 
-ThingResource.type = NS.schema("Thing");
+ThingResource.type = NS.meeting("Meeting");
 ThingResource.topology = [
   resourceTopology,
   propertyValueTopology,
@@ -44,6 +47,9 @@ ThingResource.mapDataToProps = {
     NS.schema("label"),
     NS.skos("prefLabel"),
   ],
+  date: [
+    NS.schema("startDate")
+  ]
 }
 ThingResource.linkOpts = {
   forceRender: true,

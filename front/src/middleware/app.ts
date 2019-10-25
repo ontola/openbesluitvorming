@@ -4,20 +4,21 @@
 
 import { MiddlewareActionHandler, MiddlewareWithBoundLRS } from "link-lib";
 import { LinkReduxLRSType } from "link-redux";
-import { NamedNode, Namespace } from "rdflib";
+import { NamedNode, createNS } from "@ontologies/core";
 
 import { FRONTEND_URL } from "../config";
 import { History } from "history";
+import rdfFactory from "link-lib/dist/typings/rdf";
 
 export const website = FRONTEND_URL;
-export const frontendIRI = NamedNode.find(website);
+export const frontendIRI = rdfFactory.namedNode(website);
 export const frontendIRIStr = frontendIRI.value;
 export const frontendPathname = new URL(frontendIRIStr).pathname;
 export const frontendOrigin = new URL(frontendIRIStr).origin;
 
-const app = Namespace(frontendIRIStr.endsWith("/") ? frontendIRIStr : `${frontendIRIStr}/`);
+const app = createNS(frontendIRIStr.endsWith("/") ? frontendIRIStr : `${frontendIRIStr}/`);
 const appSlashless =
-  Namespace(frontendIRIStr.slice(0, frontendIRIStr.endsWith("/") ? -1 : undefined));
+  createNS(frontendIRIStr.slice(0, frontendIRIStr.endsWith("/") ? -1 : undefined));
 
 export const appMiddleware = (history: History) =>
   (store: LinkReduxLRSType): MiddlewareWithBoundLRS => {

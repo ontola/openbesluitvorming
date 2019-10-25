@@ -10,7 +10,7 @@ import { indexToLabel } from "../../helpers";
 
 interface DocumentProps extends ORIItemType {
   content_type?: string;
-  date_modified?: string;
+  last_discussed_at?: string;
   original_url?: string;
   size_in_bytes?: string;
   text?: string;
@@ -20,8 +20,8 @@ interface DocumentProps extends ORIItemType {
 const Document: React.FunctionComponent<DocumentProps & RouteComponentProps> = (props) => {
 
   let date = null;
-  if (props.date_modified !== undefined) {
-    date = new Date(props.date_modified);
+  if (props.last_discussed_at !== undefined) {
+    date = new Date(props.last_discussed_at);
   }
 
   return (

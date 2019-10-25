@@ -87,6 +87,37 @@ p {
       color: $blue_dark;
     }
   }
+  
+  &__toggle {
+  color: $g4;
+  position: relative;
+  margin-bottom: 1rem;
+
+    h3 {
+      display: inline;
+    }
+
+    &:hover {
+      color: $blue;
+    }
+
+    &:active {
+      color: $blue_dark;
+    }
+
+    &:before {
+      content: "☐";
+      display: inline-block;
+      left: 0;
+      margin-right: .5rem;
+    }
+
+    &-on {
+      &:before {
+        content: "☑";
+      }
+    }
+  }
 }
 
 .DayPickerInput {
@@ -194,6 +225,14 @@ p {
   a:visited {
     color: $blue_dark;
   }
+
+  ul {
+    padding-left: 1.2rem;
+
+    li {
+      margin-bottom: .3rem;
+    }
+  }
 }
 
 .LabelItem {
@@ -224,6 +263,12 @@ p {
 
 .NavBar__link:hover {
   color: $blue_dark;
+}
+
+.NavBar__searchbar {
+  display: flex;
+  width: 100%;
+  margin-bottom: 1rem;
 }
 
 .Logo {
@@ -258,6 +303,7 @@ p {
   &__bottom {
     display: flex;
     max-width: $result-width;
+    flex-direction: column;
   }
 
   &__top {
@@ -495,6 +541,7 @@ p {
   position: absolute;
   top: 0;
   bottom: 0;
+  min-height: 100vh;
 }
 
 .Results__dual-loader-top {
@@ -504,7 +551,7 @@ p {
 
 .Results__dual-loader-bottom {
   position: absolute;
-  bottom: 0;
+  top: 100%;
 }
 
 .Results {
@@ -668,7 +715,13 @@ mark {
   input {
     -webkit-appearance: none;
     align-self: center;
-    border-radius: $border-radius
+    border-radius: $border-radius;
+    background-color: white;
+    transition: border-color .2s;
+
+    &:hover {
+      border-color: $g3;
+    }
   }
 
   // Filter show / hide button

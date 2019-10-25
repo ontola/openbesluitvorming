@@ -56,7 +56,7 @@ export const sortOptions: SortOption[] = [
   },
   {
     label: "Nieuwste",
-    dataField: "date_modified",
+    dataField: "last_discussed_at",
     sortBy: "desc",
   },
 ];

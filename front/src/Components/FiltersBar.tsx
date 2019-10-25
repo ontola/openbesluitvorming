@@ -1,11 +1,9 @@
 import * as React from "react";
 import {
-  DateRange,
   MultiList,
   RangeSlider,
 } from "@appbaseio/reactivesearch";
 import { indexToLabel, typeToLabel, ids, capitalize } from "../helpers";
-import { LoadingWithSpinner } from "./ResultsList";
 import Button from './Button';
 
 interface FiltersbarProps {
@@ -69,15 +67,16 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
         }}
         showFilter={true}
         URLParams={true}
-        loader={<LoadingWithSpinner/>}
       />
       <Button
         onClick={() => setShowDateRange(!showDateRange)}
-      >{showDateRange ? "Velden tonen" : "Histogram tonen" }</Button>
+        className={`Button__toggle ${showDateRange? "Button__toggle-on" : "Button__toggle-off"}`}
+      >
+        <h3>Datum filter</h3>
+      </Button>
       {showDateRange && <RangeSlider
         componentId={ids.daterange}
-        dataField="date_modified"
-        title="Datum"
+        dataField="last_discussed_at"
         className="Filter"
         tooltipTrigger="hover"
         showHistogram={true}
@@ -96,9 +95,10 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
           and: [ids.searchbox, ids.organisaties, ids.type],
         }}
       />}
-      {!showDateRange && <DateRange
+      {/* For now disable this #39 */}
+      {/* {!showDateRange && <DateRange
         componentId={ids.daterange}
-        dataField="date_modified"
+        dataField="last_discussed_at"
         className="Filter"
         title={capitalize(ids.daterange)}
         placeholder={{
@@ -112,13 +112,13 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
         showFilter={true}
         filterLabel={capitalize(ids.daterange)}
         URLParams={true}
-      />}
+      />} */}
       <MultiList
         componentId={ids.organisaties}
         dataField="_index"
         title={capitalize(ids.organisaties)}
         filterLabel={capitalize(ids.organisaties)}
-        size={100}
+        size={500}
         sortBy="count"
         queryFormat="or"
         showCheckbox={false}
@@ -131,7 +131,6 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
         showFilter={true}
         URLParams={true}
         className="Filter"
-        loader={<LoadingWithSpinner/>}
         renderItem={MunicipalityLabel}
       />
     </div>

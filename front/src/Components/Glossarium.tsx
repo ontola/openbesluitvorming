@@ -1,6 +1,9 @@
 import * as React from "react";
 import Button from "./Button";
 
+//@ts-ignore: Untyped import
+// import wikipedia from 'wikipedia-js';
+
 interface MState {
   selectedText?: string;
   information?: string;
@@ -16,10 +19,21 @@ class Glossarium extends React.PureComponent<{}, MState> {
   }
 
   evaluateSelection = () => {
+    var query = "Napoleon Bonaparte";
+    // if you want to retrieve a full article set summaryOnly to false.
+    // Full article retrieval and parsing is still beta
+    var options = {query: query, format: "html", summaryOnly: true};
+    //@ts-ignore
+    wikipedia.searchArticle(options, function(err, htmlWikiText){
+      if(err){
+        console.log("An error occurred[query=%s, error=%s]", query, err);
+        return;
+      }
+      console.log("Query successful[query=%s, html-formatted-wiki-text=%s]", query, htmlWikiText);
+    });
+
     this.setState({
-      information: `
-      Lorem Ipsum is slechts een proeftekst uit het drukkerij- en zetterijwezen. Lorem Ipsum is de standaard proeftekst in deze bedrijfstak sinds de 16e eeuw, toen een onbekende drukker een zethaak met letters nam en ze door elkaar husselde om een font-catalogus te maken. Het heeft niet alleen vijf eeuwen overleefd maar is ook, vrijwel onveranderd, overgenomen in elektronische letterzetting. Het is in de jaren '60 populair geworden met de introductie van Letraset vellen met Lorem Ipsum passages en meer recentelijk door desktop publishing software zoals Aldus PageMaker die versies van Lorem Ipsum bevatten.
-      `
+      information: "informatie"
     })
   }
 

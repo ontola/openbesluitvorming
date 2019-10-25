@@ -7,17 +7,18 @@ import Filtersbar from "../Components/FiltersBar";
 import Home from "../Components/Home";
 import NavBarTop from "../Components/NavBarTop";
 import ResultsList from "../Components/ResultsList";
-import { getParams } from "../helpers";
+import { getParams, getApiURL } from "../helpers";
 import SearchBar from "../Components/SearchBar";
+import OrganizationSelector from "../Components/OrganizationSelector";
 import { ReactiveBase, SelectedFilters } from "@appbaseio/reactivesearch";
 import theme from "../theme";
-import { SERVER_PORT, NODE_ENV } from "../config";
 import SideDrawer from "../Components/SideDrawer";
 import { LinkedResourceContainer } from "link-redux";
-import { NamedNode } from "rdflib";
+import rdfFactory from "@ontologies/core";
 import { GlobalHotKeys } from "react-hotkeys";
 
 import { keyMap } from "../helpers/keyMap";
+// import CustomSelectedFilters from '../Components/CustomSelectedFilters';
 
 const globalKeyHandlers = {
 };
@@ -27,19 +28,13 @@ const SearchRoute = (props: RouteComponentProps) => {
 
   const {
     currentResource,
-    currentSearchTerm,
+    hasParams,
   } = getParams(props.history);
 
   const setSearchParams = (newURL: string) => {
     const url = new URL(newURL);
     props.history.push(url.toString().substring(url.origin.length));
   };
-
-  const apiURL = new URL(window.location.origin);
-  apiURL.pathname = "/api";
-  if (NODE_ENV === "development") {
-    apiURL.port = SERVER_PORT.toString();
-  }
 
   return (
     <GlobalHotKeys
@@ -49,44 +44,50 @@ const SearchRoute = (props: RouteComponentProps) => {
       <ReactiveBase
         theme={theme}
         app="*"
-        url={apiURL.toString()}
+        url={getApiURL().toString()}
         setSearchParams={setSearchParams as () => string}
       >
         <div className={
-          `SearchRoute ${currentSearchTerm ? "SearchRoute--search" : ""}
+          `SearchRoute ${hasParams ? "SearchRoute--search" : ""}
           ${showFilters ? "SearchRoute--show-filters" : ""}
           `
         }>
           <div className="NavBar">
             <NavBarTop />
             <div className="NavBar__bottom">
-              <SearchBar/>
-              {currentSearchTerm && <Button
-                className="SearchBar__button"
-                onClick={() => setShowFilters(!showFilters)}
-              >
-                filters {showFilters ? "verbergen" : "tonen"}
-              </Button>}
+              <div className="NavBar__searchbar">
+                <SearchBar/>
+                {hasParams && <Button
+                  className="SearchBar__button"
+                  onClick={() => setShowFilters(!showFilters)}
+                >
+                  filters {showFilters ? "verbergen" : "tonen"}
+                </Button>}
+              </div>
+              {!hasParams &&
+                <OrganizationSelector />
+              }
             </div>
           </div>
           <div className="Wrapper">
-            {currentSearchTerm &&
+            {hasParams &&
               <Filtersbar
                 display={showFilters}
               />
             }
-            {currentSearchTerm &&
+            {hasParams &&
               <div className="Results">
                 <SelectedFilters
                   showClearAll={false}
                   className="Filter Filter__current"
+                  // render={CustomSelectedFilters}
                 />
                 <div className="ResultsListWrapper">
                   <ResultsList/>
                 </div>
               </div>
             }
-            {!currentSearchTerm &&
+            {!hasParams &&
               <Home />
             }
             <ReactCSSTransitionGroup
@@ -94,9 +95,9 @@ const SearchRoute = (props: RouteComponentProps) => {
               transitionEnterTimeout={200}
               transitionLeaveTimeout={200}
             >
-              {currentResource && currentSearchTerm &&
+              {currentResource && hasParams &&
                 <SideDrawer>
-                  <LinkedResourceContainer subject={NamedNode.find(currentResource)} />
+                  <LinkedResourceContainer subject={rdfFactory.namedNode(currentResource)} />
                 </SideDrawer>
               }
             </ReactCSSTransitionGroup>

@@ -16,8 +16,10 @@ interface SideDrawerProps {
 }
 
 const MARGIN_LEFT = 50;
+const MAX_INIT_SIZE = 880;
 
 const calcMaxWidth = (windowWidth: number) => {
+  // Large screens
   if (windowWidth > 800) {
     return windowWidth - MARGIN_LEFT;
   }
@@ -26,6 +28,10 @@ const calcMaxWidth = (windowWidth: number) => {
 };
 
 const determineInitialWith = (windowWidth: number) => {
+  if (windowWidth > 1400) {
+    return MAX_INIT_SIZE;
+  }
+
   if (windowWidth > 800) {
     return windowWidth - 600;
   }
@@ -73,7 +79,9 @@ const SideDrawer = (props: SideDrawerProps & RouteComponentProps) => {
   const uglyStyleSetting = () => {
     // TODO: Dit is jammer maar het moet nou eenmaal. (component integratie)
     const ugly = document.getElementsByClassName("react-pdf__Page__textContent")[0] as HTMLElement;
-    ugly.style.width = "100%";
+    if (ugly !== undefined) {
+      ugly.style.width = "100%";
+    }
   }
 
   const toggleGloss = () => {

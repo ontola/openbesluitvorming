@@ -1,6 +1,6 @@
 import { register } from "link-redux";
 import React from "react";
-import { NamedNode } from "rdflib";
+import { NamedNode } from "@ontologies/core";
 
 import { NS } from "../../LRS";
 import { resourceTopology } from "../Topologies/ResourceTopology";

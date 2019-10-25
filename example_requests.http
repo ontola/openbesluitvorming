@@ -124,7 +124,7 @@ content-type: application/json
 
 ### Elastic single Municipality using index with wildcard in URL
 
-GET http://ori.argu.co/api/ori_alkmaar_*/_search? HTTP/1.1
+GET http://ori.argu.co/api/ori_amsterd*/_search? HTTP/1.1
 content-type: application/json
 
 {
@@ -132,7 +132,7 @@ content-type: application/json
       "simple_query_string": {
       "fields": ["text", "title", "description", "name"],
       "default_operator": "or",
-      "query": "zoek"
+      "query": "Search only in amsterdam"
     }
   },
   "size": 10
@@ -163,7 +163,7 @@ content-type: application/json
         ],
         {
           "range": {
-            "date_modified": {
+            "last_discussed_at": {
               "gte": "2019-01-01",
               "lte": "2019-05-24"
             }
@@ -187,4 +187,30 @@ content-type: application/json
       }
     }
   ]
+}
+
+### List all indexes, see all document counts per municipality / province
+
+GET https://api.openraadsinformatie.nl/v1/elastic/_cat/indices?v HTTP/1.1
+content-type: application/json
+
+### Get all municipalities
+
+POST https://api.openraadsinformatie.nl/v1/elastic/ori_*/_search? HTTP/1.1
+content-type: application/json
+
+{
+  "size": 500,
+  "query": {
+      "bool": {
+          "must": {
+              "match_all": {}
+          },
+          "filter": {
+              "terms": {
+                  "classification": ["municipality", "province"]
+              }
+          }
+      }
+  }
 }

@@ -1,6 +1,7 @@
 import React from "react";
 import { History } from "history";
 import { NS } from "./LRS";
+import { NODE_ENV, SERVER_PORT } from './config';
 
 // Mapping for consistent component Ids
 export const ids = {
@@ -44,6 +45,7 @@ export function myPersistedState<T>(key: string, initial: T): T {
 
 export const getParams = (history: History) => {
   const searchObject = history.location.search;
+  const hasParams = searchObject !== "";
   const params = new URLSearchParams(searchObject);
 
   const currentResourceBase = params.get("showResource");
@@ -59,6 +61,7 @@ export const getParams = (history: History) => {
   return {
     currentResource,
     currentSearchTerm,
+    hasParams,
   };
 };
 
@@ -147,3 +150,31 @@ export function propertyToArr(lrs: any, acc: any, rest: any) {
 
   return listToArr(lrs, acc, rest);
 }
+
+export const getApiURL = (): URL => {
+  const url = new URL(window.location.origin);
+  url.pathname = "/api";
+  if (NODE_ENV === "development") {
+    url.port = SERVER_PORT.toString();
+  }
+  return url
+}
+
+// Custom react hook for data fetching with error handling
+export const useFetch = (url: string, options: RequestInit) => {
+  const [response, setResponse] = React.useState(null);
+  const [error, setError] = React.useState(null);
+  React.useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const res = await fetch(url, options);
+        const json = await res.json();
+        setResponse(json);
+      } catch (error) {
+        setError(error);
+      }
+    };
+    fetchData();
+  }, []);
+  return { response, error };
+};

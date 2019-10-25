@@ -1,6 +1,6 @@
 import { MiddlewareActionHandler, MiddlewareWithBoundLRS } from "link-lib";
 import { LinkReduxLRSType } from "link-redux";
-import { NamedNode } from "rdflib";
+import { NamedNode } from "@ontologies/core";
 
 const logging = () => (store: LinkReduxLRSType): MiddlewareWithBoundLRS => {
   (store as any).actions = {};

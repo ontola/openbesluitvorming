@@ -17,6 +17,13 @@ const simpleQueryStringChars = [
 
 const fields = ["text", "title", "description", "name"];
 
+// https://github.com/ontola/ori-search/issues/72
+const mustNot = [{
+  match: {
+    "@type": "Membership"
+  }
+}];
+
 export const queryGenerator = (searchTerm: string) => {
   if (searchTerm === undefined) {
     return null;
@@ -27,10 +34,17 @@ export const queryGenerator = (searchTerm: string) => {
   if (simpleQueryStringChars.some(substring => searchTerm.includes(substring))) {
     return {
       query: {
-        simple_query_string: {
-          fields,
-          default_operator: "or",
-          query: searchTerm,
+        bool: {
+          must: [
+            {
+              simple_query_string: {
+                fields,
+                default_operator: "OR",
+                query: searchTerm,
+              },
+            },
+          ],
+          must_not: mustNot
         },
       },
     };
@@ -43,12 +57,13 @@ export const queryGenerator = (searchTerm: string) => {
           {
             multi_match: {
               fields,
-              // default_operator: "or",
+              type: "best_fields",
+              operator: "OR",
               query: searchTerm,
-              fuzziness: 1,
             },
           },
         ],
+        must_not: mustNot
       },
     },
   };
