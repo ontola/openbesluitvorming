@@ -9,6 +9,7 @@ export const ids = {
   organisaties: "organisaties",
   daterange: "datums",
   type: "type",
+  tags: "thema",
 };
 
 export const capitalize = (s: string) => {

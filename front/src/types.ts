@@ -19,4 +19,18 @@ export interface ORIItemType {
   matched_queries?: string[];
   sort?: string[];
   ori_identifier: string;
+  tags?: TopTags;
+}
+
+export interface Tag {
+  "https://argu.co/ns/meeting/tag": string;
+  "@type": "https://argu.co/ns/meeting/TagHit";
+  "https://argu.co/ns/meeting/score": number;
+  "@id": string;
+}
+
+export interface TopTags {
+  "http://www.w3.org/1999/02/22-rdf-syntax-ns#_0": Tag;
+  "http://www.w3.org/1999/02/22-rdf-syntax-ns#_1": Tag;
+  "http://www.w3.org/1999/02/22-rdf-syntax-ns#_2": Tag;
 }

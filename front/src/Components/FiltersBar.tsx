@@ -63,6 +63,7 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
             ids.searchbox,
             ids.daterange,
             ids.organisaties,
+            ids.tags,
           ],
         }}
         showFilter={true}
@@ -92,7 +93,12 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
           "end": Date.now(),
         }}
         react={{
-          and: [ids.searchbox, ids.organisaties, ids.type],
+          and: [
+            ids.searchbox,
+            ids.organisaties,
+            ids.type,
+            ids.tags
+          ],
         }}
       />}
       {/* For now disable this #39 */}
@@ -126,12 +132,35 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
         showSearch={true}
         placeholder="Zoek organisatie..."
         react={{
-          and: [ids.searchbox, ids.daterange, ids.type],
+          and: [ids.searchbox, ids.daterange, ids.type, ids.tags],
         }}
         showFilter={true}
         URLParams={true}
         className="Filter"
         renderItem={MunicipalityLabel}
+      />
+      <MultiList
+        componentId={ids.tags}
+        dataField="tags.http://www.w3.org/1999/02/22-rdf-syntax-ns#_0.https://argu.co/ns/meeting/tag.keyword"
+        title={capitalize(ids.tags)}
+        filterLabel={capitalize(ids.tags)}
+        size={500}
+        sortBy="count"
+        queryFormat="or"
+        showSearch={false}
+        showCheckbox={false}
+        showCount={true}
+        react={{
+          and: [
+            ids.searchbox,
+            ids.daterange,
+            ids.type,
+            ids.organisaties
+          ],
+        }}
+        showFilter={true}
+        URLParams={true}
+        className="Filter"
       />
     </div>
   );

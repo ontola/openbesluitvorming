@@ -7,6 +7,7 @@ import { faDownload } from "@fortawesome/free-solid-svg-icons";
 import DetailType from "../Details/DetailType";
 
 import { indexToLabel } from "../../helpers";
+import Tags from '../Tags';
 
 interface DocumentProps extends ORIItemType {
   content_type?: string;
@@ -38,6 +39,7 @@ const Document: React.FunctionComponent<DocumentProps & RouteComponentProps> = (
           </a>
         }
       </div>
+      <Tags tags={props.tags}/>
       {props.highlight.text &&
         <div className="ResultCard__highlights">
           {props.highlight.text.map(
