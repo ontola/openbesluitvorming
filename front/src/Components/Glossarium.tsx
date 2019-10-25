@@ -19,18 +19,18 @@ class Glossarium extends React.PureComponent<{}, MState> {
   }
 
   evaluateSelection = () => {
-    var query = "Napoleon Bonaparte";
-    // if you want to retrieve a full article set summaryOnly to false.
-    // Full article retrieval and parsing is still beta
-    var options = {query: query, format: "html", summaryOnly: true};
-    //@ts-ignore
-    wikipedia.searchArticle(options, function(err, htmlWikiText){
-      if(err){
-        console.log("An error occurred[query=%s, error=%s]", query, err);
-        return;
-      }
-      console.log("Query successful[query=%s, html-formatted-wiki-text=%s]", query, htmlWikiText);
-    });
+    // const query = "Napoleon Bonaparte";
+    // // if you want to retrieve a full article set summaryOnly to false.
+    // // Full article retrieval and parsing is still beta
+    // const options = {query: query, format: "html", summaryOnly: true};
+    // //@ts-ignore
+    // wikipedia.searchArticle(options, function(err, htmlWikiText){
+    //   if(err){
+    //     console.log("An error occurred[query=%s, error=%s]", query, err);
+    //     return;
+    //   }
+    //   console.log("Query successful[query=%s, html-formatted-wiki-text=%s]", query, htmlWikiText);
+    // });
 
     this.setState({
       information: "informatie"
