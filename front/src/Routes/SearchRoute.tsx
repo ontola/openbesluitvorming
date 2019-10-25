@@ -14,7 +14,7 @@ import { ReactiveBase, SelectedFilters } from "@appbaseio/reactivesearch";
 import theme from "../theme";
 import SideDrawer from "../Components/SideDrawer";
 import { LinkedResourceContainer } from "link-redux";
-import { NamedNode } from "rdflib";
+import rdfFactory from "@ontologies/core";
 import { GlobalHotKeys } from "react-hotkeys";
 
 import { keyMap } from "../helpers/keyMap";
@@ -97,7 +97,7 @@ const SearchRoute = (props: RouteComponentProps) => {
             >
               {currentResource && hasParams &&
                 <SideDrawer>
-                  <LinkedResourceContainer subject={NamedNode.find(currentResource)} />
+                  <LinkedResourceContainer subject={rdfFactory.namedNode(currentResource)} />
                 </SideDrawer>
               }
             </ReactCSSTransitionGroup>

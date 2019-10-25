@@ -2,18 +2,17 @@ import {
   register,
 } from "link-redux";
 import React from "react";
-import { NamedNode } from "rdflib";
-
-import { NS } from "../../LRS";
+import { NamedNode } from "@ontologies/core";
+import schema from "@ontologies/schema";
 
 interface StartDateProps {
   linkedProp: NamedNode;
 }
 
 class StartDate extends React.Component<StartDateProps> {
-  static type = NS.schema.Thing;
+  static type = schema.Thing;
 
-  static property = NS.schema.startDate;
+  static property = schema.startDate;
 
   render() {
     const { linkedProp } = this.props;

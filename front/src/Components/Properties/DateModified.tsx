@@ -2,9 +2,9 @@ import {
   register,
 } from "link-redux";
 import React from "react";
-import { NamedNode } from "rdflib";
+import { NamedNode } from "@ontologies/core";
+import schema from "@ontologies/schema";
 
-import { NS } from "../../LRS";
 import allTopologies from "../Topologies/allTopologies";
 
 interface DateModifiedProps {
@@ -12,12 +12,12 @@ interface DateModifiedProps {
 }
 
 class DateModified extends React.Component<DateModifiedProps> {
-  static type = NS.schema.Thing;
+  static type = schema.Thing;
 
   static property = [
-    NS.schema.dateModified,
-    NS.schema.startDate,
-    NS.schema.endDate,
+    schema.dateModified,
+    schema.startDate,
+    schema.endDate,
   ];
   static topology = allTopologies;
 
