@@ -1,7 +1,8 @@
+import schema from "@ontologies/schema";
 import React from "react";
 import { register } from "link-redux";
 
-import LRS, { NS } from "../../LRS";
+import LRS from "../../LRS";
 import { propertyToArr } from "../../helpers";
 import allTopologies from "../Topologies/allTopologies";
 
@@ -32,12 +33,12 @@ const Text = (props: TextProps) => {
   );
 };
 
-Text.type = NS.schema("Thing");
-Text.property = NS.schema.text;
+Text.type = schema.Thing;
+Text.property = schema.text;
 Text.topology = allTopologies;
 Text.mapDataToProps = {
   text: {
-    label: NS.schema.text,
+    label: schema.text,
     limit: 100,
   },
 };

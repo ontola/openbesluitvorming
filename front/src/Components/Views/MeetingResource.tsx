@@ -1,3 +1,4 @@
+import { SomeTerm } from "@ontologies/core";
 import { register } from "link-redux";
 import React from "react";
 
@@ -6,7 +7,6 @@ import { resourceTopology } from "../Topologies/ResourceTopology";
 import Box from "../Topologies/BoxTopology";
 import { labelsTopology } from "../Topologies/LabelsTopology";
 import { ThingProps } from "./Thing";
-import { SomeTerm } from "rdflib";
 import { propertyValueTopology } from "../Topologies/PropertyValueTopology";
 
 interface MeetingResourceProps extends ThingProps {

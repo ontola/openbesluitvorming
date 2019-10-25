@@ -4,7 +4,7 @@ import React from "react";
 import { NS } from "../../LRS";
 import { predicateLabelTopology } from "../Topologies/PredicateLabel";
 import { ThingProps } from './Thing';
-import { SomeTerm } from "rdflib";
+import { SomeTerm } from "@ontologies/core";
 
 interface ThingPredicateLabelProps extends ThingProps {
   label: SomeTerm;

@@ -5,18 +5,15 @@ import {
   MiddlewareFn,
   RDFStore,
   RequestInitGenerator,
+  rdflib,
 } from "link-lib";
-import {
-  Formula,
-  Literal,
+import rdfFactory, {
   NamedNode,
-  Namespace,
   Node,
   SomeTerm,
-  Statement,
-  Fetcher,
-  SomeNode,
-} from "rdflib";
+  createNS,
+  LowLevelStore
+} from "@ontologies/core"
 import { ReactType } from "react";
 
 import { FRONTEND_ACCEPT, FRONTEND_URL } from "../config";
@@ -26,7 +23,7 @@ import logging from "../middleware/logging";
 import { handle } from "./logging";
 import history from "./history";
 
-(Fetcher as any).crossSiteProxyTemplate = `${FRONTEND_URL}proxy?iri={uri}`;
+(rdflib.RDFFetcher as any).crossSiteProxyTemplate = `${FRONTEND_URL}proxy?iri={uri}`;
 
 export default function generateLRS() {
   // tslint:disable-next-line: prefer-array-literal
@@ -68,13 +65,13 @@ export default function generateLRS() {
   (LRS as any).store.store.newPropertyAction(
     LRS.namespaces.rdf("first"),
     (
-      _formula: Formula | undefined,
-      subj: SomeNode,
+      _formula: LowLevelStore | undefined,
+      subj: Node,
       _pred: NamedNode,
       _obj?: SomeTerm,
       _why?: Node,
     ) => {
-      (LRS as any).store.store.add(subj, NS.rdf.type, NS.rdf.List);
+      (LRS as any).store.store.add(subj, NS.rdf("type"), NS.rdf("List"));
       return false;
     },
   );
@@ -86,21 +83,21 @@ export default function generateLRS() {
   // @ts-ignore TS2341
   LRS.api.accept.default = FRONTEND_ACCEPT;
 
-  LRS.namespaces.aod = Namespace("https://argu.co/ns/od#");
-  LRS.namespaces.dcterms = Namespace("http://purl.org/dc/terms/");
-  LRS.namespaces.fa4 = Namespace("http://fontawesome.io/icon/");
-  LRS.namespaces.foaf = Namespace("http://xmlns.com/foaf/0.1/");
-  LRS.namespaces.meeting = Namespace("https://argu.co/ns/meeting/");
-  LRS.namespaces.meta = Namespace("https://argu.co/ns/meta#");
-  LRS.namespaces.ncal = Namespace("http://www.semanticdesktop.org/ontologies/2007/04/02/ncal#");
-  LRS.namespaces.opengov = Namespace("http://www.w3.org/ns/opengov#");
-  LRS.namespaces.org = Namespace("http://www.w3.org/ns/org#");
-  LRS.namespaces.person = Namespace("http://www.w3.org/ns/person#");
-  LRS.namespaces.prov = Namespace("http://www.w3.org/ns/prov#");
-  LRS.namespaces.rdfs = Namespace("http://www.w3.org/1999/02/22-rdf-syntax-ns#");
-  LRS.namespaces.sh = Namespace("http://www.w3.org/ns/shacl#");
-  LRS.namespaces.skos = Namespace("http://www.w3.org/2004/02/skos/core#");
-  LRS.namespaces.vcard = Namespace("http://www.w3.org/2006/vcard/ns#");
+  LRS.namespaces.aod = createNS("https://argu.co/ns/od#");
+  LRS.namespaces.dcterms = createNS("http://purl.org/dc/terms/");
+  LRS.namespaces.fa4 = createNS("http://fontawesome.io/icon/");
+  LRS.namespaces.foaf = createNS("http://xmlns.com/foaf/0.1/");
+  LRS.namespaces.meeting = createNS("https://argu.co/ns/meeting/");
+  LRS.namespaces.meta = createNS("https://argu.co/ns/meta#");
+  LRS.namespaces.ncal = createNS("http://www.semanticdesktop.org/ontologies/2007/04/02/ncal#");
+  LRS.namespaces.opengov = createNS("http://www.w3.org/ns/opengov#");
+  LRS.namespaces.org = createNS("http://www.w3.org/ns/org#");
+  LRS.namespaces.person = createNS("http://www.w3.org/ns/person#");
+  LRS.namespaces.prov = createNS("http://www.w3.org/ns/prov#");
+  LRS.namespaces.rdfs = createNS("http://www.w3.org/1999/02/22-rdf-syntax-ns#");
+  LRS.namespaces.sh = createNS("http://www.w3.org/ns/shacl#");
+  LRS.namespaces.skos = createNS("http://www.w3.org/2004/02/skos/core#");
+  LRS.namespaces.vcard = createNS("http://www.w3.org/2006/vcard/ns#");
 
   const languages = {
     en: "en",
@@ -116,7 +113,7 @@ export default function generateLRS() {
 
   // @ts-ignore TS2341
   LRS.store.store.newPropertyAction(NS.rdf("type"), (
-    _: Formula,
+    _: LowLevelStore,
     __: SomeTerm,
     ___: NamedNode,
     obj: SomeTerm,
@@ -126,62 +123,62 @@ export default function generateLRS() {
       return false;
     }
     // @ts-ignore TS2341
-    LRS.schema.addStatement(new Statement(obj, NS.rdfs("subClassOf"), NS.schema("Thing")));
+    LRS.schema.addStatement(rdfFactory.quad(obj, NS.rdfs("subClassOf"), NS.schema("Thing")));
     return false;
   });
 
   // tslint:disable max-line-length
   const ontologicalClassData = [
     // Everything is a thing. Are these still necessary?
-    new Statement(NS.schema("Thing"), NS.rdfs("subClassOf"), NS.rdfs("Resource")),
-    new Statement(NS.owl("Thing"), NS.owl("sameAs"), NS.schema("Thing")),
-    new Statement(NS.schema("MediaObject"), NS.rdfs("subClassOf"), NS.schema("Thing")),
+    rdfFactory.quad(NS.schema("Thing"), NS.rdfs("subClassOf"), NS.rdfs("Resource")),
+    rdfFactory.quad(NS.owl("Thing"), NS.owl("sameAs"), NS.schema("Thing")),
+    rdfFactory.quad(NS.schema("MediaObject"), NS.rdfs("subClassOf"), NS.schema("Thing")),
 
-    new Statement(NS.dcterms("isReferencedBy"), NS.rdfs("label"), Literal.find("Besproken in", languages.nl)),
+    rdfFactory.quad(NS.dcterms("isReferencedBy"), NS.rdfs("label"), rdfFactory.literal("Besproken in", languages.nl)),
 
-    new Statement(NS.meeting("Meeting"), NS.rdfs("label"), Literal.find("Vergadering", languages.nl)),
-    new Statement(NS.meeting("Meeting"), NS.schema("description"), Literal.find("A meeting is an event where people discuss things and make decisions.", languages.en)),
+    rdfFactory.quad(NS.meeting("Meeting"), NS.rdfs("label"), rdfFactory.literal("Vergadering", languages.nl)),
+    rdfFactory.quad(NS.meeting("Meeting"), NS.schema("description"), rdfFactory.literal("A meeting is an event where people discuss things and make decisions.", languages.en)),
 
-    new Statement(NS.meeting("attachment"), NS.rdfs("label"), Literal.find("Bijlage", languages.nl)),
-    new Statement(NS.meeting("agenda"), NS.rdfs("label"), Literal.find("Agendapunten", languages.nl)),
-    new Statement(NS.meeting("committee"), NS.rdfs("label"), Literal.find("Commissie", languages.nl)),
+    rdfFactory.quad(NS.meeting("attachment"), NS.rdfs("label"), rdfFactory.literal("Bijlage", languages.nl)),
+    rdfFactory.quad(NS.meeting("agenda"), NS.rdfs("label"), rdfFactory.literal("Agendapunten", languages.nl)),
+    rdfFactory.quad(NS.meeting("committee"), NS.rdfs("label"), rdfFactory.literal("Commissie", languages.nl)),
 
-    new Statement(NS.meta("collection"), NS.rdfs("label"), Literal.find("Collectie", languages.nl)),
+    rdfFactory.quad(NS.meta("collection"), NS.rdfs("label"), rdfFactory.literal("Collectie", languages.nl)),
 
-    new Statement(NS.ncal("categories"), NS.rdfs("label"), Literal.find("Categorieën", languages.nl)),
+    rdfFactory.quad(NS.ncal("categories"), NS.rdfs("label"), rdfFactory.literal("Categorieën", languages.nl)),
 
-    new Statement(NS.org("memberOf"), NS.rdfs("label"), Literal.find("Lid van", languages.nl)),
-    new Statement(NS.org("member"), NS.rdfs("label"), Literal.find("Lid", languages.nl)),
-    new Statement(NS.org("role"), NS.rdfs("label"), Literal.find("Rol", languages.nl)),
-    new Statement(NS.org("organization"), NS.rdfs("label"), Literal.find("Organisatie", languages.nl)),
-    new Statement(NS.org("subOrganizationOf"), NS.rdfs("label"), Literal.find("Valt onder", languages.nl)),
+    rdfFactory.quad(NS.org("memberOf"), NS.rdfs("label"), rdfFactory.literal("Lid van", languages.nl)),
+    rdfFactory.quad(NS.org("member"), NS.rdfs("label"), rdfFactory.literal("Lid", languages.nl)),
+    rdfFactory.quad(NS.org("role"), NS.rdfs("label"), rdfFactory.literal("Rol", languages.nl)),
+    rdfFactory.quad(NS.org("organization"), NS.rdfs("label"), rdfFactory.literal("Organisatie", languages.nl)),
+    rdfFactory.quad(NS.org("subOrganizationOf"), NS.rdfs("label"), rdfFactory.literal("Valt onder", languages.nl)),
 
     // RDF:nil is a List, and it should not render.
-    new Statement(NS.rdf("nil"), NS.rdf("type"), NS.rdf("List")),
+    rdfFactory.quad(NS.rdf("nil"), NS.rdf("type"), NS.rdf("List")),
 
-    new Statement(NS.rdfs("first"), NS.rdfs("label"), Literal.find("Eerste van de lijst", languages.nl)),
-    new Statement(NS.rdfs("rest"), NS.rdfs("label"), Literal.find("Rest van de lijst", languages.nl)),
+    rdfFactory.quad(NS.rdfs("first"), NS.rdfs("label"), rdfFactory.literal("Eerste van de lijst", languages.nl)),
+    rdfFactory.quad(NS.rdfs("rest"), NS.rdfs("label"), rdfFactory.literal("Rest van de lijst", languages.nl)),
 
-    new Statement(NS.schema("Thing"), NS.rdf("type"), NS.rdfs("Class")),
-    new Statement(NS.schema("Thing"), NS.rdfs("comment"), Literal.find("The most generic type of item.")),
-    new Statement(NS.schema("Thing"), NS.rdfs("label"), Literal.find("Thing", languages.en)),
+    rdfFactory.quad(NS.schema("Thing"), NS.rdf("type"), NS.rdfs("Class")),
+    rdfFactory.quad(NS.schema("Thing"), NS.rdfs("comment"), rdfFactory.literal("The most generic type of item.")),
+    rdfFactory.quad(NS.schema("Thing"), NS.rdfs("label"), rdfFactory.literal("Thing", languages.en)),
 
-    new Statement(NS.schema("CreativeWork"), NS.rdfs("label"), Literal.find("Stuk", languages.nl)),
-    new Statement(NS.schema("CreativeWork"), NS.schema("description"), Literal.find("Kan van alles zijn.", languages.en)),
+    rdfFactory.quad(NS.schema("CreativeWork"), NS.rdfs("label"), rdfFactory.literal("Stuk", languages.nl)),
+    rdfFactory.quad(NS.schema("CreativeWork"), NS.schema("description"), rdfFactory.literal("Kan van alles zijn.", languages.en)),
 
-    new Statement(NS.schema("startDate"), NS.rdfs("label"), Literal.find("Startdatum", languages.nl)),
-    new Statement(NS.schema("endDate"), NS.rdfs("label"), Literal.find("Einddatum", languages.nl)),
-    new Statement(NS.schema("dateModified"), NS.rdfs("label"), Literal.find("Bewerkt op", languages.nl)),
-    new Statement(NS.schema("eventStatus"), NS.rdfs("label"), Literal.find("Status", languages.nl)),
-    new Statement(NS.schema("location"), NS.rdfs("label"), Literal.find("Locatie", languages.nl)),
-    new Statement(NS.schema("isBasedOn"), NS.rdfs("label"), Literal.find("Gebaseerd op", languages.nl)),
-    new Statement(NS.schema("invitee"), NS.rdfs("label"), Literal.find("Genodigden", languages.nl)),
-    new Statement(NS.schema("name"), NS.rdfs("label"), Literal.find("Naam", languages.nl)),
-    new Statement(NS.schema("organizer"), NS.rdfs("label"), Literal.find("Georganiseerd door", languages.nl)),
-    new Statement(NS.schema("description"), NS.rdfs("label"), Literal.find("Beschrijving", languages.nl)),
-    new Statement(NS.schema("superEvent"), NS.rdfs("label"), Literal.find("Besproken in", languages.nl)),
+    rdfFactory.quad(NS.schema("startDate"), NS.rdfs("label"), rdfFactory.literal("Startdatum", languages.nl)),
+    rdfFactory.quad(NS.schema("endDate"), NS.rdfs("label"), rdfFactory.literal("Einddatum", languages.nl)),
+    rdfFactory.quad(NS.schema("dateModified"), NS.rdfs("label"), rdfFactory.literal("Bewerkt op", languages.nl)),
+    rdfFactory.quad(NS.schema("eventStatus"), NS.rdfs("label"), rdfFactory.literal("Status", languages.nl)),
+    rdfFactory.quad(NS.schema("location"), NS.rdfs("label"), rdfFactory.literal("Locatie", languages.nl)),
+    rdfFactory.quad(NS.schema("isBasedOn"), NS.rdfs("label"), rdfFactory.literal("Gebaseerd op", languages.nl)),
+    rdfFactory.quad(NS.schema("invitee"), NS.rdfs("label"), rdfFactory.literal("Genodigden", languages.nl)),
+    rdfFactory.quad(NS.schema("name"), NS.rdfs("label"), rdfFactory.literal("Naam", languages.nl)),
+    rdfFactory.quad(NS.schema("organizer"), NS.rdfs("label"), rdfFactory.literal("Georganiseerd door", languages.nl)),
+    rdfFactory.quad(NS.schema("description"), NS.rdfs("label"), rdfFactory.literal("Beschrijving", languages.nl)),
+    rdfFactory.quad(NS.schema("superEvent"), NS.rdfs("label"), rdfFactory.literal("Besproken in", languages.nl)),
 
-    new Statement(NS.vcard("hasOrganizationName"), NS.rdfs("label"), Literal.find("Organisatie", languages.en)),
+    rdfFactory.quad(NS.vcard("hasOrganizationName"), NS.rdfs("label"), rdfFactory.literal("Organisatie", languages.en)),
   ];
   // tslint:enable max-line-length
 
@@ -190,7 +187,7 @@ export default function generateLRS() {
   LRS.store.addStatements(ontologicalClassData);
 
   const ontologicalPropertyData = [
-    new Statement(NS.foaf("name"), NS.owl("sameAs"), NS.schema("name")),
+    rdfFactory.quad(NS.foaf("name"), NS.owl("sameAs"), NS.schema("name")),
   ];
 
   LRS.addOntologySchematics(ontologicalPropertyData);

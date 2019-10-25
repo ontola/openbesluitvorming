@@ -1,5 +1,5 @@
 import { unstable, LinkReduxLRSType } from "link-redux";
-// import { NamedNode } from "rdflib";
+// import { NamedNode } from "@ontologies/core";
 import React from "react";
 // import {
 // INTERNAL_SERVER_ERROR,

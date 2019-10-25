@@ -3,7 +3,7 @@ import React from "react";
 
 import { NS } from "../../LRS";
 import { labelsTopology } from "../Topologies/LabelsTopology";
-import { NamedNode } from "rdflib";
+import { NamedNode } from "@ontologies/core";
 import PredicateLabel from "../Topologies/PredicateLabel";
 import PropertyValue from "../Topologies/PropertyValueTopology";
 
