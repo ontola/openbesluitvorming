@@ -456,6 +456,10 @@ p {
   -webkit-overflow-scrolling: touch;
 }
 
+.PropertyValue {
+  font-size: .9rem;
+}
+
 .SideDrawer__resize-handle {
   transition: .2s all;
   z-index: 2;
@@ -585,6 +589,7 @@ p {
   display: block;
   // padding: .2rem;
   border-radius: $border-radius;
+  font-size: .9rem;
 
   &:hover {
     text-decoration: underline;
