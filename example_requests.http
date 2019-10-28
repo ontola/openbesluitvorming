@@ -9,7 +9,9 @@ GET https://id.openraadsinformatie.nl/44477 HTTP/1.1
 content-type: text/turtle
 
 ### Elastic simple request
+GET https://api.openraadsinformatie.nl/v1/elastic/ori_*/_search?q=test HTTP/1.1
 
+### Elastic simple request with body
 POST https://api.openraadsinformatie.nl/v1/elastic/ori_*/_search? HTTP/1.1
 content-type: application/json
 
@@ -140,7 +142,7 @@ content-type: application/json
 
 ### Elastic filter by date
 
-POST https://api.openraadsinformatie.nl/v1/elastic/ori_*/_search? HTTP/1.1
+POST https://api.openraadsinformatie.nl/v1/elastic/ori_meierijstad_20190809125117/_search? HTTP/1.1
 content-type: application/json
 
 {
@@ -164,8 +166,8 @@ content-type: application/json
         {
           "range": {
             "last_discussed_at": {
-              "gte": "2019-01-01",
-              "lte": "2019-05-24"
+              "gte": "2019-10-20",
+              "lte": "2019-10-25"
             }
           }
         }
@@ -186,7 +188,18 @@ content-type: application/json
         "order": "desc"
       }
     }
-  ]
+  ],
+  "aggs": {
+    "tags": {
+      "terms": {
+        "field": "tags.http://www.w3.org/1999/02/22-rdf-syntax-ns#_0.https://argu.co/ns/meeting/tag.keyword",
+        "size": 500,
+        "order": {
+          "_count": "desc"
+        }
+      }
+    }
+  }
 }
 
 ### List all indexes, see all document counts per municipality / province
