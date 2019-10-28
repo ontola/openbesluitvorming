@@ -29,8 +29,7 @@ export const queryGenerator = (searchTerm: string) => {
     return null;
   }
 
-  // eslint-disable @typescript-eslint/camelcase
-
+  /* eslint-disable @typescript-eslint/camelcase */
   if (simpleQueryStringChars.some(substring => searchTerm.includes(substring))) {
     return {
       query: {
@@ -67,9 +66,9 @@ export const queryGenerator = (searchTerm: string) => {
       },
     },
   };
+  /* eslint-enable @typescript-eslint/camelcase */
 };
 
-// eslint-enable @typescript-eslint/camelcase
 
 // How many ms it takes before search is triggered after changing the query value.
 const debounce = 2500;
@@ -137,7 +136,7 @@ const SearchBar: React.FunctionComponent = () => {
         URLParams={true}
         customQuery={queryGenerator}
         customHighlight={() => ({
-          // eslint-disable @typescript-eslint/camelcase
+          /* eslint-disable @typescript-eslint/camelcase */
           highlight: {
             pre_tags: ["<mark>"],
             post_tags: ["</mark>"],
@@ -150,7 +149,7 @@ const SearchBar: React.FunctionComponent = () => {
             fragment_size: 100,
             number_of_fragments: 3,
           },
-          // eslint-enable @typescript-eslint/camelcase
+          /* eslint-enable @typescript-eslint/camelcase */
         })}
       />
     </GlobalHotKeys>
