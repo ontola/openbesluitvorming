@@ -141,7 +141,8 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
       />
       <MultiList
         componentId={ids.tags}
-        dataField="tags.http://www.w3.org/1999/02/22-rdf-syntax-ns#_0.https://argu.co/ns/meeting/tag.keyword"
+        // This selects the last theme, 9th item (there are 9 themes), which scores the lowest
+        dataField="tags.http://www.w3.org/1999/02/22-rdf-syntax-ns#_8.https://argu.co/ns/meeting/tag.keyword"
         title={capitalize(ids.tags)}
         filterLabel={capitalize(ids.tags)}
         size={500}
