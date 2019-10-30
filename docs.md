@@ -91,6 +91,6 @@ ORI was initiated by the [Open State Foundation](https://openstate.eu).
 
 ### Which projects does the API use?
 
-- [Open Raadsinformatie](https://github.com/openstate/open-raadsinformatie/)
-- [ori-theme-classifier](https://github.com/openstate/ori-theme-classifier)
-- [ori-api](https://github.com/ontola/ori_api/)
+- [Open Raadsinformatie](https://github.com/openstate/open-raadsinformatie/) for ETL & search
+- [ori-theme-classifier](https://github.com/openstate/ori-theme-classifier) for adding themes
+- [ori-api](https://github.com/ontola/ori_api/) for serializing to various RDF formats
