@@ -1207,10 +1207,10 @@
   resolved "https://registry.yarnpkg.com/@nodelib/fs.stat/-/fs.stat-1.1.3.tgz#2b5a3ab3f918cca48a8c754c08168e3f03eba61b"
   integrity sha512-shAmDyaQC4H92APFoIaVDHCx5bStIocgvbwQyxPRrbUY20V1EYTbSDchWbuwlMG3V17cprZhA6+78JfB+3DTPw==
 
-"@ontola/link-devtools@^1.0.1":
-  version "1.0.1"
-  resolved "https://registry.yarnpkg.com/@ontola/link-devtools/-/link-devtools-1.0.1.tgz#b92a75c1240c91abb852f6fc7ca9ff23379b8761"
-  integrity sha512-bKrYHpcL/lJMg2UQ7BB7NMKrtgXMtkjSCgFcPVNXvdneRI2ZCGw5cyVO27oG+IOlact74SkeYKUuVJePW5TH1w==
+"@ontola/link-devtools@^1.1.0":
+  version "1.1.0"
+  resolved "https://registry.yarnpkg.com/@ontola/link-devtools/-/link-devtools-1.1.0.tgz#700ac6e9173b9311723d3133e5da880fe0e856a2"
+  integrity sha512-i5A7cBvKw1zvJM0JLNQyHgqRx+KmgVbSw6jJPyba0DJkE9HdGHCmPb2Ky5Pca9ab3SrOzR1uKDNuAj7nw/ytsQ==
   dependencies:
     type-zoo ">=3.4.1"
 
