@@ -6,19 +6,28 @@ import Button from "./Button";
 
 interface MState {
   selectedText?: string;
+  evaluateInputText?: string;
   information?: string;
+  wikipediaThumbnailUrl?: string;
+  wikipediaReadMoreUrl?: string;
+  foundOnWikipedia?: boolean;
 }
 
 class Glossarium extends React.PureComponent<{}, MState> {
   constructor(props: {}) {
     super(props);
     this.state = {
+      evaluateInputText: '',
       selectedText: '',
-      information: ''
+      information: '',
+      wikipediaThumbnailUrl: '',
+      wikipediaReadMoreUrl: '',
+      foundOnWikipedia: undefined
     }
   }
 
-  evaluateSelection = () => {
+  evaluateSelection = (e: any) => {
+    e.preventDefault();
     // const query = "Napoleon Bonaparte";
     // // if you want to retrieve a full article set summaryOnly to false.
     // // Full article retrieval and parsing is still beta
@@ -31,15 +40,70 @@ class Glossarium extends React.PureComponent<{}, MState> {
     //   }
     //   console.log("Query successful[query=%s, html-formatted-wiki-text=%s]", query, htmlWikiText);
     // });
+    const query = this.state.evaluateInputText;
+    const endpoint = "https://nl.wikipedia.org/w/api.php?action=query&prop=extracts%7Cpageprops&exintro&explaintext&origin=*&format=json&titles=" + query;
 
-    this.setState({
-      information: "informatie"
+    // const endpoint = "https://en.wikipedia.org/w/api.php?action=query&list=search&prop=info&inprop=url&utf8=&format=json&origin=*&srlimit=20&srsearch=" + query;
+
+    fetch(endpoint)
+    .then(function (response) {
+      return response.json();
     })
+    .then(data => {
+      const page = data.query.pages[Object.keys(data.query.pages)[0]];
+      if (Object.keys(data.query.pages)[0] == "-1") {
+        this.setState({
+          foundOnWikipedia: false
+        });
+        return
+      }
+      const extract = page.extract;
+      const title = page.title;
+
+      const pictureUrl = "https://en.wikipedia.org/w/api.php?action=query&titles=" + title +"&prop=pageimages&format=json&origin=*&pithumbsize=200"
+      fetch(pictureUrl).then(response => {
+        return response.json();
+      }).then(data => {
+        console.log(data);
+        const page = data.query.pages[Object.keys(data.query.pages)[0]];
+        const thumbnailUrl = page.thumbnail.source;
+        this.setState({
+          wikipediaThumbnailUrl: thumbnailUrl
+        })
+      }).catch(() => {
+        console.log("Could not get thumbnail");
+      })
+
+      this.setState({
+        information: extract,
+        wikipediaReadMoreUrl: "https://nl.wikipedia.org/wiki/" + title,
+        foundOnWikipedia: true
+      });
+    })
+    .catch((e) => {
+      this.setState({
+        foundOnWikipedia: false
+      })
+      console.log('An error occured', e);
+    });
+
+    // console.log(url);
+    // fetch(
+    //   url,
+    //   { mode: 'no-cors' }
+    // ).then(response => {
+    //   console.log(response);
+    //   return response.json();
+    // }).then(body => {
+    //   this.setState({
+    //     information: body
+    //   })
+    // })
   }
 
   onChange = (e: React.FormEvent<HTMLInputElement>) => {
     this.setState({
-      selectedText: e.currentTarget.value
+      evaluateInputText: e.currentTarget.value
     })
   }
 
@@ -58,7 +122,8 @@ class Glossarium extends React.PureComponent<{}, MState> {
 
     if (sel.toString() !== '') {
       this.setState({
-        selectedText: sel.toString()
+        selectedText: sel.toString(),
+        evaluateInputText: sel.toString()
       })
     }
   }
@@ -70,15 +135,15 @@ class Glossarium extends React.PureComponent<{}, MState> {
         <div className="glossarium-container">
           <div className="selection-container">
             <h1>Huidige selectie</h1>
-            <input 
-              className="selected-text"
-              value={this.state.selectedText}
-              onChange={this.onChange}/>   
-            <Button
-              className="evaluate-selection-button"
-              onClick={this.evaluateSelection}>
-                Evaluate
-            </Button>
+            <form onSubmit={this.evaluateSelection}>
+              <input 
+                className="selected-text"
+                value={this.state.evaluateInputText}
+                onChange={this.onChange}/>   
+              <Button className="evaluate-selection-button">
+                  Evaluate
+              </Button>
+            </form>
           </div>
 
           <div className="definition-container">
@@ -97,14 +162,12 @@ class Glossarium extends React.PureComponent<{}, MState> {
 
           <div className="linked-data-container">
             <div className="wiki-summary">
-              <p>De Inspectie Leefomgeving en Transport (ILT), een agentschap van het Ministerie van Infrastruc een agentschap van het Ministerie van Infrastruc een agentschap van het Ministerie van Infrastruc een agentschap van het Ministerie van Infrastruc een agentschap van het Ministerie van Infrastruc een agentschap van het Ministerie van Infrastruc een agentschap van het Ministerie van Infrastruc een agentschap van het Ministerie van Infrastruc een agentschap van het Ministerie van Infrastruc een agentschap van het Ministerie van Infrastruc een agentschap van het Ministerie van Infrastructuur en Waterstaat, bewaakt en stimuleert de naleving van wet- en regelgeving voor een veilige en duurzame leefomgeving en transport. Zij is op 1 januari 2012 ontstaan door samenvoeging van de Inspectie Verkeer en Waterstaat (IVW) en de VROM-inspectie nadat beider ministeries waaronder ze vielen werden samengevoegd onder het Kabinet-Rutte I. Het is daarmee een van de Nederlandse rijksinspecties. In 2013 werd het Volkshuisvestelijk Toezicht aan de ILT toegevoegd. In 2014 werden de Kernfysische dienst en het team adviesnetwerken (nucleair) overgeplaatst naar de ANVS. In 2015 werd het Zelfstandig Bestuursorgaan CFW toegevoegd aan de ILT.</p>
-              <p className="read-more"><a href="#">Read more</a></p>
-            </div>
-            <div className="relevant-link">
-              <a href="#">http://www.ilent.nl/</a>
+              {this.state.foundOnWikipedia == true && <p>{this.state.information}</p>}
+              {this.state.foundOnWikipedia == false && <p>Did not find topic on wikipedia.</p>}
+              {this.state.wikipediaReadMoreUrl && <p className="read-more"><a href={this.state.wikipediaReadMoreUrl} target="_blank">View on wikipedia</a></p>}
             </div>
             <div className="descriptive-image">
-              <img className="wiki-image" src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/ef/Voertuig_Inspectie_Verkeer_en_Waterstaat_IVW.jpg/260px-Voertuig_Inspectie_Verkeer_en_Waterstaat_IVW.jpg"></img>
+              <img className="wiki-image" src={this.state.wikipediaThumbnailUrl}></img>
             </div>
           </div>
         </div>

@@ -862,7 +862,7 @@ mark {
   width: 70%;
 }
 
-.glossarium-container > .selection-container > .evaluate-selection-button {
+.glossarium-container > .selection-container > form > .evaluate-selection-button {
   color: $blue;
   background-color: #f8f8f8;
   font-weight: bold;
@@ -929,14 +929,16 @@ mark {
 .glossarium-container > .linked-data-container {
   border: 1px solid blue;
   height: 60%;
+  width: 100%;
   padding: 10px;
   position: absolute;
   bottom: 0;
 }
 
 .glossarium-container > .linked-data-container > .wiki-summary {
-  // border: 1px dashed black;
+  border: 1px dashed black;
   // height: 25%;
+  min-height: 50%;
   max-height: 75%;
   overflow: hidden;
   position: relative;
@@ -951,6 +953,7 @@ mark {
   border: 1px dashed black;
   padding: 5px;
   height: 20%;
+  width: 100%;
 }
 
 .wiki-image {
