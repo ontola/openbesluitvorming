@@ -1,5 +1,5 @@
 import * as React from "react";
-import { TopTags } from '../types';
+import { TopTags, topTag } from '../types';
 import { colors } from '../sharedStyles';
 
 const Tags = (props: {tags: TopTags | undefined}) => {
@@ -20,7 +20,7 @@ const Tags = (props: {tags: TopTags | undefined}) => {
           padding: '.1rem .2rem',
           display: 'inline',
         }}>
-          {props.tags["http://www.w3.org/1999/02/22-rdf-syntax-ns#_0"]["https://argu.co/ns/meeting/tag"]}
+          {props.tags[topTag]["https://argu.co/ns/meeting/tag"]}
         </div>
       </div>
     );}

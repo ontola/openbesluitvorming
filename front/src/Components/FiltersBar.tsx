@@ -5,6 +5,7 @@ import {
 } from "@appbaseio/reactivesearch";
 import { indexToLabel, typeToLabel, ids, capitalize } from "../helpers";
 import Button from './Button';
+import { topTag } from "../types";
 
 interface FiltersbarProps {
   display: boolean;
@@ -142,7 +143,7 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
       <MultiList
         componentId={ids.tags}
         // This selects the last theme, 9th item (there are 9 themes), which scores the lowest
-        dataField="tags.http://www.w3.org/1999/02/22-rdf-syntax-ns#_8.https://argu.co/ns/meeting/tag.keyword"
+        dataField={`tags.${topTag}.https://argu.co/ns/meeting/tag.keyword`}
         title={capitalize(ids.tags)}
         filterLabel={capitalize(ids.tags)}
         size={500}
