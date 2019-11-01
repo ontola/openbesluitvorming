@@ -3,7 +3,7 @@ import { TopTags } from '../types';
 import { colors } from '../sharedStyles';
 
 const Tags = (props: {tags: TopTags | undefined}) => {
-  if (props.tags === undefined) {
+  if (!props.tags) {
     return null
   }
   return (
