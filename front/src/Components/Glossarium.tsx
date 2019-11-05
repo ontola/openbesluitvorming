@@ -27,19 +27,7 @@ class Glossarium extends React.PureComponent<{}, MState> {
   }
 
   evaluateSelection = (e: any) => {
-    e.preventDefault();
-    // const query = "Napoleon Bonaparte";
-    // // if you want to retrieve a full article set summaryOnly to false.
-    // // Full article retrieval and parsing is still beta
-    // const options = {query: query, format: "html", summaryOnly: true};
-    // //@ts-ignore
-    // wikipedia.searchArticle(options, function(err, htmlWikiText){
-    //   if(err){
-    //     console.log("An error occurred[query=%s, error=%s]", query, err);
-    //     return;
-    //   }
-    //   console.log("Query successful[query=%s, html-formatted-wiki-text=%s]", query, htmlWikiText);
-    // });
+    e.preventDefault(); // Stops page on refreshing (onSubmit)
     const query = this.state.evaluateInputText;
     const endpoint = "https://nl.wikipedia.org/w/api.php?action=query&prop=extracts%7Cpageprops&exintro&explaintext&origin=*&format=json&titles=" + query;
 
@@ -60,7 +48,7 @@ class Glossarium extends React.PureComponent<{}, MState> {
       const extract = page.extract;
       const title = page.title;
 
-      const pictureUrl = "https://en.wikipedia.org/w/api.php?action=query&titles=" + title +"&prop=pageimages&format=json&origin=*&pithumbsize=200"
+      const pictureUrl = "https://nl.wikipedia.org/w/api.php?action=query&titles=" + title +"&prop=pageimages&format=json&origin=*&pithumbsize=200"
       fetch(pictureUrl).then(response => {
         return response.json();
       }).then(data => {
@@ -86,19 +74,6 @@ class Glossarium extends React.PureComponent<{}, MState> {
       })
       console.log('An error occured', e);
     });
-
-    // console.log(url);
-    // fetch(
-    //   url,
-    //   { mode: 'no-cors' }
-    // ).then(response => {
-    //   console.log(response);
-    //   return response.json();
-    // }).then(body => {
-    //   this.setState({
-    //     information: body
-    //   })
-    // })
   }
 
   onChange = (e: React.FormEvent<HTMLInputElement>) => {
