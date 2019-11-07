@@ -1,5 +1,6 @@
 import * as React from "react";
 import Button from "./Button";
+import { SERVER_PORT } from "../config";
 
 //@ts-ignore: Untyped import
 // import wikipedia from 'wikipedia-js';
@@ -32,6 +33,21 @@ class Glossarium extends React.PureComponent<{}, MState> {
     const endpoint = "https://nl.wikipedia.org/w/api.php?action=query&prop=extracts%7Cpageprops&exintro&explaintext&origin=*&format=json&titles=" + query;
 
     // const endpoint = "https://en.wikipedia.org/w/api.php?action=query&list=search&prop=info&inprop=url&utf8=&format=json&origin=*&srlimit=20&srsearch=" + query;
+
+    const url = new URL(window.location.origin);
+    url.pathname = "/topics_api/dev/custom"
+    url.port = SERVER_PORT.toString();
+    console.log(url.toString());
+
+    fetch(url.toString()).then(response => {
+      console.log(response);
+      return response.json();
+    }).then(data => {
+      console.log(data);
+    }).catch(error => {
+      console.log(error);
+    })
+
 
     fetch(endpoint)
     .then(function (response) {
