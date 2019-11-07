@@ -152,7 +152,7 @@ class Glossarium extends React.PureComponent<{}, MState> {
             <div className="wiki-summary">
               {this.state.foundOnWikipedia == true && <p>{this.state.information}</p>}
               {this.state.foundOnWikipedia == false && <p>Did not find topic on wikipedia.</p>}
-              {this.state.wikipediaReadMoreUrl && <p className="read-more"><a href={this.state.wikipediaReadMoreUrl} target="_blank">View on wikipedia</a></p>}
+              {this.state.wikipediaReadMoreUrl && <p className="read-more"><a href={this.state.wikipediaReadMoreUrl} target="_blank" rel="noopener noreferrer">View on wikipedia</a></p>}
             </div>
             <div className="descriptive-image">
               <img className="wiki-image" src={this.state.wikipediaThumbnailUrl}></img>
