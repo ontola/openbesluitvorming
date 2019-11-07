@@ -49,11 +49,9 @@ class Glossarium extends React.PureComponent<{}, MState> {
     })
 
 
-    fetch(endpoint)
-    .then(function (response) {
+    fetch(endpoint).then(function (response) {
       return response.json();
-    })
-    .then(data => {
+    }).then(data => {
       const page = data.query.pages[Object.keys(data.query.pages)[0]];
       if (Object.keys(data.query.pages)[0] == "-1") {
         this.setState({
@@ -83,8 +81,7 @@ class Glossarium extends React.PureComponent<{}, MState> {
         wikipediaReadMoreUrl: "https://nl.wikipedia.org/wiki/" + title,
         foundOnWikipedia: true
       });
-    })
-    .catch((e) => {
+    }).catch((e) => {
       this.setState({
         foundOnWikipedia: false
       })
