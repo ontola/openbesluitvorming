@@ -73,8 +73,8 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
   const glossIsOpen =
     myPersistedState<boolean>("orisearch.pdfviewer.glossariumOpened", false);
 
-  const setDocumentSectionAnnotations = 
-    usePersistedState<any>("orisearch.pdfviewer.documentSectionAnnotations", [])[1]
+  const setDocumentSectionAnnotations =
+    usePersistedState<any>("orisearch.pdfviewer.documentSectionAnnotations", [])[1];
 
   const documentID = myPersistedState<string>("orisearch.pdfviewer.documentID", "");
   const wordhoardNames: string[] = ["orid:" + documentID];
@@ -83,23 +83,23 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
     glossariumAPI.getAgendaItemFromDocID(documentID).then((id: any) => {
       if (id) {
         wordhoardNames.push(id);
-      } 
+      }
     }).then(() => {
       glossariumAPI.getWordhoardList(wordhoardNames).then((result: any) => {
         const wordhoardIDs = result.items.map((item: any) => {
           return item.id;
-        })
+        });
         glossariumAPI.getDocumentSectionAnnotations("orid:" + documentID, pageNumber, wordhoardIDs).then(result => {
           if (result.surface_forms) {
             setDocumentSectionAnnotations(result.surface_forms);
           } else {
             setDocumentSectionAnnotations([]);
           }
-          
+
         });
-      }); 
+      });
     });
-  }
+  };
 
   const uglyStyleSetting = () => {
     // TODO: Dit is jammer maar het moet nou eenmaal. (component integratie)
@@ -108,7 +108,7 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
       ugly.style.width = "100%";
       console.log("gelukt!");
     }
-  }
+  };
 
   const handlePreviousPage = () => {
     if (pageNumber === 1) {
