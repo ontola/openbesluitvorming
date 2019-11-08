@@ -78,7 +78,25 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
 
   // const documentID_ = myPersistedState<string>("orisearch.pdfviewer.documentID", "");
   const documentID = "34225";
-  let wordhoardNames: Array<string> = ["orid:" + documentID];
+  const wordhoardNames: string[] = ["orid:" + documentID];
+
+  const getDocAnnotations = () => {
+    glossariumAPI.getAgendaItemFromDocID(documentID).then((id: any) => {
+      if (id) {
+        wordhoardNames.push(id);
+      } 
+    }).then(() => {
+      glossariumAPI.getWordhoardList(wordhoardNames).then((result: any) => {
+        const wordhoardIDs = result.items.map((item : any) => {
+          return item.id;
+        })
+        glossariumAPI.getDocumentSectionAnnotations("orid:" + documentID, pageNumber, wordhoardIDs).then(result => {
+          console.log(result.surface_forms);
+          setDocumentSectionAnnotations(result.surface_forms);
+        });
+      }); 
+    });
+  }
 
   const handlePreviousPage = () => {
     if (pageNumber === 1) {
@@ -95,24 +113,6 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
     setPageNumber(pageNumber + 1);
     getDocAnnotations();
   };
-
-  const getDocAnnotations = () => {
-    glossariumAPI.getAgendaItemFromDocID(documentID).then((id: any) => {
-      if (id) {
-        wordhoardNames.push(id);
-      } 
-    }).then(() => {
-      glossariumAPI.getWordhoardList(wordhoardNames).then((result: any) => {
-        let wordhoardIDs = result.items.map((item:any) => {
-          return item.id;
-        })
-        glossariumAPI.getDocumentSectionAnnotations("orid:" + documentID, pageNumber, wordhoardIDs).then(result => {
-          console.log(result.surface_forms);
-          setDocumentSectionAnnotations(result.surface_forms);
-        });
-      }); 
-    });
-  }
 
   function focusOnViewer() {
     if (pdfWrapper.current !== null) {

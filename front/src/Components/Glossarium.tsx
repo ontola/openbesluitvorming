@@ -74,7 +74,7 @@ class Glossarium extends React.PureComponent<{}, MState> {
           wikipediaQuery = surface_form.candidates[0].label;
         } else {
           customTopic = surface_form.candidates[0].topic_id;
-          for (let candidate of surface_form.candidates) {
+          for (const candidate of surface_form.candidates) {
             if (candidate.topic_id == null) {
               wikipediaQuery = candidate.label;
               break;

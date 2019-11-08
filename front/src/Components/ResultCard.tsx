@@ -48,11 +48,6 @@ const ResultCard: React.FunctionComponent<ResultCardProps & RouteComponentProps>
   const [documentID, setDocumentID] = 
     usePersistedState<string>("orisearch.pdfviewer.documentID", "");
   console.log(documentID);
-  
-  if (currentResource) {
-    
-  }
-  
 
   const header = props.name || props.label || props.title || "Geen naam";
   return (
