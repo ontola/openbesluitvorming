@@ -87,7 +87,7 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
       } 
     }).then(() => {
       glossariumAPI.getWordhoardList(wordhoardNames).then((result: any) => {
-        const wordhoardIDs = result.items.map((item : any) => {
+        const wordhoardIDs = result.items.map((item: any) => {
           return item.id;
         })
         glossariumAPI.getDocumentSectionAnnotations("orid:" + documentID, pageNumber, wordhoardIDs).then(result => {

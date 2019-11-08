@@ -2,7 +2,7 @@ import { SERVER_PORT } from "../config";
 
 
 class GlossariumAPI {
-  getDocumentSectionAnnotations = async (documentName: string, pageNumber: number, wordhoardIDs: Array<any>) => {
+  getDocumentSectionAnnotations = async (documentName: string, pageNumber: number, wordhoardIDs: any[]) => {
     const documentAnnotationsURL = new URL(window.location.origin);
     documentAnnotationsURL.port = SERVER_PORT.toString();
 
@@ -11,7 +11,7 @@ class GlossariumAPI {
       documentAnnotationsURL.searchParams.append("wordhoard_id", wid);
     }
     console.log("getDocSecAnn:", documentAnnotationsURL.toString());
-    let response = await fetch(documentAnnotationsURL.toString());
+    const response = await fetch(documentAnnotationsURL.toString());
     return await response.json();
   }
 
@@ -23,7 +23,7 @@ class GlossariumAPI {
     for (const name of names) {
       wordhoardURL.searchParams.append("name", name + "_definitions");
     }
-    let response = await fetch(wordhoardURL.toString() + "/");
+    const response = await fetch(wordhoardURL.toString() + "/");
     return await response.json();
   }
 
@@ -33,8 +33,8 @@ class GlossariumAPI {
     topicURL2.port = SERVER_PORT.toString();
 
     topicURL2.pathname = "/topics_api/dev/custom/topic/";
-    let response = await fetch(topicURL2.toString());
-    let json = await response.json();
+    const response = await fetch(topicURL2.toString());
+    const json = await response.json();
 
     const topic = json.topics.find((topic: any) => { return topic.id == uuid})
     return topic;
@@ -50,14 +50,14 @@ class GlossariumAPI {
 
   getWikipediaSummary = async (query: string): Promise<any> => {
     const apiQuery = "https://nl.wikipedia.org/w/api.php?action=query&prop=extracts%7Cpageprops&exintro&explaintext&origin=*&format=json&titles=" + query;
-    var response = await fetch(apiQuery);
-    var data = await response.json();
+    const response = await fetch(apiQuery);
+    const data = await response.json();
     const firstPageKey = Object.keys(data.query.pages)[0]
     const page = data.query.pages[firstPageKey];
     if (firstPageKey == "-1") {
       return false;
     }
-    let extract: string = page.extract;
+    const extract: string = page.extract;
     const imageURL = await this.getWikipediaImageURL(page.title);
     const readmoreURL = "https://nl.wikipedia.org/wiki/" + page.title;
     return [extract, imageURL, readmoreURL];
@@ -65,8 +65,8 @@ class GlossariumAPI {
 
   getWikipediaImageURL = async (query: string): Promise<any> => {
     const apiQuery = "https://nl.wikipedia.org/w/api.php?action=query&titles=" + query +"&prop=pageimages&format=json&origin=*&pithumbsize=200";
-    let response = await fetch(apiQuery);
-    let data = await response.json();
+    const response = await fetch(apiQuery);
+    const data = await response.json();
     try {
       const firstPageKey = Object.keys(data.query.pages)[0]
       const page = data.query.pages[firstPageKey];
