@@ -1,9 +1,8 @@
 import * as React from "react";
 import Button from "./Button";
-import { SERVER_PORT } from "../config";
+import GlossariumAPI from "./GlossariumAPI";
+import { myPersistedState } from '../helpers';
 
-//@ts-ignore: Untyped import
-// import wikipedia from 'wikipedia-js';
 
 interface MState {
   selectedText?: string;
@@ -12,81 +11,137 @@ interface MState {
   wikipediaThumbnailUrl?: string;
   wikipediaReadMoreUrl?: string;
   foundOnWikipedia?: boolean;
+  topicDescription?: string;
+  topicAbbreviation?: string;
+  topicCanonicalName?: string;
+  topicSource?: string;
+  customTopic?: boolean;
+  loading?: boolean;
 }
 
 class Glossarium extends React.PureComponent<{}, MState> {
+  glossariumAPI: any;
+
   constructor(props: {}) {
     super(props);
+    this.glossariumAPI = new GlossariumAPI();
     this.state = {
       evaluateInputText: '',
       selectedText: '',
       information: '',
       wikipediaThumbnailUrl: '',
       wikipediaReadMoreUrl: '',
-      foundOnWikipedia: undefined
+      foundOnWikipedia: undefined,
+      topicDescription: '',
+      topicAbbreviation: '',
+      topicCanonicalName: '',
+      topicSource: '',
+      customTopic: false,
+      loading: false
     }
   }
 
+  // TODO: don't make text selection work everywhere, only in pdf reader text.
+  // TODO: remove old data when new query
   evaluateSelection = (e: any) => {
     e.preventDefault(); // Stops page on refreshing (onSubmit)
-    const query = this.state.evaluateInputText;
-    const endpoint = "https://nl.wikipedia.org/w/api.php?action=query&prop=extracts%7Cpageprops&exintro&explaintext&origin=*&format=json&titles=" + query;
-
-    // const endpoint = "https://en.wikipedia.org/w/api.php?action=query&list=search&prop=info&inprop=url&utf8=&format=json&origin=*&srlimit=20&srsearch=" + query;
-
-    const url = new URL(window.location.origin);
-    url.pathname = "/topics_api/dev/custom"
-    url.port = SERVER_PORT.toString();
-    console.log(url.toString());
-
-    fetch(url.toString()).then(response => {
-      console.log(response);
-      return response.json();
-    }).then(data => {
-      console.log(data);
-    }).catch(error => {
-      console.log(error);
-    })
-
-
-    fetch(endpoint).then(function (response) {
-      return response.json();
-    }).then(data => {
-      const page = data.query.pages[Object.keys(data.query.pages)[0]];
-      if (Object.keys(data.query.pages)[0] == "-1") {
-        this.setState({
-          foundOnWikipedia: false
-        });
-        return
-      }
-      const extract = page.extract;
-      const title = page.title;
-
-      const pictureUrl = "https://nl.wikipedia.org/w/api.php?action=query&titles=" + title +"&prop=pageimages&format=json&origin=*&pithumbsize=200"
-      fetch(pictureUrl).then(response => {
-        return response.json();
-      }).then(data => {
-        console.log(data);
-        const page = data.query.pages[Object.keys(data.query.pages)[0]];
-        const thumbnailUrl = page.thumbnail.source;
-        this.setState({
-          wikipediaThumbnailUrl: thumbnailUrl
-        })
-      }).catch(() => {
-        console.log("Could not get thumbnail");
-      })
-
-      this.setState({
-        information: extract,
-        wikipediaReadMoreUrl: "https://nl.wikipedia.org/wiki/" + title,
-        foundOnWikipedia: true
-      });
-    }).catch((e) => {
-      this.setState({
-        foundOnWikipedia: false
-      })
-      console.log('An error occured', e);
+    this.setState({
+      loading: true,
+      foundOnWikipedia: false,
+      information: "",
+      wikipediaReadMoreUrl: "",
+      wikipediaThumbnailUrl: "",
+      topicAbbreviation: "",
+      topicCanonicalName: "",
+      topicDescription: "",
+      topicSource: ""
     });
+    let wikipediaQuery: any;
+    let customTopic: any = false;
+    const inputText = this.state.evaluateInputText;
+
+    // documentSectionAnnotations is a list of surface forms
+    const documentSectionAnnotations = myPersistedState<any>("orisearch.pdfviewer.documentSectionAnnotations", []);
+
+    if (documentSectionAnnotations.length == 0) {
+      wikipediaQuery = inputText;
+    }
+
+    documentSectionAnnotations.map((surface_form: any) => {
+      if (surface_form.name == inputText) {
+        // Get top candidate
+        if (surface_form.candidates[0].topic_id == null) {
+          wikipediaQuery = surface_form.candidates[0].label;
+        } else {
+          customTopic = surface_form.candidates[0].topic_id;
+          for (let candidate of surface_form.candidates) {
+            if (candidate.topic_id == null) {
+              wikipediaQuery = candidate.label;
+              break;
+            }
+          }
+          if (wikipediaQuery == null) {
+            wikipediaQuery = inputText;
+          }
+        }
+      }
+    });
+
+    if (wikipediaQuery == undefined) {
+      wikipediaQuery = inputText;
+    }
+
+    this.glossariumAPI.getWikipediaSummary(wikipediaQuery).then((result: any) => {
+      console.log(wikipediaQuery, result);
+      if (result) {
+        // Only set thumbnail if available
+
+        if (result[1]) {
+          this.setState({
+            wikipediaThumbnailUrl: result[1],
+          })
+        }
+
+        this.setState({
+          foundOnWikipedia: true,
+          information: result[0],
+          wikipediaReadMoreUrl: result[2]
+        })
+      } else {
+        this.setState({
+          foundOnWikipedia: false,
+          information: "Did not find topic",
+          wikipediaThumbnailUrl: "",
+        });
+      }
+    });
+
+    console.log(customTopic);
+
+    if (customTopic) {
+      this.glossariumAPI.getTopic(customTopic).then((response: any) => {
+        console.log(response);
+        let topicSource = "";
+        if (response.sources.length > 0) {
+          topicSource = "https://id.openraadsinformatie.nl/" + response.sources[0]
+        }
+
+        this.setState({
+          topicDescription: response.description,
+          topicAbbreviation: response.abbrevation,
+          topicCanonicalName: response.canonical_name,
+          topicSource: topicSource,
+          customTopic: true,
+          loading: false
+        });
+      })
+    } else {
+      this.setState({
+        loading: false,
+        topicDescription: "Geen custom topic gevonden."
+      })
+    }
+
   }
 
   onChange = (e: React.FormEvent<HTMLInputElement>) => {
@@ -96,6 +151,7 @@ class Glossarium extends React.PureComponent<{}, MState> {
   }
 
   componentDidMount() {
+    //let pdfViewer = document.getElementsByClassName("PDFViewer");
     document.addEventListener('selectionchange', this.updateSelection);
     this.updateSelection();
   }
@@ -134,24 +190,22 @@ class Glossarium extends React.PureComponent<{}, MState> {
             </form>
           </div>
 
-          <div className="definition-container">
+          {!this.state.loading && <div className="definition-container">
             <div className="definition-title">
-              <b>[canonical_name] ([abbreviation])</b>
+              {this.state.customTopic == true && <b>{this.state.topicCanonicalName} + ({this.state.topicAbbreviation})</b>}
             </div>
-            {/* <div className="definition-source">
-              <i>Link naar bron</i>
-              <p>... de toetsende partijen zoals <b>Inspectie Leefomgeving en Transport (ILT)</b> en de Regionale Uitvoeringsdiesnt (RUD) moet verder gepland ...</p>
-            </div> */}
             <div className="definition">
-              <i>Link naar bron</i>
-              <p>[description]</p>
+              {this.state.customTopic == true && <a href={this.state.topicSource}>Bron</a>}
+              <p>{this.state.topicDescription}</p>
             </div>
-          </div>
+          </div>}
+
+          {this.state.loading && <div className="definition-container">Zoeken...</div>}
 
           <div className="linked-data-container">
             <div className="wiki-summary">
               {this.state.foundOnWikipedia == true && <p>{this.state.information}</p>}
-              {this.state.foundOnWikipedia == false && <p>Did not find topic on wikipedia.</p>}
+              {this.state.foundOnWikipedia == false && this.state.loading && <p>Zoeken...</p>}
               {this.state.wikipediaReadMoreUrl && <p className="read-more"><a href={this.state.wikipediaReadMoreUrl} target="_blank" rel="noopener noreferrer">View on wikipedia</a></p>}
             </div>
             <div className="descriptive-image">

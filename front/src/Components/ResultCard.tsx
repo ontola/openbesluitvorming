@@ -2,7 +2,7 @@ import * as React from "react";
 
 import { ORIItemType } from "../types";
 import { RouteComponentProps, withRouter } from "react-router";
-import { getParams, openResource } from "../helpers";
+import { getParams, openResource, usePersistedState } from "../helpers";
 import paths from "../paths";
 import Document from "./Cards/Document";
 import Meeting from "./Cards/Meeting";
@@ -45,11 +45,24 @@ const ResultCard: React.FunctionComponent<ResultCardProps & RouteComponentProps>
     (props["@id"] && (currentResource === paths.oriId(props["@id"])))
       ? "ResultCard--active" : "" }`;
 
+  const [documentID, setDocumentID] = 
+    usePersistedState<string>("orisearch.pdfviewer.documentID", "");
+  console.log(documentID);
+  
+  if (currentResource) {
+    
+  }
+  
+
   const header = props.name || props.label || props.title || "Geen naam";
   return (
     <div key={props["@id"]} className={className}>
       <Button
-        onClick={() => openResource((paths.oriId(props["@id"]) || ""), props.history)}
+        onClick={() => {
+          openResource((paths.oriId(props["@id"]) || ""), props.history);
+          // setDocumentID(props["@id"]);
+          setDocumentID("34225");
+        }}
       >
         <h2 dangerouslySetInnerHTML={{ __html: `${header}` }}/>
       </Button>

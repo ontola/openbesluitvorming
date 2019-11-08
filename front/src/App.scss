@@ -891,38 +891,15 @@ mark {
 }
 
 
-.glossarium-container > .definition-container > .definition-source {
-  // border: 1px dashed black;
-  height: 40%;
-  overflow: hidden;
-  position: relative;
-}
-
-.glossarium-container > .definition-container > .definition-source > i {
-  display: inline-block;
-  width: 15%;
-}
-
-.glossarium-container > .definition-container > .definition-source > p {
-  display: inline-block;
-  width: 75%;
-}
-
 .glossarium-container > .definition-container > .definition {
   // border: 1px dashed black;
-  height: 40%;
   overflow: hidden;
   position: relative;
-}
-
-.glossarium-container > .definition-container > .definition > i {
-  display: inline-block;
-  width: 15%;
 }
 
 .glossarium-container > .definition-container > .definition > p {
   display: inline-block;
-  width: 75%;
+  width: 100%;
 }
 
 

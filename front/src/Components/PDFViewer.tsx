@@ -17,6 +17,8 @@ import { keyMap } from "../helpers/keyMap";
 import { Property } from "link-redux";
 import { NS } from "../LRS";
 import Glossarium from './Glossarium';
+import GlossariumAPI from './GlossariumAPI';
+import { usePersistedState } from '../helpers';
 
 // eslint-disable-next-line
 const { Document, Page, pdfjs } = require("react-pdf");
@@ -57,6 +59,8 @@ export const LoadingComponent = () =>
     <FontAwesomeIcon icon={faSpinner} size="6x" spin />
   </div>;
 
+const glossariumAPI = new GlossariumAPI();
+
 const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
   const [pageNumber, setPageNumber] = React.useState<number>(1);
   const [docRef, setDocRef] = React.useState<any>(null);
@@ -69,11 +73,19 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
   const glossIsOpen =
     myPersistedState<boolean>("orisearch.pdfviewer.glossariumOpened", false);
 
+  const setDocumentSectionAnnotations = 
+    usePersistedState<any>("orisearch.pdfviewer.documentSectionAnnotations", [])[1]
+
+  // const documentID_ = myPersistedState<string>("orisearch.pdfviewer.documentID", "");
+  const documentID = "34225";
+  let wordhoardNames: Array<string> = ["orid:" + documentID];
+
   const handlePreviousPage = () => {
     if (pageNumber === 1) {
       return;
     }
     setPageNumber(pageNumber - 1);
+    getDocAnnotations();
   };
 
   const handleNextPage = () => {
@@ -81,7 +93,26 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
       return;
     }
     setPageNumber(pageNumber + 1);
+    getDocAnnotations();
   };
+
+  const getDocAnnotations = () => {
+    glossariumAPI.getAgendaItemFromDocID(documentID).then((id: any) => {
+      if (id) {
+        wordhoardNames.push(id);
+      } 
+    }).then(() => {
+      glossariumAPI.getWordhoardList(wordhoardNames).then((result: any) => {
+        let wordhoardIDs = result.items.map((item:any) => {
+          return item.id;
+        })
+        glossariumAPI.getDocumentSectionAnnotations("orid:" + documentID, pageNumber, wordhoardIDs).then(result => {
+          console.log(result.surface_forms);
+          setDocumentSectionAnnotations(result.surface_forms);
+        });
+      }); 
+    });
+  }
 
   function focusOnViewer() {
     if (pdfWrapper.current !== null) {
@@ -103,6 +134,7 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
     setNumPages(e.numPages);
     setPageNumber(1);
     setShowButtons(true);
+    getDocAnnotations();
   };
 
   const PDFErrorComponent = (error: any) => {
