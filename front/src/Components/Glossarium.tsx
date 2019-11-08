@@ -9,6 +9,7 @@ interface MState {
   evaluateInputText?: string;
   information?: string;
   wikipediaThumbnailUrl?: string;
+  wikipediaTitle?: string;
   wikipediaReadMoreUrl?: string;
   foundOnWikipedia?: boolean;
   topicDescription?: string;
@@ -52,6 +53,7 @@ class Glossarium extends React.PureComponent<{}, MState> {
       information: "",
       wikipediaReadMoreUrl: "",
       wikipediaThumbnailUrl: "",
+      wikipediaTitle: "",
       topicAbbreviation: "",
       topicCanonicalName: "",
       topicDescription: "",
@@ -95,16 +97,16 @@ class Glossarium extends React.PureComponent<{}, MState> {
     this.glossariumAPI.getWikipediaSummary(wikipediaQuery).then((result: any) => {
       if (result) {
         // Only set thumbnail if available
-        if (result[1]) {
+        if (result.imageURL) {
           this.setState({
-            wikipediaThumbnailUrl: result[1],
+            wikipediaThumbnailUrl: result.imageURL,
           })
         }
-
         this.setState({
           foundOnWikipedia: true,
-          information: result[0],
-          wikipediaReadMoreUrl: result[2]
+          information: result.extract,
+          wikipediaReadMoreUrl: result.readmoreURL,
+          wikipediaTitle: result.title,
         })
       } else {
         this.setState({
@@ -209,12 +211,12 @@ class Glossarium extends React.PureComponent<{}, MState> {
           <div className="selection-container">
             <h1>Huidige selectie</h1>
             <form onSubmit={this.evaluateSelection}>
-              <input 
+              <input
                 className="selected-text"
                 value={this.state.evaluateInputText}
-                onChange={this.onChange}/>   
+                onChange={this.onChange}/>
               <Button className="evaluate-selection-button">
-                  Evaluate
+                  Verzenden
               </Button>
             </form>
           </div>
@@ -224,7 +226,7 @@ class Glossarium extends React.PureComponent<{}, MState> {
               {this.state.customTopic == true && <b>{this.state.topicCanonicalName} + ({this.state.topicAbbreviation})</b>}
             </div>
             <div className="definition" id="glossary_item_definition">
-              {this.state.customTopic == true && <a href={this.state.topicSource}>Bron</a>}
+              {this.state.customTopic == true && <a href={this.state.topicSource} target="_blank" rel="noopener noreferrer">Bron</a>}
               <p>{this.state.topicDescription}</p>
             </div>
           </div>}
@@ -235,10 +237,10 @@ class Glossarium extends React.PureComponent<{}, MState> {
             <div className="wiki-summary">
               {this.state.foundOnWikipedia == true && <p>{this.state.information}</p>}
               {this.state.foundOnWikipedia == false && this.state.loading && <p>Zoeken...</p>}
-              {this.state.wikipediaReadMoreUrl && <p className="read-more"><a href={this.state.wikipediaReadMoreUrl} target="_blank" rel="noopener noreferrer">View on wikipedia</a></p>}
+              {this.state.wikipediaReadMoreUrl && <p className="read-more"><a href={this.state.wikipediaReadMoreUrl} target="_blank" rel="noopener noreferrer">Lees verder op Wikipedia</a></p>}
             </div>
             <div className="descriptive-image">
-              <img className="wiki-image" src={this.state.wikipediaThumbnailUrl}></img>
+              {this.state.wikipediaThumbnailUrl && <img className="wiki-image" src={this.state.wikipediaThumbnailUrl} alt={"afbeelding van " + this.state.wikipediaTitle} />}
             </div>
           </div>
         </div>
