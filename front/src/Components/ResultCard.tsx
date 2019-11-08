@@ -55,8 +55,8 @@ const ResultCard: React.FunctionComponent<ResultCardProps & RouteComponentProps>
       <Button
         onClick={() => {
           openResource((paths.oriId(props["@id"]) || ""), props.history);
-          // setDocumentID(props["@id"]);
-          setDocumentID("34225");
+          setDocumentID(props["@id"]);
+          // setDocumentID("32330");
         }}
       >
         <h2 dangerouslySetInnerHTML={{ __html: `${header}` }}/>
