@@ -62,36 +62,37 @@ class Glossarium extends React.PureComponent<{}, MState> {
     let wikipediaQuery: any;
     let customTopic: any = false;
     const inputText = this.state.evaluateInputText;
+    const cleanInput = inputText && inputText.trim();
 
     // documentSectionAnnotations is a list of surface forms
     const documentSectionAnnotations = myPersistedState<any>("orisearch.pdfviewer.documentSectionAnnotations", []);
 
-    if (documentSectionAnnotations.length == 0) {
-      wikipediaQuery = inputText;
+    if (documentSectionAnnotations.length === 0) {
+      wikipediaQuery = cleanInput;
     }
 
     documentSectionAnnotations.map((surface_form: any) => {
-      if (surface_form.name == inputText) {
+      if (cleanInput && surface_form.name.toLowerCase() === cleanInput.toLowerCase()) {
         // Get top candidate
-        if (surface_form.candidates[0].topic_id == null) {
+        if (surface_form.candidates[0].topic_id === null) {
           wikipediaQuery = surface_form.candidates[0].label;
         } else {
           customTopic = surface_form.candidates[0].topic_id;
           for (const candidate of surface_form.candidates) {
-            if (candidate.topic_id == null) {
+            if (candidate.topic_id === null) {
               wikipediaQuery = candidate.label;
               break;
             }
           }
-          if (wikipediaQuery == null) {
-            wikipediaQuery = inputText;
+          if (wikipediaQuery === null) {
+            wikipediaQuery = cleanInput;
           }
         }
       }
     });
 
-    if (wikipediaQuery == undefined) {
-      wikipediaQuery = inputText;
+    if (wikipediaQuery === undefined) {
+      wikipediaQuery = cleanInput;
     }
 
     this.glossariumAPI.getWikipediaSummary(wikipediaQuery).then((result: any) => {
@@ -111,7 +112,7 @@ class Glossarium extends React.PureComponent<{}, MState> {
       } else {
         this.setState({
           foundOnWikipedia: false,
-          information: "Did not find topic",
+          information: "Onderwerp niet gevonden",
           wikipediaThumbnailUrl: "",
         });
       }
