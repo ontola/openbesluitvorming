@@ -62,7 +62,7 @@ export const LoadingComponent = () =>
 const glossariumAPI = new GlossariumAPI();
 
 const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
-  const [pageNumber, setPageNumber] = React.useState<number>(1);
+  const [pageNumber, setPageNumber] = React.useState<number>(0);
   const [docRef, setDocRef] = React.useState<any>(null);
   const [numPages, setNumPages] = React.useState<number>(0);
   const [maxWidth] = React.useState<number>(calcMaxWidth(window.innerWidth));
@@ -95,7 +95,6 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
           } else {
             setDocumentSectionAnnotations([]);
           }
-
         });
       });
     });

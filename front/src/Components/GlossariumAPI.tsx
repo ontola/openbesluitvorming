@@ -2,11 +2,11 @@ import { SERVER_PORT } from "../config";
 
 
 class GlossariumAPI {
-  getDocumentSectionAnnotations = async (documentName: string, pageNumber: number, wordhoardIDs: any[]) => {
+  getDocumentSectionAnnotations = async (documentName: string, sectionNumber: number, wordhoardIDs: any[]) => {
     const documentAnnotationsURL = new URL(window.location.origin);
     documentAnnotationsURL.port = SERVER_PORT.toString();
 
-    documentAnnotationsURL.pathname = "/topics_api/dev/document/" + documentName + "/" + (pageNumber - 1) + "/annotations/";
+    documentAnnotationsURL.pathname = "/topics_api/dev/document/" + documentName + "/" + sectionNumber + "/annotations/";
     for (const wid of wordhoardIDs) {
       documentAnnotationsURL.searchParams.append("wordhoard_id", wid);
     }
