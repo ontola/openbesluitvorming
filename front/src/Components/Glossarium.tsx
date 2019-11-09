@@ -136,7 +136,7 @@ class Glossarium extends React.PureComponent<{}, MState> {
     } else {
       this.setState({
         loading: false,
-        topicDescription: "Geen custom topic gevonden."
+        topicDescription: "Geen definitie in documenten gevonden."
       })
     }
 

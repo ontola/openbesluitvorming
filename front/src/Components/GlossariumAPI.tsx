@@ -6,7 +6,7 @@ class GlossariumAPI {
     const documentAnnotationsURL = new URL(window.location.origin);
     documentAnnotationsURL.port = SERVER_PORT.toString();
 
-    documentAnnotationsURL.pathname = "/topics_api/dev/document/" + documentName + "/" + pageNumber + "/annotations/";
+    documentAnnotationsURL.pathname = "/topics_api/dev/document/" + documentName + "/" + (pageNumber - 1) + "/annotations/";
     for (const wid of wordhoardIDs) {
       documentAnnotationsURL.searchParams.append("wordhoard_id", wid);
     }
