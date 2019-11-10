@@ -168,7 +168,7 @@ class Glossarium extends React.PureComponent<{}, MState> {
   componentDidMount() {
     document.addEventListener('selectionchange', this.selectionChangeCallback);
 
-    let pdfViewer = document.getElementById("PDFViewer");
+    const pdfViewer = document.getElementById("PDFViewer");
     if (pdfViewer) {
       pdfViewer.addEventListener('selectstart', () => {
         this.setState({
@@ -178,7 +178,7 @@ class Glossarium extends React.PureComponent<{}, MState> {
       });
     }
 
-    let glossaryDescription = document.getElementById("glossary_item_definition");
+    const glossaryDescription = document.getElementById("glossary_item_definition");
     if (glossaryDescription) {
       glossaryDescription.addEventListener('selectstart', () => {
         this.setState({
@@ -187,14 +187,14 @@ class Glossarium extends React.PureComponent<{}, MState> {
         document.addEventListener('mouseup', this.selectionEnd);
       });
     }
-  };
+  }
 
   componentWillUnmount() {
-    let pdfViewer = document.getElementById("PDFViewer");
+    const pdfViewer = document.getElementById("PDFViewer");
     if (pdfViewer) {
       pdfViewer.removeEventListener('selectionchange', this.selectionChangeCallback);
     }
-    let glossaryDescription = document.getElementById("glossary_item_definition");
+    const glossaryDescription = document.getElementById("glossary_item_definition");
     if (glossaryDescription) {
       glossaryDescription.removeEventListener('selectionchange', this.selectionChangeCallback);
     }
