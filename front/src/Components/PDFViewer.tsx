@@ -101,12 +101,22 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
     });
   }
 
+  const uglyStyleSetting = () => {
+    // TODO: Dit is jammer maar het moet nou eenmaal. (component integratie)
+    const ugly = document.getElementsByClassName("react-pdf__Page__textContent")[0] as HTMLElement;
+    if (ugly !== undefined) {
+      ugly.style.width = "100%";
+      console.log("gelukt!");
+    }
+  }
+
   const handlePreviousPage = () => {
     if (pageNumber === 1) {
       return;
     }
     setPageNumber(pageNumber - 1);
     getDocAnnotations();
+    setTimeout(uglyStyleSetting, 100);
   };
 
   const handleNextPage = () => {
@@ -115,6 +125,7 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
     }
     setPageNumber(pageNumber + 1);
     getDocAnnotations();
+    setTimeout(uglyStyleSetting, 100);
   };
 
   function focusOnViewer() {
@@ -138,6 +149,7 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
     setPageNumber(1);
     setShowButtons(true);
     getDocAnnotations();
+    setTimeout(uglyStyleSetting, 100);
   };
 
   const PDFErrorComponent = (error: any) => {
