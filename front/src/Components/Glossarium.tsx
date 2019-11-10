@@ -17,6 +17,7 @@ interface MState {
   topicSource?: string;
   customTopic?: boolean;
   loading?: boolean;
+  selectingText?: boolean;
 }
 
 class Glossarium extends React.PureComponent<{}, MState> {
@@ -92,10 +93,8 @@ class Glossarium extends React.PureComponent<{}, MState> {
     }
 
     this.glossariumAPI.getWikipediaSummary(wikipediaQuery).then((result: any) => {
-      console.log(wikipediaQuery, result);
       if (result) {
         // Only set thumbnail if available
-
         if (result[1]) {
           this.setState({
             wikipediaThumbnailUrl: result[1],
@@ -116,11 +115,8 @@ class Glossarium extends React.PureComponent<{}, MState> {
       }
     });
 
-    console.log(customTopic);
-
     if (customTopic) {
       this.glossariumAPI.getTopic(customTopic).then((response: any) => {
-        console.log(response);
         let topicSource = "";
         if (response.sources.length > 0) {
           topicSource = "https://id.openraadsinformatie.nl/" + response.sources[0]
@@ -150,26 +146,59 @@ class Glossarium extends React.PureComponent<{}, MState> {
     })
   }
 
-  componentDidMount() {
-    //let pdfViewer = document.getElementsByClassName("PDFViewer");
-    document.addEventListener('selectionchange', this.updateSelection);
-    this.updateSelection();
+  selectionChangeCallback = () => {
+    if (this.state.selectingText) {
+      const selection = document.getSelection();
+      if (selection) {
+        this.setState({
+          selectedText: selection.toString(),
+          evaluateInputText: selection.toString()
+        });
+      }
+    }
   }
 
-  updateSelection = () => {
-    let sel = {};
-    
-    const selected = document.getSelection();
-    if (selected !== null) {
-      sel = selected;
+  selectionEnd = () => {
+    document.removeEventListener('mouseup', this.selectionEnd);
+    this.setState({
+      selectingText: false
+    });
+  }
+
+  componentDidMount() {
+    document.addEventListener('selectionchange', this.selectionChangeCallback);
+
+    let pdfViewer = document.getElementById("PDFViewer");
+    if (pdfViewer) {
+      pdfViewer.addEventListener('selectstart', () => {
+        this.setState({
+          selectingText: true
+        });
+        document.addEventListener('mouseup', this.selectionEnd);
+      });
     }
 
-    if (sel.toString() !== '') {
-      this.setState({
-        selectedText: sel.toString(),
-        evaluateInputText: sel.toString()
-      })
+    let glossaryDescription = document.getElementById("glossary_item_definition");
+    if (glossaryDescription) {
+      glossaryDescription.addEventListener('selectstart', () => {
+        this.setState({
+          selectingText: true
+        });
+        document.addEventListener('mouseup', this.selectionEnd);
+      });
     }
+  };
+
+  componentWillUnmount() {
+    let pdfViewer = document.getElementById("PDFViewer");
+    if (pdfViewer) {
+      pdfViewer.removeEventListener('selectionchange', this.selectionChangeCallback);
+    }
+    let glossaryDescription = document.getElementById("glossary_item_definition");
+    if (glossaryDescription) {
+      glossaryDescription.removeEventListener('selectionchange', this.selectionChangeCallback);
+    }
+    document.removeEventListener('selectionchange', this.selectionChangeCallback);
   }
 
 
@@ -194,7 +223,7 @@ class Glossarium extends React.PureComponent<{}, MState> {
             <div className="definition-title">
               {this.state.customTopic == true && <b>{this.state.topicCanonicalName} + ({this.state.topicAbbreviation})</b>}
             </div>
-            <div className="definition">
+            <div className="definition" id="glossary_item_definition">
               {this.state.customTopic == true && <a href={this.state.topicSource}>Bron</a>}
               <p>{this.state.topicDescription}</p>
             </div>

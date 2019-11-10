@@ -10,9 +10,13 @@ class GlossariumAPI {
     for (const wid of wordhoardIDs) {
       documentAnnotationsURL.searchParams.append("wordhoard_id", wid);
     }
-    console.log("getDocSecAnn:", documentAnnotationsURL.toString());
-    const response = await fetch(documentAnnotationsURL.toString());
-    return await response.json();
+    try {
+      const response = await fetch(documentAnnotationsURL.toString());
+      const mjson = await response.json();
+      return mjson;
+    } catch(e) {
+      return {surface_forms: []}
+    }
   }
 
   getWordhoardList = async(names: any[]) => {
@@ -23,22 +27,30 @@ class GlossariumAPI {
     for (const name of names) {
       wordhoardURL.searchParams.append("name", name + "_definitions");
     }
-    const response = await fetch(wordhoardURL.toString() + "/");
-    return await response.json();
+    try {
+      const response = await fetch(wordhoardURL.toString() + "/");
+      return await response.json();
+    } catch(e) {
+      return [];
+    }
   }
 
   getTopic = async (uuid: string) => {
     // Get the whole list and find it, because of unknown issue.
+    // TODO: fix this
     const topicURL2 = new URL(window.location.origin);
     topicURL2.port = SERVER_PORT.toString();
 
     topicURL2.pathname = "/topics_api/dev/custom/topic/";
-    const response = await fetch(topicURL2.toString());
-    const json = await response.json();
+    try {
+      const response = await fetch(topicURL2.toString());
+      const json = await response.json();
 
-    const topic = json.topics.find((topic: any) => { return topic.id == uuid})
-    return topic;
-    // console.log(topic);
+      const topic = json.topics.find((topic: any) => { return topic.id == uuid})
+      return topic;
+    } catch(e) {
+      return {}
+    }
 
     // let topicURL = new URL(window.location.origin);
     // topicURL.port = SERVER_PORT.toString();
@@ -50,17 +62,21 @@ class GlossariumAPI {
 
   getWikipediaSummary = async (query: string): Promise<any> => {
     const apiQuery = "https://nl.wikipedia.org/w/api.php?action=query&prop=extracts%7Cpageprops&exintro&explaintext&origin=*&format=json&titles=" + query;
-    const response = await fetch(apiQuery);
-    const data = await response.json();
-    const firstPageKey = Object.keys(data.query.pages)[0]
-    const page = data.query.pages[firstPageKey];
-    if (firstPageKey == "-1") {
+    try {
+      const response = await fetch(apiQuery);
+      const data = await response.json();
+      const firstPageKey = Object.keys(data.query.pages)[0]
+      const page = data.query.pages[firstPageKey];
+      if (firstPageKey == "-1") {
+        return false;
+      }
+      const extract: string = page.extract;
+      const imageURL = await this.getWikipediaImageURL(page.title);
+      const readmoreURL = "https://nl.wikipedia.org/wiki/" + page.title;
+      return [extract, imageURL, readmoreURL];
+    } catch(e) {
       return false;
     }
-    const extract: string = page.extract;
-    const imageURL = await this.getWikipediaImageURL(page.title);
-    const readmoreURL = "https://nl.wikipedia.org/wiki/" + page.title;
-    return [extract, imageURL, readmoreURL];
   }
 
   getWikipediaImageURL = async (query: string): Promise<any> => {
@@ -78,9 +94,9 @@ class GlossariumAPI {
 
   getAgendaItemFromDocID = async (id: string): Promise<any> => {
     const query = "https://id.openraadsinformatie.nl/" + id + ".jsonld";
-    const response = await fetch(query);
-    const data = await response.json();
     try {
+      const response = await fetch(query);
+      const data = await response.json();
       return data["dc:isReferencedBy"]["@id"]
     } catch (e) {
       return false;

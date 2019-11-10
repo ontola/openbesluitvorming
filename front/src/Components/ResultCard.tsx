@@ -45,9 +45,7 @@ const ResultCard: React.FunctionComponent<ResultCardProps & RouteComponentProps>
     (props["@id"] && (currentResource === paths.oriId(props["@id"])))
       ? "ResultCard--active" : "" }`;
 
-  const [documentID, setDocumentID] = 
-    usePersistedState<string>("orisearch.pdfviewer.documentID", "");
-  console.log(documentID);
+  const setDocumentID = usePersistedState<string>("orisearch.pdfviewer.documentID", "")[1];
 
   const header = props.name || props.label || props.title || "Geen naam";
   return (
@@ -55,8 +53,7 @@ const ResultCard: React.FunctionComponent<ResultCardProps & RouteComponentProps>
       <Button
         onClick={() => {
           openResource((paths.oriId(props["@id"]) || ""), props.history);
-          setDocumentID(props["@id"]);
-          // setDocumentID("32330");
+          setDocumentID(props["@id"]); // TODO: this code should work differently.
         }}
       >
         <h2 dangerouslySetInnerHTML={{ __html: `${header}` }}/>

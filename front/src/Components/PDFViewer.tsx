@@ -77,7 +77,6 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
     usePersistedState<any>("orisearch.pdfviewer.documentSectionAnnotations", [])[1]
 
   const documentID = myPersistedState<string>("orisearch.pdfviewer.documentID", "");
-  // const documentID = "32330";
   const wordhoardNames: string[] = ["orid:" + documentID];
 
   const getDocAnnotations = () => {
@@ -91,8 +90,12 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
           return item.id;
         })
         glossariumAPI.getDocumentSectionAnnotations("orid:" + documentID, pageNumber, wordhoardIDs).then(result => {
-          console.log(result.surface_forms);
-          setDocumentSectionAnnotations(result.surface_forms);
+          if (result.surface_forms) {
+            setDocumentSectionAnnotations(result.surface_forms);
+          } else {
+            setDocumentSectionAnnotations([]);
+          }
+          
         });
       }); 
     });
@@ -218,7 +221,7 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
       handlers={keyHandlers}
       ref={() => pdfWrapper}
     >
-      <div className="PDFViewer">
+      <div className="PDFViewer" id="PDFViewer">
         <div className="PDFViewer__scroller">
           {/* This component catches focus on Opening and deals with keys */}
           <div
