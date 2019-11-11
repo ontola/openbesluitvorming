@@ -82,10 +82,10 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
 
   const getDocAnnotations = () => {
     glossariumAPI.findSuperItems(documentID).then((oridList: any[]) => {
-      for (let orid of oridList) {
+      for (const orid of oridList) {
         if (orid) {
-          let definitionsWordhoardName = "orid:" + orid + "_definitions";
-          let abbreviationsWordhoardName = "orid:" + orid + "_abbreviations";
+          const definitionsWordhoardName = "orid:" + orid + "_definitions";
+          const abbreviationsWordhoardName = "orid:" + orid + "_abbreviations";
           wordhoardNames.push(definitionsWordhoardName);
           wordhoardNames.push(abbreviationsWordhoardName);
         }
