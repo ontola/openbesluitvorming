@@ -36,28 +36,12 @@ class GlossariumAPI {
   };
 
   getTopic = async (uuid: string) => {
-    // Get the whole list and find it, because of unknown issue.
-    // TODO: fix this
-    const topicURL2 = new URL(window.location.origin);
-    topicURL2.port = SERVER_PORT.toString();
+    let topicURL = new URL(window.location.origin);
+    topicURL.port = SERVER_PORT.toString();
 
-    topicURL2.pathname = "/topics_api/dev/custom/topic/";
-    try {
-      const response = await fetch(topicURL2.toString());
-      const json = await response.json();
-
-      const topic = json.topics.find((topic: any) => { return topic.id == uuid});
-      return topic;
-    } catch(e) {
-      return {}
-    }
-
-    // let topicURL = new URL(window.location.origin);
-    // topicURL.port = SERVER_PORT.toString();
-
-    // topicURL.pathname = "/topics_api/dev/custom/topic/" + uuid;
-    // var response = await fetch(topicURL.toString());
-    // return await response.json();
+    topicURL.pathname = "/topics_api/dev/custom/topic/" + uuid + "/";
+    const response = await fetch(topicURL.toString());
+    return await response.json();
   };
 
   getWikipediaSummary = async (query: string): Promise<any> => {
