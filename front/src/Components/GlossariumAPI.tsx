@@ -25,13 +25,13 @@ class GlossariumAPI {
 
     wordhoardURL.pathname = "/topics_api/dev/custom/wordhoard/";
     for (const name of names) {
-      wordhoardURL.searchParams.append("name", name + "_definitions");
+      wordhoardURL.searchParams.append("name", name);
     }
     try {
       const response = await fetch(wordhoardURL.toString() + "/");
       return await response.json();
     } catch(e) {
-      return [];
+      return {items: []};
     }
   }
 

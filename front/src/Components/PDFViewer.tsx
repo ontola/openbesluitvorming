@@ -77,27 +77,33 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
     usePersistedState<any>("orisearch.pdfviewer.documentSectionAnnotations", [])[1]
 
   const documentID = myPersistedState<string>("orisearch.pdfviewer.documentID", "");
-  const wordhoardNames: string[] = ["orid:" + documentID];
+  const wordhoardNames: string[] = ["orid:" + documentID + "_definitions", "orid:" + documentID + "_abbreviations"];
+
 
   const getDocAnnotations = () => {
-    glossariumAPI.getAgendaItemFromDocID(documentID).then((orid: any) => {
-      if (orid) {
-        wordhoardNames.push(orid);
-      } 
+    glossariumAPI.findSuperItems(documentID).then((oridList: any[]) => {
+      for (let orid of oridList) {
+        if (orid) {
+          let definitionsWordhoardName = "orid:" + orid + "_definitions";
+          let abbreviationsWordhoardName = "orid:" + orid + "_abbreviations";
+          wordhoardNames.push(definitionsWordhoardName);
+          wordhoardNames.push(abbreviationsWordhoardName);
+        }
+      }
     }).then(() => {
-      glossariumAPI.getWordhoardList(wordhoardNames).then((result: any) => {
-        const wordhoardIDs = result.items.map((item: any) => {
+      glossariumAPI.getWordhoardList(wordhoardNames).then((wListResponse: any) => {
+        const wordhoardIDs = wListResponse.items.map((item: any) => {
           return item.id;
-        })
-        glossariumAPI.getDocumentSectionAnnotations("orid:" + documentID, pageNumber, wordhoardIDs).then(result => {
-          if (result.surface_forms) {
-            setDocumentSectionAnnotations(result.surface_forms);
+        });
+
+        glossariumAPI.getDocumentSectionAnnotations("orid:" + documentID, pageNumber, wordhoardIDs).then(response => {
+          if (response.surface_forms) {
+            setDocumentSectionAnnotations(response.surface_forms);
           } else {
             setDocumentSectionAnnotations([]);
           }
-          
         });
-      }); 
+      });
     });
   }
 
