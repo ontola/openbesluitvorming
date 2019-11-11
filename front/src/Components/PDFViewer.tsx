@@ -80,9 +80,9 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
   const wordhoardNames: string[] = ["orid:" + documentID];
 
   const getDocAnnotations = () => {
-    glossariumAPI.getAgendaItemFromDocID(documentID).then((id: any) => {
-      if (id) {
-        wordhoardNames.push(id);
+    glossariumAPI.getAgendaItemFromDocID(documentID).then((orid: any) => {
+      if (orid) {
+        wordhoardNames.push(orid);
       } 
     }).then(() => {
       glossariumAPI.getWordhoardList(wordhoardNames).then((result: any) => {

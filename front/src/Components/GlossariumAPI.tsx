@@ -102,6 +102,60 @@ class GlossariumAPI {
       return false;
     }
   }
+
+
+  findSuperItems = async (documentID: string): Promise<any> => {
+    let parentORID;
+    let parentData;
+    let committeeORID;
+    let grandparentORID;
+    let meetingItemData;
+
+    try {
+      const docJson = await this.getLinkedData(documentID);
+      parentORID = docJson["dc:isReferencedBy"]["@id"].split(":")[1];
+    } catch(e) {
+      return [null, null, null];
+    }
+
+    try {
+      parentData = await this.getLinkedData(parentORID);
+    } catch(e) {
+      return [parentORID, null, null];
+    }
+
+    try {
+      committeeORID = parentData["meeting:committee"]["@id"].split(":")[1];
+    } catch(e) {
+      committeeORID = null;
+    }
+
+    try {
+      grandparentORID = parentData["schema:superEvent"]["@id"].split(":")[1];
+    } catch(e) {
+      return [parentORID, null, committeeORID];
+    }
+
+    try {
+      meetingItemData = await this.getLinkedData(grandparentORID);
+      committeeORID = meetingItemData["meeting:committee"]["@id"].split(":")[1];
+    } catch(e) {
+      return [parentORID, grandparentORID, null];
+    }
+
+    return [parentORID, grandparentORID, committeeORID];
+  }
+
+  getLinkedData = async (id: string): Promise<any> => {
+    const query = "https://id.openraadsinformatie.nl/" + id + ".jsonld";
+    try {
+      const response = await fetch(query);
+      const data = await response.json()
+      return data
+    } catch(e) {
+      throw("item orid:" + id + " did not resolve.")
+    }
+  }
 }
 
 
