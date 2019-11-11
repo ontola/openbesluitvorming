@@ -36,7 +36,7 @@ class GlossariumAPI {
   };
 
   getTopic = async (uuid: string) => {
-    let topicURL = new URL(window.location.origin);
+    const topicURL = new URL(window.location.origin);
     topicURL.port = SERVER_PORT.toString();
 
     topicURL.pathname = "/topics_api/dev/custom/topic/" + uuid + "/";
@@ -45,7 +45,7 @@ class GlossariumAPI {
   };
 
   getWikipediaSummary = async (query: string): Promise<any> => {
-    const apiQuery = "https://nl.wikipedia.org/w/api.php?action=query&prop=extracts%7Cpageprops&exintro&explaintext&origin=*&format=json&titles=" + query;
+    const apiQuery = `https://nl.wikipedia.org/w/api.php?action=query&prop=extracts%7Cpageprops&exintro&explaintext&origin=*&format=json&titles=${query}`;
     try {
       const response = await fetch(apiQuery);
       const data = await response.json();

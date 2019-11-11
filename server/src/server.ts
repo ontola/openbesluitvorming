@@ -49,7 +49,7 @@ oauthClient.clientCredentials.getToken({}).then((result) => {
 function onProxyReq(
   proxyReq: http.ClientRequest, req: http.IncomingMessage, res: http.ServerResponse,
 ) {
-  proxyReq.setHeader("Authorization", "Bearer ${accessToken}");
+  proxyReq.setHeader("Authorization", `Bearer ${accessToken}`);
 }
 
 const apiProxy = httpProxyMiddleware(
