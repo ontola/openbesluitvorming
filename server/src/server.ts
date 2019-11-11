@@ -12,8 +12,6 @@ require("dotenv").config();
 
 import { ES_URL, PORT, WWW_DIR } from "./config";
 
-
-
 const app = express();
 
 // Enable all CORS requests
@@ -21,52 +19,51 @@ app.use(cors());
 // Logger middleware
 app.use(morgan("combined"));
 
-
 // TAPI connection
-const TAPI_ROOT_URL = "https://topics-dev.platform.co.nl/"
+const TAPI_ROOT_URL = "https://topics-dev.platform.co.nl/";
 const clientID = process.env.CLIENT_ID;
 const clientSecret = process.env.CLIENT_SECRET;
 
 const credentials = {
   client: {
     id: clientID,
-    secret: clientSecret
+    secret: clientSecret,
   },
   auth: {
     tokenHost: TAPI_ROOT_URL,
-    tokenPath: '/o/token'
-  }
-}
+    tokenPath: "/o/token",
+  },
+};
 
-const oauthClient = simple_oauth2.create(credentials)
+const oauthClient = simple_oauth2.create(credentials);
 
 let accessToken: String;
 
-oauthClient.clientCredentials.getToken({}).then(result => {
-  accessToken = result.access_token
-  console.log('Access token received:', accessToken);
-}).catch(error => {
+oauthClient.clientCredentials.getToken({}).then((result) => {
+  accessToken = result.access_token;
+  console.log("Access token received:", accessToken);
+}).catch((error) => {
   console.log("Error getting access token for TAPI:", error);
-})
+});
 
-function onProxyReq(proxyReq: http.ClientRequest, req: http.IncomingMessage, res: http.ServerResponse) {
-  proxyReq.setHeader('Authorization', 'Bearer ' + accessToken)
+function onProxyReq(
+  proxyReq: http.ClientRequest, req: http.IncomingMessage, res: http.ServerResponse,
+) {
+  proxyReq.setHeader("Authorization", `Bearer ${accessToken}`);
 }
 
 const apiProxy = httpProxyMiddleware(
-  '/topics_api', 
+  "/topics_api",
   {
+    onProxyReq,
     ws: true,
     target: TAPI_ROOT_URL,
     changeOrigin: true,
-    onProxyReq,
-    pathRewrite: {"^/topics_api": ""}
-  }
+    followRedirects: true,
+    pathRewrite: { "^/topics_api": "" },
+  },
 );
 app.use(apiProxy);
-
-
-
 
 // Proxy search requests
 app.all("/api/*", httpProxyMiddleware({
@@ -80,10 +77,8 @@ app.all("/api/*", httpProxyMiddleware({
 // Production, serve static files
 app.use(express.static(path.join(WWW_DIR)));
 
-
 app.get("/", (req: Request, res: Response) => {
   res.sendFile(path.join(WWW_DIR, "index.html"));
 });
 
 app.listen(PORT);
-

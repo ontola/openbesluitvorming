@@ -62,7 +62,7 @@ export const LoadingComponent = () =>
 const glossariumAPI = new GlossariumAPI();
 
 const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
-  const [pageNumber, setPageNumber] = React.useState<number>(1);
+  const [pageNumber, setPageNumber] = React.useState<number>(0);
   const [docRef, setDocRef] = React.useState<any>(null);
   const [numPages, setNumPages] = React.useState<number>(0);
   const [maxWidth] = React.useState<number>(calcMaxWidth(window.innerWidth));
@@ -73,8 +73,8 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
   const glossIsOpen =
     myPersistedState<boolean>("orisearch.pdfviewer.glossariumOpened", false);
 
-  const setDocumentSectionAnnotations = 
-    usePersistedState<any>("orisearch.pdfviewer.documentSectionAnnotations", [])[1]
+  const setDocumentSectionAnnotations =
+    usePersistedState<any>("orisearch.pdfviewer.documentSectionAnnotations", [])[1];
 
   const documentID = myPersistedState<string>("orisearch.pdfviewer.documentID", "");
   const wordhoardNames: string[] = ["orid:" + documentID + "_definitions", "orid:" + documentID + "_abbreviations"];
@@ -105,7 +105,7 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
         });
       });
     });
-  }
+  };
 
   const uglyStyleSetting = () => {
     // TODO: Dit is jammer maar het moet nou eenmaal. (component integratie)
@@ -114,7 +114,7 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
       ugly.style.width = "100%";
       console.log("gelukt!");
     }
-  }
+  };
 
   const handlePreviousPage = () => {
     if (pageNumber === 1) {
