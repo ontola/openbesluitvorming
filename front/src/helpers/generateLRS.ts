@@ -19,17 +19,18 @@ import { ReactType } from "react";
 import { FRONTEND_ACCEPT, FRONTEND_URL } from "../config";
 import transformers from "./transformers";
 import { appMiddleware, website } from "../middleware/app";
-import logging from "../middleware/logging";
 import { handle } from "./logging";
 import history from "./history";
+import { loggingMiddleware, execFilter } from "@ontola/mash";
 
 (rdflib.RDFFetcher as any).crossSiteProxyTemplate = `${FRONTEND_URL}proxy?iri={uri}`;
 
 export default function generateLRS() {
   // tslint:disable-next-line: prefer-array-literal
   const middleware: MiddlewareFn<any>[] = [
-    logging(),
+    loggingMiddleware,
     appMiddleware(history),
+    execFilter(),
   ];
 
   const store = new RDFStore()

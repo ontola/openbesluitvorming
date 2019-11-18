@@ -11,37 +11,34 @@ interface TitleProps {
   name: StringLiteral;
 }
 
-class Title extends React.Component<TitleProps> {
+const Title = (props: TitleProps) => {
+  return (
+    <h1>
+      {props.name.value}
+    </h1>
+  );
+}
 
-  static type = NS.schema("Thing");
+Title.type = NS.schema("Thing");
 
-  static topology = resourceTopology;
+Title.topology = resourceTopology;
 
-  static property = [
+Title.property = [
+  NS.schema("name"),
+  NS.as("name"),
+  NS.rdfs("label"),
+  NS.foaf("name"),
+  NS.skos("prefLabel"),
+];
+
+Title.mapDataToProps = {
+  name: [
     NS.schema("name"),
     NS.as("name"),
     NS.rdfs("label"),
     NS.foaf("name"),
     NS.skos("prefLabel"),
-  ];
-
-  static mapDataToProps = {
-    name: [
-      NS.schema("name"),
-      NS.as("name"),
-      NS.rdfs("label"),
-      NS.foaf("name"),
-      NS.skos("prefLabel"),
-    ],
-  };
-
-  render() {
-    return (
-      <h1>
-        {this.props.name.value}
-      </h1>
-    );
-  }
-}
+  ],
+};
 
 export default register(Title);

@@ -1,4 +1,4 @@
-import { TopologyProvider, unstable, withLRS, LinkReduxLRSType } from "link-redux";
+import { TopologyProvider, withLRS, LinkReduxLRSType } from "link-redux";
 import React from "react";
 import { NS } from "../../LRS";
 import Button from "../Button";
@@ -19,8 +19,6 @@ class Box extends TopologyProvider<TopologyProviderProps> {
 
     this.topology = boxTopology;
   }
-
-  static contextType = unstable.LinkRenderCtx;
 
   static topology = boxTopology;
 

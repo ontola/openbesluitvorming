@@ -11,25 +11,23 @@ interface DateModifiedProps {
   linkedProp: NamedNode;
 }
 
-class DateModified extends React.Component<DateModifiedProps> {
-  static type = schema.Thing;
+const DateModified = (props: DateModifiedProps) => {
+  const { linkedProp } = props;
 
-  static property = [
-    schema.dateModified,
-    schema.startDate,
-    schema.endDate,
-  ];
-  static topology = allTopologies;
+  const date = new Date(linkedProp.value);
 
-  render() {
-    const { linkedProp } = this.props;
-
-    const date = new Date(linkedProp.value);
-
-    return (
-      <span title={date.toISOString()}>{date.toLocaleDateString('nl-NL')}</span>
-    );
-  }
+  return (
+    <span title={date.toISOString()}>{date.toLocaleDateString('nl-NL')}</span>
+  );
 }
+
+DateModified.type = schema.Thing;
+DateModified.property = [
+  schema.dateModified,
+  schema.startDate,
+  schema.endDate,
+];
+DateModified.topology = allTopologies;
+
 
 export default register(DateModified);

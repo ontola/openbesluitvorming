@@ -2,13 +2,13 @@
  * LinkedRenderStore app middleware
  */
 
+import { createActionPair } from '@ontola/mash';
+import rdfFactory, { NamedNode, createNS } from "@ontologies/core";
+import { History } from "history";
 import { MiddlewareActionHandler, MiddlewareWithBoundLRS } from "link-lib";
 import { LinkReduxLRSType } from "link-redux";
-import { NamedNode, createNS } from "@ontologies/core";
 
 import { FRONTEND_URL } from "../config";
-import { History } from "history";
-import rdfFactory from "link-lib/dist/typings/rdf";
 
 export const website = FRONTEND_URL;
 export const frontendIRI = rdfFactory.namedNode(website);
@@ -20,9 +20,15 @@ const app = createNS(frontendIRIStr.endsWith("/") ? frontendIRIStr : `${frontend
 const appSlashless =
   createNS(frontendIRIStr.slice(0, frontendIRIStr.endsWith("/") ? -1 : undefined));
 
+interface AppParams {
+  location: NamedNode;
+}
+
 export const appMiddleware = (history: History) =>
   (store: LinkReduxLRSType): MiddlewareWithBoundLRS => {
     (store as any).actions.app = {};
+
+    const { dispatch, parse } = createActionPair<AppParams>(app, store);
 
     // eslint-disable-next-line no-param-reassign
     store.namespaces.app = app;
@@ -30,10 +36,8 @@ export const appMiddleware = (history: History) =>
     store.namespaces.appSlashless = appSlashless;
 
     // BoundActionCreators
-    (store as any).actions.app.showResource = (resource: NamedNode) => {
-      const actionIRI = `actions/showResource?location=${encodeURIComponent(resource.value)}`;
-      store.exec(store.namespaces.app(actionIRI));
-    };
+    (store as any).actions.app.showResource = (resource: NamedNode) =>
+      dispatch('actions/showResource', { location: resource });
 
     const currentPath = (): string => {
       const l = history.location;
@@ -58,19 +62,23 @@ export const appMiddleware = (history: History) =>
     // Action Handlers
     return (next: MiddlewareActionHandler) => (iri: NamedNode, opts: any): Promise<any> => {
 
-      switch (iri) {
-        default:
+      const { base, params } = parse(iri)
+
+      switch (base.value) {
+        case store.namespaces.app("actions/showResource").value: {
+          const currentURL = new URL(currentPath(), frontendOrigin);
+          if (params.location) {
+            currentURL.searchParams.set("showResource", encodeURIComponent(params.location.value));
+          } else {
+            throw "No location in URL"
+          }
+          history.push(retrievePath(currentURL.toString()));
+
+          return Promise.resolve();
+        }
+        default: {
+          return next(iri, opts);
+        }
       }
-
-      if (iri.value.startsWith(store.namespaces.app("actions/showResource").value)) {
-        const resource = new URL(iri.value).searchParams.get("location");
-
-        const currentURL = new URL(currentPath(), frontendOrigin);
-        // eslint-disable-next-line
-        currentURL.searchParams.set("showResource", encodeURIComponent(resource!));
-        history.push(retrievePath(currentURL.toString()));
-      }
-
-      return next(iri, opts);
     };
   };
