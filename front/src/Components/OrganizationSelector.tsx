@@ -64,13 +64,8 @@ const OrganizationSelector = (props: RouteComponentProps) => {
   if (result.response != null) {
     isLoading = false;
     onSelectOrg = (event: any) => {
-
       const municipalityIndex = event.value;
-
-      const currentURL = new URL(window.location.href);
-
       const pathWithQueryParams = `search?zoekterm="*"&organisaties=%5B"${municipalityIndex}"%5D`;
-      const url = new URL(currentURL + pathWithQueryParams)
       props.history.push(pathWithQueryParams)
     }
 
