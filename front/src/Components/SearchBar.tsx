@@ -30,37 +30,32 @@ export const queryGenerator = (searchTerm: string) => {
   }
 
   /* eslint-disable @typescript-eslint/camelcase */
+  let queryPart: {} = {
+    multi_match: {
+      fields,
+      type: "best_fields",
+      operator: "OR",
+      query: searchTerm,
+    },
+  }
+
+  // If any of the special characters are present, assume that the user wants
+  // to perform a simpel_query search
   if (simpleQueryStringChars.some(substring => searchTerm.includes(substring))) {
-    return {
-      query: {
-        bool: {
-          must: [
-            {
-              simple_query_string: {
-                fields,
-                default_operator: "OR",
-                query: searchTerm,
-              },
-            },
-          ],
-          must_not: mustNot
-        },
+    queryPart = {
+      simple_query_string: {
+        fields,
+        default_operator: "OR",
+        query: searchTerm,
       },
-    };
+    }
   }
 
   return {
     query: {
       bool: {
         must: [
-          {
-            multi_match: {
-              fields,
-              type: "best_fields",
-              operator: "OR",
-              query: searchTerm,
-            },
-          },
+          queryPart
         ],
         must_not: mustNot
       },
