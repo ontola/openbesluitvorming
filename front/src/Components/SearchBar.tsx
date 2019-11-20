@@ -24,7 +24,10 @@ const mustNot = [{
   }
 }];
 
-export const queryGenerator = (searchTerm: string) => {
+export const queryGenerator = (
+  searchTerm: string,
+) => {
+
   if (searchTerm === undefined) {
     return null;
   }
@@ -57,7 +60,7 @@ export const queryGenerator = (searchTerm: string) => {
         must: [
           queryPart
         ],
-        must_not: mustNot
+        must_not: mustNot,
       },
     },
   };

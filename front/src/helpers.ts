@@ -10,6 +10,7 @@ export const ids = {
   daterange: "datums",
   type: "type",
   tags: "thema",
+  location: "locatie",
 };
 
 export const capitalize = (s: string) => {

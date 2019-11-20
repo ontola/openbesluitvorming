@@ -109,7 +109,7 @@ const SideDrawer = (props: SideDrawerProps & RouteComponentProps) => {
           enable={{ left: true }}
         >
           <Button
-            className="Button__close"
+            className="Button__close Button__default"
             onClick={closeDocument}
           >
             Sluiten

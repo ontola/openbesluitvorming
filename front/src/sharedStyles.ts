@@ -10,3 +10,5 @@ export const colors = {
   bluelight: "#A4D2EB",
   bluemark: "#d1f0ff",
 }
+
+export const borderRadius = "5px"

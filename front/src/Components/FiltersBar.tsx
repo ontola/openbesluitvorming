@@ -6,12 +6,13 @@ import {
 import { indexToLabel, typeToLabel, ids, capitalize } from "../helpers";
 import Button from './Button';
 import { topTag } from "../types";
+import MapFilter from "./MapFilter";
 
 interface FiltersbarProps {
   display: boolean;
 }
 
-const startDate = new Date(2018, 1);
+const startDate = new Date(2000, 1);
 
 const dateLabel = (date: Date) => `${date.getFullYear()}-${date.getMonth()}`
 
@@ -45,12 +46,13 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
     <div
       className={`FilterBar ${props.display ? "FilterBar__visible" : "FilterBar__hidden"}`}
     >
+      <MapFilter />
       <MultiList
         componentId={ids.type}
         dataField="@type.keyword"
         filterLabel="Type"
         title="Type"
-        className="Filter"
+        className="SidebarFilter"
         size={500}
         sortBy="count"
         queryFormat="or"
@@ -70,16 +72,18 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
         showFilter={true}
         URLParams={true}
       />
-      <Button
-        onClick={() => setShowDateRange(!showDateRange)}
-        className={`Button__toggle ${showDateRange? "Button__toggle-on" : "Button__toggle-off"}`}
-      >
-        <h3>Datum filter</h3>
-      </Button>
+      <div className="SidebarFilter">
+        <Button
+          onClick={() => setShowDateRange(!showDateRange)}
+          className={`Button__toggle ${showDateRange ? "Button__toggle-on" : "Button__toggle-off"}`}
+        >
+          <h3>Datum filter</h3>
+        </Button>
+      </div>
       {showDateRange && <RangeSlider
         componentId={ids.daterange}
         dataField="last_discussed_at"
-        className="Filter"
+        className="SidebarFilter"
         tooltipTrigger="hover"
         showHistogram={true}
         showFilter={true}
@@ -106,7 +110,7 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
       {/* {!showDateRange && <DateRange
         componentId={ids.daterange}
         dataField="last_discussed_at"
-        className="Filter"
+        className="SidebarFilter"
         title={capitalize(ids.daterange)}
         placeholder={{
           start: "Van...",
@@ -137,7 +141,7 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
         }}
         showFilter={true}
         URLParams={true}
-        className="Filter"
+        className="SidebarFilter"
         renderItem={MunicipalityLabel}
       />
       <MultiList
@@ -162,7 +166,7 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
         }}
         showFilter={true}
         URLParams={true}
-        className="Filter"
+        className="SidebarFilter"
       />
     </div>
   );

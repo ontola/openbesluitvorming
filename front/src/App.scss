@@ -58,18 +58,26 @@ p {
   }
 
   &__close {
-    color: $blue;
-    font-weight: bold;
-    border-radius: $border-radius;
-    padding: .5rem;
     position: absolute;
     top: .5rem;
     right: .5rem;
     background-color: transparentize(white, .1);
     z-index: 1;
+  }
+
+  &__default {
+    font-weight: bold;
+    color: $blue;
+    border-radius: $border-radius;
+    padding: .5rem;
+    background-color: white;
 
     &:hover {
-      color: $blue_dark;
+      color: $blue_dark
+    }
+
+    &:active {
+      background-color: whitesmoke;
     }
   }
 
@@ -135,8 +143,9 @@ p {
   }
 }
 
-.Filter {
+.SidebarFilter {
   margin-bottom: 1rem !important;
+  padding: 0rem 1rem;
 
   &__current {
     a {
@@ -157,7 +166,6 @@ p {
   z-index: 2;
   background-color: white;
   width: $filter-bar-width;
-  padding: 1rem;
   left: 0;
   top: $navbar-height;
   bottom: 0;

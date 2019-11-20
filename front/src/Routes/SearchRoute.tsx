@@ -78,7 +78,7 @@ const SearchRoute = (props: RouteComponentProps) => {
             {hasParams &&
               <div className="Results">
                 <SelectedFilters
-                  showClearAll={false}
+                  showClearAll={true}
                   className="Filter Filter__current"
                   // render={CustomSelectedFilters}
                 />
