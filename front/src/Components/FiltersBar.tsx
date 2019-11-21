@@ -147,6 +147,7 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
         <Button
           onClick={() => setShowMap(!showMap)}
           className={`Button__toggle ${showMap ? "Button__toggle-on" : "Button__toggle-off"}`}
+          title={"Door het herkennen van straatnamen kunnen we items zoeken op de kaart. Mogelijk gemaakt door WaarOverheid.nl."}
         >
           <h3>{`${showMap ? "Sluit" : "Toon"} kaart`}</h3>
         </Button>
