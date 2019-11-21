@@ -23,6 +23,11 @@ const otherApps: AppType[] = [
     description: "Volg thema's die worden besproken en ontvang meldingen.",
     url: "https://1848.nl",
   },
+  {
+    name: "Voordat het nieuws was",
+    description: "Zoek stukken van de raad en staten bij het laatste nieuws",
+    url: "https://www.voordathetnieuwswas.nl/",
+  },
 ]
 
 const Home = () => {
@@ -80,12 +85,22 @@ const Home = () => {
         <h2>Feedback</h2>
         <p>
           Technische vragen of suggesties over de API kunnen op
-          de <a href={paths.oriBackEndGithub}>Issue tracker</a> van
+          de <a href={paths.oriBackEndGithub}>issue tracker</a> van
           de ORI achterkant worden geplaatst.
         </p>
         <p>
           Voor suggesties, problemen of vragen over deze zoekmachine,
-          plaats een issue op <a href={paths.oriSearchGithub}>Github</a>.
+          plaats een issue op <a href={paths.oriSearchGithub}>de ori-search issue tracker</a>.
+        </p>
+        <h2>Privacy</h2>
+        <p>
+          Deze app gebruikt geen cookies.
+          Jouw IP adres en de zoekopdrachten slaan we niet op.
+        </p>
+        <h2>Disclaimer</h2>
+        <p>
+          De organisaties hebben toestemming gegeven om de data te importeren en als open data aan te bieden.
+          De data kan incompleet of onjuist zijn, doordat het wordt ge
         </p>
       </div>
     </div>
