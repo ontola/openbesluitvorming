@@ -20,9 +20,6 @@ import { GlobalHotKeys } from "react-hotkeys";
 import { keyMap } from "../helpers/keyMap";
 // import CustomSelectedFilters from '../Components/CustomSelectedFilters';
 
-const globalKeyHandlers = {
-};
-
 const SearchRoute = (props: RouteComponentProps) => {
   const [showFilters, setShowFilters] = React.useState(false);
 
@@ -34,6 +31,17 @@ const SearchRoute = (props: RouteComponentProps) => {
   const setSearchParams = (newURL: string) => {
     const url = new URL(newURL);
     props.history.push(url.toString().substring(url.origin.length));
+  };
+
+  const closeDocument = () => {
+    const currentURL = new URL(window.location.href);
+    const params = new URLSearchParams(currentURL.search);
+    params.delete("showResource");
+    props.history.push(`/search?${params.toString()}`);
+  };
+
+  const globalKeyHandlers = {
+    CLOSE: closeDocument,
   };
 
   return (
@@ -80,6 +88,7 @@ const SearchRoute = (props: RouteComponentProps) => {
                 <SelectedFilters
                   showClearAll={true}
                   className="Filter Filter__current"
+                  clearAllLabel="Reset"
                   // render={CustomSelectedFilters}
                 />
                 <div className="ResultsListWrapper">

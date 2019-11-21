@@ -3,21 +3,33 @@ import { History } from "history";
 import { NS } from "./LRS";
 import { NODE_ENV, SERVER_PORT } from './config';
 
-// Mapping for consistent component Ids
+/** Mapping for consistent component Ids, used by reactivesearch */
 export const ids = {
   searchbox: "zoekterm",
   organisaties: "organisaties",
   daterange: "datums",
   type: "type",
-  tags: "thema",
+  tag: "thema",
   location: "locatie",
 };
+
+/** Returns an array of all identifiers */
+export const allComponentIds = Object.values(ids);
+
+/** Returns an array of all identifiers, except the one you pass */
+export const allIdsBut = (id: string): string[] => {
+  const allValues = Object.values(ids)
+  const filteredValues = allValues.filter(
+    (value) => {
+      return value != id
+    }
+  )
+  return filteredValues
+}
 
 export const capitalize = (s: string) => {
   return s.charAt(0).toUpperCase() + s.slice(1);
 };
-
-export const allComponentIds = Object.values(ids);
 
 export function usePersistedState<T>(key: string, initial: T):
 [T, React.Dispatch<React.SetStateAction<T>>] {

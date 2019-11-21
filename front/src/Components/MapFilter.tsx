@@ -17,6 +17,7 @@ export const demoCoordinates: LatLngBoundsLiteral = [
     51.978959373192446
   ]
 ]
+
 /* eslint-disable @typescript-eslint/camelcase */
 const geoFilter = (coordinates: LatLngBoundsLiteral) => { return {
   geo_shape: {
@@ -44,6 +45,7 @@ const Button = (props: any) => {
         bottom: ".5rem",
         left: ".5rem",
       }}
+      title="Zoek items die plaatsen noemen die binnen de huidige kaartweergave vallen."
       onClick={() => {
 
         const bounds =  map.getBounds()
@@ -65,7 +67,7 @@ const Button = (props: any) => {
 
         return props.setQuery({
           query: geoFilter(coordinates),
-          value: JSON.stringify(coordinates),
+          value: `JSON.stringify(coordinates)`,
         })}
       }
     >
@@ -91,6 +93,7 @@ const MapComp = (props: any) => (
   </Map>
 )
 
+/** A custom Filter that uses Waaroverheid Geo Coordinates */
 const MapFilter = () => {
   return (
     <ReactiveComponent

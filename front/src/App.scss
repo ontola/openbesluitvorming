@@ -85,7 +85,6 @@ p {
   &__toggle {
   color: $g4;
   position: relative;
-  margin-bottom: 1rem;
 
     h3 {
       display: inline;
@@ -97,19 +96,6 @@ p {
 
     &:active {
       color: $blue_dark;
-    }
-
-    &:before {
-      content: "☐";
-      display: inline-block;
-      left: 0;
-      margin-right: .5rem;
-    }
-
-    &-on {
-      &:before {
-        content: "☑";
-      }
     }
   }
 }
@@ -144,8 +130,9 @@ p {
   }
 }
 
-.SidebarFilter {
+.Filter__item {
   padding: 0rem 1rem;
+  margin-bottom: 1rem;
 
   &__current {
     a {
@@ -155,7 +142,13 @@ p {
 
   ul {
     overflow-x: hidden;
+    padding-bottom: 0;
   }
+}
+
+.Filter__Title {
+  margin-bottom: .3rem;
+  margin-top: 0;
 }
 
 .FilterBar {
@@ -163,6 +156,7 @@ p {
   border-right: $border;
   transition: .2s all;
   padding: 0;
+  padding-top: 1rem;
   z-index: 2;
   background-color: white;
   width: $filter-bar-width;

@@ -8,8 +8,6 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { withRouter, RouteComponentProps } from "react-router";
 import { usePersistedState } from "../helpers";
-import { HotKeys } from "react-hotkeys";
-import { keyMap } from "../helpers/keyMap";
 
 interface SideDrawerProps {
   children: React.ReactNode;
@@ -51,6 +49,13 @@ const SideDrawer = (props: SideDrawerProps & RouteComponentProps) => {
 
   const pdfWrapper = React.createRef<HTMLInputElement>();
 
+  const closeDocument = () => {
+    const currentURL = new URL(window.location.href);
+    const params = new URLSearchParams(currentURL.search);
+    params.delete("showResource");
+    props.history.push(`/search?${params.toString()}`);
+  };
+
   React.useLayoutEffect(() => {
     const handleResize = () => {
       if (pdfWrapper.current) {
@@ -65,17 +70,6 @@ const SideDrawer = (props: SideDrawerProps & RouteComponentProps) => {
     return () => window.removeEventListener("resize", listener);
   });
 
-  const closeDocument = () => {
-    const currentURL = new URL(window.location.href);
-    const params = new URLSearchParams(currentURL.search);
-    params.delete("showResource");
-    props.history.push(`/search?${params.toString()}`);
-  };
-
-  const keyHandlers = {
-    CLOSE: closeDocument,
-  };
-
   return (
     <SideDrawerContext.Provider
       value={{
@@ -83,9 +77,7 @@ const SideDrawer = (props: SideDrawerProps & RouteComponentProps) => {
         setWidth,
       }}
     >
-      <HotKeys
-        keyMap={keyMap}
-        handlers={keyHandlers}
+      <div
         className="SideDrawer__wrapper"
       >
         <Resizable
@@ -123,7 +115,7 @@ const SideDrawer = (props: SideDrawerProps & RouteComponentProps) => {
             }
           </div>
         </Resizable>
-      </HotKeys>
+      </div>
     </SideDrawerContext.Provider>
   );
 };
