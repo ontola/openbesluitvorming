@@ -99,8 +99,10 @@ const Home = () => {
         </p>
         <h2>Disclaimer</h2>
         <p>
-          De organisaties hebben toestemming gegeven om de data te importeren en als open data aan te bieden.
-          De data kan incompleet of onjuist zijn, doordat het wordt ge
+          De data in deze zoekmachine komt uit Open Raadsinformatie en Open Stateninformatie.
+          Deze data is met toestemming van de deelnemende gemeenten en provincies geïmporteerd uit diverse vergadersystemen.
+          De data kan door het importeren incompleet, onjuist of niet up to date zijn.
+          Het eigenaarschap van de data ligt bij de organisaties die de data hebben aangemaakt, of de respectievelijke auteurs van de documenten.
         </p>
       </div>
     </div>
