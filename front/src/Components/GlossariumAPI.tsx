@@ -17,7 +17,7 @@ class GlossariumAPI {
   };
 
   getWordhoardList = async(names: string[]) => {
-    const wordhoardURL = getTopicsApiURL("/topics_api/dev/custom/wordhoard/");
+    const wordhoardURL = getTopicsApiURL("/custom/wordhoard/");
     for (const name of names) {
       wordhoardURL.searchParams.append("name", name);
     }
@@ -30,7 +30,7 @@ class GlossariumAPI {
   };
 
   getTopic = async (uuid: string) => {
-    const topicURL = getTopicsApiURL(`/topics_api/dev/custom/topic/${uuid}/`);
+    const topicURL = getTopicsApiURL(`/custom/topic/${uuid}/`);
     const response = await fetch(topicURL.toString());
     return await response.json();
   };
