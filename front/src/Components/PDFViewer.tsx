@@ -121,6 +121,7 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
       return;
     }
     setPageNumber(pageNumber - 1);
+    // TODO: fix page number in annotations calls
     getDocAnnotations();
     setTimeout(uglyStyleSetting, 100);
   };
