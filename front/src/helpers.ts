@@ -158,7 +158,16 @@ export const getApiURL = (): URL => {
     url.port = SERVER_PORT.toString();
   }
   return url
-}
+};
+
+export const getTopicsApiURL = (relUrl: string): URL => {
+  const url = new URL(window.location.origin);
+  url.pathname = `/topics_api/dev${relUrl}`;
+  if (NODE_ENV === "development") {
+    url.port = SERVER_PORT.toString();
+  }
+  return url
+};
 
 // Custom react hook for data fetching with error handling
 export const useFetch = (url: string, options: RequestInit) => {

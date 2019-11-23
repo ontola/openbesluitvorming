@@ -1,34 +1,28 @@
-import { SERVER_PORT } from "../config";
+import { getTopicsApiURL } from "../helpers";
 
 
 class GlossariumAPI {
-  getDocumentSectionAnnotations = async (documentName: string, sectionNumber: number, wordhoardIDs: any[]) => {
-    const documentAnnotationsURL = new URL(window.location.origin);
-    documentAnnotationsURL.port = SERVER_PORT.toString();
-
-    documentAnnotationsURL.pathname = "/topics_api/dev/document/" + documentName + "/" + sectionNumber + "/annotations/";
+  getDocumentSectionAnnotations = async (documentName: string, sectionNumber: number, wordhoardIDs: string[]) => {
+    const documentAnnotationsURL = getTopicsApiURL(
+      `/document/${documentName}/${sectionNumber}/annotations/`);
     for (const wid of wordhoardIDs) {
       documentAnnotationsURL.searchParams.append("wordhoard_id", wid);
     }
     try {
       const response = await fetch(documentAnnotationsURL.toString());
-      const mjson = await response.json();
-      return mjson;
+      return await response.json();
     } catch(e) {
       return {surface_forms: []}
     }
   };
 
-  getWordhoardList = async(names: any[]) => {
-    const wordhoardURL = new URL(window.location.origin);
-    wordhoardURL.port = SERVER_PORT.toString();
-
-    wordhoardURL.pathname = "/topics_api/dev/custom/wordhoard/";
+  getWordhoardList = async(names: string[]) => {
+    const wordhoardURL = getTopicsApiURL("/topics_api/dev/custom/wordhoard/");
     for (const name of names) {
       wordhoardURL.searchParams.append("name", name);
     }
     try {
-      const response = await fetch(wordhoardURL.toString() + "/");
+      const response = await fetch(wordhoardURL.toString());
       return await response.json();
     } catch(e) {
       return {items: []};
@@ -36,10 +30,7 @@ class GlossariumAPI {
   };
 
   getTopic = async (uuid: string) => {
-    const topicURL = new URL(window.location.origin);
-    topicURL.port = SERVER_PORT.toString();
-
-    topicURL.pathname = "/topics_api/dev/custom/topic/" + uuid + "/";
+    const topicURL = getTopicsApiURL(`/topics_api/dev/custom/topic/${uuid}/`);
     const response = await fetch(topicURL.toString());
     return await response.json();
   };
@@ -69,7 +60,7 @@ class GlossariumAPI {
   };
 
   getWikipediaImageURL = async (query: string): Promise<any> => {
-    const apiQuery = "https://nl.wikipedia.org/w/api.php?action=query&titles=" + query +"&prop=pageimages&format=json&origin=*&pithumbsize=200";
+    const apiQuery = `https://nl.wikipedia.org/w/api.php?action=query&titles=${query}&prop=pageimages&format=json&origin=*&pithumbsize=200`;
     const response = await fetch(apiQuery);
     const data = await response.json();
     try {
@@ -80,18 +71,6 @@ class GlossariumAPI {
       return false;
     }
   };
-
-  getAgendaItemFromDocID = async (id: string): Promise<any> => {
-    const query = "https://id.openraadsinformatie.nl/" + id + ".jsonld";
-    try {
-      const response = await fetch(query);
-      const data = await response.json();
-      return data["dc:isReferencedBy"]["@id"]
-    } catch (e) {
-      return false;
-    }
-  }
-
 
   findSuperItems = async (documentID: string): Promise<any> => {
     let parentORID;
@@ -133,19 +112,17 @@ class GlossariumAPI {
     }
 
     return [parentORID, grandparentORID, committeeORID];
-  }
+  };
 
   getLinkedData = async (id: string): Promise<any> => {
-    const query = "https://id.openraadsinformatie.nl/" + id + ".jsonld";
+    const query = `https://id.openraadsinformatie.nl/${id}.jsonld`;
     try {
       const response = await fetch(query);
-      const data = await response.json()
-      return data
+      return await response.json()
     } catch(e) {
       throw("item orid:" + id + " did not resolve.")
     }
   }
 }
-
 
 export default GlossariumAPI;
