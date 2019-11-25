@@ -67,7 +67,8 @@ const Button = (props: any) => {
 
         return props.setQuery({
           query: geoFilter(coordinates),
-          value: `JSON.stringify(coordinates)`,
+          // TODO: Not working properly, even if the `coordanites` value is added here.
+          value: 'kaart',
         })}
       }
     >
