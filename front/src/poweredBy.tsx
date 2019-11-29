@@ -1,3 +1,5 @@
+import paths from "./paths";
+
 export interface OrgType {
   /** Relative to /public/orglogos/ */
   picture: string;
@@ -10,21 +12,21 @@ export interface OrgType {
 export const poweredBy: OrgType[] = [
   {
     name: "Argu",
-    url: "http://argu.co/",
+    url: paths.argu,
     toelichting: "initiatefnemer Open Besluitvorming",
     picture: "argu.svg",
   },
   {
-    name: "Ontola",
-    url: "http://ontola.io/nl",
-    toelichting: "softwareontwikkeling & technisch beheer",
-    picture: "ontola.svg",
-  },
-  {
     name: "Open State Foundation",
-    url: "https://openstate.eu/nl/",
+    url: paths.openstate,
     toelichting: "initiatiefnemer Open Raadsinformatie & Open Stateninformatie",
     picture: "openstate.svg",
+  },
+  {
+    name: "Ontola",
+    url: paths.ontola,
+    toelichting: "softwareontwikkeling & technisch beheer",
+    picture: "ontola.svg",
   },
   {
     name: "VNG Realisatie",
