@@ -74,7 +74,8 @@ const Home = () => {
           :
           <div>
             <p>
-              Open Besluitvorming is een initiatief van <a href={paths.argu}>Argu</a> om
+              Open Besluitvorming is een initiatief van <a href={paths.argu}>Argu</a> en
+              de <a href={paths.openstate}>Open State Foundation</a> om
               data van gemeenten, provincies en andere overheden samen te brengen in
               één zoekomgeving.
               De broncode van zowel deze <a href={paths.oriSearchGithub}>zoekmachine</a> als

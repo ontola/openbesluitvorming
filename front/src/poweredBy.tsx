@@ -16,14 +16,14 @@ export const poweredBy: OrgType[] = [
   },
   {
     name: "Ontola",
-    url: "http://ontola.io/",
+    url: "http://ontola.io/nl",
     toelichting: "softwareontwikkeling & technisch beheer",
     picture: "ontola.svg",
   },
   {
     name: "Open State Foundation",
     url: "https://openstate.eu/nl/",
-    toelichting: "initiatief Open Raadsinformatie",
+    toelichting: "initiatiefnemer Open Raadsinformatie & Open Stateninformatie",
     picture: "openstate.svg",
   },
   {
