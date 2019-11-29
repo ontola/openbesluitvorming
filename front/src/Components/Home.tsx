@@ -33,6 +33,10 @@ const otherApps: AppType[] = [
 ]
 
 const Home = () => {
+  React.useEffect(() => {
+    document.title = TITLE
+  }, []);
+
   return (
     <div className="Home">
       <div className="Home__wrapper">
