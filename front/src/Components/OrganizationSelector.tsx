@@ -5,6 +5,7 @@ import Creatable from "react-select/creatable";
 import { withRouter, RouteComponentProps } from 'react-router-dom'
 import paths from "../paths";
 import { handle } from "../helpers/logging";
+import { IS_ORI } from "../config";
 
 const query = {
   "size": 500,
@@ -15,7 +16,7 @@ const query = {
       },
       "filter": {
         "terms": {
-          "classification": ["municipality", "province"]
+          "classification": IS_ORI ? ["municipality"] : ["municipality", "province"]
         }
       }
     }
@@ -79,6 +80,9 @@ const OrganizationSelector = (props: RouteComponentProps) => {
       })
     })
   }
+
+  const placeholderEnd = IS_ORI ? `gemeenten...` : `gemeenten en provincies...`
+
   return (
     <div className="OrganizationSelector">
       <Creatable
@@ -86,7 +90,7 @@ const OrganizationSelector = (props: RouteComponentProps) => {
         isLoading={isLoading}
         options={options}
         onChange={onSelectOrg}
-        placeholder={`Kies uit ${totalCount} gemeenten en provincies...`}
+        placeholder={`Kies uit ${totalCount} ${placeholderEnd}`}
         onCreateOption={handleCreateOption}
       />
     </div>

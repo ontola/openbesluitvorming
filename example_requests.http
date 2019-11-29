@@ -8,6 +8,9 @@ content-type: application/n-quads
 GET https://id.openraadsinformatie.nl/44477 HTTP/1.1
 content-type: text/turtle
 
+### Elastic get resource
+GET https://api.openraadsinformatie.nl/v1/elastic/ori_*/_search?q=_id:44477 HTTP/1.1
+
 ### Elastic simple request
 GET https://api.openraadsinformatie.nl/v1/elastic/ori_*/_search?q=test HTTP/1.1
 

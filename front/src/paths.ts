@@ -10,6 +10,7 @@ const paths = {
   oriSearchGithub: "https://github.com/ontola/ori-search/",
   oriBackEndGithub: "https://github.com/openstate/open-raadsinformatie/",
   projectMail: "mailto:sander.bakker@vng.nl",
+  arguMail: "mailto:joep@argu.co",
   vngProject: "https://www.vngrealisatie.nl/producten/pilots-open-raadsinformatie",
   vngRealisatie: "https://www.vngrealisatie.nl/",
   vngNewForm: "https://formulieren.vngrealisatie.nl/deelname_openraadsinformatie",
