@@ -156,7 +156,8 @@ const Home = () => {
                   minWidth: '2rem',
                   maxWidth: '5rem',
                   maxHeight: '5rem',
-                  width: '100%'
+                  width: '100%',
+                  height: '100%',
                 }}
               />
             </a>
