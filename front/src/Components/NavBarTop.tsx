@@ -15,7 +15,7 @@ const NavBarTop = () => {
         {IS_ORI ?
           <span>Raadsinformatie</span>
           :
-          <span>Besluitvorming</span>
+          <span>Besluitvorming.nl</span>
         }
       </Link>
       {/* <a

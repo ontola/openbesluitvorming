@@ -47,6 +47,18 @@ export const poweredBy: OrgType[] = [
     picture: "svdj.svg",
   },
   {
+    name: "Open Overheid",
+    url: paths.actieplan,
+    toelichting: "Actieplan Open Overheid",
+    picture: "openoverheid.jpg",
+  },
+  {
+    name: "Ministerie van Binnenlandse Zaken",
+    url: paths.actieplan,
+    toelichting: "Open Overheid",
+    picture: "bzk.jpg",
+  },
+  {
     name: "Provincie Utrecht",
     url: "https://www.provincie-utrecht.nl/",
     toelichting: "financiering",

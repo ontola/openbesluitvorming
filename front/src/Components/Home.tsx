@@ -2,6 +2,7 @@ import * as React from "react";
 import paths from "../paths";
 import { TITLE, IS_ORI } from "../config";
 import { poweredBy, OrgType } from "../poweredBy";
+import { colors } from "../sharedStyles";
 
 interface AppType {
   name: string;
@@ -74,13 +75,26 @@ const Home = () => {
           :
           <div>
             <p>
-              Open Besluitvorming is een initiatief van <a href={paths.argu}>Argu</a> en
-              de <a href={paths.openstate}>Open State Foundation</a> om
+              OpenBesluitvorming.nl is een initiatief van <a href={paths.argu}>Argu</a> om
               data van gemeenten, provincies en andere overheden samen te brengen in
               één zoekomgeving.
-              De broncode van zowel deze <a href={paths.oriSearchGithub}>zoekmachine</a> als
-              de <a href={paths.oriBackEndGithub}>Open Raadsinformatie server</a> zijn open source.
-              Lees <a href={paths.vngProject}>hier</a> meer over Open Raadsinformatie.
+              Zowel deze <a href={paths.oriSearchGithub}>zoekmachine</a> als
+              de <a href={paths.oriBackEndGithub}>server</a> zijn open source.
+            </p>
+            <p>
+              Vanuit het <a href={paths.actieplan}>actieplan open overheid</a> werkt
+              het Ministerie van Binnenlandse Zaken aan het transparanter maken van overheden.
+              Actiepunt 1 uit dit plan is het openen van besluitvormingsdata.
+              De <a href={paths.openstate}>Open State Foundation</a> is samen
+              met <a href={paths.vngRealisatie}>VNG Realisatie</a> het
+              project <a href={paths.vngProject}>Open Raadsinformatie</a> gestart om data
+              uit gemeenteraden te verzamelen.
+              Voor de provincies is Open Stateninformatie gestart.
+            </p>
+            <p>
+              Argu heeft als missie om besluitvorming zo open en toegankelijk mogelijk te maken
+              en raakte zo als betrokken bij deze projecten.
+              In de toekomst willen we ook data van waterschappen en de Tweede Kamer toevoegen.
             </p>
           </div>
         }
@@ -88,7 +102,9 @@ const Home = () => {
         <p>
           Als je wil dat ook jouw gemeente aangesloten wordt op Open Raadsinformatie,
           vraag dan de griffie van je gemeenteraad <a href={paths.vngNewForm}>dit formulier</a> in te vullen.
-          Provincies kunnen mailen naar <a href={paths.arguMail}>joep@argu.co</a>
+          {IS_ORI ? null :
+            <span> Provincies of andere overheden kunnen mailen naar <a href={paths.arguMail}>joep@argu.co</a>.</span>
+          }
         </p>
         <h2>Andere apps</h2>
         <ul>
@@ -105,16 +121,18 @@ const Home = () => {
           Als je zelf ook gebruik wil maken van deze data, lees dan
           de <a href={paths.apiDocs}>documentatie</a>.
         </p>
-        <h2>Feedback</h2>
+        <h2>Contact</h2>
         <p>
           Technische vragen of suggesties over de API kunnen op
-          de <a href={paths.oriBackEndGithub}>issue tracker</a> van
-          de Open Raadsinformatie achterkant worden geplaatst.
+          de <a href={paths.oriBackEndGithub}>issue tracker van de server</a> geplaatst worden.
         </p>
         <p>
           Voor suggesties, problemen of vragen over deze zoekmachine,
           plaats een issue op <a href={paths.oriSearchGithub}>de ori-search issue tracker</a>.
         </p>
+        {IS_ORI ? null : <p>
+          Voor algemene vragen kunt u mailen naar <a href={paths.arguMail}>Joep Meindertsma</a>.
+        </p>}
         <h2>Privacy</h2>
         <p>
           Deze app gebruikt geen cookies.
@@ -137,7 +155,10 @@ const Home = () => {
             flexDirection: "row",
             alignItems: "center",
             justifyContent: "center",
+            marginTop: "2rem",
             flexWrap: "wrap",
+            borderTop: "solid 1px",
+            borderTopColor: colors.g2,
           }}
         >
           {poweredBy.map((org: OrgType) => (
