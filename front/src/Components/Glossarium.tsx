@@ -70,14 +70,14 @@ class Glossarium extends React.PureComponent<{}, MState> {
       wikipediaQuery = cleanInput;
     }
 
-    documentSectionAnnotations.map((surface_form: any) => {
-      if (cleanInput && surface_form.name.toLowerCase() === cleanInput.toLowerCase()) {
+    documentSectionAnnotations.map((surfaceForm: any) => {
+      if (cleanInput && surfaceForm.name.toLowerCase() === cleanInput.toLowerCase()) {
         // Get top candidate
-        if (surface_form.candidates[0].topic_id === null) {
-          wikipediaQuery = surface_form.candidates[0].label;
+        if (surfaceForm.candidates[0].topic_id === null) {
+          wikipediaQuery = surfaceForm.candidates[0].label;
         } else {
-          customTopic = surface_form.candidates[0].topic_id;
-          for (const candidate of surface_form.candidates) {
+          customTopic = surfaceForm.candidates[0].topic_id;
+          for (const candidate of surfaceForm.candidates) {
             if (candidate.topic_id === null) {
               wikipediaQuery = candidate.label;
               break;

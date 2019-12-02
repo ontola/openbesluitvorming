@@ -84,8 +84,8 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
   const getSectionAnnotations = (page: number, wids: any[]) => {
     if (wids) {
       glossariumAPI.getDocumentSectionAnnotations("orid:" + documentID, page - 1, wids).then(response => {
-        if (response.surface_forms) {
-          setDocumentSectionAnnotations(response.surface_forms);
+        if (response.surfaceForms) {
+          setDocumentSectionAnnotations(response.surfaceForms);
         } else {
           setDocumentSectionAnnotations([]);
         }
@@ -96,7 +96,6 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
   }
 
   const getDocumentWordhoardList = () => {
-    console.log('?')
     glossariumAPI.findSuperItems(documentID).then((oridList: any[]) => {
       for (const orid of oridList) {
         if (orid) {
