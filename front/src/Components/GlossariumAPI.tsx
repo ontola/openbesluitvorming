@@ -12,8 +12,7 @@ class GlossariumAPI {
       const response = await fetch(documentAnnotationsURL.toString());
       return await response.json();
     } catch(e) {
-      // @ts-ignore
-      return {surface_forms: []}
+      return undefined
     }
   };
 
