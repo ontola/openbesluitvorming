@@ -84,8 +84,8 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
   const getSectionAnnotations = (page: number, wids: any[]) => {
     if (wids) {
       glossariumAPI.getDocumentSectionAnnotations("orid:" + documentID, page - 1, wids).then(response => {
-        if (response.surfaceForms) {
-          setDocumentSectionAnnotations(response.surfaceForms);
+        if (response.surface_forms) {
+          setDocumentSectionAnnotations(response.surface_forms);
         } else {
           setDocumentSectionAnnotations([]);
         }
