@@ -62,15 +62,9 @@ You can find all the defintions of the various models incudling the properties [
 
 In the future, we hope to use the [VNG Open Raadsinformatie spec](https://github.com/VNG-Realisatie/Open-Raadsinformatie/) for serialization.
 
-### Who's behind this project?
-
-ORI was initiated by the [Open State Foundation](https://openstate.eu).
-[VNG Realisatie](https://www.vngrealisatie.nl/producten/pilots-open-raadsinformatie) is the main funder.
-[Ontola](https://ontola.io) / [Argu](https://argu.co) is responsible for the technology.
-
 ### Who uses ORI / these APIs?
 
-- [Ori-search](http://ori.argu.co), the official ORI search interface 
+- [Ori-search](http://ori.argu.co), the official ORI search interface
 - [1848.nl](https://1848.nl), which features a notification system (contact: Lucas Benschop)
 - [WaarOverheid](https://waaroverheid.nl/), a location based app to navigate, search and subscribe to ORI data (contact: Alex Olieman)
 - [Argu.co](https://argu.co), an e-democracy platform for civic engagement (contact: [Joep Meindertsma](mailto:joep@argu.co))
@@ -88,3 +82,15 @@ If you have general questions about Open Raadsinformatie, get in touch with proj
 ### How can my municipality / government
 
 Ask your municipality to fill in [this form](https://formulieren.vngrealisatie.nl/deelname_openraadsinformatie)!
+
+### Who's behind this project?
+
+ORI was initiated by the [Open State Foundation](https://openstate.eu).
+[VNG Realisatie](https://www.vngrealisatie.nl/producten/pilots-open-raadsinformatie) is the main funder.
+[Ontola](https://ontola.io) / [Argu](https://argu.co) is responsible for the technology.
+
+### Which projects does the API use?
+
+- [Open Raadsinformatie](https://github.com/openstate/open-raadsinformatie/) for ETL & search
+- [ori-theme-classifier](https://github.com/openstate/ori-theme-classifier) for adding themes
+- [ori-api](https://github.com/ontola/ori_api/) for serializing to various RDF formats

@@ -9,20 +9,19 @@ interface StartDateProps {
   linkedProp: NamedNode;
 }
 
-class StartDate extends React.Component<StartDateProps> {
-  static type = schema.Thing;
+const StartDate = (props: StartDateProps) => {
+  const { linkedProp } = props;
 
-  static property = schema.startDate;
+  const date = new Date(linkedProp.value);
 
-  render() {
-    const { linkedProp } = this.props;
-
-    const date = new Date(linkedProp.value);
-
-    return (
-      <span title={date.toISOString()}>Start: {date.toDateString()}</span>
-    );
-  }
+  return (
+    <span title={date.toISOString()}>Start: {date.toDateString()}</span>
+  );
 }
+
+StartDate.type = schema.Thing;
+
+StartDate.property = schema.startDate;
+
 
 export default register(StartDate);

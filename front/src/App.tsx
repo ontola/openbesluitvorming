@@ -26,6 +26,6 @@ export default App;
 if (typeof window !== 'undefined') {
   window.LRS = LRS;
   if (typeof (window as any).__REACT_DEVTOOLS_GLOBAL_HOOK__ !== 'undefined') {
-    (window as any).dev = new LinkDevTools('');
+    (window as any).dev = new LinkDevTools('', 'dev', LRS);
   }
 }

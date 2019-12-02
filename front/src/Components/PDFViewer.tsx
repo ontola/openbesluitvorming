@@ -96,6 +96,7 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
   }
 
   const getDocumentWordhoardList = () => {
+    console.log('?')
     glossariumAPI.findSuperItems(documentID).then((oridList: any[]) => {
       for (const orid of oridList) {
         if (orid) {

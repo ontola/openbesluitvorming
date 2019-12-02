@@ -44,6 +44,7 @@ p {
   text-align: left;
   padding: 0;
   margin: 0;
+  font-size: inherit;
 
   &:focus {
     // WARNING: make sure to add focus styling for a11y!
@@ -60,16 +61,27 @@ p {
   &__close {
     color: $blue;
     font-weight: bold;
-    border-radius: $border-radius;
     padding: .5rem;
     position: absolute;
     top: .5rem;
     right: .5rem;
     background-color: transparentize(white, .1);
     z-index: 1;
+  }
+
+  &__default {
+    font-weight: bold;
+    color: $blue;
+    border-radius: $border-radius;
+    padding: .5rem;
+    background-color: white;
 
     &:hover {
-      color: $blue_dark;
+      color: $blue_dark
+    }
+
+    &:active {
+      background-color: whitesmoke;
     }
   }
 
@@ -91,7 +103,6 @@ p {
   &__toggle {
   color: $g4;
   position: relative;
-  margin-bottom: 1rem;
 
     h3 {
       display: inline;
@@ -103,19 +114,6 @@ p {
 
     &:active {
       color: $blue_dark;
-    }
-
-    &:before {
-      content: "☐";
-      display: inline-block;
-      left: 0;
-      margin-right: .5rem;
-    }
-
-    &-on {
-      &:before {
-        content: "☑";
-      }
     }
   }
 }
@@ -150,8 +148,9 @@ p {
   }
 }
 
-.Filter {
-  margin-bottom: 1rem !important;
+.Filter__item {
+  padding: 0rem 1rem;
+  margin-bottom: 1rem;
 
   &__current {
     a {
@@ -161,7 +160,13 @@ p {
 
   ul {
     overflow-x: hidden;
+    padding-bottom: 0;
   }
+}
+
+.Filter__Title {
+  margin-bottom: .3rem;
+  margin-top: 0;
 }
 
 .FilterBar {
@@ -169,10 +174,10 @@ p {
   border-right: $border;
   transition: .2s all;
   padding: 0;
+  padding-top: 1rem;
   z-index: 2;
   background-color: white;
   width: $filter-bar-width;
-  padding: 1rem;
   left: 0;
   top: $navbar-height;
   bottom: 0;
@@ -471,6 +476,10 @@ p {
   -webkit-overflow-scrolling: touch;
 }
 
+.PropertyValue {
+  font-size: .9rem;
+}
+
 .SideDrawer__resize-handle {
   transition: .2s all;
   z-index: 2;
@@ -600,6 +609,7 @@ p {
   display: block;
   // padding: .2rem;
   border-radius: $border-radius;
+  font-size: .9rem;
 
   &:hover {
     text-decoration: underline;

@@ -24,52 +24,49 @@ const mustNot = [{
   }
 }];
 
-export const queryGenerator = (searchTerm: string) => {
+export const queryGenerator = (
+  searchTerm: string,
+) => {
+
   if (searchTerm === undefined) {
     return null;
   }
 
-  // eslint-disable @typescript-eslint/camelcase
+  /* eslint-disable @typescript-eslint/camelcase */
+  let queryPart: {} = {
+    multi_match: {
+      fields,
+      type: "best_fields",
+      operator: "OR",
+      query: searchTerm,
+    },
+  }
 
+  // If any of the special characters are present, assume that the user wants
+  // to perform a simpel_query search
   if (simpleQueryStringChars.some(substring => searchTerm.includes(substring))) {
-    return {
-      query: {
-        bool: {
-          must: [
-            {
-              simple_query_string: {
-                fields,
-                default_operator: "OR",
-                query: searchTerm,
-              },
-            },
-          ],
-          must_not: mustNot
-        },
+    queryPart = {
+      simple_query_string: {
+        fields,
+        default_operator: "OR",
+        query: searchTerm,
       },
-    };
+    }
   }
 
   return {
     query: {
       bool: {
         must: [
-          {
-            multi_match: {
-              fields,
-              type: "best_fields",
-              operator: "OR",
-              query: searchTerm,
-            },
-          },
+          queryPart
         ],
-        must_not: mustNot
+        must_not: mustNot,
       },
     },
   };
+  /* eslint-enable @typescript-eslint/camelcase */
 };
 
-// eslint-enable @typescript-eslint/camelcase
 
 // How many ms it takes before search is triggered after changing the query value.
 const debounce = 2500;
@@ -137,7 +134,7 @@ const SearchBar: React.FunctionComponent = () => {
         URLParams={true}
         customQuery={queryGenerator}
         customHighlight={() => ({
-          // eslint-disable @typescript-eslint/camelcase
+          /* eslint-disable @typescript-eslint/camelcase */
           highlight: {
             pre_tags: ["<mark>"],
             post_tags: ["</mark>"],
@@ -150,7 +147,7 @@ const SearchBar: React.FunctionComponent = () => {
             fragment_size: 100,
             number_of_fragments: 3,
           },
-          // eslint-enable @typescript-eslint/camelcase
+          /* eslint-enable @typescript-eslint/camelcase */
         })}
       />
     </GlobalHotKeys>

@@ -11,18 +11,17 @@ interface PdfProps {
   linkedProp: NamedNode;
 }
 
-class PdfProp extends React.Component<PdfProps> {
-  static type = schema.Thing;
+const PdfProp = (props: PdfProps) => {
+  const { linkedProp } = props;
 
-  static property = schema.contentUrl;
-
-  render() {
-    const { linkedProp } = this.props;
-
-    return (
-      <PDFViewer url={linkedProp.value} />
-    );
-  }
+  return (
+    <PDFViewer url={linkedProp.value} />
+  );
 }
+
+PdfProp.type = schema.Thing;
+
+PdfProp.property = schema.contentUrl;
+
 
 export default register(PdfProp);

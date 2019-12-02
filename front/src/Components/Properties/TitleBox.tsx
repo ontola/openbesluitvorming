@@ -9,32 +9,29 @@ interface TitleBoxProps {
   name: StringLiteral;
 }
 
-class TitleBox extends React.Component<TitleBoxProps> {
+const TitleBox = (props: TitleBoxProps) => {
+  const { name } = props;
 
-  static type = NS.schema("Thing");
-
-  static topology = resourceTopology;
-
-  static property = [
-    NS.schema("name"),
-    NS.as("name"),
-    NS.rdfs("label"),
-    NS.foaf("name"),
-  ];
-
-  static mapDataToProps = [
-    NS.schema("name"),
-  ];
-
-  render() {
-    const { name } = this.props;
-
-    return (
-      <h2>
-        {name.value}
-      </h2>
-    );
-  }
+  return (
+    <h2>
+      {name.value}
+    </h2>
+  );
 }
+
+TitleBox.type = NS.schema("Thing");
+
+TitleBox.topology = resourceTopology;
+
+TitleBox.property = [
+  NS.schema("name"),
+  NS.as("name"),
+  NS.rdfs("label"),
+  NS.foaf("name"),
+];
+
+TitleBox.mapDataToProps = [
+  NS.schema("name"),
+];
 
 export default register(TitleBox);

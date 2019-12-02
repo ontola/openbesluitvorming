@@ -21,9 +21,6 @@ const ResultStats = (props: ResultsType) =>
     {" resultaten gevonden"}
   </div>;
 
-const NoResults = () =>
-  <div>Geen resultaten gevonden.</div>;
-
 export const LoadingWithSpinner = () =>
   <div className="Results__loader">
     <FontAwesomeIcon icon={faSpinner} spin />
@@ -70,7 +67,7 @@ const ResultsList: React.FunctionComponent = () => {
       sortBy="desc"
       size={20}
       pagination={false}
-      onNoResults={<NoResults/>}
+      onNoResults={"Geen resultaten gevonden."}
       renderResultStats={props => <ResultStats {...props}/>}
       loader={<DualLoader/>}
       sortOptions={sortOptions}

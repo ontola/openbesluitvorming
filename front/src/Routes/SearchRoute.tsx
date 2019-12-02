@@ -18,10 +18,8 @@ import rdfFactory from "@ontologies/core";
 import { GlobalHotKeys } from "react-hotkeys";
 
 import { keyMap } from "../helpers/keyMap";
+import { IS_ORI } from "../config";
 // import CustomSelectedFilters from '../Components/CustomSelectedFilters';
-
-const globalKeyHandlers = {
-};
 
 const SearchRoute = (props: RouteComponentProps) => {
   const [showFilters, setShowFilters] = React.useState(false);
@@ -36,6 +34,17 @@ const SearchRoute = (props: RouteComponentProps) => {
     props.history.push(url.toString().substring(url.origin.length));
   };
 
+  const closeDocument = () => {
+    const currentURL = new URL(window.location.href);
+    const params = new URLSearchParams(currentURL.search);
+    params.delete("showResource");
+    props.history.push(`/search?${params.toString()}`);
+  };
+
+  const globalKeyHandlers = {
+    CLOSE: closeDocument,
+  };
+
   return (
     <GlobalHotKeys
       keyMap={keyMap}
@@ -43,7 +52,7 @@ const SearchRoute = (props: RouteComponentProps) => {
     >
       <ReactiveBase
         theme={theme}
-        app="*"
+        app={IS_ORI ? "ori_*" : "*"}
         url={getApiURL().toString()}
         setSearchParams={setSearchParams as () => string}
       >
@@ -78,8 +87,9 @@ const SearchRoute = (props: RouteComponentProps) => {
             {hasParams &&
               <div className="Results">
                 <SelectedFilters
-                  showClearAll={false}
+                  showClearAll={true}
                   className="Filter Filter__current"
+                  clearAllLabel="Reset"
                   // render={CustomSelectedFilters}
                 />
                 <div className="ResultsListWrapper">

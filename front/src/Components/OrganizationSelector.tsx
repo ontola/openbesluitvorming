@@ -4,6 +4,8 @@ import { getApiURL, useFetch } from '../helpers';
 import Creatable from "react-select/creatable";
 import { withRouter, RouteComponentProps } from 'react-router-dom'
 import paths from "../paths";
+import { handle } from "../helpers/logging";
+import { IS_ORI } from "../config";
 
 const query = {
   "size": 500,
@@ -14,7 +16,7 @@ const query = {
       },
       "filter": {
         "terms": {
-          "classification": ["municipality", "province"]
+          "classification": IS_ORI ? ["municipality"] : ["municipality", "province"]
         }
       }
     }
@@ -55,26 +57,16 @@ const OrganizationSelector = (props: RouteComponentProps) => {
     window.location.href = paths.vngNewForm;
   }
 
-  // Change the route to the filter of the organization
-
-
-  let totalCount = "124";
+  let totalCount = "126";
   const options: any = [];
-  let onSelectOrg = (event: any) => {console.log(event)}
+  let onSelectOrg = (event: any) => {handle(event)}
   let isLoading = true;
 
   if (result.response != null) {
     isLoading = false;
     onSelectOrg = (event: any) => {
-      console.log(event, props.history);
-
       const municipalityIndex = event.value;
-
-      const currentURL = new URL(window.location.href);
-
       const pathWithQueryParams = `search?zoekterm="*"&organisaties=%5B"${municipalityIndex}"%5D`;
-      const url = new URL(currentURL + pathWithQueryParams)
-      console.log(url)
       props.history.push(pathWithQueryParams)
     }
 
@@ -88,6 +80,9 @@ const OrganizationSelector = (props: RouteComponentProps) => {
       })
     })
   }
+
+  const placeholderEnd = IS_ORI ? `gemeenten...` : `gemeenten en provincies...`
+
   return (
     <div className="OrganizationSelector">
       <Creatable
@@ -95,7 +90,7 @@ const OrganizationSelector = (props: RouteComponentProps) => {
         isLoading={isLoading}
         options={options}
         onChange={onSelectOrg}
-        placeholder={`Kies uit ${totalCount} gemeenten en provincies...`}
+        placeholder={`Kies uit ${totalCount} ${placeholderEnd}`}
         onCreateOption={handleCreateOption}
       />
     </div>
