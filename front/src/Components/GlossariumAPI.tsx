@@ -17,7 +17,6 @@ class GlossariumAPI {
   };
 
   getWordhoardList = async(names: string[]) => {
-    // TODO: this call should only be done when a new document is selected
     const wordhoardURL = getTopicsApiURL("/custom/wordhoard/");
     for (const name of names) {
       wordhoardURL.searchParams.append("name", name);

@@ -34,6 +34,7 @@ export interface PDFViewerState {
   pageNumber: number;
   // Should equal 70vw on desktops, 100vw on mobile
   maxWidth: number;
+  wordhoardIDs: Array<string>;
 }
 
 interface OnLoadSuccessType {
@@ -63,6 +64,7 @@ const glossariumAPI = new GlossariumAPI();
 
 const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
   const [pageNumber, setPageNumber] = React.useState<number>(0);
+  const [wordhoardIDs, setWordhoardIDs] = React.useState<Array<string>>([]);
   const [docRef, setDocRef] = React.useState<any>(null);
   const [numPages, setNumPages] = React.useState<number>(0);
   const [maxWidth] = React.useState<number>(calcMaxWidth(window.innerWidth));
@@ -79,8 +81,7 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
   const documentID = myPersistedState<string>("orisearch.pdfviewer.documentID", "");
   const wordhoardNames: string[] = ["orid:" + documentID + "_definitions", "orid:" + documentID + "_abbreviations"];
 
-
-  const getDocAnnotations = () => {
+  const getDocumentWordhoardList = () => {
     glossariumAPI.findSuperItems(documentID).then((oridList: any[]) => {
       for (const orid of oridList) {
         if (orid) {
@@ -91,28 +92,35 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
         }
       }
     }).then(() => {
-      glossariumAPI.getWordhoardList(wordhoardNames).then((wListResponse: any) => {
-        const wordhoardIDs = wListResponse.items.map((item: any) => {
-          return item.id;
-        });
+      glossariumAPI.getWordhoardList(wordhoardNames).then((wordhoardList: any) => {
+        const wordhoardIDs = wordhoardList.items.map((item: any) => {
+          return item.id
+        })
+        setWordhoardIDs(wordhoardIDs)
+        getSectionAnnotations(1, wordhoardIDs) // Get first page annotations
+      })
+    })
+  }
 
-        glossariumAPI.getDocumentSectionAnnotations("orid:" + documentID, pageNumber, wordhoardIDs).then(response => {
-          if (response.surface_forms) {
-            setDocumentSectionAnnotations(response.surface_forms);
-          } else {
-            setDocumentSectionAnnotations([]);
-          }
-        });
-      });
-    });
-  };
+  const getSectionAnnotations = (page:number, wids:Array<any>) => {
+    if (wids) {
+      glossariumAPI.getDocumentSectionAnnotations("orid:" + documentID, page - 1, wids).then(response => {
+        if (response.surface_forms) {
+          setDocumentSectionAnnotations(response.surface_forms);
+        } else {
+          setDocumentSectionAnnotations([]);
+        }
+      })
+    } else {
+      setDocumentSectionAnnotations([]);
+    }
+  }
 
   const uglyStyleSetting = () => {
     // TODO: Dit is jammer maar het moet nou eenmaal. (component integratie)
     const ugly = document.getElementsByClassName("react-pdf__Page__textContent")[0] as HTMLElement;
     if (ugly !== undefined) {
       ugly.style.width = "100%";
-      console.log("gelukt!");
     }
   };
 
@@ -122,7 +130,7 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
     }
     setPageNumber(pageNumber - 1);
     // TODO: fix page number in annotations calls
-    getDocAnnotations();
+    getSectionAnnotations(pageNumber-1, wordhoardIDs);
     setTimeout(uglyStyleSetting, 100);
   };
 
@@ -130,8 +138,8 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
     if (numPages === pageNumber) {
       return;
     }
-    setPageNumber(pageNumber + 1);
-    getDocAnnotations();
+    setPageNumber(pageNumber + 1)
+    getSectionAnnotations(pageNumber+1, wordhoardIDs);
     setTimeout(uglyStyleSetting, 100);
   };
 
@@ -155,7 +163,7 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
     setNumPages(e.numPages);
     setPageNumber(1);
     setShowButtons(true);
-    getDocAnnotations();
+    getDocumentWordhoardList();
     setTimeout(uglyStyleSetting, 100);
   };
 

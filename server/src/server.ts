@@ -59,8 +59,17 @@ function onProxyReq(
   proxyReq.setHeader("Authorization", `Bearer ${accessToken}`);
 }
 
+function tapiRequestFilter(pathname:any, req:any) {
+  if (pathname.match('^/topics_api')) {
+    if (req.method == "GET" || req.method == "OPTIONS" || req.method == "HEAD") {
+      return true
+    }
+  }
+  return false
+}
+
 const apiProxy = httpProxyMiddleware(
-  "/topics_api",
+  tapiRequestFilter,
   {
     onProxyReq,
     ws: true,
