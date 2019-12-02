@@ -43,8 +43,7 @@ class Glossarium extends React.PureComponent<{}, MState> {
     }
   }
 
-  // TODO: don't make text selection work everywhere, only in pdf reader text.
-  // TODO: remove old data when new query
+
   evaluateSelection = (e: any) => {
     e.preventDefault(); // Stops page on refreshing (onSubmit)
     this.setState({

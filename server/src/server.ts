@@ -39,12 +39,19 @@ const oauthClient = simple_oauth2.create(credentials);
 
 let accessToken: String;
 
-oauthClient.clientCredentials.getToken({}).then((result) => {
-  accessToken = result.access_token;
-  console.log("Access token received:", accessToken);
-}).catch((error) => {
-  console.log("Error getting access token for TAPI:", error);
-});
+getTAPIToken()
+
+setInterval(getTAPIToken, 1000*60*60)
+
+function getTAPIToken() {
+  console.log("Refreshing TAPI access token...")
+  oauthClient.clientCredentials.getToken({}).then((result) => {
+    accessToken = result.access_token;
+    console.log("Access token received:", accessToken);
+  }).catch((error) => {
+    console.log("Error getting access token for TAPI:", error);
+  });
+}
 
 function onProxyReq(
   proxyReq: http.ClientRequest, req: http.IncomingMessage, res: http.ServerResponse,
