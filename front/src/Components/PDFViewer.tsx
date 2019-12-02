@@ -34,7 +34,7 @@ export interface PDFViewerState {
   pageNumber: number;
   // Should equal 70vw on desktops, 100vw on mobile
   maxWidth: number;
-  wordhoardIDs: Array<string>;
+  wordhoardIDs: string[];
 }
 
 interface OnLoadSuccessType {
@@ -64,7 +64,7 @@ const glossariumAPI = new GlossariumAPI();
 
 const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
   const [pageNumber, setPageNumber] = React.useState<number>(0);
-  const [wordhoardIDs, setWordhoardIDs] = React.useState<Array<string>>([]);
+  const [wordhoardIDs, setWordhoardIDs] = React.useState<string[]>([]);
   const [docRef, setDocRef] = React.useState<any>(null);
   const [numPages, setNumPages] = React.useState<number>(0);
   const [maxWidth] = React.useState<number>(calcMaxWidth(window.innerWidth));
@@ -80,6 +80,20 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
 
   const documentID = myPersistedState<string>("orisearch.pdfviewer.documentID", "");
   const wordhoardNames: string[] = ["orid:" + documentID + "_definitions", "orid:" + documentID + "_abbreviations"];
+
+  const getSectionAnnotations = (page: number, wids: any[]) => {
+    if (wids) {
+      glossariumAPI.getDocumentSectionAnnotations("orid:" + documentID, page - 1, wids).then(response => {
+        if (response.surface_forms) {
+          setDocumentSectionAnnotations(response.surface_forms);
+        } else {
+          setDocumentSectionAnnotations([]);
+        }
+      })
+    } else {
+      setDocumentSectionAnnotations([]);
+    }
+  }
 
   const getDocumentWordhoardList = () => {
     glossariumAPI.findSuperItems(documentID).then((oridList: any[]) => {
@@ -100,20 +114,6 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
         getSectionAnnotations(1, wordhoardIDs) // Get first page annotations
       })
     })
-  }
-
-  const getSectionAnnotations = (page:number, wids:Array<any>) => {
-    if (wids) {
-      glossariumAPI.getDocumentSectionAnnotations("orid:" + documentID, page - 1, wids).then(response => {
-        if (response.surface_forms) {
-          setDocumentSectionAnnotations(response.surface_forms);
-        } else {
-          setDocumentSectionAnnotations([]);
-        }
-      })
-    } else {
-      setDocumentSectionAnnotations([]);
-    }
   }
 
   const uglyStyleSetting = () => {
