@@ -4,7 +4,7 @@ import cors from "cors";
 import express, { Response, Request } from "express";
 import httpProxyMiddleware from "http-proxy-middleware";
 import morgan from "morgan";
-import simple_oauth2 from "simple-oauth2";
+import simpleOauth2 from "simple-oauth2";
 
 import * as http from "http";
 
@@ -35,16 +35,16 @@ const credentials = {
   },
 };
 
-const oauthClient = simple_oauth2.create(credentials);
+const oauthClient = simpleOauth2.create(credentials);
 
 let accessToken: String;
 
-getTAPIToken()
+getTAPIToken();
 
-setInterval(getTAPIToken, 1000*60*60)
+setInterval(getTAPIToken, 1000 * 60 * 55);
 
 function getTAPIToken() {
-  console.log("Refreshing TAPI access token...")
+  console.log("Refreshing TAPI access token...");
   oauthClient.clientCredentials.getToken({}).then((result) => {
     accessToken = result.access_token;
     console.log("Access token received:", accessToken);
@@ -60,12 +60,12 @@ function onProxyReq(
 }
 
 function tapiRequestFilter(pathname:any, req:any) {
-  if (pathname.match('^/topics_api')) {
-    if (req.method == "GET" || req.method == "OPTIONS" || req.method == "HEAD") {
-      return true
+  if (pathname.match("^/topics_api")) {
+    if (req.method === "GET" || req.method === "OPTIONS" || req.method === "HEAD") {
+      return true;
     }
   }
-  return false
+  return false;
 }
 
 const apiProxy = httpProxyMiddleware(
