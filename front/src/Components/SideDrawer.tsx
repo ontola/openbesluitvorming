@@ -45,6 +45,10 @@ const Handler = () =>
 const SideDrawer = (props: SideDrawerProps & RouteComponentProps) => {
   const [width, setWidth] =
     usePersistedState<number>("orisearch.pdfviewer.width", determineInitialWith(window.innerWidth));
+
+  const [glossIsOpen, toggleGlossarium] =
+    usePersistedState<boolean>("orisearch.pdfviewer.glossariumOpened", false);
+
   const [maxWidth, setMaxWidth] = React.useState<number>(calcMaxWidth(window.innerWidth));
 
   const pdfWrapper = React.createRef<HTMLInputElement>();
@@ -70,9 +74,28 @@ const SideDrawer = (props: SideDrawerProps & RouteComponentProps) => {
     return () => window.removeEventListener("resize", listener);
   });
 
+  const uglyStyleSetting = () => {
+    // TODO: Dit is jammer maar het moet nou eenmaal. (component integratie)
+    const ugly = document.getElementsByClassName("react-pdf__Page__textContent")[0] as HTMLElement;
+    if (ugly !== undefined) {
+      ugly.style.width = "100%";
+    }
+  }
+
+  const toggleGloss = () => {
+    toggleGlossarium(!glossIsOpen);
+    if (!glossIsOpen) {
+      setWidth(width + 400);
+      uglyStyleSetting();
+    } else {
+      setWidth(width - 400);
+    }
+  }
+
   return (
     <SideDrawerContext.Provider
       value={{
+        glossIsOpen,
         width,
         setWidth,
       }}
@@ -96,12 +119,22 @@ const SideDrawer = (props: SideDrawerProps & RouteComponentProps) => {
             direction: any,
             refToElement: HTMLDivElement,
             delta: any,
-          ) =>
-            setWidth(width + delta.width)}
+          ) => {
+            setWidth(width + delta.width);
+            uglyStyleSetting();
+          }}
           enable={{ left: true }}
         >
           <Button
-            className="Button__close Button__default"
+            className="Button__openGlossary"
+            onClick={toggleGloss}
+          >
+            {glossIsOpen ?
+              "Sluit Glossarium" :
+              "Open Glossarium"}
+          </Button>
+          <Button
+            className="Button__close"
             onClick={closeDocument}
           >
             Sluiten
@@ -121,12 +154,14 @@ const SideDrawer = (props: SideDrawerProps & RouteComponentProps) => {
 };
 
 export interface SideDrawerContextType {
+  glossIsOpen: boolean;
   width: number;
   setWidth: Function;
 }
 
 export const SideDrawerContext = React.createContext<SideDrawerContextType>({
   width: 250,
+  glossIsOpen: false,
   setWidth: () => null,
 });
 

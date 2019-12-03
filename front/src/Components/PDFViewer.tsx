@@ -10,12 +10,15 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { withRouter, RouteComponentProps } from "react-router";
 import { SideDrawerContext } from "./SideDrawer";
-import { getParams } from "../helpers";
+import { getParams, myPersistedState, usePersistedState } from "../helpers";
 import { handle } from "../helpers/logging";
 import { HotKeys } from "react-hotkeys";
 import { keyMap } from "../helpers/keyMap";
 import { Property } from "link-redux";
 import { NS } from "../LRS";
+import Glossarium from './Glossarium';
+import GlossariumAPI from './GlossariumAPI';
+
 // eslint-disable-next-line
 const { Document, Page, pdfjs } = require("react-pdf");
 // tslint:disable-next-line:max-line-length
@@ -30,6 +33,7 @@ export interface PDFViewerState {
   pageNumber: number;
   // Should equal 70vw on desktops, 100vw on mobile
   maxWidth: number;
+  wordhoardIDs: string[];
 }
 
 interface OnLoadSuccessType {
@@ -55,8 +59,11 @@ export const LoadingComponent = () =>
     <FontAwesomeIcon icon={faSpinner} size="6x" spin />
   </div>;
 
+const glossariumAPI = new GlossariumAPI();
+
 const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
-  const [pageNumber, setPageNumber] = React.useState<number>(1);
+  const [pageNumber, setPageNumber] = React.useState<number>(0);
+  const [wordhoardIDs, setWordhoardIDs] = React.useState<string[]>([]);
   const [docRef, setDocRef] = React.useState<any>(null);
   const [numPages, setNumPages] = React.useState<number>(0);
   const [maxWidth] = React.useState<number>(calcMaxWidth(window.innerWidth));
@@ -64,18 +71,80 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
   const drawer = React.useContext(SideDrawerContext);
   const pdfWrapper = React.createRef<HTMLInputElement>();
 
+  const glossIsOpen =
+    myPersistedState<boolean>("orisearch.pdfviewer.glossariumOpened", false);
+
+  const setDocumentSectionAnnotations =
+    usePersistedState<any>("orisearch.pdfviewer.documentSectionAnnotations", [])[1];
+
+  const documentID = getParams(props.history)['documentID'];
+
+  const wordhoardNames: string[] = ["orid:" + documentID + "_definitions", "orid:" + documentID + "_abbreviations"];
+
+  const getSectionAnnotations = (page: number, wids: any[]) => {
+    if (wids) {
+      glossariumAPI.getDocumentSectionAnnotations("orid:" + documentID, page - 1, wids).then(response => {
+        if (response) {
+          if (response.surface_forms) {
+            setDocumentSectionAnnotations(response.surface_forms);
+          } else {
+            setDocumentSectionAnnotations([]);
+          }
+        } else {
+          setDocumentSectionAnnotations([]);
+        }
+      })
+    } else {
+      setDocumentSectionAnnotations([]);
+    }
+  }
+
+  const getDocumentWordhoardList = () => {
+    glossariumAPI.findSuperItems(documentID).then((oridList: any[]) => {
+      for (const orid of oridList) {
+        if (orid) {
+          const definitionsWordhoardName = "orid:" + orid + "_definitions";
+          const abbreviationsWordhoardName = "orid:" + orid + "_abbreviations";
+          wordhoardNames.push(definitionsWordhoardName);
+          wordhoardNames.push(abbreviationsWordhoardName);
+        }
+      }
+    }).then(() => {
+      glossariumAPI.getWordhoardList(wordhoardNames).then((wordhoardList: any) => {
+        const wordhoardIDs = wordhoardList.items.map((item: any) => {
+          return item.id
+        })
+        setWordhoardIDs(wordhoardIDs)
+        getSectionAnnotations(1, wordhoardIDs) // Get first page annotations
+      })
+    })
+  }
+
+  const uglyStyleSetting = () => {
+    // TODO: Dit is jammer maar het moet nou eenmaal. (component integratie)
+    const ugly = document.getElementsByClassName("react-pdf__Page__textContent")[0] as HTMLElement;
+    if (ugly !== undefined) {
+      ugly.style.width = "100%";
+    }
+  };
+
   const handlePreviousPage = () => {
     if (pageNumber === 1) {
       return;
     }
     setPageNumber(pageNumber - 1);
+    // TODO: fix page number in annotations calls
+    getSectionAnnotations(pageNumber-1, wordhoardIDs);
+    setTimeout(uglyStyleSetting, 100);
   };
 
   const handleNextPage = () => {
     if (numPages === pageNumber) {
       return;
     }
-    setPageNumber(pageNumber + 1);
+    setPageNumber(pageNumber + 1)
+    getSectionAnnotations(pageNumber+1, wordhoardIDs);
+    setTimeout(uglyStyleSetting, 100);
   };
 
   function focusOnViewer() {
@@ -98,6 +167,8 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
     setNumPages(e.numPages);
     setPageNumber(1);
     setShowButtons(true);
+    getDocumentWordhoardList();
+    setTimeout(uglyStyleSetting, 100);
   };
 
   const PDFErrorComponent = (error: any) => {
@@ -181,7 +252,7 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
       handlers={keyHandlers}
       ref={() => pdfWrapper}
     >
-      <div className="PDFViewer">
+      <div className="PDFViewer" id="PDFViewer">
         <div className="PDFViewer__scroller">
           {/* This component catches focus on Opening and deals with keys */}
           <div
@@ -201,7 +272,8 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
                 loading={<LoadingComponent/>}
                 error={<PDFErrorComponent/>}
                 pageIndex={pageNumber - 1}
-                width={drawer.width}
+                width={drawer.glossIsOpen ? drawer.width - 400 : drawer.width}
+                // width={drawer.width}
                 customTextRenderer={currentSearchTerm && makeTextRenderer(currentSearchTerm)}
               />
             </Document>
@@ -241,6 +313,7 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
           </div>
         }
       </div>
+      {glossIsOpen && <Glossarium/>}
     </HotKeys>
   );
 };
