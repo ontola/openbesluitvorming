@@ -1,10 +1,10 @@
 import { getTopicsApiURL } from "../helpers";
 
-interface wikipediaSummary {
+interface WikipediaSummary {
   extract: string;
   imageURL: string | boolean;
   readmoreURL: string;
-  title: string
+  title: string;
 }
 
 class GlossariumAPI {
@@ -41,7 +41,7 @@ class GlossariumAPI {
     return await response.json();
   };
 
-  getWikipediaSummary = async (query: string): Promise<wikipediaSummary | boolean> => {
+  getWikipediaSummary = async (query: string): Promise<WikipediaSummary | boolean> => {
     const apiQuery = `https://nl.wikipedia.org/w/api.php?action=query&prop=extracts%7Cpageprops&exintro&explaintext&origin=*&format=json&titles=${query}`;
     try {
       const response = await fetch(apiQuery);
@@ -54,7 +54,7 @@ class GlossariumAPI {
       const extract: string = page.extract;
       const imageURL = await this.getWikipediaImageURL(page.title);
       const readmoreURL = "https://nl.wikipedia.org/wiki/" + page.title;
-      const summary: wikipediaSummary = {
+      const summary: WikipediaSummary = {
         extract: extract,
         imageURL: imageURL,
         readmoreURL: readmoreURL,

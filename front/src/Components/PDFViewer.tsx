@@ -78,7 +78,6 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
     usePersistedState<any>("orisearch.pdfviewer.documentSectionAnnotations", [])[1];
 
   const documentID = getParams(props.history)['documentID'];
-  console.log(documentID);
 
   const wordhoardNames: string[] = ["orid:" + documentID + "_definitions", "orid:" + documentID + "_abbreviations"];
 
