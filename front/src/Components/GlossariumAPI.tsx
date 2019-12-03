@@ -35,7 +35,7 @@ class GlossariumAPI {
     return await response.json();
   };
 
-  getWikipediaSummary = async (query: string): Promise<any> => {
+  getWikipediaSummary = async (query: string): Promise<object | boolean> => {
     const apiQuery = `https://nl.wikipedia.org/w/api.php?action=query&prop=extracts%7Cpageprops&exintro&explaintext&origin=*&format=json&titles=${query}`;
     try {
       const response = await fetch(apiQuery);

@@ -41,6 +41,7 @@ let accessToken: String;
 
 getTAPIToken();
 
+// Indefinitely refresh the oauth token every 55 minutes
 setInterval(getTAPIToken, 1000 * 60 * 55);
 
 function getTAPIToken() {

@@ -85,7 +85,6 @@
     "not op_mini all"
   ],
   "devDependencies": {
-    "gh-pages": "^1.1.0",
     "husky": "^3.0.0"
   },
   "husky": {
