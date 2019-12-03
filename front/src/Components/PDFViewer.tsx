@@ -10,7 +10,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { withRouter, RouteComponentProps } from "react-router";
 import { SideDrawerContext } from "./SideDrawer";
-import { getParams, myPersistedState } from "../helpers";
+import { getParams, myPersistedState, usePersistedState } from "../helpers";
 import { handle } from "../helpers/logging";
 import { HotKeys } from "react-hotkeys";
 import { keyMap } from "../helpers/keyMap";
@@ -18,7 +18,6 @@ import { Property } from "link-redux";
 import { NS } from "../LRS";
 import Glossarium from './Glossarium';
 import GlossariumAPI from './GlossariumAPI';
-import { usePersistedState } from '../helpers';
 
 // eslint-disable-next-line
 const { Document, Page, pdfjs } = require("react-pdf");
@@ -78,14 +77,20 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
   const setDocumentSectionAnnotations =
     usePersistedState<any>("orisearch.pdfviewer.documentSectionAnnotations", [])[1];
 
-  const documentID = myPersistedState<string>("orisearch.pdfviewer.documentID", "");
+  const documentID = getParams(props.history)['documentID'];
+  console.log(documentID);
+
   const wordhoardNames: string[] = ["orid:" + documentID + "_definitions", "orid:" + documentID + "_abbreviations"];
 
   const getSectionAnnotations = (page: number, wids: any[]) => {
     if (wids) {
       glossariumAPI.getDocumentSectionAnnotations("orid:" + documentID, page - 1, wids).then(response => {
         if (response) {
-          setDocumentSectionAnnotations(response.surface_forms);
+          if (response.surface_forms) {
+            setDocumentSectionAnnotations(response.surface_forms);
+          } else {
+            setDocumentSectionAnnotations([]);
+          }
         } else {
           setDocumentSectionAnnotations([]);
         }

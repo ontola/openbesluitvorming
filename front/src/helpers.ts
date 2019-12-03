@@ -72,10 +72,17 @@ export const getParams = (history: History) => {
   if (currentSearchTerm) {
     currentSearchTerm = currentSearchTerm.substr(1, currentSearchTerm.length - 2);
   }
+
+  let documentID = null;
+  if (currentResource !== null) {
+    documentID = currentResource.split("/")[3]
+  }
+
   return {
     currentResource,
     currentSearchTerm,
     hasParams,
+    documentID
   };
 };
 

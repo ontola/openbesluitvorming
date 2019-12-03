@@ -1,5 +1,11 @@
 import { getTopicsApiURL } from "../helpers";
 
+interface wikipediaSummary {
+  extract: string;
+  imageURL: string | boolean;
+  readmoreURL: string;
+  title: string
+}
 
 class GlossariumAPI {
   getDocumentSectionAnnotations = async (documentName: string, sectionNumber: number, wordhoardIDs: string[]) => {
@@ -35,7 +41,7 @@ class GlossariumAPI {
     return await response.json();
   };
 
-  getWikipediaSummary = async (query: string): Promise<object | boolean> => {
+  getWikipediaSummary = async (query: string): Promise<wikipediaSummary | boolean> => {
     const apiQuery = `https://nl.wikipedia.org/w/api.php?action=query&prop=extracts%7Cpageprops&exintro&explaintext&origin=*&format=json&titles=${query}`;
     try {
       const response = await fetch(apiQuery);
@@ -48,18 +54,19 @@ class GlossariumAPI {
       const extract: string = page.extract;
       const imageURL = await this.getWikipediaImageURL(page.title);
       const readmoreURL = "https://nl.wikipedia.org/wiki/" + page.title;
-      return {
+      const summary: wikipediaSummary = {
         extract: extract,
         imageURL: imageURL,
         readmoreURL: readmoreURL,
         title: page.title,
       }
+      return summary;
     } catch(e) {
       return false;
     }
   };
 
-  getWikipediaImageURL = async (query: string): Promise<any> => {
+  getWikipediaImageURL = async (query: string): Promise<string | boolean> => {
     const apiQuery = `https://nl.wikipedia.org/w/api.php?action=query&titles=${query}&prop=pageimages&format=json&origin=*&pithumbsize=200`;
     const response = await fetch(apiQuery);
     const data = await response.json();
@@ -72,12 +79,16 @@ class GlossariumAPI {
     }
   };
 
-  findSuperItems = async (documentID: string): Promise<any> => {
+  findSuperItems = async (documentID: string | null): Promise<string[] | null[]> => {
     let parentORID;
     let parentData;
     let committeeORID;
     let grandparentORID;
     let meetingItemData;
+
+    if (documentID === null) {
+      return [];
+    }
 
     try {
       const docJson = await this.getLinkedData(documentID);
