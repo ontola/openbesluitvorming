@@ -72,6 +72,7 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
   const drawer = React.useContext(SideDrawerContext);
   const pdfWrapper = React.createRef<HTMLInputElement>();
   const [glossIsOpen, setGlossIsOpen] = React.useState<boolean>(false);
+  const [selectedText, setSelectedText] = React.useState<string>('Utrecht');
 
   const setDocumentSectionAnnotations =
     usePersistedState<any>("orisearch.pdfviewer.documentSectionAnnotations", [])[1];
@@ -119,14 +120,6 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
     })
   }
 
-  const uglyStyleSetting = () => {
-    // TODO: Dit is jammer maar het moet nou eenmaal. (component integratie)
-    const ugly = document.getElementsByClassName("react-pdf__Page__textContent")[0] as HTMLElement;
-    if (ugly !== undefined) {
-      ugly.style.width = "100%";
-    }
-  };
-
   const handlePreviousPage = () => {
     if (pageNumber === 1) {
       return;
@@ -134,7 +127,6 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
     setPageNumber(pageNumber - 1);
     // TODO: fix page number in annotations calls
     getSectionAnnotations(pageNumber-1, wordhoardIDs);
-    setTimeout(uglyStyleSetting, 100);
   };
 
   const handleNextPage = () => {
@@ -143,7 +135,6 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
     }
     setPageNumber(pageNumber + 1)
     getSectionAnnotations(pageNumber+1, wordhoardIDs);
-    setTimeout(uglyStyleSetting, 100);
   };
 
   function focusOnViewer() {
@@ -167,7 +158,6 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
     setPageNumber(1);
     setShowButtons(true);
     getDocumentWordhoardList();
-    setTimeout(uglyStyleSetting, 100);
   };
 
   const PDFErrorComponent = (error: any) => {
@@ -244,6 +234,16 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
     FULLSCREEN: setFillWidth,
   };
 
+  const handleCheckSelect = (_e: React.MouseEvent) => {
+    const selection = window.getSelection()
+    if ((selection !== null) && (selection.toString() !== '')) {
+      const selectionString = selection.toString()
+      setSelectedText(selectionString)
+    } else {
+      setSelectedText('')
+    }
+  }
+
   return (
     <HotKeys
       allowChanges={true}
@@ -259,6 +259,7 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
             tabIndex={-1}
             style={{ width: "100%" }}
             ref={pdfWrapper}
+            onMouseUp={handleCheckSelect}
           >
             <Document
               error={<PDFErrorComponent/>}
@@ -311,10 +312,10 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
                 title={glossIsOpen ? "Sluit glossarium" : "Open glossarium"}
                 onClick={glossIsOpen ? () => setGlossIsOpen(false) : () => setGlossIsOpen(true)}
               >
-                <FontAwesomeIcon icon={faBook} />
+                <FontAwesomeIcon spin={(selectedText.length > 1 && !glossIsOpen)} icon={faBook} />
               </Button>
             </div>
-            {glossIsOpen && <Glossarium/>}
+            {glossIsOpen && <Glossarium selectedText={selectedText}/>}
           </div>
         }
       </div>

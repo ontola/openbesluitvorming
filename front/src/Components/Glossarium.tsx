@@ -1,12 +1,8 @@
 import * as React from "react";
-import Button from "./Button";
 import GlossariumAPI from "./GlossariumAPI";
 import { myPersistedState } from '../helpers';
 
-
 interface MState {
-  selectedText?: string;
-  evaluateInputText?: string;
   information?: string;
   wikipediaThumbnailUrl?: string;
   wikipediaTitle?: string;
@@ -21,17 +17,17 @@ interface MState {
   selectingText?: boolean;
 }
 
-const showForm = false
+interface MProps {
+  selectedText?: string;
+}
 
-class Glossarium extends React.PureComponent<{}, MState> {
+class Glossarium extends React.PureComponent<MProps, MState> {
   glossariumAPI: any;
 
-  constructor(props: {}) {
+  constructor(props: MProps) {
     super(props);
     this.glossariumAPI = new GlossariumAPI();
     this.state = {
-      evaluateInputText: '',
-      selectedText: '',
       information: '',
       wikipediaThumbnailUrl: '',
       wikipediaReadMoreUrl: '',
@@ -41,7 +37,7 @@ class Glossarium extends React.PureComponent<{}, MState> {
       topicCanonicalName: '',
       topicSource: '',
       customTopic: false,
-      loading: false
+      loading: true,
     }
   }
 
@@ -61,7 +57,7 @@ class Glossarium extends React.PureComponent<{}, MState> {
     });
     let wikipediaQuery: any;
     let customTopic: any = false;
-    const inputText = this.state.evaluateInputText;
+    const inputText = this.props.selectedText;
     const cleanInput = inputText && inputText.trim();
 
     // documentSectionAnnotations is a list of surface forms
@@ -103,18 +99,19 @@ class Glossarium extends React.PureComponent<{}, MState> {
             wikipediaThumbnailUrl: result.imageURL,
           })
         }
-        console.log('result', result)
         this.setState({
           foundOnWikipedia: true,
           information: result.extract,
           wikipediaReadMoreUrl: result.readmoreURL,
           wikipediaTitle: result.title,
+          loading: false,
         })
       } else {
         this.setState({
           foundOnWikipedia: false,
           information: "Onderwerp niet gevonden",
           wikipediaThumbnailUrl: "",
+          loading: false,
         });
       }
     });
@@ -137,77 +134,23 @@ class Glossarium extends React.PureComponent<{}, MState> {
       })
     } else {
       this.setState({
-        loading: false,
         topicDescription: undefined,
       })
     }
   }
 
-  onChange = (e: React.FormEvent<HTMLInputElement>) => {
-    this.setState({
-      evaluateInputText: e.currentTarget.value
-    })
-  }
-
-  selectionChangeCallback = () => {
-    if (this.state.selectingText) {
-      const selection = document.getSelection();
-      if (selection) {
-        this.setState({
-          selectedText: selection.toString(),
-          evaluateInputText: selection.toString()
-        });
-      }
-    }
-  }
-
-  selectionEnd = () => {
-    document.removeEventListener('mouseup', this.selectionEnd);
-    this.setState({
-      selectingText: false
-    });
+  componentDidMount() {
     this.evaluateSelection()
   }
 
-  componentDidMount() {
-    document.addEventListener('selectionchange', this.selectionChangeCallback);
-
-    const pdfViewer = document.getElementById("PDFViewer");
-    if (pdfViewer) {
-      pdfViewer.addEventListener('selectstart', () => {
-        this.setState({
-          selectingText: true
-        });
-        document.addEventListener('mouseup', this.selectionEnd);
-      });
-    }
-
-    const glossaryDescription = document.getElementById("glossary_item_definition");
-    if (glossaryDescription) {
-      glossaryDescription.addEventListener('selectstart', () => {
-        this.setState({
-          selectingText: true
-        });
-        document.addEventListener('mouseup', this.selectionEnd);
-      });
+  componentDidUpdate(prevProps: MProps) {
+    if (prevProps.selectedText !== this.props.selectedText) {
+      this.evaluateSelection()
     }
   }
-
-  componentWillUnmount() {
-    const pdfViewer = document.getElementById("PDFViewer");
-    if (pdfViewer) {
-      pdfViewer.removeEventListener('selectionchange', this.selectionChangeCallback);
-    }
-    const glossaryDescription = document.getElementById("glossary_item_definition");
-    if (glossaryDescription) {
-      glossaryDescription.removeEventListener('selectionchange', this.selectionChangeCallback);
-    }
-    document.removeEventListener('selectionchange', this.selectionChangeCallback);
-  }
-
 
   render() {
-    if (this.state.evaluateInputText === '') {
+    if (this.props.selectedText === '') {
       return (
         <div className="Glossarium">
           Selecteer tekst
@@ -217,19 +160,6 @@ class Glossarium extends React.PureComponent<{}, MState> {
       return (
         <div className="Glossarium">
           <div className="glossarium-container">
-            {showForm &&
-              <div className="selection-container">
-                <form onSubmit={this.evaluateSelection}>
-                  <input
-                    className="selected-text"
-                    value={this.state.evaluateInputText}
-                    onChange={this.onChange} />
-                  <Button className="evaluate-selection-button">
-                    Verzenden
-                  </Button>
-                </form>
-              </div>
-            }
             {this.state.loading ?
               <div className="definition-container">Laden...</div>
               :
@@ -259,8 +189,10 @@ class Glossarium extends React.PureComponent<{}, MState> {
                     {this.state.information}
                   </p>
                   :
-                  this.state.loading ? <p>Laden...</p> :
-                    <p>Niet gevonden</p>
+                  this.state.loading ?
+                    <p>Laden...</p>
+                    :
+                    <p>Niet gevonden voor {this.props.selectedText}</p>
                 }
                 {this.state.wikipediaReadMoreUrl && <p className="read-more"><a href={this.state.wikipediaReadMoreUrl} target="_blank" rel="noopener noreferrer">Lees verder op Wikipedia</a></p>}
               </div>
