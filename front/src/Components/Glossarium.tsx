@@ -21,6 +21,8 @@ interface MState {
   selectingText?: boolean;
 }
 
+const showForm = false
+
 class Glossarium extends React.PureComponent<{}, MState> {
   glossariumAPI: any;
 
@@ -43,9 +45,8 @@ class Glossarium extends React.PureComponent<{}, MState> {
     }
   }
 
-
-  evaluateSelection = (e: any) => {
-    e.preventDefault(); // Stops page on refreshing (onSubmit)
+  evaluateSelection = (e?: any) => {
+    e && e.preventDefault(); // Stops page on refreshing (onSubmit)
     this.setState({
       loading: true,
       foundOnWikipedia: false,
@@ -102,6 +103,7 @@ class Glossarium extends React.PureComponent<{}, MState> {
             wikipediaThumbnailUrl: result.imageURL,
           })
         }
+        console.log('result', result)
         this.setState({
           foundOnWikipedia: true,
           information: result.extract,
@@ -136,10 +138,9 @@ class Glossarium extends React.PureComponent<{}, MState> {
     } else {
       this.setState({
         loading: false,
-        topicDescription: "Geen definitie in documenten gevonden."
+        topicDescription: undefined,
       })
     }
-
   }
 
   onChange = (e: React.FormEvent<HTMLInputElement>) => {
@@ -165,6 +166,7 @@ class Glossarium extends React.PureComponent<{}, MState> {
     this.setState({
       selectingText: false
     });
+    this.evaluateSelection()
   }
 
   componentDidMount() {
@@ -205,47 +207,68 @@ class Glossarium extends React.PureComponent<{}, MState> {
 
 
   render() {
-    return (
-      <div className="Glossarium">
-        <div className="glossarium-container">
-          <div className="selection-container">
-            <h1>Huidige selectie</h1>
-            <form onSubmit={this.evaluateSelection}>
-              <input
-                className="selected-text"
-                value={this.state.evaluateInputText}
-                onChange={this.onChange}/>
-              <Button className="evaluate-selection-button">
-                  Verzenden
-              </Button>
-            </form>
-          </div>
-
-          {!this.state.loading && <div className="definition-container">
-            <div className="definition-title">
-              {this.state.customTopic == true && <b>{this.state.topicCanonicalName} + ({this.state.topicAbbreviation})</b>}
-            </div>
-            <div className="definition" id="glossary_item_definition">
-              {this.state.customTopic == true && <a href={this.state.topicSource} target="_blank" rel="noopener noreferrer">Bron</a>}
-              <p>{this.state.topicDescription}</p>
-            </div>
-          </div>}
-
-          {this.state.loading && <div className="definition-container">Zoeken...</div>}
-
-          <div className="linked-data-container">
-            <div className="wiki-summary">
-              {this.state.foundOnWikipedia == true && <p>{this.state.information}</p>}
-              {this.state.foundOnWikipedia == false && this.state.loading && <p>Zoeken...</p>}
-              {this.state.wikipediaReadMoreUrl && <p className="read-more"><a href={this.state.wikipediaReadMoreUrl} target="_blank" rel="noopener noreferrer">Lees verder op Wikipedia</a></p>}
-            </div>
-            <div className="descriptive-image">
-              {this.state.wikipediaThumbnailUrl && <img className="wiki-image" src={this.state.wikipediaThumbnailUrl} alt={"afbeelding van " + this.state.wikipediaTitle} />}
+    if (this.state.evaluateInputText === '') {
+      return (
+        <div className="Glossarium">
+          Selecteer tekst
+        </div>
+      );
+    } else {
+      return (
+        <div className="Glossarium">
+          <div className="glossarium-container">
+            {showForm &&
+              <div className="selection-container">
+                <form onSubmit={this.evaluateSelection}>
+                  <input
+                    className="selected-text"
+                    value={this.state.evaluateInputText}
+                    onChange={this.onChange} />
+                  <Button className="evaluate-selection-button">
+                    Verzenden
+                  </Button>
+                </form>
+              </div>
+            }
+            {this.state.loading ?
+              <div className="definition-container">Laden...</div>
+              :
+              <div className="definition-container">
+                <div className="definition-title">
+                  {this.state.customTopic == true && <b>{this.state.topicCanonicalName} + ({this.state.topicAbbreviation})</b>}
+                </div>
+                <div className="definition" id="glossary_item_definition">
+                  {this.state.customTopic == true && <a href={this.state.topicSource} target="_blank" rel="noopener noreferrer">Bron</a>}
+                  {this.state.topicDescription &&
+                    <p>{this.state.topicDescription}</p>
+                  }
+                </div>
+              </div>
+            }
+            <div className="linked-data-container">
+              <div className="wiki-summary">
+                {this.state.wikipediaThumbnailUrl &&
+                  <img
+                    className="wiki-image"
+                    src={this.state.wikipediaThumbnailUrl}
+                    alt={"afbeelding van " + this.state.wikipediaTitle}
+                  />}
+                {this.state.foundOnWikipedia ?
+                  <p>
+                    <b>{this.state.wikipediaTitle}: </b>
+                    {this.state.information}
+                  </p>
+                  :
+                  this.state.loading ? <p>Laden...</p> :
+                    <p>Niet gevonden</p>
+                }
+                {this.state.wikipediaReadMoreUrl && <p className="read-more"><a href={this.state.wikipediaReadMoreUrl} target="_blank" rel="noopener noreferrer">Lees verder op Wikipedia</a></p>}
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    );
+      );
+    }
   }
 }
 

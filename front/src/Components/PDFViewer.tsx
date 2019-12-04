@@ -7,10 +7,11 @@ import {
   faSpinner,
   faDownload,
   faExpand,
+  faBook,
 } from "@fortawesome/free-solid-svg-icons";
 import { withRouter, RouteComponentProps } from "react-router";
 import { SideDrawerContext } from "./SideDrawer";
-import { getParams, myPersistedState, usePersistedState } from "../helpers";
+import { getParams, usePersistedState } from "../helpers";
 import { handle } from "../helpers/logging";
 import { HotKeys } from "react-hotkeys";
 import { keyMap } from "../helpers/keyMap";
@@ -70,9 +71,7 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
   const [showButtons, setShowButtons] = React.useState<boolean>(false);
   const drawer = React.useContext(SideDrawerContext);
   const pdfWrapper = React.createRef<HTMLInputElement>();
-
-  const glossIsOpen =
-    myPersistedState<boolean>("orisearch.pdfviewer.glossariumOpened", false);
+  const [glossIsOpen, setGlossIsOpen] = React.useState<boolean>(false);
 
   const setDocumentSectionAnnotations =
     usePersistedState<any>("orisearch.pdfviewer.documentSectionAnnotations", [])[1];
@@ -272,8 +271,7 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
                 loading={<LoadingComponent/>}
                 error={<PDFErrorComponent/>}
                 pageIndex={pageNumber - 1}
-                width={drawer.glossIsOpen ? drawer.width - 400 : drawer.width}
-                // width={drawer.width}
+                width={drawer.width}
                 customTextRenderer={currentSearchTerm && makeTextRenderer(currentSearchTerm)}
               />
             </Document>
@@ -309,11 +307,17 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
               >
                 <FontAwesomeIcon icon={faExpand} />
               </Button>
+              <Button
+                title={glossIsOpen ? "Sluit glossarium" : "Open glossarium"}
+                onClick={glossIsOpen ? () => setGlossIsOpen(false) : () => setGlossIsOpen(true)}
+              >
+                <FontAwesomeIcon icon={faBook} />
+              </Button>
             </div>
+            {glossIsOpen && <Glossarium/>}
           </div>
         }
       </div>
-      {glossIsOpen && <Glossarium/>}
     </HotKeys>
   );
 };

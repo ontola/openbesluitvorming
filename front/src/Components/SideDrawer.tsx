@@ -46,9 +46,6 @@ const SideDrawer = (props: SideDrawerProps & RouteComponentProps) => {
   const [width, setWidth] =
     usePersistedState<number>("orisearch.pdfviewer.width", determineInitialWith(window.innerWidth));
 
-  const [glossIsOpen, toggleGlossarium] =
-    usePersistedState<boolean>("orisearch.pdfviewer.glossariumOpened", false);
-
   const [maxWidth, setMaxWidth] = React.useState<number>(calcMaxWidth(window.innerWidth));
 
   const pdfWrapper = React.createRef<HTMLInputElement>();
@@ -82,20 +79,9 @@ const SideDrawer = (props: SideDrawerProps & RouteComponentProps) => {
     }
   }
 
-  const toggleGloss = () => {
-    toggleGlossarium(!glossIsOpen);
-    if (!glossIsOpen) {
-      setWidth(width + 400);
-      uglyStyleSetting();
-    } else {
-      setWidth(width - 400);
-    }
-  }
-
   return (
     <SideDrawerContext.Provider
       value={{
-        glossIsOpen,
         width,
         setWidth,
       }}
@@ -126,14 +112,6 @@ const SideDrawer = (props: SideDrawerProps & RouteComponentProps) => {
           enable={{ left: true }}
         >
           <Button
-            className="Button__openGlossary"
-            onClick={toggleGloss}
-          >
-            {glossIsOpen ?
-              "Sluit Glossarium" :
-              "Open Glossarium"}
-          </Button>
-          <Button
             className="Button__close"
             onClick={closeDocument}
           >
@@ -154,14 +132,12 @@ const SideDrawer = (props: SideDrawerProps & RouteComponentProps) => {
 };
 
 export interface SideDrawerContextType {
-  glossIsOpen: boolean;
   width: number;
   setWidth: Function;
 }
 
 export const SideDrawerContext = React.createContext<SideDrawerContextType>({
   width: 250,
-  glossIsOpen: false,
   setWidth: () => null,
 });
 
