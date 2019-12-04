@@ -1,4 +1,5 @@
 import { getTopicsApiURL } from "../helpers";
+import paths from "../paths";
 
 interface WikipediaSummary {
   extract: string;
@@ -126,7 +127,7 @@ class GlossariumAPI {
   };
 
   getLinkedData = async (id: string): Promise<any> => {
-    const query = `https://id.openraadsinformatie.nl/${id}.jsonld`;
+    const query = `${paths.oriId(id)}.jsonld`;
     try {
       const response = await fetch(query);
       return await response.json()

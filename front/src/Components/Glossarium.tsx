@@ -1,6 +1,7 @@
 import * as React from "react";
 import GlossariumAPI from "./GlossariumAPI";
 import { myPersistedState } from '../helpers';
+import paths from "../paths";
 
 interface MState {
   information?: string;
@@ -120,7 +121,7 @@ class Glossarium extends React.PureComponent<MProps, MState> {
       this.glossariumAPI.getTopic(customTopic).then((response: any) => {
         let topicSource = "";
         if (response.sources.length > 0) {
-          topicSource = "https://id.openraadsinformatie.nl/" + response.sources[0]
+          topicSource = paths.oriIdBase + response.sources[0]
         }
 
         this.setState({
@@ -192,7 +193,7 @@ class Glossarium extends React.PureComponent<MProps, MState> {
                   this.state.loading ?
                     <p>Laden...</p>
                     :
-                    <p>Niet gevonden voor {this.props.selectedText}</p>
+                    <p>Niets gevonden voor &quot;{this.props.selectedText}&quot;</p>
                 }
                 {this.state.wikipediaReadMoreUrl && <p className="read-more"><a href={this.state.wikipediaReadMoreUrl} target="_blank" rel="noopener noreferrer">Lees verder op Wikipedia</a></p>}
               </div>
