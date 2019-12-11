@@ -29,6 +29,12 @@ export const poweredBy: OrgType[] = [
     picture: "ontola.svg",
   },
   {
+    name: "Qollab",
+    url: "https://qollab.io",
+    toelichting: "softwareontwikkeling WaarOverheid & HierOverheid",
+    picture: "qollab.svg",
+  },
+  {
     name: "VNG Realisatie",
     url: "https://www.vngrealisatie.nl/",
     toelichting: "financiering & beheer Open Raadsinformatie",
