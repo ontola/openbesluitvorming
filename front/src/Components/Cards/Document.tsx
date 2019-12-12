@@ -31,7 +31,7 @@ const Document: React.FunctionComponent<DocumentProps & RouteComponentProps> = (
         <div className="ResultCard__detail" >{indexToLabel(props._index)}</div>
         <DetailType type={props["@type"]} />
         {date &&
-          <div className="ResultCard__detail" >{date.toLocaleDateString()}</div>
+          <div className="ResultCard__detail" >{date.toLocaleDateString("nl-NL")}</div>
         }
         {props.original_url &&
           <a className="ResultCard__detail" href={props.original_url} title="Download bestand">
