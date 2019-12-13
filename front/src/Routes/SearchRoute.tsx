@@ -18,7 +18,6 @@ import rdfFactory from "@ontologies/core";
 import { GlobalHotKeys } from "react-hotkeys";
 
 import { keyMap } from "../helpers/keyMap";
-import { IS_ORI } from "../config";
 // import CustomSelectedFilters from '../Components/CustomSelectedFilters';
 
 const SearchRoute = (props: RouteComponentProps) => {
@@ -52,7 +51,8 @@ const SearchRoute = (props: RouteComponentProps) => {
     >
       <ReactiveBase
         theme={theme}
-        app={IS_ORI ? "ori_*" : "*"}
+        // app={IS_ORI ? "ori_*" : "*"}
+        app="*"
         url={getApiURL().toString()}
         setSearchParams={setSearchParams as () => string}
       >

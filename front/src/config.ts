@@ -7,4 +7,4 @@ export const FRONTEND_ACCEPT = "application/n-quads";
  * Defaults to true.
  */
 export const IS_ORI = window.location.host.startsWith("zoek.openraadsinformatie");
-export const TITLE = IS_ORI ? "Open Raadsinformatie" : "Open Besluitvorming"
+export const TITLE = IS_ORI ? "Open Raadsinformatie" : "OpenBesluitvorming.nl"
