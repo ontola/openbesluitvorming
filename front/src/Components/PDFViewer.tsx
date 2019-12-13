@@ -7,6 +7,7 @@ import {
   faSpinner,
   faDownload,
   faExpand,
+  faHighlighter,
 } from "@fortawesome/free-solid-svg-icons";
 import { withRouter, RouteComponentProps } from "react-router";
 import { SideDrawerContext } from "./SideDrawer";
@@ -61,6 +62,7 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
   const [numPages, setNumPages] = React.useState<number>(0);
   const [maxWidth] = React.useState<number>(calcMaxWidth(window.innerWidth));
   const [showButtons, setShowButtons] = React.useState<boolean>(false);
+  const [useHighlighter, setHighlighter] = React.useState<boolean>(true);
   const drawer = React.useContext(SideDrawerContext);
   const pdfWrapper = React.createRef<HTMLInputElement>();
 
@@ -149,7 +151,7 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
   const setFillWidth = () => {
     if (docRef !== null) {
       const docRatio = docRef.clientWidth / docRef.clientHeight;
-      const newWidth =  window.innerHeight * docRatio;
+      const newWidth = window.innerHeight * docRatio;
       if (newWidth < maxWidth) {
         drawer.setWidth(newWidth);
       } else {
@@ -202,7 +204,9 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
                 error={<PDFErrorComponent/>}
                 pageIndex={pageNumber - 1}
                 width={drawer.width}
-                customTextRenderer={currentSearchTerm && makeTextRenderer(currentSearchTerm)}
+                customTextRenderer={
+                  currentSearchTerm && useHighlighter && makeTextRenderer(currentSearchTerm)
+                }
               />
             </Document>
           </div>
@@ -236,6 +240,12 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
                 title="Scherm vullen (F)"
               >
                 <FontAwesomeIcon icon={faExpand} />
+              </Button>
+              <Button
+                onClick={() => setHighlighter(!useHighlighter)}
+                title={useHighlighter ? "Resultaten niet onderstrepen" : "Resultaten onderstrepen"}
+              >
+                <FontAwesomeIcon icon={faHighlighter} />
               </Button>
             </div>
           </div>
