@@ -44,7 +44,7 @@ const Home = () => {
         <h1 className="Home__header">Doorzoek vergaderstukken van gemeenten en provincies</h1>
         <p>
           Met deze app zoek je door de openbare vergaderingen, agendapunten, moties en
-          documenten van meer dan 120 deelnemende gemeenten {IS_ORI ? "" : "en zes provincies"}.
+          documenten van meer dan 120 deelnemende gemeenten en zes provincies.
         </p>
         {IS_ORI ?
           <div>
@@ -102,9 +102,7 @@ const Home = () => {
         <p>
           Als je wil dat ook jouw gemeente aangesloten wordt op Open Raadsinformatie,
           vraag dan de griffie van je gemeenteraad <a href={paths.vngNewForm}>dit formulier</a> in te vullen.
-          {IS_ORI ? null :
-            <span> Provincies of andere overheden kunnen mailen naar <a href={paths.arguMail}>joep@argu.co</a>.</span>
-          }
+          <span> Provincies of andere overheden kunnen mailen naar <a href={paths.arguMail}>joep@argu.co</a>.</span>
         </p>
         <h2>Andere apps</h2>
         <ul>
