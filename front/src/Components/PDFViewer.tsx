@@ -7,6 +7,7 @@ import {
   faSpinner,
   faDownload,
   faExpand,
+  faHighlighter,
   faBook,
 } from "@fortawesome/free-solid-svg-icons";
 import escapeRegExp from "lodash.escaperegexp"
@@ -70,6 +71,7 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
   const [numPages, setNumPages] = React.useState<number>(0);
   const [maxWidth] = React.useState<number>(calcMaxWidth(window.innerWidth));
   const [showButtons, setShowButtons] = React.useState<boolean>(false);
+  const [useHighlighter, setHighlighter] = React.useState<boolean>(true);
   const drawer = React.useContext(SideDrawerContext);
   const pdfWrapper = React.createRef<HTMLInputElement>();
   const [glossIsOpen, setGlossIsOpen] = React.useState<boolean>(true);
@@ -212,7 +214,7 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
   const setFillWidth = () => {
     if (docRef !== null) {
       const docRatio = docRef.clientWidth / docRef.clientHeight;
-      const newWidth =  window.innerHeight * docRatio;
+      const newWidth = window.innerHeight * docRatio;
       if (newWidth < maxWidth) {
         drawer.setWidth(newWidth);
       } else {
@@ -281,7 +283,9 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
                 error={<PDFErrorComponent/>}
                 pageIndex={pageNumber - 1}
                 width={drawer.width}
-                customTextRenderer={currentSearchTerm && makeTextRenderer(currentSearchTerm)}
+                customTextRenderer={
+                  currentSearchTerm && useHighlighter && makeTextRenderer(currentSearchTerm)
+                }
               />
             </Document>
           </div>
@@ -325,6 +329,12 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
                   className={(selectedText.length > 1 && !glossIsOpen) ? "bounce" : ""}
                   icon={faBook}
                 />
+              </Button>
+              <Button
+                onClick={() => setHighlighter(!useHighlighter)}
+                title={useHighlighter ? "Resultaten niet onderstrepen" : "Resultaten onderstrepen"}
+              >
+                <FontAwesomeIcon icon={faHighlighter} />
               </Button>
             </div>
             {selectedText && glossIsOpen && <Glossarium selectedText={selectedText} pdfWrapperRef={pdfWrapper}/>}
