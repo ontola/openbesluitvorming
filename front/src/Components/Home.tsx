@@ -49,10 +49,10 @@ const Home = () => {
         {IS_ORI ?
           <div>
             <p>
-              {TITLE} is een initiatief om de besluitvorming van Nederlandse overheden
+              Open Raadsinformatie is een initiatief om de besluitvorming van Nederlandse gemeenten
               transparanter te maken.
               Dit wordt gedaan door automatisch uit de bestaande vergadersoftware
-              (zoals raadsinformatiesystemen van gemeenten) de vergaderingen en documenten te halen en
+              (raadsinformatiesystemen) de vergaderingen en documenten te halen en
               deze vervolgens middels een API te ontsluiten op een gestandaardiseerde manier.
             </p>
             <h2>Door wie</h2>
@@ -144,6 +144,10 @@ const Home = () => {
           Deze data is met toestemming van de deelnemende gemeenten en provincies geïmporteerd uit diverse vergadersystemen.
           De data kan door het importeren incompleet, onjuist of niet up to date zijn.
           Het eigenaarschap van de data ligt bij de organisaties die de data hebben aangemaakt, of de respectievelijke auteurs van de documenten.
+        </p>
+        <p>
+          OpenBesluitvorming.nl is tot stand gekomen door de tijd en moeite van de onderstaande organisaties.
+          Hover met je muis over de logo&apos;s om te zien wat hoe de organisaties hebben bijgedragen, en klik er op om er meer over te lezen.
         </p>
       </div>
       {IS_ORI ? null :
