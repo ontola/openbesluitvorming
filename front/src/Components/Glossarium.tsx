@@ -50,7 +50,7 @@ class Glossarium extends React.PureComponent<MProps, MState> {
         if (tapiResponse) {
           const wikisumm = result.extract.toLowerCase();
           const toCompare = [tapiResponse.canonical_name.toLowerCase()];
-          for (let name of tapiResponse.names) {
+          for (const name of tapiResponse.names) {
             toCompare.push(name.toLowerCase());
           }
           
