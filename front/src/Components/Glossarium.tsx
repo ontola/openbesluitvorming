@@ -49,8 +49,10 @@ class Glossarium extends React.PureComponent<MProps, MState> {
         // Only add if relevant
         if (tapiResponse) {
           const wikisumm = result.extract.toLowerCase();
-          const toCompare = [tapiResponse.canonical_name];
-          toCompare.concat(tapiResponse.names);
+          const toCompare = [tapiResponse.canonical_name.toLowerCase()];
+          for (var name of tapiResponse.names) {
+            toCompare.push(name.toLowerCase());
+          }
           
           if (toCompare.some(name => wikisumm.includes(name))) {
             console.log('relevant');
@@ -68,6 +70,8 @@ class Glossarium extends React.PureComponent<MProps, MState> {
               loading: false,
             });
             return;
+          } else {
+            console.log(wikisumm, toCompare);
           }
         } else {
           this.setState({
@@ -166,12 +170,16 @@ class Glossarium extends React.PureComponent<MProps, MState> {
 
         this.setState({
           topicDescription: response.description,
-          topicAbbreviation: response.abbrevation,
+          topicAbbreviation: response.abbreviation,
           topicCanonicalName: response.canonical_name,
           topicSource: topicSource,
           customTopic: true,
           loading: false
         });
+
+        if (response.abbreviation) {
+          wikipediaQuery = response.canonical_name;
+        }
 
         return response
       }).then((response: any) => {
