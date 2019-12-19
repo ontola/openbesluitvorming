@@ -3,6 +3,7 @@ import GlossariumAPI from "./GlossariumAPI";
 import { myPersistedState } from '../helpers';
 import paths from "../paths";
 
+
 interface MState {
   information?: string;
   wikipediaThumbnailUrl?: string;
