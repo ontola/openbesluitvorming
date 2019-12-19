@@ -47,9 +47,13 @@ class GlossariumAPI {
     try {
       const response = await fetch(apiQuery);
       const data = await response.json();
+      console.log(data);
       const firstPageKey = Object.keys(data.query.pages)[0];
       const page = data.query.pages[firstPageKey];
       if (firstPageKey == "-1") {
+        return false;
+      }
+      if ('disambiguation' in page.pageprops) {
         return false;
       }
       const extract: string = page.extract;
