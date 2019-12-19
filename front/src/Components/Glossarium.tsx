@@ -42,6 +42,65 @@ class Glossarium extends React.PureComponent<MProps, MState> {
     }
   }
 
+  addWikipediaSumm = (queryString: string, tapiResponse: any) => {
+    this.glossariumAPI.getWikipediaSummary(queryString).then((result: any) => {
+      if (result) {
+        console.log('wiki result');
+        // Only add if relevant
+        if (tapiResponse) {
+          const wikisumm = result.extract.toLowerCase();
+          const toCompare = [tapiResponse.canonical_name];
+          toCompare.concat(tapiResponse.names);
+          
+          if (toCompare.some(name => wikisumm.includes(name))) {
+            console.log('relevant');
+            // Only set thumbnail if available
+            if (result.imageURL) {
+              this.setState({
+                wikipediaThumbnailUrl: result.imageURL,
+              })
+            }
+            this.setState({
+              foundOnWikipedia: true,
+              information: result.extract,
+              wikipediaReadMoreUrl: result.readmoreURL,
+              wikipediaTitle: result.title,
+              loading: false,
+            });
+            return;
+          }
+        } else {
+          this.setState({
+            foundOnWikipedia: true,
+            information: result.extract,
+            wikipediaReadMoreUrl: result.readmoreURL,
+            wikipediaTitle: result.title,
+            loading: false
+          });
+          return;
+        }
+      }
+      // If no wiki is found or irrelevant..
+      if (tapiResponse) {
+        this.setState({
+          foundOnWikipedia: false,
+          information: "",
+          wikipediaThumbnailUrl: "",
+          wikipediaReadMoreUrl: "",
+          loading: false
+        });
+      } else {
+        this.setState({
+          foundOnWikipedia: false,
+          information: "Onderwerp niet gevonden",
+          wikipediaThumbnailUrl: "",
+          wikipediaReadMoreUrl: "",
+          loading: false,
+        });
+      }
+    });
+  }
+
   evaluateSelection = (e?: any) => {
     e && e.preventDefault(); // Stops page on refreshing (onSubmit)
     this.setState({
@@ -68,6 +127,7 @@ class Glossarium extends React.PureComponent<MProps, MState> {
       wikipediaQuery = cleanInput;
     }
 
+    // Try to find topic in section annotations and determine wikipedia-query-string
     documentSectionAnnotations.map((surfaceForm: any) => {
       if (cleanInput && surfaceForm.name.toLowerCase() === cleanInput.toLowerCase()) {
         // Get top candidate
@@ -92,37 +152,17 @@ class Glossarium extends React.PureComponent<MProps, MState> {
       wikipediaQuery = cleanInput;
     }
 
-    this.glossariumAPI.getWikipediaSummary(wikipediaQuery).then((result: any) => {
-      if (result) {
-        // Only set thumbnail if available
-        if (result.imageURL) {
-          this.setState({
-            wikipediaThumbnailUrl: result.imageURL,
-          })
-        }
-        this.setState({
-          foundOnWikipedia: true,
-          information: result.extract,
-          wikipediaReadMoreUrl: result.readmoreURL,
-          wikipediaTitle: result.title,
-          loading: false,
-        })
-      } else {
-        this.setState({
-          foundOnWikipedia: false,
-          information: "Onderwerp niet gevonden",
-          wikipediaThumbnailUrl: "",
-          loading: false,
-        });
-      }
-    });
-
+    // If topic was found set state
+    // Add wikipedia summary if relevant
     if (customTopic) {
+      console.log('custom topic')
       this.glossariumAPI.getTopic(customTopic).then((response: any) => {
         let topicSource = "";
         if (response.sources.length > 0) {
           topicSource = paths.oriIdBase + response.sources[0]
         }
+
+        console.log(response);
 
         this.setState({
           topicDescription: response.description,
@@ -132,11 +172,21 @@ class Glossarium extends React.PureComponent<MProps, MState> {
           customTopic: true,
           loading: false
         });
+
+        return response
+      }).then((response: any) => {
+        this.addWikipediaSumm(wikipediaQuery, response);
       })
     } else {
+      console.log('no custom topic')
       this.setState({
+        topicAbbreviation: '',
+        topicCanonicalName: '',
         topicDescription: undefined,
-      })
+        topicSource: '',
+        customTopic: false
+      });
+      this.addWikipediaSumm(wikipediaQuery, undefined);
     }
   }
 
@@ -191,11 +241,14 @@ class Glossarium extends React.PureComponent<MProps, MState> {
                   </p>
                   :
                   this.state.loading ?
-                    <p>Laden...</p>
+                    <p></p>
                     :
+                    this.state.information !== "" ?
                     <p>Niets gevonden voor &quot;{this.props.selectedText}&quot;</p>
+                    :
+                    <p></p>
                 }
-                {this.state.wikipediaReadMoreUrl && <p className="read-more"><a href={this.state.wikipediaReadMoreUrl} target="_blank" rel="noopener noreferrer">Lees verder op Wikipedia</a></p>}
+                {this.state.wikipediaReadMoreUrl !== "" && <p className="read-more"><a href={this.state.wikipediaReadMoreUrl} target="_blank" rel="noopener noreferrer">Lees verder op Wikipedia</a></p>}
               </div>
             </div>
           </div>
