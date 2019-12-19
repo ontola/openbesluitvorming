@@ -244,9 +244,9 @@ class Glossarium extends React.PureComponent<MProps, MState> {
                     <p></p>
                     :
                     this.state.information !== "" ?
-                    <p>Niets gevonden voor &quot;{this.props.selectedText}&quot;</p>
-                    :
-                    <p></p>
+                      <p>Niets gevonden voor &quot;{this.props.selectedText}&quot;</p>
+                      :
+                      <p></p>
                 }
                 {this.state.wikipediaReadMoreUrl !== "" && <p className="read-more"><a href={this.state.wikipediaReadMoreUrl} target="_blank" rel="noopener noreferrer">Lees verder op Wikipedia</a></p>}
               </div>
