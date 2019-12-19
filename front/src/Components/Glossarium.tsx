@@ -45,7 +45,6 @@ class Glossarium extends React.PureComponent<MProps, MState> {
   addWikipediaSumm = (queryString: string, tapiResponse: any) => {
     this.glossariumAPI.getWikipediaSummary(queryString).then((result: any) => {
       if (result) {
-        console.log('wiki result');
         // Only add if relevant
         if (tapiResponse) {
           const wikisumm = result.extract.toLowerCase();
@@ -55,7 +54,6 @@ class Glossarium extends React.PureComponent<MProps, MState> {
           }
           
           if (toCompare.some(name => wikisumm.includes(name))) {
-            console.log('relevant');
             // Only set thumbnail if available
             if (result.imageURL) {
               this.setState({
@@ -70,8 +68,6 @@ class Glossarium extends React.PureComponent<MProps, MState> {
               loading: false,
             });
             return;
-          } else {
-            console.log(wikisumm, toCompare);
           }
         } else {
           this.setState({
@@ -159,14 +155,11 @@ class Glossarium extends React.PureComponent<MProps, MState> {
     // If topic was found set state
     // Add wikipedia summary if relevant
     if (customTopic) {
-      console.log('custom topic')
       this.glossariumAPI.getTopic(customTopic).then((response: any) => {
         let topicSource = "";
         if (response.sources.length > 0) {
           topicSource = paths.oriIdBase + response.sources[0]
         }
-
-        console.log(response);
 
         this.setState({
           topicDescription: response.description,
@@ -186,7 +179,6 @@ class Glossarium extends React.PureComponent<MProps, MState> {
         this.addWikipediaSumm(wikipediaQuery, response);
       })
     } else {
-      console.log('no custom topic')
       this.setState({
         topicAbbreviation: '',
         topicCanonicalName: '',
