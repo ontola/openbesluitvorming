@@ -71,8 +71,8 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
   const [showButtons, setShowButtons] = React.useState<boolean>(false);
   const drawer = React.useContext(SideDrawerContext);
   const pdfWrapper = React.createRef<HTMLInputElement>();
-  const [glossIsOpen, setGlossIsOpen] = React.useState<boolean>(false);
-  const [selectedText, setSelectedText] = React.useState<string>('Utrecht');
+  const [glossIsOpen, setGlossIsOpen] = React.useState<boolean>(true);
+  const [selectedText, setSelectedText] = React.useState<string>('');
 
   const setDocumentSectionAnnotations =
     usePersistedState<any>("orisearch.pdfviewer.documentSectionAnnotations", [])[1];
@@ -225,6 +225,10 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
     }
   };
 
+  const toggleGlossary = () => {
+    setGlossIsOpen(!glossIsOpen)
+  };
+
   const makeTextRenderer = (searchText: string) =>
     (textItem: TextLayerItem) => highlightPattern(textItem.str, searchText);
 
@@ -232,6 +236,7 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
     PREVIOUS: handlePreviousPage,
     NEXT: handleNextPage,
     FULLSCREEN: setFillWidth,
+    GLOSS: toggleGlossary,
   };
 
   const handleCheckSelect = (_e: React.MouseEvent) => {
@@ -312,10 +317,14 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
                 title={glossIsOpen ? "Sluit glossarium" : "Open glossarium"}
                 onClick={glossIsOpen ? () => setGlossIsOpen(false) : () => setGlossIsOpen(true)}
               >
-                <FontAwesomeIcon spin={(selectedText.length > 1 && !glossIsOpen)} icon={faBook} />
+                <FontAwesomeIcon
+                  // If text is selected, spint this bad boy
+                  spin={(selectedText.length > 1 && !glossIsOpen)}
+                  icon={faBook}
+                />
               </Button>
             </div>
-            {glossIsOpen && <Glossarium selectedText={selectedText}/>}
+            {selectedText && glossIsOpen && <Glossarium selectedText={selectedText}/>}
           </div>
         }
       </div>

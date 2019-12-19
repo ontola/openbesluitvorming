@@ -37,6 +37,8 @@ Read the [Elastic v7.0](https://www.elastic.co/guide/en/elasticsearch/reference/
 Only [specific Elastic endpoints](https://github.com/openstate/open-raadsinformatie/blob/master/deployment/endpoints/production.yaml) are publicly available.
 This is to prevent (malicious or accidental) write / remove commands.
 
+If you want to know the mapping for Elastic, visit `https://api.openraadsinformatie.nl/v1/elastic/ori_amers*/_mapping`. Replace `ori_amsers` with the index that you're interested in.
+
 If you want to see some examples of how to query this endpoint, check out [`example_requests.http`](/example_requests.http).
 
 ## Changes from V0
