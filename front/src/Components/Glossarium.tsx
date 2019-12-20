@@ -2,6 +2,8 @@ import * as React from "react";
 import GlossariumAPI from "./GlossariumAPI";
 import { myPersistedState } from '../helpers';
 import paths from "../paths";
+import {FontAwesomeIcon} from "@fortawesome/react-fontawesome";
+import {faFileAlt} from "@fortawesome/free-solid-svg-icons/faFileAlt";
 
 
 interface MState {
@@ -11,10 +13,10 @@ interface MState {
   wikipediaReadMoreUrl?: string;
   foundOnWikipedia?: boolean;
   topicDescription?: string;
-  topicAbbreviation?: string;
-  topicCanonicalName?: string;
-  topicNames?: string[];
-  topicSources?: string[];
+  topicAbbreviation: string;
+  topicCanonicalName: string;
+  topicNames: string[];
+  topicSources: string[];
   customTopic?: boolean;
   loading?: boolean;
   selectingText?: boolean;
@@ -243,14 +245,29 @@ class Glossarium extends React.PureComponent<MProps, MState> {
                 <div className="definition-title">
                   <strong>{this.state.topicCanonicalName} {this.state.topicAbbreviation && <span>({this.state.topicAbbreviation})</span>}</strong>
                 </div>
+                {this.state.topicNames.length > 0 && <div className="definition-names">
+                  {'Ook bekend als: '}
+                  {this.state.topicNames.map<React.ReactNode>(
+                    (name) => <em key={name}>{name}</em>
+                  ).reduce(
+                    (prev, curr) => [prev, ', ', curr]
+                  )}
+                </div>}
                 <div className="definition-sources">
-                  {this.state.topicSources!.length > 1 ? 'Bronnen: ' : 'Bron: '}
-                  {this.state.topicSources!.map<React.ReactNode>(
-                      (source) => <a href={`${paths.oriIdBase}${source}`} target="_blank" rel="noopener noreferrer">{`orid:${source}`}</a>
-                    ).reduce(
-                      (prev, curr) => [prev, ', ', curr]
-                    )
-                  }
+                  {this.state.topicSources.length > 1 ? 'Bronnen: ' : 'Bron: '}
+                  {this.state.topicSources.length > 0 && this.state.topicSources.map<React.ReactNode>(
+                    (source) => <span key={source}>
+                      <FontAwesomeIcon icon={faFileAlt} />{' '}
+                      <a
+                        href={'?showResource=' + encodeURIComponent(`${paths.oriIdBase}${source}`)}
+                        target="_blank" rel="noopener noreferrer"
+                      >
+                        {`orid:${source}`}
+                      </a>
+                    </span>
+                  ).reduce(
+                    (prev, curr) => [prev, ', ', curr]
+                  )}
                 </div>
                 <div className="definition" id="glossary_item_definition">
                   {this.state.topicDescription &&

@@ -835,11 +835,19 @@ mark {
     font-weight: bold;
     text-decoration: none;
   }
+
+  .svg-inline--fa {
+    color: $grey;
+  }
 }
 
 .definition-container {
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
   text-align: left;
+
+  div {
+    margin-bottom: 0.5rem;
+  }
 }
 
 .wiki-summary {
