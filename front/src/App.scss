@@ -843,11 +843,22 @@ mark {
   background-color: white;
   border-top: solid 1px $g2;
   pointer-events: auto;
+  padding: 1rem;
+
+  a {
+    color: $blue;
+    font-weight: bold;
+    text-decoration: none;
+  }
+}
+
+.definition-container {
+  margin-bottom: 1rem;
+  text-align: left;
 }
 
 .wiki-summary {
   text-align: left;
-  padding: 1rem;
   min-width: 10rem;
 }
 
@@ -856,14 +867,4 @@ mark {
   max-width: 10rem;
   padding-left: .4rem;
   padding-bottom: .4rem;
-}
-
-.definition-title {
-  padding-top: .5rem;
-}
-
-.Glossarium a {
-  color: $blue;
-  font-weight: bold;
-  text-decoration: none;
 }

@@ -238,46 +238,51 @@ class Glossarium extends React.PureComponent<MProps, MState> {
       return (
         <div ref={this.glossaryDiv} className="Glossarium">
           <div className="glossarium-container">
-            {this.state.loading ?
-              <div className="definition-container">Laden...</div>
-              :
+            {this.state.customTopic == true &&
               <div className="definition-container">
                 <div className="definition-title">
-                  {this.state.customTopic == true && <b>{this.state.topicCanonicalName} + ({this.state.topicAbbreviation})</b>}
+                  <strong>{this.state.topicCanonicalName} {this.state.topicAbbreviation && <span>({this.state.topicAbbreviation})</span>}</strong>
                 </div>
                 <div className="definition" id="glossary_item_definition">
-                  {this.state.customTopic == true && <a href={this.state.topicSource} target="_blank" rel="noopener noreferrer">Bron</a>}
+                  <a href={this.state.topicSource} target="_blank" rel="noopener noreferrer">Bron</a>
                   {this.state.topicDescription &&
                     <p>{this.state.topicDescription}</p>
                   }
                 </div>
               </div>
             }
-            <div className="linked-data-container">
-              <div className="wiki-summary">
-                {this.state.wikipediaThumbnailUrl &&
-                  <img
-                    className="wiki-image"
-                    src={this.state.wikipediaThumbnailUrl}
-                    alt={"afbeelding van " + this.state.wikipediaTitle}
-                  />}
-                {this.state.foundOnWikipedia ?
-                  <p>
-                    <b>{this.state.wikipediaTitle}: </b>
-                    {this.state.information}
-                  </p>
-                  :
-                  this.state.loading ?
-                    <p></p>
+            {this.state.loading ?
+              <div className="linked-data-container">Laden...</div>
+              :
+              <div className="linked-data-container">
+                <div className="wiki-summary">
+                  {this.state.wikipediaThumbnailUrl &&
+                    <img
+                      className="wiki-image"
+                      src={this.state.wikipediaThumbnailUrl}
+                      alt={"afbeelding van " + this.state.wikipediaTitle}
+                    />}
+                  {this.state.foundOnWikipedia ?
+                    <p>
+                      <strong>{this.state.wikipediaTitle}: </strong>
+                      {this.state.information}
+                    </p>
                     :
                     this.state.information !== "" ?
                       <p>Niets gevonden voor &quot;{this.props.selectedText}&quot;</p>
                       :
-                      <p></p>
-                }
-                {this.state.wikipediaReadMoreUrl !== "" && <p className="read-more"><a href={this.state.wikipediaReadMoreUrl} target="_blank" rel="noopener noreferrer">Lees verder op Wikipedia</a></p>}
+                      <p/>
+                  }
+                  {this.state.wikipediaReadMoreUrl !== "" &&
+                    <p className="read-more">
+                      <a href={this.state.wikipediaReadMoreUrl} target="_blank" rel="noopener noreferrer">
+                        Lees verder op Wikipedia
+                      </a>
+                    </p>
+                  }
+                </div>
               </div>
-            </div>
+            }
           </div>
         </div>
       );
