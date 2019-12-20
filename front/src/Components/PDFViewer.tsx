@@ -317,8 +317,8 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
                 onClick={glossIsOpen ? () => setGlossIsOpen(false) : () => setGlossIsOpen(true)}
               >
                 <FontAwesomeIcon
-                  // If text is selected, spint this bad boy
-                  spin={(selectedText.length > 1 && !glossIsOpen)}
+                  // If text is selected, bounce this bad boy
+                  className={(selectedText.length > 1 && !glossIsOpen) ? "bounce" : ""}
                   icon={faBook}
                 />
               </Button>

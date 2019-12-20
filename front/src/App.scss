@@ -85,21 +85,6 @@ p {
     }
   }
 
-  &__openGlossary {
-    color: $blue;
-    font-weight: bold;
-    border-radius: $border-radius;
-    padding: .5rem;
-    position: absolute;
-    top: .5rem;
-    right: 5rem;
-    background-color: transparentize(white, .1);
-    z-index: 1;
-    &:hover {
-      color: $blue_dark;
-    }
-  }
-
   &__toggle {
   color: $g4;
   position: relative;
@@ -867,4 +852,22 @@ mark {
   max-width: 10rem;
   padding-left: .4rem;
   padding-bottom: .4rem;
+}
+
+.bounce {
+  align-self: flex-end;
+  animation-duration: .67s;
+  animation-iteration-count: infinite;
+  animation-name: bounce;
+  animation-timing-function: ease;
+  transform-origin: bottom;
+}
+@keyframes bounce {
+  0%   { transform: scale(1,1)      translateY(0); }
+  10%  { transform: scale(1.1,.9)   translateY(0); }
+  30%  { transform: scale(.9,1.1)   translateY(-0.4em); }
+  48%  { transform: scale(1.05,.95) translateY(0); }
+  55%  { transform: scale(1,1)      translateY(-0.03em); }
+  67%  { transform: scale(1,1)      translateY(0); }
+  100% { transform: scale(1,1)      translateY(0); }
 }
