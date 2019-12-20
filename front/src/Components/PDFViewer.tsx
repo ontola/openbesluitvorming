@@ -97,7 +97,7 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
     } else {
       setDocumentSectionAnnotations([]);
     }
-  }
+  };
 
   const getDocumentWordhoardList = () => {
     glossariumAPI.findSuperItems(documentID).then((oridList: any[]) => {
@@ -113,19 +113,18 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
       glossariumAPI.getWordhoardList(wordhoardNames).then((wordhoardList: any) => {
         const wordhoardIDs = wordhoardList.items.map((item: any) => {
           return item.id
-        })
-        setWordhoardIDs(wordhoardIDs)
+        });
+        setWordhoardIDs(wordhoardIDs);
         getSectionAnnotations(1, wordhoardIDs) // Get first page annotations
       })
     })
-  }
+  };
 
   const handlePreviousPage = () => {
     if (pageNumber === 1) {
       return;
     }
     setPageNumber(pageNumber - 1);
-    // TODO: fix page number in annotations calls
     getSectionAnnotations(pageNumber-1, wordhoardIDs);
   };
 
@@ -133,7 +132,7 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
     if (numPages === pageNumber) {
       return;
     }
-    setPageNumber(pageNumber + 1)
+    setPageNumber(pageNumber + 1);
     getSectionAnnotations(pageNumber+1, wordhoardIDs);
   };
 
@@ -240,14 +239,14 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
   };
 
   const handleCheckSelect = (_e: React.MouseEvent) => {
-    const selection = window.getSelection()
+    const selection = window.getSelection();
     if ((selection !== null) && (selection.toString() !== '')) {
-      const selectionString = selection.toString()
+      const selectionString = selection.toString();
       setSelectedText(selectionString)
     } else {
       setSelectedText('')
     }
-  }
+  };
 
   return (
     <HotKeys
@@ -324,7 +323,7 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
                 />
               </Button>
             </div>
-            {selectedText && glossIsOpen && <Glossarium selectedText={selectedText}/>}
+            {selectedText && glossIsOpen && <Glossarium selectedText={selectedText} pdfWrapperRef={pdfWrapper}/>}
           </div>
         }
       </div>

@@ -21,10 +21,13 @@ interface MState {
 
 interface MProps {
   selectedText?: string;
+  pdfWrapperRef: React.RefObject<HTMLDivElement>;
 }
 
 class Glossarium extends React.PureComponent<MProps, MState> {
   glossariumAPI: any;
+  private glossaryDiv: React.RefObject<HTMLDivElement>;
+  private pdfWrapper: HTMLDivElement | null;
 
   constructor(props: MProps) {
     super(props);
@@ -40,7 +43,9 @@ class Glossarium extends React.PureComponent<MProps, MState> {
       topicSource: '',
       customTopic: false,
       loading: true,
-    }
+    };
+    this.glossaryDiv = React.createRef();
+    this.pdfWrapper = null;
   }
 
   addWikipediaSumm = (queryString: string, tapiResponse: any) => {
@@ -53,7 +58,7 @@ class Glossarium extends React.PureComponent<MProps, MState> {
           for (const name of tapiResponse.names) {
             toCompare.push(name.toLowerCase());
           }
-          
+
           if (toCompare.some(name => wikisumm.includes(name))) {
             // Only set thumbnail if available
             if (result.imageURL) {
@@ -68,6 +73,7 @@ class Glossarium extends React.PureComponent<MProps, MState> {
               wikipediaTitle: result.title,
               loading: false,
             });
+            this.addPdfWrapperMargin();
             return;
           }
         } else {
@@ -78,6 +84,7 @@ class Glossarium extends React.PureComponent<MProps, MState> {
             wikipediaTitle: result.title,
             loading: false
           });
+          this.addPdfWrapperMargin();
           return;
         }
       }
@@ -99,8 +106,9 @@ class Glossarium extends React.PureComponent<MProps, MState> {
           loading: false,
         });
       }
+      this.addPdfWrapperMargin();
     });
-  }
+  };
 
   evaluateSelection = (e?: any) => {
     e && e.preventDefault(); // Stops page on refreshing (onSubmit)
@@ -189,28 +197,46 @@ class Glossarium extends React.PureComponent<MProps, MState> {
       });
       this.addWikipediaSumm(wikipediaQuery, undefined);
     }
+  };
+
+  addPdfWrapperMargin() {
+    const glossaryDiv = this.glossaryDiv.current;
+    if (glossaryDiv && this.pdfWrapper) {
+      this.pdfWrapper.style.marginBottom = `${glossaryDiv.offsetHeight}px`
+    }
+  }
+
+  removePdfWrapperMargin() {
+    if (this.pdfWrapper) {
+      this.pdfWrapper.style.marginBottom = null
+    }
   }
 
   componentDidMount() {
-    this.evaluateSelection()
+    this.pdfWrapper = this.props.pdfWrapperRef.current;
+    this.evaluateSelection();
   }
 
   componentDidUpdate(prevProps: MProps) {
     if (prevProps.selectedText !== this.props.selectedText) {
-      this.evaluateSelection()
+      this.evaluateSelection();
     }
+  }
+
+  componentWillUnmount(): void {
+    this.removePdfWrapperMargin()
   }
 
   render() {
     if (this.props.selectedText === '') {
       return (
-        <div className="Glossarium">
+        <div ref={this.glossaryDiv} className="Glossarium">
           Selecteer tekst
         </div>
       );
     } else {
       return (
-        <div className="Glossarium">
+        <div ref={this.glossaryDiv} className="Glossarium">
           <div className="glossarium-container">
             {this.state.loading ?
               <div className="definition-container">Laden...</div>
