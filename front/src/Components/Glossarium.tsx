@@ -13,7 +13,8 @@ interface MState {
   topicDescription?: string;
   topicAbbreviation?: string;
   topicCanonicalName?: string;
-  topicSource?: string;
+  topicNames?: string[];
+  topicSources?: string[];
   customTopic?: boolean;
   loading?: boolean;
   selectingText?: boolean;
@@ -40,7 +41,8 @@ class Glossarium extends React.PureComponent<MProps, MState> {
       topicDescription: '',
       topicAbbreviation: '',
       topicCanonicalName: '',
-      topicSource: '',
+      topicNames: [],
+      topicSources: [],
       customTopic: false,
       loading: true,
     };
@@ -121,8 +123,9 @@ class Glossarium extends React.PureComponent<MProps, MState> {
       wikipediaTitle: "",
       topicAbbreviation: "",
       topicCanonicalName: "",
+      topicNames: [],
       topicDescription: "",
-      topicSource: ""
+      topicSources: []
     });
     let wikipediaQuery: any;
     let customTopic: any = false;
@@ -165,16 +168,12 @@ class Glossarium extends React.PureComponent<MProps, MState> {
     // Add wikipedia summary if relevant
     if (customTopic) {
       this.glossariumAPI.getTopic(customTopic).then((response: any) => {
-        let topicSource = "";
-        if (response.sources.length > 0) {
-          topicSource = paths.oriIdBase + response.sources[0]
-        }
-
         this.setState({
           topicDescription: response.description,
           topicAbbreviation: response.abbreviation,
           topicCanonicalName: response.canonical_name,
-          topicSource: topicSource,
+          topicNames: response.names,
+          topicSources: response.sources,
           customTopic: true,
           loading: false
         });
@@ -192,7 +191,8 @@ class Glossarium extends React.PureComponent<MProps, MState> {
         topicAbbreviation: '',
         topicCanonicalName: '',
         topicDescription: undefined,
-        topicSource: '',
+        topicNames: [],
+        topicSources: [],
         customTopic: false
       });
       this.addWikipediaSumm(wikipediaQuery, undefined);
@@ -243,8 +243,16 @@ class Glossarium extends React.PureComponent<MProps, MState> {
                 <div className="definition-title">
                   <strong>{this.state.topicCanonicalName} {this.state.topicAbbreviation && <span>({this.state.topicAbbreviation})</span>}</strong>
                 </div>
+                <div className="definition-sources">
+                  {this.state.topicSources!.length > 1 ? 'Bronnen: ' : 'Bron: '}
+                  {this.state.topicSources!.map<React.ReactNode>(
+                      (source) => <a href={`${paths.oriIdBase}${source}`} target="_blank" rel="noopener noreferrer">{`orid:${source}`}</a>
+                    ).reduce(
+                      (prev, curr) => [prev, ', ', curr]
+                    )
+                  }
+                </div>
                 <div className="definition" id="glossary_item_definition">
-                  <a href={this.state.topicSource} target="_blank" rel="noopener noreferrer">Bron</a>
                   {this.state.topicDescription &&
                     <p>{this.state.topicDescription}</p>
                   }
