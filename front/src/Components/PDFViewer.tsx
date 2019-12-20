@@ -9,6 +9,7 @@ import {
   faExpand,
   faBook,
 } from "@fortawesome/free-solid-svg-icons";
+import escapeRegExp from "lodash.escaperegexp"
 import { withRouter, RouteComponentProps } from "react-router";
 import { SideDrawerContext } from "./SideDrawer";
 import { getParams, usePersistedState } from "../helpers";
@@ -174,13 +175,16 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
   };
 
   const highlightPattern = (text: string, pattern: string): React.ReactNode => {
-    const splitText = text.split(pattern);
+    const patternPlaceholder = pattern.replace(/[\s\-－﹣֊᐀‐–︲—﹘―⸺⸻⸗⹀〜゠⸚]+/g, '%').replace(/[^\w\d%]/g, '');
+    const patternRewrite = escapeRegExp(patternPlaceholder).replace(/%/g, '[\\s\\-－﹣֊᐀‐–︲—﹘―⸺⸻⸗⹀〜゠⸚]+');
+    const safePattern = new RegExp(patternRewrite, 'gui');
+    const splitText = text.split(safePattern);
 
     if (splitText.length <= 1) {
       return text;
     }
 
-    const matches = text.match(pattern);
+    const matches = text.match(safePattern);
 
     const whatever = splitText.reduce<React.ReactNode[]>(
       (arr, element, index) => {

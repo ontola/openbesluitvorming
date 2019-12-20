@@ -1654,6 +1654,13 @@
   dependencies:
     "@types/geojson" "*"
 
+"@types/lodash.escaperegexp@^4.1.6":
+  version "4.1.6"
+  resolved "https://registry.yarnpkg.com/@types/lodash.escaperegexp/-/lodash.escaperegexp-4.1.6.tgz#3e2326aa33e95b2f3801de027f04a4f7aba2af4f"
+  integrity sha512-uENiqxLlqh6RzeE1cC6Z2gHqakToN9vKlTVCFkSVjAfeMeh2fY0916tHwJHeeKs28qB/hGYvKuampGYH5QDVCw==
+  dependencies:
+    "@types/lodash" "*"
+
 "@types/lodash.throttle@^4.1.6":
   version "4.1.6"
   resolved "https://registry.yarnpkg.com/@types/lodash.throttle/-/lodash.throttle-4.1.6.tgz#f5ba2c22244ee42ff6c2c49e614401a870c1009c"
@@ -7017,6 +7024,11 @@ lodash._reinterpolate@^3.0.0:
   version "3.0.0"
   resolved "https://registry.yarnpkg.com/lodash._reinterpolate/-/lodash._reinterpolate-3.0.0.tgz#0ccf2d89166af03b3663c796538b75ac6e114d9d"
   integrity sha1-DM8tiRZq8Ds2Y8eWU4t1rG4RTZ0=
+
+lodash.escaperegexp@^4.1.1:
+  version "4.1.2"
+  resolved "https://registry.yarnpkg.com/lodash.escaperegexp/-/lodash.escaperegexp-4.1.2.tgz#64762c48618082518ac3df4ccf5d5886dae20347"
+  integrity sha1-ZHYsSGGAglGKw99Mz11YhtriA0c=
 
 lodash.memoize@^4.1.2:
   version "4.1.2"
