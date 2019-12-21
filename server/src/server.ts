@@ -20,7 +20,7 @@ app.use(cors());
 app.use(morgan("combined"));
 
 // TAPI connection
-const TAPI_ROOT_URL = "https://topics-dev.platform.co.nl/";
+const TAPI_ROOT_URL = "https://topics.platform.co.nl/";
 const clientID = process.env.CLIENT_ID;
 const clientSecret = process.env.CLIENT_SECRET;
 
