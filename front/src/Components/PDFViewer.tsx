@@ -1,4 +1,4 @@
-import React, { useLayoutEffect } from "react";
+import React from "react";
 import Button from "./Button";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -139,17 +139,17 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
     getSectionAnnotations(pageNumber+1, wordhoardIDs);
   };
 
-  function focusOnViewer() {
-    if (pdfWrapper.current !== null) {
-      pdfWrapper.current.focus();
-    }
-  }
+  // function focusOnViewer() {
+  //   if (pdfWrapper.current !== null) {
+  //     pdfWrapper.current.focus();
+  //   }
+  // }
 
-  useLayoutEffect(
-    () => {
-      focusOnViewer();
-    },
-  );
+  // useLayoutEffect(
+  //   () => {
+  //     focusOnViewer();
+  //   },
+  // );
 
   const {
     currentSearchTerm,

@@ -70,7 +70,7 @@ export const appMiddleware = (history: History) =>
           if (params.location) {
             currentURL.searchParams.set("showResource", encodeURIComponent(params.location.value));
           } else {
-            throw "No location in URL"
+            throw new Error("No location in URL")
           }
           history.push(retrievePath(currentURL.toString()));
 

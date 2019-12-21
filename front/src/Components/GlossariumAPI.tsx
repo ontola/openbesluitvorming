@@ -49,7 +49,7 @@ class GlossariumAPI {
       const data = await response.json();
       const firstPageKey = Object.keys(data.query.pages)[0];
       const page = data.query.pages[firstPageKey];
-      if (firstPageKey == "-1") {
+      if (firstPageKey === "-1") {
         return false;
       }
       if ('disambiguation' in page.pageprops) {
@@ -135,7 +135,7 @@ class GlossariumAPI {
       const response = await fetch(query);
       return await response.json()
     } catch(e) {
-      throw("item orid:" + id + " did not resolve.")
+      throw( new Error("item orid:" + id + " did not resolve."))
     }
   }
 }

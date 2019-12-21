@@ -142,7 +142,7 @@ class Glossarium extends React.PureComponent<MProps, MState> {
     }
 
     // Try to find topic in section annotations and determine wikipedia-query-string
-    documentSectionAnnotations.map((surfaceForm: any) => {
+    documentSectionAnnotations.forEach((surfaceForm: any) => {
       if (cleanInput && surfaceForm.name.toLowerCase() === cleanInput.toLowerCase()) {
         // Get top candidate
         if (surfaceForm.candidates[0].topic_id === null) {
@@ -240,7 +240,7 @@ class Glossarium extends React.PureComponent<MProps, MState> {
       return (
         <div ref={this.glossaryDiv} className="Glossarium">
           <div className="glossarium-container">
-            {this.state.customTopic == true &&
+            {this.state.customTopic === true &&
               <div className="definition-container">
                 <div className="definition-title">
                   <strong>{this.state.topicCanonicalName} {this.state.topicAbbreviation && <span>({this.state.topicAbbreviation})</span>}</strong>

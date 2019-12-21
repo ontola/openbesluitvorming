@@ -80,7 +80,7 @@ const SearchBar: React.FunctionComponent = () => {
       // When the component unmounts, remove the timer.
       clearTimeout(timer);
     },
-    [],
+    [timer],
   );
 
   const handlers = {

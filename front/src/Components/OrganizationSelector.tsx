@@ -73,7 +73,7 @@ const OrganizationSelector = (props: RouteComponentProps) => {
     const hits = result.response.hits.hits;
     totalCount = result.response.hits.total.value.toString();
 
-    hits.map(function(h: Municipality) {
+    hits.forEach(function(h: Municipality) {
       options.push({
         label: h._source.name,
         value: h._index,

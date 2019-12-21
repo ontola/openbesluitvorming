@@ -21,7 +21,7 @@ export const allIdsBut = (id: string): string[] => {
   const allValues = Object.values(ids)
   const filteredValues = allValues.filter(
     (value) => {
-      return value != id
+      return value !== id
     }
   )
   return filteredValues
@@ -205,6 +205,6 @@ export const useFetch = (url: string, options: RequestInit) => {
       }
     };
     fetchData();
-  }, []);
+  }, [options, url]);
   return { response, error };
 };
