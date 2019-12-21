@@ -139,18 +139,6 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
     getSectionAnnotations(pageNumber+1, wordhoardIDs);
   };
 
-  // function focusOnViewer() {
-  //   if (pdfWrapper.current !== null) {
-  //     pdfWrapper.current.focus();
-  //   }
-  // }
-
-  // useLayoutEffect(
-  //   () => {
-  //     focusOnViewer();
-  //   },
-  // );
-
   const {
     currentSearchTerm,
   } = getParams(props.history);
