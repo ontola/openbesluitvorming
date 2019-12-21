@@ -45,6 +45,7 @@ const Handler = () =>
 const SideDrawer = (props: SideDrawerProps & RouteComponentProps) => {
   const [width, setWidth] =
     usePersistedState<number>("orisearch.pdfviewer.width", determineInitialWith(window.innerWidth));
+
   const [maxWidth, setMaxWidth] = React.useState<number>(calcMaxWidth(window.innerWidth));
 
   const pdfWrapper = React.createRef<HTMLInputElement>();
@@ -96,12 +97,13 @@ const SideDrawer = (props: SideDrawerProps & RouteComponentProps) => {
             direction: any,
             refToElement: HTMLDivElement,
             delta: any,
-          ) =>
-            setWidth(width + delta.width)}
+          ) => {
+            setWidth(width + delta.width);
+          }}
           enable={{ left: true }}
         >
           <Button
-            className="Button__close Button__default"
+            className="Button__close"
             onClick={closeDocument}
           >
             Sluiten

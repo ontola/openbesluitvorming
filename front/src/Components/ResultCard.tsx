@@ -49,7 +49,9 @@ const ResultCard: React.FunctionComponent<ResultCardProps & RouteComponentProps>
   return (
     <div key={props["@id"]} className={className}>
       <Button
-        onClick={() => openResource((paths.oriId(props["@id"]) || ""), props.history)}
+        onClick={() => {
+          openResource((paths.oriId(props["@id"]) || ""), props.history);
+        }}
       >
         <h2 dangerouslySetInnerHTML={{ __html: `${header}` }}/>
       </Button>

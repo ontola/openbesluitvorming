@@ -59,6 +59,9 @@ p {
   }
 
   &__close {
+    color: $blue;
+    font-weight: bold;
+    padding: .5rem;
     position: absolute;
     top: .5rem;
     right: .5rem;
@@ -402,8 +405,10 @@ p {
   right: 0;
   z-index: 1;
   text-align: center;
+  pointer-events: none;
 
   &-inner{
+    pointer-events: auto;
     display: inline-block;
     background: white;
     margin: auto;
@@ -809,11 +814,67 @@ mark {
 
 // Detect touch devices
 @media (pointer:coarse) {
-  .PDFViewer__button-bar {
+  .PDFViewer__button-bar-inner {
     transform: scale(1.2);
   }
 
   .SideDrawer__handler {
     transform: scale(1.4);
   }
+}
+
+.Glossarium {
+  background-color: white;
+  border-top: solid 1px $g2;
+  pointer-events: auto;
+  padding: 1rem;
+
+  a {
+    color: $blue;
+    font-weight: bold;
+    text-decoration: none;
+  }
+
+  .svg-inline--fa {
+    color: $grey;
+  }
+}
+
+.definition-container {
+  margin-bottom: 0.5rem;
+  text-align: left;
+
+  div {
+    margin-bottom: 0.5rem;
+  }
+}
+
+.wiki-summary {
+  text-align: left;
+  min-width: 10rem;
+}
+
+.wiki-image {
+  float: right;
+  max-width: 10rem;
+  padding-left: .4rem;
+  padding-bottom: .4rem;
+}
+
+.bounce {
+  align-self: flex-end;
+  animation-duration: .67s;
+  animation-iteration-count: infinite;
+  animation-name: bounce;
+  animation-timing-function: ease;
+  transform-origin: bottom;
+}
+@keyframes bounce {
+  0%   { transform: scale(1,1)      translateY(0); }
+  10%  { transform: scale(1.1,.9)   translateY(0); }
+  30%  { transform: scale(.9,1.1)   translateY(-0.4em); }
+  48%  { transform: scale(1.05,.95) translateY(0); }
+  55%  { transform: scale(1,1)      translateY(-0.03em); }
+  67%  { transform: scale(1,1)      translateY(0); }
+  100% { transform: scale(1,1)      translateY(0); }
 }

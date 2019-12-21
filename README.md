@@ -52,6 +52,7 @@ Make sure ES has the [correct proxy settings](https://opensource.appbase.io/reac
 
 - [VNG Realisatie](https://vngrealisatie.nl) for funding.
 - [Open State Foundation](https://openstate.eu/nl/) for providing useful feedback on this project and starting Open Raadsinformatie.
-- Software developed by @joepio from [Argu](https://argu.co) / [Ontola](https://ontola.io).
+- Software developed by [Joep Meindertsma](http://github.com/joepio) from [Argu](https://argu.co) / [Ontola](https://ontola.io).
 - Feedback from @breyten, @aolieman, @fletcher91, @jurrian
 - Various open source projects that we're using, most notably ReactiveSearch and Link-Lib. Check out the `package.json` files to see which projects were used.
+- [@aolieman](http://github.com/aolieman) and [Hendrik](http://github.com/henkieeeee) fpr implementing the Glossary feature (select text in PDF to view definition).

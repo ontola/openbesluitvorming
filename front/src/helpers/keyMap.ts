@@ -7,4 +7,6 @@ export const keyMap = {
   FULLSCREEN: "f",
   // Close the sideDrawer
   CLOSE: ["escape", "esc"],
+  // Toggle the glossary
+  GLOSS: "g",
 };

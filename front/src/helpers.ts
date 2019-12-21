@@ -33,7 +33,6 @@ export const capitalize = (s: string) => {
 
 export function usePersistedState<T>(key: string, initial: T):
 [T, React.Dispatch<React.SetStateAction<T>>] {
-
   const [value, setValue] = React.useState<T>(() => {
     const storageValue = sessionStorage.getItem(key);
     if (storageValue) {
@@ -47,8 +46,15 @@ export function usePersistedState<T>(key: string, initial: T):
     sessionStorage.setItem(key, JSON.stringify(next));
     setValue(next);
   };
-
   return [value, setPersistedValue];
+}
+
+export function myPersistedState<T>(key: string, initial: T): T {
+  const storageValue = sessionStorage.getItem(key);
+  if (storageValue === null) {
+    return initial;
+  }
+  return JSON.parse(storageValue);
 }
 
 export const getParams = (history: History) => {
@@ -66,10 +72,17 @@ export const getParams = (history: History) => {
   if (currentSearchTerm) {
     currentSearchTerm = currentSearchTerm.substr(1, currentSearchTerm.length - 2);
   }
+
+  let documentID = null;
+  if (currentResource !== null) {
+    documentID = currentResource.split("/")[3]
+  }
+
   return {
     currentResource,
     currentSearchTerm,
     hasParams,
+    documentID
   };
 };
 
@@ -166,7 +179,16 @@ export const getApiURL = (): URL => {
     url.port = SERVER_PORT.toString();
   }
   return url
-}
+};
+
+export const getTopicsApiURL = (relUrl: string): URL => {
+  const url = new URL(window.location.origin);
+  url.pathname = `/topics_api/dev${relUrl}`;
+  if (NODE_ENV === "development") {
+    url.port = SERVER_PORT.toString();
+  }
+  return url
+};
 
 // Custom react hook for data fetching with error handling
 export const useFetch = (url: string, options: RequestInit) => {
