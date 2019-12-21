@@ -205,6 +205,6 @@ export const useFetch = (url: string, options: RequestInit) => {
       }
     };
     fetchData();
-  }, [options, url]);
+  }, [url]);
   return { response, error };
 };
