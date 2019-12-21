@@ -19,7 +19,7 @@ app.use(cors());
 // Logger middleware
 app.use(morgan("combined"));
 
-// TAPI connection
+// START GLOSSARY API FUNCTIONALITY
 const TAPI_ROOT_URL = "https://topics.platform.co.nl/";
 const clientID = process.env.CLIENT_ID;
 const clientSecret = process.env.CLIENT_SECRET;
@@ -81,6 +81,8 @@ const apiProxy = httpProxyMiddleware(
   },
 );
 app.use(apiProxy);
+
+// END GLOSSARY API FUNCTIONALITY
 
 // Proxy search requests
 app.all("/api/*", httpProxyMiddleware({

@@ -71,14 +71,6 @@ const SideDrawer = (props: SideDrawerProps & RouteComponentProps) => {
     return () => window.removeEventListener("resize", listener);
   });
 
-  const uglyStyleSetting = () => {
-    // TODO: Dit is jammer maar het moet nou eenmaal. (component integratie)
-    const ugly = document.getElementsByClassName("react-pdf__Page__textContent")[0] as HTMLElement;
-    if (ugly !== undefined) {
-      ugly.style.width = "100%";
-    }
-  }
-
   return (
     <SideDrawerContext.Provider
       value={{
@@ -107,7 +99,6 @@ const SideDrawer = (props: SideDrawerProps & RouteComponentProps) => {
             delta: any,
           ) => {
             setWidth(width + delta.width);
-            uglyStyleSetting();
           }}
           enable={{ left: true }}
         >
