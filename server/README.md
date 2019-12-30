@@ -12,6 +12,6 @@ This typescript node application serves as a static file server and a proxy for 
 ES_URL=Link to elasticsearch endpoint
 PORT=Port of this server.
 WWW_DIR=Path to the static files. Should be "../front/build" for local development, if you want to serve the local
-CLIENT_ID= ask Qollap / Waaroverheid @aolieman
-CLIENT_SECRET= ask Qollap / Waaroverheid @aolieman
+SEARCH_GLOSS_CLIENT_ID= ask Qollap / Waaroverheid @aolieman
+SEARCH_GLOSS_CLIENT_SECRET= ask Qollap / Waaroverheid @aolieman
 ```

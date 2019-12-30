@@ -21,8 +21,8 @@ app.use(morgan("combined"));
 
 // START GLOSSARY API FUNCTIONALITY
 const TAPI_ROOT_URL = "https://topics.platform.co.nl/";
-const clientID = process.env.CLIENT_ID;
-const clientSecret = process.env.CLIENT_SECRET;
+const clientID = process.env.SEARCH_GLOSS_CLIENT_ID;
+const clientSecret = process.env.SEARCH_GLOSS_CLIENT_SECRET;
 
 const credentials = {
   client: {
