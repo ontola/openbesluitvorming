@@ -54,7 +54,7 @@ const SideDrawer = (props: SideDrawerProps & RouteComponentProps) => {
     const currentURL = new URL(window.location.href);
     const params = new URLSearchParams(currentURL.search);
     params.delete("showResource");
-    props.history.push(`/search?${params.toString()}`);
+    props.history.push(`/?${params.toString()}`);
   };
 
   React.useLayoutEffect(() => {
