@@ -58,7 +58,16 @@ export const queryGenerator = (
     query: {
       bool: {
         must: [
-          queryPart
+          queryPart,
+          {
+            "terms": {
+              "_index": [
+                "ori_*",
+                "osi_*",
+                "ggm_*",
+              ]
+            }
+          }
         ],
         must_not: mustNot,
       },
