@@ -12,6 +12,7 @@
    -ms-animation: fadein 4s; /* Internet Explorer */
        animation: fadein 4s;
   animation-fill-mode: forwards;
+  padding: 1rem;
 }
 @keyframes fadein {
   0% { opacity: 0; }
