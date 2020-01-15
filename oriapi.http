@@ -1,2 +1,0 @@
-GET http://id.openraadsinformatie.nl/62297 HTTP/1.1
-content-type: application/json

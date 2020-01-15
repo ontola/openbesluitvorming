@@ -41,7 +41,17 @@ If you want to know the mapping for Elastic, visit `https://api.openraadsinforma
 
 If you want to see some examples of how to query this endpoint, check out [`example_requests.http`](/example_requests.http).
 
-## Changes from V0
+## API Versioning & deprecation
+
+APIs change over time, and some of these changes could break implementations.
+At all times, we try to minimize these breaking changes.
+When these are necessary, however, we will upgrade the API version.
+If you want to receive notifications prior to breaking API changes, subscribe by mailing to [joep@argu.co](mailto:joep@argu.co?subject=ORI API versioning) with the subject: "ORI API versioning".
+
+- The REST API should be considered stable.
+- The Elastic API has various undocument endpoints.
+
+### Changes from V0 to V1
 
 - ElasticSearch was upgraded from 5 to 7 ([upgrade guide](https://www.elastic.co/guide/en/cloud/current/ec-upgrading-v7.html))
 - Events are now split between "Meetings" and "AgendaItems"
@@ -66,7 +76,7 @@ In the future, we hope to use the [VNG Open Raadsinformatie spec](https://github
 
 ### Who uses ORI / these APIs?
 
-- [Ori-search](http://ori.argu.co), the official ORI search interface
+- [OpenBesluitvorming.nl](https://openbesluitvorming.nl), the new search interface
 - [1848.nl](https://1848.nl), which features a notification system (contact: Lucas Benschop)
 - [WaarOverheid](https://waaroverheid.nl/), a location based app to navigate, search and subscribe to ORI data (contact: Alex Olieman)
 - [Argu.co](https://argu.co), an e-democracy platform for civic engagement (contact: [Joep Meindertsma](mailto:joep@argu.co))

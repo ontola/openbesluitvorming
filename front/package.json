@@ -8,7 +8,7 @@
   "bugs": "https://github.com/ontola/ori-search/issues",
   "homepage": "https://ori.argu.co",
   "repository": "github:ontola/ori-search",
-  "description": "Search interface for Open Raadsinformatie",
+  "description": "Search interface for Open Raadsinformatie & Stateninformatie",
   "private": true,
   "dependencies": {
     "@appbaseio/reactivesearch": "^3.0.3",
