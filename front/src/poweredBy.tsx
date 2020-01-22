@@ -13,7 +13,7 @@ export const poweredBy: OrgType[] = [
   {
     name: "Argu",
     url: paths.argu,
-    toelichting: "initiatefnemer OpenBesluitvorming.nl",
+    toelichting: "initiatiefnemer OpenBesluitvorming.nl",
     picture: "argu.svg",
   },
   {
@@ -39,6 +39,12 @@ export const poweredBy: OrgType[] = [
     url: "https://qollab.io",
     toelichting: "softwareontwikkeling WaarOverheid & HierOverheid",
     picture: "qollab.svg",
+  },
+  {
+    name: "Universiteit van Amsterdam",
+    url: "https://e.humanities.uva.nl/access/",
+    toelichting: "conceptueel ontwerp WaarOverheid & HierOverheid",
+    picture: "uva.svg",
   },
   {
     name: "SIDN Fonds",
@@ -100,4 +106,4 @@ export const poweredBy: OrgType[] = [
     toelichting: "financiering Open Stateninformatie",
     picture: "overijssel.png",
   },
-]
+];
