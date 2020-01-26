@@ -4,7 +4,7 @@
 
 Search through meeting documents of 100+ Dutch local governments. Powered by [Open Raadsinformatie](https://github.com/openstate/open-raadsinformatie/).
 
-Check it out at [ori.argu.co](http://ori.argu.co)!
+Check it out at [OpenBesuitvorming.nl](http://openbesluitvorming.nl)!
 
 ## Using the ORI API
 

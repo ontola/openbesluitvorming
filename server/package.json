@@ -7,7 +7,7 @@
     "email": "joep@ontola.io"
   },
   "bugs": "https://github.com/ontola/ori-search/issues",
-  "homepage": "https://ori.argu.co",
+  "homepage": "https://openbesluitvorming.nl",
   "repository": "github:ontola/ori-search",
   "description": "Node server for ori-search",
   "dependencies": {
