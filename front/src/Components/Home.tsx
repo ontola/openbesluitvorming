@@ -102,7 +102,7 @@ const Home = () => {
         <p>
           Als je wil dat ook jouw gemeente aangesloten wordt op Open Raadsinformatie,
           vraag dan de griffie van je gemeenteraad <a href={paths.vngNewForm}>dit formulier</a> in te vullen.
-          {IS_ORI &&
+          {IS_ORI ? null :
             <span> Provincies of andere overheden kunnen mailen naar <a href={paths.arguMail}>joep@argu.co</a>.</span>
           }
         </p>
@@ -145,10 +145,12 @@ const Home = () => {
           De data kan door het importeren incompleet, onjuist of niet up to date zijn.
           Het eigenaarschap van de data ligt bij de organisaties die de data hebben aangemaakt, of de respectievelijke auteurs van de documenten.
         </p>
-        <p>
-          OpenBesluitvorming.nl is tot stand gekomen door de tijd en moeite van de onderstaande organisaties.
-          Hover met je muis over de logo&apos;s om te zien wat hoe de organisaties hebben bijgedragen, en klik er op om er meer over te lezen.
-        </p>
+        {IS_ORI ? null :
+          <p>
+            OpenBesluitvorming.nl is tot stand gekomen door de tijd en moeite van de onderstaande organisaties.
+            Hover met je muis over de logo&apos;s om te zien wat hoe de organisaties hebben bijgedragen, en klik er op om er meer over te lezen.
+          </p>
+        }
       </div>
       {IS_ORI ? null :
         <div
