@@ -135,8 +135,9 @@ const Home = () => {
         </p>}
         <h2>Privacy</h2>
         <p>
-          Deze app gebruikt geen cookies.
-          Jouw IP adres en de zoekopdrachten slaan we niet op.
+          We gebruiken Matomo (een privacy-vriendelijk alternatief voor Google analytics) om bezoekersstatistieken te verzamelen.
+          We gebruiken deze gegevens alleen om anonieme rapportages te maken van bezoekers, en verkopen deze data aan niemand door.
+          We slaan de laatste zes getallen van IP adressen niet op om jouw privacy te beschermen.
         </p>
         <h2>Disclaimer</h2>
         <p>
