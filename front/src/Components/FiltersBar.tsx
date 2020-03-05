@@ -14,6 +14,8 @@ interface FiltersbarProps {
 }
 
 const startDate = new Date(2000, 1);
+// Set endDate one year in the future - we might want to see meetings that haven't happened yet
+const endDate = new Date(Date.now() + 1000 /*sec*/ * 60 /*min*/ * 60 /*hour*/ * 24 /*day*/ * 365);
 
 const dateLabel = (date: Date) => `${date.getFullYear()}-${date.getMonth()}`
 
@@ -172,11 +174,11 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
         URLParams={true}
         rangeLabels={{
           "start": dateLabel(startDate),
-          "end": dateLabel(new Date()),
+          "end": dateLabel(endDate),
         }}
         range={{
           "start": startDate.getTime(),
-          "end": Date.now(),
+          "end": endDate.getTime(),
         }}
         react={{
           and: allIdsBut(ids.daterange),
