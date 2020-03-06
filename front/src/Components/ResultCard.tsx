@@ -53,6 +53,7 @@ const ResultCard: React.FunctionComponent<ResultCardProps & RouteComponentProps>
           openResource((paths.oriId(props["@id"]) || ""), props.history);
         }}
       >
+        {/* This is not ideal - it makes injection possible in ORI data, bu */}
         <h2 dangerouslySetInnerHTML={{ __html: `${header}` }}/>
       </Button>
       {renderComponent(props)}

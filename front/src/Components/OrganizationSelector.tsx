@@ -6,6 +6,9 @@ import { withRouter, RouteComponentProps } from 'react-router-dom'
 import paths from "../paths";
 import { handle } from "../helpers/logging";
 
+/** The amount of participating municipalities / provinces */
+export const defaultOrgsCount = "143";
+
 const query = {
   "size": 500,
   "query": {
@@ -44,6 +47,7 @@ interface Municipality {
 }
 
 const OrganizationSelector = (props: RouteComponentProps) => {
+
   const result: ResultType = useFetch(`${getApiURL().toString()}/_search?`, {
     method: 'POST',
     headers: {
@@ -57,7 +61,7 @@ const OrganizationSelector = (props: RouteComponentProps) => {
     window.location.href = paths.vngNewForm;
   }
 
-  let totalCount = "126";
+  let totalCount = defaultOrgsCount
   const options: any = [];
   let onSelectOrg = (event: any) => {handle(event)}
   let isLoading = true;

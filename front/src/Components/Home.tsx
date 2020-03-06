@@ -44,7 +44,7 @@ const Home = () => {
         <h1 className="Home__header">Doorzoek vergaderstukken van gemeenten en provincies</h1>
         <p>
           Met deze app zoek je door de openbare vergaderingen, agendapunten, moties en
-          documenten van meer dan 120 deelnemende gemeenten en zes provincies.
+          documenten van meer dan 130 deelnemende gemeenten en zes provincies.
         </p>
         {IS_ORI ?
           <div>
