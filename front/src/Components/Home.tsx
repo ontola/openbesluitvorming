@@ -98,15 +98,27 @@ const Home = () => {
             </p>
           </div>
         }
+        <h2>Voor wie is deze app?</h2>
+        <ul>
+          <li><b>Ambtenaren</b> zoeken naar hoe andere overheden bepaalde problemen oplossen.</li>
+          <li><b>Ontwikkelaars</b> gaan aan de slag met deze data om eigen apps te maken.</li>
+          <li><b>Betrokken burgers</b> zoeken wat overheden hebben gezegd over een bepaald onderwerp.</li>
+          <li><b>Belangenbehartigers</b> kunnen volgen waar beslissingen over (gaan) worden gemaakt.</li>
+          <li><b>Journalisten</b> zien hoe besluitvorming zich heeft ontwikkeld over tijd.</li>
+        </ul>
         <h2>Jouw gemeente of provincie toevoegen</h2>
         <p>
           Als je wil dat ook jouw gemeente aangesloten wordt op Open Raadsinformatie,
           vraag dan de griffie van je gemeenteraad <a href={paths.vngNewForm}>dit formulier</a> in te vullen.
           {IS_ORI ? null :
-            <span> Provincies of andere overheden kunnen mailen naar <a href={paths.arguMail}>joep@argu.co</a>.</span>
+            <span> Provincies, waterschappen of andere overheden kunnen mailen naar <a href={paths.arguMail}>joep@argu.co</a>.</span>
           }
         </p>
-        <h2>Andere apps</h2>
+        <h2>Andere apps gemaakt met deze data</h2>
+        <p>
+          Alle data (moties, vergaderingen, documenten, agendapunten, stukken...) is gratis te gebruiken.
+          Deze zoekmachine is dan ook maar één van de apps die is gemaakt met de data:
+        </p>
         <ul>
           {otherApps.map((app: AppType) => (
             <li key={app.name}>
@@ -114,13 +126,8 @@ const Home = () => {
               : <span>{app.description}</span>
             </li>
           ))}
-          <li>Jouw app hier? <a href={paths.appList}>Dien een PR in!</a></li>
+          <li>Jouw app hier? Ga aan de slag met de <a href={paths.apiDocs}>documentatie</a> en <a href={paths.appList}>dien een PR in!</a></li>
         </ul>
-        <h2>Open data hergebruiken</h2>
-        <p>
-          Als je zelf ook gebruik wil maken van deze data, lees dan
-          de <a href={paths.apiDocs}>documentatie</a>.
-        </p>
         <h2>Contact</h2>
         <p>
           Technische vragen of suggesties over de API kunnen op
