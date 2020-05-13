@@ -1,8 +1,8 @@
-# Open Raadsinformatie Search
+# OpenBesluitvorming Search
 
 [![Build Status](https://semaphoreci.com/api/v1/argu/ori-search-2/branches/master/badge.svg)](https://semaphoreci.com/argu/ori-search-2)
 
-Search through meeting documents of 100+ Dutch local governments. Powered by [Open Raadsinformatie](https://github.com/openstate/open-raadsinformatie/).
+Search through meeting documents of 140+ Dutch local governments. Powered by [Open Raadsinformatie](https://github.com/openstate/open-raadsinformatie/).
 
 Check it out at [OpenBesuitvorming.nl](http://openbesluitvorming.nl)!
 
