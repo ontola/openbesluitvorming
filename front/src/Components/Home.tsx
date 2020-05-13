@@ -44,7 +44,7 @@ const Home = () => {
         <h1 className="Home__header">Doorzoek vergaderstukken van gemeenten en provincies</h1>
         <p>
           Met deze app zoek je door de openbare vergaderingen, agendapunten, moties en
-          documenten van meer dan 130 deelnemende gemeenten en zes provincies.
+          documenten van meer dan 140 deelnemende gemeenten en zes provincies.
         </p>
         {IS_ORI ?
           <div>
@@ -74,6 +74,7 @@ const Home = () => {
           </div>
           :
           <div>
+            <h2>Door wie?</h2>
             <p>
               OpenBesluitvorming.nl is een initiatief van <a href={paths.argu}>Argu</a> om
               data van gemeenten, provincies en andere overheden samen te brengen in
@@ -92,9 +93,8 @@ const Home = () => {
               Voor de provincies is Open Stateninformatie gestart.
             </p>
             <p>
-              Argu heeft als missie om besluitvorming zo open en toegankelijk mogelijk te maken
-              en raakte zo als betrokken bij deze projecten.
-              In de toekomst willen we ook data van waterschappen en de Tweede Kamer toevoegen.
+              Argu heeft als missie om besluitvorming zo open en toegankelijk mogelijk te maken.
+              Als technisch ontwikkelaar en beheerder raakte Argu betrokken bij deze projecten.
             </p>
           </div>
         }

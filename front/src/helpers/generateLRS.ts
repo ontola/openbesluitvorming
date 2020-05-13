@@ -195,6 +195,11 @@ export default function generateLRS() {
   // @ts-ignore TS2341
   LRS.store.addStatements(ontologicalPropertyData);
 
+  // @ts-ignore private
+  LRS.api.bulkEndpoint = "https://id.openbesluitvorming.nl/link-lib/bulk";
+  // @ts-ignore private
+  LRS.bulkFetch = true;
+
   (LRS as any).broadcast();
   (window as any).LRS = LRS;
 
