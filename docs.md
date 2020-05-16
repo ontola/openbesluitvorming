@@ -1,8 +1,8 @@
-# Open Raadsinformatie API docs
+# OpenBesluitvorming / Open Raadsinformatie / Open Stateninformatie API docs
 
-Open Raadsinformatie (ORI) aims to make governmental decision making more transparent
+OpenBesluitvorming aims to make governmental decision making more transparent
 by aggregating and standardizing meeting & decision data.
-Currently, the API includes data from more than 110 municipalities (gemeenten) and 5 provinces.
+Currently, the API includes data from more than 140 municipalities (gemeenten) and 5 provinces.
 
 ## Endpoints
 
@@ -25,6 +25,8 @@ There is a special endpoint for getting all organizations: [`https://api.openraa
 Read more about the REST API in its [github repo](https://github.com/ontola/ori_api) and its [documentation](https://id.openraadsinformatie.nl/).
 
 If you want to see some examples of how to query this endpoint, check out [`example_requests.http`](/example_requests.http).
+
+_A new REST API is being tested that aims to replace the current one. It is available at `id.openbesluitvorming.nl` (check out the 'random' endpoint [here](https://id.openbesluitvorming.nl/random))._
 
 ### Elastic
 
@@ -91,15 +93,17 @@ In the future, we hope to use the [VNG Open Raadsinformatie spec](https://github
 For technical questions, please create an issue in the aforementioned Github repos.
 If you have general questions about Open Raadsinformatie, get in touch with project leader [Sander Bakker](mailto:sander.bakker@vng.nl).
 
-### How can my municipality / government
+### How can my municipality / government join?
 
-Ask your municipality to fill in [this form](https://formulieren.vngrealisatie.nl/deelname_openraadsinformatie)!
+If you're a Dutch municipality, fill in [this form](https://formulieren.vngrealisatie.nl/deelname_openraadsinformatie).
+If you're another type of government, get in touch with [joep@argu.co](mailto:joep@argu.co)
 
 ### Who's behind this project?
 
-ORI was initiated by the [Open State Foundation](https://openstate.eu).
+Open Raadsinformatie and Open Stateninformatie were initiated by the [Open State Foundation](https://openstate.eu).
 [VNG Realisatie](https://www.vngrealisatie.nl/producten/pilots-open-raadsinformatie) is the main funder.
 [Ontola](https://ontola.io) / [Argu](https://argu.co) is responsible for the technology.
+For more details, check out [poweredBy.tsx](https://github.com/ontola/openbesluitvorming/blob/master/front/src/poweredBy.tsx)
 
 ### Which projects does the API use?
 
