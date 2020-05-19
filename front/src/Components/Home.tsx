@@ -137,9 +137,13 @@ const Home = () => {
           Voor suggesties, problemen of vragen over deze zoekmachine,
           plaats een issue op <a href={paths.oriSearchGithub}>de ori-search issue tracker</a>.
         </p>
-        {IS_ORI ? null : <p>
-          Voor algemene vragen kunt u mailen naar <a href={paths.arguMail}>Joep Meindertsma</a>.
-        </p>}
+        <p>
+          Voor algemene vragen kunt u mailen naar <a href={
+            IS_ORI ? paths.projectMail : paths.arguMail
+          }>{
+              IS_ORI ? "Sander Bakker" : "Joep Meindertsma"
+            }</a>
+        </p>
         <h2>Privacy</h2>
         <p>
           We gebruiken Matomo (een privacy-vriendelijk alternatief voor Google analytics) om bezoekersstatistieken te verzamelen.
