@@ -39,6 +39,6 @@ const Meeting = (props: MeetingProps) => {
   );
 };
 
-Meeting.type = NS.meeting("Meeting");
+Meeting.type = [NS.meeting("Meeting"), NS.meeting("Report")];
 
 export default register(Meeting);
