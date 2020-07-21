@@ -2,7 +2,7 @@ import path from "path";
 
 import cors from "cors";
 import express, { Response, Request } from "express";
-import httpProxyMiddleware from "http-proxy-middleware";
+import {createProxyMiddleware} from "http-proxy-middleware";
 import morgan from "morgan";
 import simpleOauth2 from "simple-oauth2";
 
@@ -69,7 +69,7 @@ function tapiRequestFilter(pathname:any, req:any) {
   return false;
 }
 
-const apiProxy = httpProxyMiddleware(
+const apiProxy = createProxyMiddleware(
   tapiRequestFilter,
   {
     onProxyReq,
@@ -85,7 +85,7 @@ app.use(apiProxy);
 // END GLOSSARY API FUNCTIONALITY
 
 // Proxy search requests
-app.all("/api/*", httpProxyMiddleware({
+app.all("/api/*", createProxyMiddleware({
   ws: true,
   target: ES_URL,
   changeOrigin: true,
