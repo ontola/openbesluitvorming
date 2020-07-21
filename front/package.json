@@ -1,13 +1,13 @@
 {
-  "name": "ori-search",
+  "name": "openbesluitvorming",
   "version": "1.0.0",
   "author": {
     "name": "Joep Meindertsma",
     "email": "joep@ontola.io"
   },
-  "bugs": "https://github.com/ontola/ori-search/issues",
+  "bugs": "https://github.com/ontola/openbesluitvorming/issues",
   "homepage": "https://openbesluitvorming.nl",
-  "repository": "github:ontola/ori-search",
+  "repository": "github:ontola/openbesluitvorming",
   "description": "Search interface for Open Raadsinformatie & Stateninformatie",
   "private": true,
   "dependencies": {
