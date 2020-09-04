@@ -55,7 +55,7 @@
     "lodash.escaperegexp": "^4.1.1",
     "lodash.throttle": "^4.1.1",
     "n-quads-parser": "=2.0.3-ontologies",
-    "node-sass": "^4.12.0",
+    "node-sass": "^4.13.1",
     "rdflib": "=1.0.7-0",
     "re-resizable": "^5.0.1",
     "react": "^16.9.0",
