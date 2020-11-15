@@ -34,6 +34,7 @@ const Meeting = (props: MeetingProps) => {
         <Property label={NS.meeting("attachment")} limit={100}/>
         <Property label={NS.meeting("agenda")} limit={100}/>
         <Property label={NS.schema("invitee")} limit={100}/>
+        <Property label={NS.prov("wasGeneratedBy")} />
       </Labels>
     </ResourceTopology>
   );

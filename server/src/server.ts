@@ -2,7 +2,10 @@ import path from "path";
 
 import cors from "cors";
 import express, { Response, Request } from "express";
+//@ts-ignore
 import {createProxyMiddleware} from "http-proxy-middleware";
+import proxy from "express-http-proxy";
+
 import morgan from "morgan";
 import simpleOauth2 from "simple-oauth2";
 
@@ -80,23 +83,29 @@ const apiProxy = createProxyMiddleware(
     pathRewrite: { "^/topics_api": "" },
   },
 );
+// @ts-ignore createProxyMiddleware needs new types
 app.use(apiProxy);
 
 // END GLOSSARY API FUNCTIONALITY
 
 // Proxy search requests
-app.all("/api/*", createProxyMiddleware({
-  ws: true,
-  target: ES_URL,
-  changeOrigin: true,
-  pathRewrite: { "^/api": "" },
-  logLevel: process.env.NODE_ENV === "production" ? "info" :  "debug",
-}));
+// @ts-ignore createProxyMiddleware needs new types
+// app.all("/api/*", createProxyMiddleware({
+//   ws: true,
+//   target: ES_URL,
+//   changeOrigin: true,
+//   pathRewrite: { "^/api": "/egioensiog" },
+//   logLevel: process.env.NODE_ENV === "production" ? "info" :  "debug",
+//   // onProxyRes: (proxyRes, req, res) => console.log(proxyRes)
+// }));
 
-// Production, serve static files
+app.all("/api/*", proxy(ES_URL));
+
+// Production, serve stat ic files
 app.use(express.static(path.join(WWW_DIR)));
 
 app.get("/", (req: Request, res: Response) => {
+  // @ts-ignore createProxyMiddleware needs new types
   res.sendFile(path.join(WWW_DIR, "index.html"));
 });
 

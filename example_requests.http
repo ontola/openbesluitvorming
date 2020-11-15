@@ -93,7 +93,7 @@ content-type: application/json
 
 ### Elastic Filter Municipality using terms
 
-GET http://ori.argu.co/api/ori_*/_search? HTTP/1.1
+GET https://api.openraadsinformatie.nl/v1/elastic/*/_search? HTTP/1.1
 content-type: application/json
 
 {
@@ -129,7 +129,7 @@ content-type: application/json
 
 ### Elastic single Municipality using index with wildcard in URL
 
-GET http://ori.argu.co/api/ori_amsterd*/_search? HTTP/1.1
+GET https://api.openraadsinformatie.nl/v1/elastic/ori_amster*/_search? HTTP/1.1
 content-type: application/json
 
 {
@@ -145,7 +145,7 @@ content-type: application/json
 
 ### Elastic filter by date
 
-POST https://api.openraadsinformatie.nl/v1/elastic/ori_meierijstad_20190809125117/_search? HTTP/1.1
+POST https://api.openraadsinformatie.nl/v1/elastic/*/_search? HTTP/1.1
 content-type: application/json
 
 {
@@ -216,7 +216,7 @@ POST https://api.openraadsinformatie.nl/v1/elastic/ori_*/_search? HTTP/1.1
 content-type: application/json
 
 {
-  "size": 500,
+  "size": 5,
   "query": {
       "bool": {
           "must": {

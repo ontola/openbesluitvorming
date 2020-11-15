@@ -27,6 +27,7 @@ const AgendaItem = (props: AgendaItemProps) => {
         <Property label={NS.schema("description")} />
         <Property label={NS.schema("startDate")} />
         <Property label={NS.meeting("attachment")} limit={100}/>
+        <Property label={NS.prov("wasGeneratedBy")} />
       </Labels>
     </ResourceTopology>
   );

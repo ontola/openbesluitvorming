@@ -29,6 +29,7 @@ const query = {
 interface ResultType {
   error?: Error | null;
   response?: null | {
+    error: any;
     hits: {
       total: {
         value: number;
@@ -48,14 +49,21 @@ interface Municipality {
 
 const OrganizationSelector = (props: RouteComponentProps) => {
 
-  const result: ResultType = useFetch(`${getApiURL().toString()}/_search?`, {
+  const URL = `${getApiURL().toString()}/_search?`;
+  // const URL = `https://api.openraadsinformatie.nl/v1/_search?`;
+
+  const result: ResultType = useFetch(URL, {
     method: 'POST',
     headers: {
       'Accept': 'application/json',
       'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': 'https://api.raadsinformatie.nl'
     },
-    body: JSON.stringify(query)
+    body: JSON.stringify(query),
+    // mode: "cors"
   });
+
+  // debugger;
 
   const handleCreateOption = () => {
     window.location.href = paths.vngNewForm;
@@ -72,6 +80,12 @@ const OrganizationSelector = (props: RouteComponentProps) => {
       const municipalityIndex = event.value;
       const pathWithQueryParams = `?zoekterm="*"&organisaties=%5B"${municipalityIndex}"%5D`;
       props.history.push(pathWithQueryParams)
+    }
+
+    if (result.response.error) {
+      handle(result.response.error);
+
+      return <p>Error!</p>
     }
 
     const hits = result.response.hits.hits;

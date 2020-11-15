@@ -25,7 +25,10 @@ const Organization = (props: OrganizationProps) => {
         <Property label={NS.dcterms("description")} />
         <Property label={NS.org("subOrganizationOf")} />
         <Property label={NS.ncal("categories")} />
+        <Property label={NS.vcard("email")} />
+        <Property label={NS.vcard("url")} />
         <Property label={NS.meta("collection")} />
+        <Property label={NS.prov("wasGeneratedBy")} />
         <Property label={NS.schema("superEvent")} />
         <Property label={NS.meeting("attachment")} limit={100}/>
       </Labels>

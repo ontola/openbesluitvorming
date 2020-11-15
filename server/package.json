@@ -12,7 +12,8 @@
   "description": "Node server for ori-search",
   "dependencies": {
     "@types/cors": "^2.8.4",
-    "@types/express": "^4.16.1",
+    "@types/express": "^4.17.7",
+    "@types/express-http-proxy": "^1.6.1",
     "@types/http-proxy-middleware": "^0.19.3",
     "@types/morgan": "^1.7.35",
     "@types/node": "^11.11.6",
@@ -20,13 +21,14 @@
     "@types/simple-oauth2": "^2.5.0",
     "cors": "^2.8.5",
     "dotenv": "^8.0.0",
-    "express": "^4.16.4",
+    "express": "^4.17.1",
+    "express-http-proxy": "^1.6.2",
     "http-proxy-middleware": "^1.0.5",
     "morgan": "^1.9.1",
     "simple-oauth2": "^3.0.1",
     "tslint": "^5.16.0",
     "tslint-config-airbnb": "^5.11.1",
-    "typescript": "^3.3.3"
+    "typescript": "^3.9.7"
   },
   "scripts": {
     "dev": "ts-node-dev ./src/server.ts",

@@ -176,12 +176,13 @@ export function propertyToArr(lrs: any, acc: any, rest: any) {
 }
 
 export const getApiURL = (): URL => {
-  const url = new URL(window.location.origin);
-  url.pathname = "/api";
-  if (NODE_ENV === "development") {
-    url.port = SERVER_PORT.toString();
-  }
-  return url
+  // const url = new URL(window.location.origin);
+  // url.pathname = "/api";
+  // if (NODE_ENV === "development") {
+  //   url.port = SERVER_PORT.toString();
+  // }
+  // return url
+  return new URL("https://api.openraadsinformatie.nl/v1/elastic")
 };
 
 export const getTopicsApiURL = (relUrl: string): URL => {

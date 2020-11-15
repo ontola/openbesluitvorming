@@ -26,6 +26,7 @@ const MediaObject = (props: MediaObjectProps) => {
           <Property label={NS.vcard("hasOrganizationName")} />
           <Property label={NS.dcterms("isReferencedBy")} />
           <Property label={NS.schema("dateModified")} />
+          <Property label={NS.prov("wasGeneratedBy")} />
           <Property label={NS.schema("isBasedOn")} />
           {/* <Property label={NS.schema("fileSize")} />
           <Property label={NS.schema("encodingFormat")} /> */}

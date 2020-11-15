@@ -5,6 +5,7 @@ import LRS from "../../LRS";
  * Please properly include each file when access to the code is needed.
  */
 
+import Activity from "./Activity";
 import AgendaItem from "./AgendaItem";
 import ErrorComp from "./Error";
 import Loading from "./Loading";
@@ -24,6 +25,7 @@ import ThingPredicateLabel from "./ThingPredicateLabel";
 
 function register() {
   LRS.registerAll(
+    ...Activity,
     ...AgendaItem,
     ...ErrorComp,
     ...Loading,
