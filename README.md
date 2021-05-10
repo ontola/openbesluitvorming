@@ -44,6 +44,13 @@ It's a typescript react application that uses [reactiveserach](https://github.co
 
 The [server](/server) is a node express application that serves as both a static file server and a proxy that forward elasticsearch queries to the elastic endpoint of open raadsinformatie.
 
+## Re-using OpenBesluitvorming components in your stack
+
+The `/front/components/views/` library contains react components that use `link-redux` to render the data from the [Open-Raadsinformatie API](https://github.com/openstate/open-raadsinformatie/).
+This repo is MIT licensed, so feel free to use these components in your own application.
+If you need any help during development, please check out the `link-redux` [wiki](https://github.com/fletcher91/link-redux/wiki).
+Feel free to create an issue or reach out to joep@ontola.io.
+
 ## Connecting with Elasticsearch
 
 Make sure ES has the [correct proxy settings](https://opensource.appbase.io/reactive-manual/getting-started/reactivebase.html#connect-to-elasticsearch).
