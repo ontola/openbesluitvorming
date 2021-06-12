@@ -144,12 +144,6 @@ const Home = () => {
               IS_ORI ? "Sander Bakker" : "Joep Meindertsma"
             }</a>
         </p>
-        <React.Fragment>
-          <h2>Openbare consultatie ORI API 1.1</h2>
-          <p>De eerder gezamenlijk opgestelde ORI API specs (1.0) zijn in de praktijk getoetst met iBabs, PLOOI en VNG Realisatie om te zien waar we in de praktijk tegenaan lopen. Om het behapbaar te houden is in deze eerste fase (1.1) gekozen voor een beperkte selectie namelijk de resources &nbsp;vergaderingen&rdquo;, &ldquo;agendapunten&rdquo; en &ldquo;informatieobjecten. ( <a href="https://vng-realisatie.github.io/ODS-Open-Raadsinformatie/docs/Uitwisselingsmodel.html">&nbsp;Uitwisselingsmodel | ODS-Open-Raadsinformatie (vng-realisatie.github.io)</a>) . Uiteraard willen ook graag weten hoe de toepassing hiervan voor de andere leveranciers en hergebruikers wordt ervaren omdat we ons richten op een breed gedragen standaard. Om die reden willen we vragen om jullie reactie.</p>
-          <p>Om de consultatie voor 1.1 eenvoudig te laten verlopen hebben we met <a href="https://vng-realisatie.github.io/ODS-Open-Raadsinformatie/">ODS Open RaadsInformatie | ODS-Open-Raadsinformatie (vng-realisatie.github.io)</a> een wat vriendelijker Git-locatie aangemaakt. Opmerkingen, wijzigingsverzoeken e/o vragen kunnen worden toegevoegd via &ldquo;<a href="https://github.com/VNG-Realisatie/ODS-Open-Raadsinformatie/issues">issues</a>&rdquo; en is met het oog op de transparantie en beheersing van dit proces de enige manier.</p>
-          <p>De openbare consultatie sluit 19 april 18:00</p>
-        </React.Fragment>
         <h2>Privacy</h2>
         <p>
           We gebruiken Matomo (een privacy-vriendelijk alternatief voor Google analytics) om bezoekersstatistieken te verzamelen.
