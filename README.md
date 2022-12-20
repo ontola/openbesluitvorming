@@ -63,3 +63,9 @@ Make sure ES has the [correct proxy settings](https://opensource.appbase.io/reac
 - Feedback from @breyten, @aolieman, @fletcher91, @jurrian
 - Various open source projects that we're using, most notably ReactiveSearch and Link-Lib. Check out the `package.json` files to see which projects were used.
 - [@aolieman](http://github.com/aolieman) and [Hendrik](http://github.com/henkieeeee) fpr implementing the Glossary feature (select text in PDF to view definition).
+
+
+
+<video src="https://user-images.githubusercontent.com/2183313/208661302-385fb00d-5be2-4c50-8159-591c7805e51c.mov"></video>
+
+
