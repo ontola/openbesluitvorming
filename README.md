@@ -1,6 +1,6 @@
 # OpenBesluitvorming Search
 
-_As of december 23rd 2022, OpenBesluitvormin.nl is [no longer available online](https://github.com/ontola/openbesluitvorming/issues/142)._
+_As of december 23rd 2022, OpenBesluitvorming.nl is [no longer available online](https://github.com/ontola/openbesluitvorming/issues/142)._
 
 [![Build Status](https://semaphoreci.com/api/v1/argu/ori-search-2/branches/master/badge.svg)](https://semaphoreci.com/argu/ori-search-2)
 
