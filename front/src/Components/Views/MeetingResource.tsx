@@ -1,4 +1,3 @@
-import { SomeTerm } from "@ontologies/core";
 import { register } from "link-redux";
 import React from "react";
 
@@ -16,7 +15,6 @@ interface MeetingResourceProps extends ThingProps {
 
 /** A Thing inside the Resource or Labels topology */
 const ThingResource = (props: MeetingResourceProps) => {
-
   let labelString = props.subject.value;
 
   if (props.name !== undefined) {
@@ -26,11 +24,7 @@ const ThingResource = (props: MeetingResourceProps) => {
 
   const date = new Date(props.date.value);
 
-  return (
-    <Box>
-      {`${labelString} - ${date.toLocaleDateString("nl-NL")}`}
-    </Box>
-  );
+  return <Box>{`${labelString} - ${date.toLocaleDateString("nl-NL")}`}</Box>;
 };
 
 ThingResource.type = NS.meeting("Meeting");
@@ -47,10 +41,8 @@ ThingResource.mapDataToProps = {
     NS.schema("label"),
     NS.skos("prefLabel"),
   ],
-  date: [
-    NS.schema("startDate")
-  ]
-}
+  date: [NS.schema("startDate")],
+};
 ThingResource.linkOpts = {
   forceRender: true,
 };

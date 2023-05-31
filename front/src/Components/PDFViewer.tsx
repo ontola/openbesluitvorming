@@ -10,7 +10,7 @@ import {
   faHighlighter,
   faBook,
 } from "@fortawesome/free-solid-svg-icons";
-import escapeRegExp from "lodash.escaperegexp"
+import escapeRegExp from "lodash.escaperegexp";
 import { withRouter, RouteComponentProps } from "react-router";
 import { SideDrawerContext } from "./SideDrawer";
 import { getParams, usePersistedState } from "../helpers";
@@ -18,9 +18,8 @@ import { handle } from "../helpers/logging";
 import { HotKeys } from "react-hotkeys";
 import { keyMap } from "../helpers/keyMap";
 import { Property } from "link-redux";
-import { NS } from "../LRS";
-import Glossarium from './Glossarium';
-import GlossariumAPI from './GlossariumAPI';
+import Glossarium from "./Glossarium";
+import GlossariumAPI from "./GlossariumAPI";
 
 // eslint-disable-next-line
 const { Document, Page, pdfjs } = require("react-pdf");
@@ -57,10 +56,11 @@ const calcMaxWidth = (windowWidth: number) => {
   return windowWidth;
 };
 
-export const LoadingComponent = () =>
+export const LoadingComponent = () => (
   <div className="PDFViewer__loading">
     <FontAwesomeIcon icon={faSpinner} size="6x" spin />
-  </div>;
+  </div>
+);
 
 const glossariumAPI = new GlossariumAPI();
 
@@ -75,52 +75,65 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
   const drawer = React.useContext(SideDrawerContext);
   const pdfWrapper = React.createRef<HTMLInputElement>();
   const [glossIsOpen, setGlossIsOpen] = React.useState<boolean>(true);
-  const [selectedText, setSelectedText] = React.useState<string>('');
+  const [selectedText, setSelectedText] = React.useState<string>("");
 
-  const setDocumentSectionAnnotations =
-    usePersistedState<any>("orisearch.pdfviewer.documentSectionAnnotations", [])[1];
+  const setDocumentSectionAnnotations = usePersistedState<any>(
+    "orisearch.pdfviewer.documentSectionAnnotations",
+    []
+  )[1];
 
-  const documentID = getParams(props.history)['documentID'];
+  const documentID = getParams(props.history)["documentID"];
 
-  const wordhoardNames: string[] = ["orid:" + documentID + "_definitions", "orid:" + documentID + "_abbreviations"];
+  const wordhoardNames: string[] = [
+    "orid:" + documentID + "_definitions",
+    "orid:" + documentID + "_abbreviations",
+  ];
 
   const getSectionAnnotations = (page: number, wids: any[]) => {
     if (wids) {
-      glossariumAPI.getDocumentSectionAnnotations("orid:" + documentID, page - 1, wids).then(response => {
-        if (response) {
-          if (response.surface_forms) {
-            setDocumentSectionAnnotations(response.surface_forms);
+      glossariumAPI
+        .getDocumentSectionAnnotations("orid:" + documentID, page - 1, wids)
+        .then((response) => {
+          if (response) {
+            if (response.surface_forms) {
+              setDocumentSectionAnnotations(response.surface_forms);
+            } else {
+              setDocumentSectionAnnotations([]);
+            }
           } else {
             setDocumentSectionAnnotations([]);
           }
-        } else {
-          setDocumentSectionAnnotations([]);
-        }
-      })
+        });
     } else {
       setDocumentSectionAnnotations([]);
     }
   };
 
   const getDocumentWordhoardList = () => {
-    glossariumAPI.findSuperItems(documentID).then((oridList: any[]) => {
-      for (const orid of oridList) {
-        if (orid) {
-          const definitionsWordhoardName = "orid:" + orid + "_definitions";
-          const abbreviationsWordhoardName = "orid:" + orid + "_abbreviations";
-          wordhoardNames.push(definitionsWordhoardName);
-          wordhoardNames.push(abbreviationsWordhoardName);
+    glossariumAPI
+      .findSuperItems(documentID)
+      .then((oridList: any[]) => {
+        for (const orid of oridList) {
+          if (orid) {
+            const definitionsWordhoardName = "orid:" + orid + "_definitions";
+            const abbreviationsWordhoardName =
+              "orid:" + orid + "_abbreviations";
+            wordhoardNames.push(definitionsWordhoardName);
+            wordhoardNames.push(abbreviationsWordhoardName);
+          }
         }
-      }
-    }).then(() => {
-      glossariumAPI.getWordhoardList(wordhoardNames).then((wordhoardList: any) => {
-        const wordhoardIDs = wordhoardList.items.map((item: any) => {
-          return item.id
-        });
-        setWordhoardIDs(wordhoardIDs);
-        getSectionAnnotations(1, wordhoardIDs) // Get first page annotations
       })
-    })
+      .then(() => {
+        glossariumAPI
+          .getWordhoardList(wordhoardNames)
+          .then((wordhoardList: any) => {
+            const wordhoardIDs = wordhoardList.items.map((item: any) => {
+              return item.id;
+            });
+            setWordhoardIDs(wordhoardIDs);
+            getSectionAnnotations(1, wordhoardIDs); // Get first page annotations
+          });
+      });
   };
 
   const handlePreviousPage = () => {
@@ -128,7 +141,7 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
       return;
     }
     setPageNumber(pageNumber - 1);
-    getSectionAnnotations(pageNumber-1, wordhoardIDs);
+    getSectionAnnotations(pageNumber - 1, wordhoardIDs);
   };
 
   const handleNextPage = () => {
@@ -136,12 +149,10 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
       return;
     }
     setPageNumber(pageNumber + 1);
-    getSectionAnnotations(pageNumber+1, wordhoardIDs);
+    getSectionAnnotations(pageNumber + 1, wordhoardIDs);
   };
 
-  const {
-    currentSearchTerm,
-  } = getParams(props.history);
+  const { currentSearchTerm } = getParams(props.history);
 
   const onDocumentLoadSuccess = (e: OnLoadSuccessType) => {
     setNumPages(e.numPages);
@@ -154,20 +165,24 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
     handle(error);
     return (
       <div className="PDFViewer__error">
-        <p>
-          De PDF kan niet worden geladen.
-        </p>
-        <a href={props.url} download >Download het bestand.</a>
+        <p>De PDF kan niet worden geladen.</p>
+        <a href={props.url} download>
+          Download het bestand.
+        </a>
         {/* If the PDF does not render, show the plaintext */}
-        <Property label={NS.schema("text")} />
       </div>
     );
   };
 
   const highlightPattern = (text: string, pattern: string): React.ReactNode => {
-    const patternPlaceholder = pattern.replace(/[\s\-－﹣֊᐀‐–︲—﹘―⸺⸻⸗⹀〜゠⸚]+/g, '%').replace(/[^\w\d%]/g, '');
-    const patternRewrite = escapeRegExp(patternPlaceholder).replace(/%/g, '[\\s\\-－﹣֊᐀‐–︲—﹘―⸺⸻⸗⹀〜゠⸚]+');
-    const safePattern = new RegExp(patternRewrite, 'gui');
+    const patternPlaceholder = pattern
+      .replace(/[\s\-－﹣֊᐀‐–︲—﹘―⸺⸻⸗⹀〜゠⸚]+/g, "%")
+      .replace(/[^\w\d%]/g, "");
+    const patternRewrite = escapeRegExp(patternPlaceholder).replace(
+      /%/g,
+      "[\\s\\-－﹣֊᐀‐–︲—﹘―⸺⸻⸗⹀〜゠⸚]+"
+    );
+    const safePattern = new RegExp(patternRewrite, "gui");
     const splitText = text.split(safePattern);
 
     if (splitText.length <= 1) {
@@ -182,21 +197,15 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
           return [
             ...arr,
             element,
-            <mark key={`mark-${index}`}>
-              {matches[index]}
-            </mark>,
+            <mark key={`mark-${index}`}>{matches[index]}</mark>,
           ];
         }
         return [...arr, element];
       },
-      [],
+      []
     );
 
-    return (
-      <React.Fragment>
-        {whatever}
-      </React.Fragment>
-    );
+    return <React.Fragment>{whatever}</React.Fragment>;
   };
 
   const setFillWidth = () => {
@@ -209,21 +218,22 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
         drawer.setWidth(maxWidth);
       }
       setTimeout(
-        () => docRef.scrollIntoView({
-          behavior: "smooth",
-          block: "start",
-        }),
-        100,
+        () =>
+          docRef.scrollIntoView({
+            behavior: "smooth",
+            block: "start",
+          }),
+        100
       );
     }
   };
 
   const toggleGlossary = () => {
-    setGlossIsOpen(!glossIsOpen)
+    setGlossIsOpen(!glossIsOpen);
   };
 
-  const makeTextRenderer = (searchText: string) =>
-    (textItem: TextLayerItem) => highlightPattern(textItem.str, searchText);
+  const makeTextRenderer = (searchText: string) => (textItem: TextLayerItem) =>
+    highlightPattern(textItem.str, searchText);
 
   const keyHandlers = {
     PREVIOUS: handlePreviousPage,
@@ -234,11 +244,11 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
 
   const handleCheckSelect = (_e: React.MouseEvent) => {
     const selection = window.getSelection();
-    if ((selection !== null) && (selection.toString() !== '')) {
+    if (selection !== null && selection.toString() !== "") {
       const selectionString = selection.toString();
-      setSelectedText(selectionString)
+      setSelectedText(selectionString);
     } else {
-      setSelectedText('')
+      setSelectedText("");
     }
   };
 
@@ -260,30 +270,34 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
             onMouseUp={handleCheckSelect}
           >
             <Document
-              error={<PDFErrorComponent/>}
+              error={<PDFErrorComponent />}
               file={props.url}
-              loading={<LoadingComponent/>}
-              inputRef={(ref: any) => { setDocRef(ref); }}
+              loading={<LoadingComponent />}
+              inputRef={(ref: any) => {
+                setDocRef(ref);
+              }}
               onLoadSuccess={onDocumentLoadSuccess}
             >
               <Page
-                loading={<LoadingComponent/>}
-                error={<PDFErrorComponent/>}
+                loading={<LoadingComponent />}
+                error={<PDFErrorComponent />}
                 pageIndex={pageNumber - 1}
                 width={drawer.width}
                 customTextRenderer={
-                  currentSearchTerm && useHighlighter && makeTextRenderer(currentSearchTerm)
+                  currentSearchTerm &&
+                  useHighlighter &&
+                  makeTextRenderer(currentSearchTerm)
                 }
               />
             </Document>
           </div>
         </div>
-        {showButtons &&
+        {showButtons && (
           <div className="PDFViewer__button-bar">
             <div className="PDFViewer__button-bar-inner">
               <Button
                 onClick={handlePreviousPage}
-                disabled={(pageNumber === 1)}
+                disabled={pageNumber === 1}
                 title="Vorige pagina (←)"
               >
                 <FontAwesomeIcon icon={faArrowLeft} />
@@ -291,7 +305,7 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
               <span>{`${pageNumber} / ${numPages}`}</span>
               <Button
                 onClick={handleNextPage}
-                disabled={(pageNumber === (numPages))}
+                disabled={pageNumber === numPages}
                 title="Volgende pagina (→)"
               >
                 <FontAwesomeIcon icon={faArrowRight} />
@@ -302,32 +316,44 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
               >
                 <FontAwesomeIcon icon={faDownload} />
               </Button>
-              <Button
-                onClick={setFillWidth}
-                title="Scherm vullen (F)"
-              >
+              <Button onClick={setFillWidth} title="Scherm vullen (F)">
                 <FontAwesomeIcon icon={faExpand} />
               </Button>
               <Button
                 title={glossIsOpen ? "Sluit glossarium" : "Open glossarium"}
-                onClick={glossIsOpen ? () => setGlossIsOpen(false) : () => setGlossIsOpen(true)}
+                onClick={
+                  glossIsOpen
+                    ? () => setGlossIsOpen(false)
+                    : () => setGlossIsOpen(true)
+                }
               >
                 <FontAwesomeIcon
                   // If text is selected, bounce this bad boy
-                  className={(selectedText.length > 1 && !glossIsOpen) ? "bounce" : ""}
+                  className={
+                    selectedText.length > 1 && !glossIsOpen ? "bounce" : ""
+                  }
                   icon={faBook}
                 />
               </Button>
               <Button
                 onClick={() => setHighlighter(!useHighlighter)}
-                title={useHighlighter ? "Resultaten niet onderstrepen" : "Resultaten onderstrepen"}
+                title={
+                  useHighlighter
+                    ? "Resultaten niet onderstrepen"
+                    : "Resultaten onderstrepen"
+                }
               >
                 <FontAwesomeIcon icon={faHighlighter} />
               </Button>
             </div>
-            {selectedText && glossIsOpen && <Glossarium selectedText={selectedText} pdfWrapperRef={pdfWrapper}/>}
+            {selectedText && glossIsOpen && (
+              <Glossarium
+                selectedText={selectedText}
+                pdfWrapperRef={pdfWrapper}
+              />
+            )}
           </div>
-        }
+        )}
       </div>
     </HotKeys>
   );

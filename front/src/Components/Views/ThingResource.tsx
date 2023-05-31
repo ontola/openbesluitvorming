@@ -1,4 +1,3 @@
-import { SomeTerm } from "@ontologies/core";
 import { register } from "link-redux";
 import React from "react";
 
@@ -15,7 +14,6 @@ interface ThingResourceProps extends ThingProps {
 
 /** A Thing inside the Resource or Labels topology */
 const ThingResource = (props: ThingResourceProps) => {
-
   let labelString = props.subject.value;
 
   if (props.name !== undefined) {
@@ -23,11 +21,7 @@ const ThingResource = (props: ThingResourceProps) => {
     labelString = props.name.value;
   }
 
-  return (
-    <Box>
-      {labelString}
-    </Box>
-  );
+  return <Box>{labelString}</Box>;
 };
 
 ThingResource.type = NS.schema("Thing");
@@ -44,7 +38,7 @@ ThingResource.mapDataToProps = {
     NS.schema("label"),
     NS.skos("prefLabel"),
   ],
-}
+};
 ThingResource.linkOpts = {
   forceRender: true,
 };

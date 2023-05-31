@@ -4,35 +4,24 @@ import { GlobalHotKeys } from "react-hotkeys";
 import { ids } from "../helpers";
 import { keyMap } from "../helpers/keyMap";
 
-const simpleQueryStringChars = [
-  "\"",
-  "+",
-  ",",
-  "|",
-  "*",
-  "~",
-  "(",
-  ")",
-];
+const simpleQueryStringChars = ['"', "+", ",", "|", "*", "~", "(", ")"];
 
 const fields = ["text", "title", "description", "name"];
 
 // https://github.com/ontola/ori-search/issues/72
-const mustNot = [{
-  match: {
-    "@type": "Membership"
-  }
-}];
+const mustNot = [
+  {
+    match: {
+      "@type": "Membership",
+    },
+  },
+];
 
-export const queryGenerator = (
-  searchTerm: string,
-) => {
-
+export const queryGenerator = (searchTerm: string) => {
   if (searchTerm === undefined) {
     return null;
   }
 
-  /* eslint-disable @typescript-eslint/camelcase */
   let queryPart: {} = {
     multi_match: {
       fields,
@@ -40,18 +29,20 @@ export const queryGenerator = (
       operator: "OR",
       query: searchTerm,
     },
-  }
+  };
 
   // If any of the special characters are present, assume that the user wants
   // to perform a simpel_query search
-  if (simpleQueryStringChars.some(substring => searchTerm.includes(substring))) {
+  if (
+    simpleQueryStringChars.some((substring) => searchTerm.includes(substring))
+  ) {
     queryPart = {
       simple_query_string: {
         fields,
         default_operator: "OR",
         query: searchTerm,
       },
-    }
+    };
   }
 
   return {
@@ -60,22 +51,16 @@ export const queryGenerator = (
         must: [
           queryPart,
           {
-            "terms": {
-              "_index": [
-                "ori_*",
-                "osi_*",
-                "ggm_*",
-              ]
-            }
-          }
+            terms: {
+              _index: ["ori_*", "osi_*", "ggm_*"],
+            },
+          },
         ],
         must_not: mustNot,
       },
     },
   };
-  /* eslint-enable @typescript-eslint/camelcase */
 };
-
 
 // How many ms it takes before search is triggered after changing the query value.
 const debounce = 2500;
@@ -89,7 +74,7 @@ const SearchBar: React.FunctionComponent = () => {
       // When the component unmounts, remove the timer.
       clearTimeout(timer);
     },
-    [timer],
+    [timer]
   );
 
   const handlers = {
@@ -143,7 +128,6 @@ const SearchBar: React.FunctionComponent = () => {
         URLParams={true}
         customQuery={queryGenerator}
         customHighlight={() => ({
-          /* eslint-disable @typescript-eslint/camelcase */
           highlight: {
             pre_tags: ["<mark>"],
             post_tags: ["</mark>"],
@@ -156,7 +140,6 @@ const SearchBar: React.FunctionComponent = () => {
             fragment_size: 100,
             number_of_fragments: 3,
           },
-          /* eslint-enable @typescript-eslint/camelcase */
         })}
       />
     </GlobalHotKeys>

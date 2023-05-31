@@ -14,7 +14,6 @@ import { ReactiveBase, SelectedFilters } from "@appbaseio/reactivesearch";
 import theme from "../theme";
 import SideDrawer from "../Components/SideDrawer";
 import { LinkedResourceContainer } from "link-redux";
-import rdfFactory from "@ontologies/core";
 import { GlobalHotKeys } from "react-hotkeys";
 
 import { keyMap } from "../helpers/keyMap";
@@ -23,10 +22,7 @@ import { keyMap } from "../helpers/keyMap";
 const SearchRoute = (props: RouteComponentProps) => {
   const [showFilters, setShowFilters] = React.useState(false);
 
-  const {
-    currentResource,
-    hasParams,
-  } = getParams(props.history);
+  const { currentResource, hasParams } = getParams(props.history);
 
   const setSearchParams = (newURL: string) => {
     const url = new URL(newURL);
@@ -45,10 +41,7 @@ const SearchRoute = (props: RouteComponentProps) => {
   };
 
   return (
-    <GlobalHotKeys
-      keyMap={keyMap}
-      handlers={globalKeyHandlers}
-    >
+    <GlobalHotKeys keyMap={keyMap} handlers={globalKeyHandlers}>
       <ReactiveBase
         theme={theme}
         // app={IS_ORI ? "ori_*" : "*"}
@@ -56,35 +49,31 @@ const SearchRoute = (props: RouteComponentProps) => {
         url={getApiURL().toString()}
         setSearchParams={setSearchParams as () => string}
       >
-        <div className={
-          `SearchRoute ${hasParams ? "SearchRoute--search" : ""}
+        <div
+          className={`SearchRoute ${hasParams ? "SearchRoute--search" : ""}
           ${showFilters ? "SearchRoute--show-filters" : ""}
-          `
-        }>
+          `}
+        >
           <div className="NavBar">
             <NavBarTop />
             <div className="NavBar__bottom">
               <div className="NavBar__searchbar">
-                <SearchBar/>
-                {hasParams && <Button
-                  className="SearchBar__button"
-                  onClick={() => setShowFilters(!showFilters)}
-                >
-                  filters {showFilters ? "verbergen" : "tonen"}
-                </Button>}
+                <SearchBar />
+                {hasParams && (
+                  <Button
+                    className="SearchBar__button"
+                    onClick={() => setShowFilters(!showFilters)}
+                  >
+                    filters {showFilters ? "verbergen" : "tonen"}
+                  </Button>
+                )}
               </div>
-              {!hasParams &&
-                <OrganizationSelector />
-              }
+              {!hasParams && <OrganizationSelector />}
             </div>
           </div>
           <div className="Wrapper">
-            {hasParams &&
-              <Filtersbar
-                display={showFilters}
-              />
-            }
-            {hasParams &&
+            {hasParams && <Filtersbar display={showFilters} />}
+            {hasParams && (
               <div className="Results">
                 <SelectedFilters
                   showClearAll={true}
@@ -93,23 +82,19 @@ const SearchRoute = (props: RouteComponentProps) => {
                   // render={CustomSelectedFilters}
                 />
                 <div className="ResultsListWrapper">
-                  <ResultsList/>
+                  <ResultsList />
                 </div>
               </div>
-            }
-            {!hasParams &&
-              <Home />
-            }
+            )}
+            {!hasParams && <Home />}
             <ReactCSSTransitionGroup
               transitionName="SideDrawer__wrapper"
               transitionEnterTimeout={200}
               transitionLeaveTimeout={200}
             >
-              {currentResource && hasParams &&
-                <SideDrawer>
-                  <LinkedResourceContainer subject={rdfFactory.namedNode(currentResource)} />
-                </SideDrawer>
-              }
+              {currentResource && hasParams && (
+                <SideDrawer>Render PDF here plox</SideDrawer>
+              )}
             </ReactCSSTransitionGroup>
           </div>
         </div>

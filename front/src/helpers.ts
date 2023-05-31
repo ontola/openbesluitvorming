@@ -1,7 +1,5 @@
 import React from "react";
-import { History } from "history";
-import { NS } from "./LRS";
-import { NODE_ENV, SERVER_PORT } from './config';
+import { NODE_ENV, SERVER_PORT } from "./config";
 
 /** Mapping for consistent component Ids, used by reactivesearch */
 export const ids = {
@@ -18,21 +16,21 @@ export const allComponentIds = Object.values(ids);
 
 /** Returns an array of all identifiers, except the one you pass */
 export const allIdsBut = (id: string): string[] => {
-  const allValues = Object.values(ids)
-  const filteredValues = allValues.filter(
-    (value) => {
-      return value !== id
-    }
-  )
-  return filteredValues
-}
+  const allValues = Object.values(ids);
+  const filteredValues = allValues.filter((value) => {
+    return value !== id;
+  });
+  return filteredValues;
+};
 
 export const capitalize = (s: string) => {
   return s.charAt(0).toUpperCase() + s.slice(1);
 };
 
-export function usePersistedState<T>(key: string, initial: T):
-[T, React.Dispatch<React.SetStateAction<T>>] {
+export function usePersistedState<T>(
+  key: string,
+  initial: T
+): [T, React.Dispatch<React.SetStateAction<T>>] {
   const [value, setValue] = React.useState<T>(() => {
     const storageValue = sessionStorage.getItem(key);
     if (storageValue) {
@@ -70,19 +68,22 @@ export const getParams = (history: History) => {
 
   let currentSearchTerm = params.get(ids.searchbox);
   if (currentSearchTerm) {
-    currentSearchTerm = currentSearchTerm.substr(1, currentSearchTerm.length - 2);
+    currentSearchTerm = currentSearchTerm.substr(
+      1,
+      currentSearchTerm.length - 2
+    );
   }
 
   let documentID = null;
   if (currentResource !== null) {
-    documentID = currentResource.split("/")[3]
+    documentID = currentResource.split("/")[3];
   }
 
   return {
     currentResource,
     currentSearchTerm,
     hasParams,
-    documentID
+    documentID,
   };
 };
 
@@ -92,16 +93,16 @@ export const indexToLabel = (_index: string) => {
   const parts = _index.split("_");
   const stitchedName = parts
     .slice(1, parts.length - 1)
-    .map(s => `${s.charAt(0).toLocaleUpperCase()}${s.substring(1)}`)
-    .join(" ")
+    .map((s) => `${s.charAt(0).toLocaleUpperCase()}${s.substring(1)}`)
+    .join(" ");
   if (parts[0] === "osi") {
-    return `Provincie ${stitchedName}`
+    return `Provincie ${stitchedName}`;
   }
   if (parts[0] === "ori") {
-    return `Gemeente ${stitchedName}`
+    return `Gemeente ${stitchedName}`;
   }
   if (parts[0] === "ggm") {
-    return `Tweede Kamer`
+    return `Tweede Kamer`;
   }
   return stitchedName;
 };
@@ -135,53 +136,14 @@ export const typeToLabel = (type: string) => {
   }
 };
 
-// Turns an RDF list in to a JS Array
-export function listToArr(lrs: any, acc: any, rest: any) {
-  if (Array.isArray(rest)) {
-    return rest;
-  }
-  if (!rest || rest === NS.rdf("nil")) {
-    return acc;
-  }
-
-  let first;
-  if (rest.termType === "BlankNode") {
-    const firstStatement = lrs.store.anyStatementMatching(rest, NS.rdf("first"));
-    first = firstStatement && firstStatement.object;
-  } else {
-    first = lrs.getResourceProperty(rest, NS.rdf("first"));
-
-    if (!first) {
-      return lrs.getEntity(rest);
-    }
-  }
-  acc.push(first);
-  listToArr(lrs, acc, lrs.store.anyStatementMatching(rest, NS.rdf("rest")).object);
-
-  return acc;
-}
-
-export function propertyToArr(lrs: any, acc: any, rest: any) {
-  if (Array.isArray(rest)) {
-    return rest;
-  }
-  if (typeof rest === "undefined" || rest === null) {
-    return [];
-  }
-  if (Object.hasOwnProperty.call(rest, "termType") && rest.termType === "Literal") {
-    return [rest];
-  }
-
-  return listToArr(lrs, acc, rest);
-}
-
 export const getApiURL = (): URL => {
   const url = new URL(window.location.origin);
   url.pathname = "/api";
   if (NODE_ENV === "development") {
     url.port = SERVER_PORT.toString();
   }
-  return url
+  return "https://api.openraadsinformatie.nl/v1/elastic";
+  return url;
 };
 
 export const getTopicsApiURL = (relUrl: string): URL => {
@@ -190,7 +152,7 @@ export const getTopicsApiURL = (relUrl: string): URL => {
   if (NODE_ENV === "development") {
     url.port = SERVER_PORT.toString();
   }
-  return url
+  return url;
 };
 
 // Custom react hook for data fetching with error handling

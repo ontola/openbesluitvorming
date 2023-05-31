@@ -1,5 +1,4 @@
 import { unstable, LinkReduxLRSType } from "link-redux";
-// import { NamedNode } from "@ontologies/core";
 import React from "react";
 // import {
 // INTERNAL_SERVER_ERROR,
@@ -54,8 +53,7 @@ class ErrorButtonWithFeedback extends React.Component<ErrorButtonProps> {
       return this.props.reset();
     }
 
-    this
-      .props
+    this.props
       .reloadLinkedObject()
       .then(disable)
       .catch((e: Error) => {
@@ -86,8 +84,9 @@ class ErrorButtonWithFeedback extends React.Component<ErrorButtonProps> {
         onClick={this.reload}
         {...this.props}
       >
-        {this.props.children ||
-          <FormattedMessage id="https://app.argu.co/i18n/errors/inlineButton/label" />}
+        {this.props.children || (
+          <FormattedMessage id="https://app.argu.co/i18n/errors/inlineButton/label" />
+        )}
       </Button>
     );
   }
