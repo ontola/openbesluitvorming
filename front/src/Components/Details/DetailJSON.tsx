@@ -10,16 +10,16 @@ const DetailJSON: React.FunctionComponent<ORIItemType> = (props) => {
   return (
     <a
       className="ResultCard__detail"
-      href={`data:application/json;charset=utf-8,${
-        encodeURIComponent(JSON.stringify(props, null, SpacingLevelJSON))
-      }`}
-      download={`${paths.oriId(props["@id"])}.json`}
+      href={`data:application/json;charset=utf-8,${encodeURIComponent(
+        JSON.stringify(props, null, SpacingLevelJSON)
+      )}`}
+      download={`${props["@id"]}.json`}
       // eslint-disable-next-line
       target="_blank"
       rel="noopener noreferrer"
       title="Download JSON"
     >
-      <FontAwesomeIcon icon={faCode}/>
+      <FontAwesomeIcon icon={faCode} />
     </a>
   );
 };

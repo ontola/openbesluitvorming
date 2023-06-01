@@ -707,13 +707,13 @@ mark {
 
 .SearchBar {
   flex: 1;
-  display: flex;
+  // display: flex;
   max-width: $result-width;
 
-  > div {
-    flex: 1;
-    display: flex;
-  }
+  // > div {
+  //   flex: 1;
+  //   display: flex;
+  // }
 
   input {
     -webkit-appearance: none;
@@ -721,6 +721,8 @@ mark {
     border-radius: $border-radius;
     background-color: white;
     transition: border-color .2s;
+    display: flex;
+    flex: 1;
 
     &:hover {
       border-color: $g3;
@@ -736,6 +738,7 @@ mark {
     border-left: 0;
     padding-left: 1rem;
     padding-right: 1rem;
+    height: 2.6rem;
 
     &:hover {
       background: $g1;
@@ -754,7 +757,7 @@ mark {
 }
 
 .SearchBar__wrapper {
-  flex: 1;
+  // flex: 1;
 }
 
 .Text-Page {

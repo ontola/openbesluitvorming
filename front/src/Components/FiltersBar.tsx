@@ -1,10 +1,13 @@
 import * as React from "react";
+import { MultiList, RangeSlider } from "@appbaseio/reactivesearch";
 import {
-  MultiList,
-  RangeSlider,
-} from "@appbaseio/reactivesearch";
-import { indexToLabel, typeToLabel, ids, capitalize, allIdsBut } from "../helpers";
-import Button from './Button';
+  indexToLabel,
+  typeToLabel,
+  ids,
+  capitalize,
+  allIdsBut,
+} from "../helpers";
+import Button from "./Button";
 import { topTag } from "../types";
 import MapFilter from "./MapFilter";
 import FilterTitle from "./FilterTitle";
@@ -15,9 +18,11 @@ interface FiltersbarProps {
 
 const startDate = new Date(2000, 1);
 // Set endDate one year in the future - we might want to see meetings that haven't happened yet
-const endDate = new Date(Date.now() + 1000 /*sec*/ * 60 /*min*/ * 60 /*hour*/ * 24 /*day*/ * 365);
+const endDate = new Date(
+  Date.now() + 1000 /*sec*/ * 60 /*min*/ * 60 /*hour*/ * 24 /*day*/ * 365
+);
 
-const dateLabel = (date: Date) => `${date.getFullYear()}-${date.getMonth()}`
+const dateLabel = (date: Date) => `${date.getFullYear()}-${date.getMonth()}`;
 
 const MunicipalityLabel = (label: string, count: number) => {
   return (
@@ -26,40 +31,44 @@ const MunicipalityLabel = (label: string, count: number) => {
       <span>{count}</span>
     </span>
   );
-}
+};
 
-export const TypeLabel = (label: string, count: number) =>
+export const TypeLabel = (label: string, count: number) => (
   <span>
     <span>{typeToLabel(label)}</span>
     <span>{count}</span>
-  </span>;
+  </span>
+);
 
-export const DateToolTip = (data: string) =>
+export const DateToolTip = (data: string) => (
   <div
     style={{
       whiteSpace: "nowrap",
     }}
-  >{dateLabel(new Date(data))}</div>
+  >
+    {dateLabel(new Date(data))}
+  </div>
+);
 
 const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
-
   const [showDateRange, setShowDateRange] = React.useState(false);
   const [showMap, setShowMap] = React.useState(false);
 
   return (
     <div
-      className={`FilterBar ${props.display ? "FilterBar__visible" : "FilterBar__hidden"}`}
+      className={`FilterBar ${
+        props.display ? "FilterBar__visible" : "FilterBar__hidden"
+      }`}
     >
       <MultiList
         title={
-          <FilterTitle
-            helper="Het type item, zoals Document of Vergadering."
-          >
+          <FilterTitle helper="Het type item, zoals Document of Vergadering.">
             Type
           </FilterTitle>
         }
         componentId={ids.type}
-        dataField="@type.keyword"
+        dataField="@type"
+        defaultValue={["MediaObject"]}
         filterLabel="Type"
         className="Filter__item"
         size={500}
@@ -96,9 +105,7 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
       />} */}
       <MultiList
         title={
-          <FilterTitle
-            helper="De organisatie waar het document vandaan komt."
-          >
+          <FilterTitle helper="De organisatie waar het document vandaan komt.">
             Organisaties
           </FilterTitle>
         }
@@ -122,9 +129,7 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
       />
       <MultiList
         title={
-          <FilterTitle
-            helper="Het thema dat wordt herkend in de tekst. Dit is automatisch gegenereerd."
-          >
+          <FilterTitle helper="Het thema dat wordt herkend in de tekst. Dit is automatisch gegenereerd.">
             Thema
           </FilterTitle>
         }
@@ -148,8 +153,12 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
       <div className="Filter__item">
         <Button
           onClick={() => setShowMap(!showMap)}
-          className={`Button__toggle ${showMap ? "Button__toggle-on" : "Button__toggle-off"}`}
-          title={"Door het herkennen van straatnamen kunnen we items zoeken op de kaart. Mogelijk gemaakt door WaarOverheid.nl."}
+          className={`Button__toggle ${
+            showMap ? "Button__toggle-on" : "Button__toggle-off"
+          }`}
+          title={
+            "Door het herkennen van straatnamen kunnen we items zoeken op de kaart. Mogelijk gemaakt door WaarOverheid.nl."
+          }
         >
           <h3>{`${showMap ? "Sluit" : "Toon"} kaart`}</h3>
         </Button>
@@ -158,32 +167,36 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
       <div className="Filter__item">
         <Button
           onClick={() => setShowDateRange(!showDateRange)}
-          className={`Button__toggle ${showDateRange ? "Button__toggle-on" : "Button__toggle-off"}`}
+          className={`Button__toggle ${
+            showDateRange ? "Button__toggle-on" : "Button__toggle-off"
+          }`}
         >
           <h3>{`${showDateRange ? "Sluit" : "Toon"} datum filter`}</h3>
         </Button>
       </div>
-      {showDateRange && <RangeSlider
-        componentId={ids.daterange}
-        dataField="last_discussed_at"
-        className="Filter__item"
-        tooltipTrigger="hover"
-        showHistogram={true}
-        showFilter={true}
-        renderTooltipData={DateToolTip}
-        URLParams={true}
-        rangeLabels={{
-          "start": dateLabel(startDate),
-          "end": dateLabel(endDate),
-        }}
-        range={{
-          "start": startDate.getTime(),
-          "end": endDate.getTime(),
-        }}
-        react={{
-          and: allIdsBut(ids.daterange),
-        }}
-      />}
+      {showDateRange && (
+        <RangeSlider
+          componentId={ids.daterange}
+          dataField="last_discussed_at"
+          className="Filter__item"
+          tooltipTrigger="hover"
+          showHistogram={true}
+          showFilter={true}
+          renderTooltipData={DateToolTip}
+          URLParams={true}
+          rangeLabels={{
+            start: dateLabel(startDate),
+            end: dateLabel(endDate),
+          }}
+          range={{
+            start: startDate.getTime(),
+            end: endDate.getTime(),
+          }}
+          react={{
+            and: allIdsBut(ids.daterange),
+          }}
+        />
+      )}
     </div>
   );
 };

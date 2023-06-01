@@ -17,9 +17,6 @@ import { getParams, usePersistedState } from "../helpers";
 import { handle } from "../helpers/logging";
 import { HotKeys } from "react-hotkeys";
 import { keyMap } from "../helpers/keyMap";
-import { Property } from "link-redux";
-import Glossarium from "./Glossarium";
-import GlossariumAPI from "./GlossariumAPI";
 
 // eslint-disable-next-line
 const { Document, Page, pdfjs } = require("react-pdf");
@@ -62,11 +59,8 @@ export const LoadingComponent = () => (
   </div>
 );
 
-const glossariumAPI = new GlossariumAPI();
-
 const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
   const [pageNumber, setPageNumber] = React.useState<number>(0);
-  const [wordhoardIDs, setWordhoardIDs] = React.useState<string[]>([]);
   const [docRef, setDocRef] = React.useState<any>(null);
   const [numPages, setNumPages] = React.useState<number>(0);
   const [maxWidth] = React.useState<number>(calcMaxWidth(window.innerWidth));
@@ -77,71 +71,11 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
   const [glossIsOpen, setGlossIsOpen] = React.useState<boolean>(true);
   const [selectedText, setSelectedText] = React.useState<string>("");
 
-  const setDocumentSectionAnnotations = usePersistedState<any>(
-    "orisearch.pdfviewer.documentSectionAnnotations",
-    []
-  )[1];
-
-  const documentID = getParams(props.history)["documentID"];
-
-  const wordhoardNames: string[] = [
-    "orid:" + documentID + "_definitions",
-    "orid:" + documentID + "_abbreviations",
-  ];
-
-  const getSectionAnnotations = (page: number, wids: any[]) => {
-    if (wids) {
-      glossariumAPI
-        .getDocumentSectionAnnotations("orid:" + documentID, page - 1, wids)
-        .then((response) => {
-          if (response) {
-            if (response.surface_forms) {
-              setDocumentSectionAnnotations(response.surface_forms);
-            } else {
-              setDocumentSectionAnnotations([]);
-            }
-          } else {
-            setDocumentSectionAnnotations([]);
-          }
-        });
-    } else {
-      setDocumentSectionAnnotations([]);
-    }
-  };
-
-  const getDocumentWordhoardList = () => {
-    glossariumAPI
-      .findSuperItems(documentID)
-      .then((oridList: any[]) => {
-        for (const orid of oridList) {
-          if (orid) {
-            const definitionsWordhoardName = "orid:" + orid + "_definitions";
-            const abbreviationsWordhoardName =
-              "orid:" + orid + "_abbreviations";
-            wordhoardNames.push(definitionsWordhoardName);
-            wordhoardNames.push(abbreviationsWordhoardName);
-          }
-        }
-      })
-      .then(() => {
-        glossariumAPI
-          .getWordhoardList(wordhoardNames)
-          .then((wordhoardList: any) => {
-            const wordhoardIDs = wordhoardList.items.map((item: any) => {
-              return item.id;
-            });
-            setWordhoardIDs(wordhoardIDs);
-            getSectionAnnotations(1, wordhoardIDs); // Get first page annotations
-          });
-      });
-  };
-
   const handlePreviousPage = () => {
     if (pageNumber === 1) {
       return;
     }
     setPageNumber(pageNumber - 1);
-    getSectionAnnotations(pageNumber - 1, wordhoardIDs);
   };
 
   const handleNextPage = () => {
@@ -149,7 +83,6 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
       return;
     }
     setPageNumber(pageNumber + 1);
-    getSectionAnnotations(pageNumber + 1, wordhoardIDs);
   };
 
   const { currentSearchTerm } = getParams(props.history);
@@ -158,7 +91,6 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
     setNumPages(e.numPages);
     setPageNumber(1);
     setShowButtons(true);
-    getDocumentWordhoardList();
   };
 
   const PDFErrorComponent = (error: any) => {
@@ -228,10 +160,6 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
     }
   };
 
-  const toggleGlossary = () => {
-    setGlossIsOpen(!glossIsOpen);
-  };
-
   const makeTextRenderer = (searchText: string) => (textItem: TextLayerItem) =>
     highlightPattern(textItem.str, searchText);
 
@@ -239,7 +167,6 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
     PREVIOUS: handlePreviousPage,
     NEXT: handleNextPage,
     FULLSCREEN: setFillWidth,
-    GLOSS: toggleGlossary,
   };
 
   const handleCheckSelect = (_e: React.MouseEvent) => {
@@ -346,12 +273,6 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
                 <FontAwesomeIcon icon={faHighlighter} />
               </Button>
             </div>
-            {selectedText && glossIsOpen && (
-              <Glossarium
-                selectedText={selectedText}
-                pdfWrapperRef={pdfWrapper}
-              />
-            )}
           </div>
         )}
       </div>

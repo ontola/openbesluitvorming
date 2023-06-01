@@ -9,21 +9,26 @@ interface WikipediaSummary {
 }
 
 class GlossariumAPI {
-  getDocumentSectionAnnotations = async (documentName: string, sectionNumber: number, wordhoardIDs: string[]) => {
+  getDocumentSectionAnnotations = async (
+    documentName: string,
+    sectionNumber: number,
+    wordhoardIDs: string[]
+  ) => {
     const documentAnnotationsURL = getTopicsApiURL(
-      `/document/${documentName}/${sectionNumber}/annotations/`);
+      `/document/${documentName}/${sectionNumber}/annotations/`
+    );
     for (const wid of wordhoardIDs) {
       documentAnnotationsURL.searchParams.append("wordhoard_id", wid);
     }
     try {
       const response = await fetch(documentAnnotationsURL.toString());
       return await response.json();
-    } catch(e) {
-      return undefined
+    } catch (e) {
+      return undefined;
     }
   };
 
-  getWordhoardList = async(names: string[]) => {
+  getWordhoardList = async (names: string[]) => {
     const wordhoardURL = getTopicsApiURL("/custom/wordhoard/");
     for (const name of names) {
       wordhoardURL.searchParams.append("name", name);
@@ -31,8 +36,8 @@ class GlossariumAPI {
     try {
       const response = await fetch(wordhoardURL.toString());
       return await response.json();
-    } catch(e) {
-      return {items: []};
+    } catch (e) {
+      return { items: [] };
     }
   };
 
@@ -42,7 +47,9 @@ class GlossariumAPI {
     return await response.json();
   };
 
-  getWikipediaSummary = async (query: string): Promise<WikipediaSummary | boolean> => {
+  getWikipediaSummary = async (
+    query: string
+  ): Promise<WikipediaSummary | boolean> => {
     const apiQuery = `https://nl.wikipedia.org/w/api.php?redirects&action=query&prop=extracts%7Cpageprops&exintro&explaintext&origin=*&format=json&titles=${query}`;
     try {
       const response = await fetch(apiQuery);
@@ -52,7 +59,7 @@ class GlossariumAPI {
       if (firstPageKey === "-1") {
         return false;
       }
-      if ('disambiguation' in page.pageprops) {
+      if ("disambiguation" in page.pageprops) {
         return false;
       }
       const extract: string = page.extract;
@@ -65,7 +72,7 @@ class GlossariumAPI {
         title: page.title,
       };
       return summary;
-    } catch(e) {
+    } catch (e) {
       return false;
     }
   };
@@ -83,7 +90,9 @@ class GlossariumAPI {
     }
   };
 
-  findSuperItems = async (documentID: string | null): Promise<string[] | null[]> => {
+  findSuperItems = async (
+    documentID: string | null
+  ): Promise<string[] | null[]> => {
     let parentORID;
     let parentData;
     let committeeORID;
@@ -97,47 +106,37 @@ class GlossariumAPI {
     try {
       const docJson = await this.getLinkedData(documentID);
       parentORID = docJson["dc:isReferencedBy"]["@id"].split(":")[1];
-    } catch(e) {
+    } catch (e) {
       return [null, null, null];
     }
 
     try {
       parentData = await this.getLinkedData(parentORID);
-    } catch(e) {
+    } catch (e) {
       return [parentORID, null, null];
     }
 
     try {
       committeeORID = parentData["meeting:committee"]["@id"].split(":")[1];
-    } catch(e) {
+    } catch (e) {
       committeeORID = null;
     }
 
     try {
       grandparentORID = parentData["schema:superEvent"]["@id"].split(":")[1];
-    } catch(e) {
+    } catch (e) {
       return [parentORID, null, committeeORID];
     }
 
     try {
       meetingItemData = await this.getLinkedData(grandparentORID);
       committeeORID = meetingItemData["meeting:committee"]["@id"].split(":")[1];
-    } catch(e) {
+    } catch (e) {
       return [parentORID, grandparentORID, null];
     }
 
     return [parentORID, grandparentORID, committeeORID];
   };
-
-  getLinkedData = async (id: string): Promise<any> => {
-    const query = `${paths.oriId(id)}.jsonld`;
-    try {
-      const response = await fetch(query);
-      return await response.json()
-    } catch(e) {
-      throw( new Error("item orid:" + id + " did not resolve."))
-    }
-  }
 }
 
 export default GlossariumAPI;

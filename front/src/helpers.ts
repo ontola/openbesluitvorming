@@ -109,6 +109,7 @@ export const indexToLabel = (_index: string) => {
 
 // Sets the URL to the selected resource
 export const openResource = (url: string, history: History) => {
+  console.log("open resource", url);
   const currentURL = new URL(window.location.href);
   currentURL.searchParams.set("showResource", encodeURIComponent(url));
   history.push(currentURL.toString().substring(currentURL.origin.length));

@@ -13,16 +13,17 @@ import OrganizationSelector from "../Components/OrganizationSelector";
 import { ReactiveBase, SelectedFilters } from "@appbaseio/reactivesearch";
 import theme from "../theme";
 import SideDrawer from "../Components/SideDrawer";
-import { LinkedResourceContainer } from "link-redux";
 import { GlobalHotKeys } from "react-hotkeys";
 
 import { keyMap } from "../helpers/keyMap";
+import PDFViewer from "../Components/PDFViewer";
 // import CustomSelectedFilters from '../Components/CustomSelectedFilters';
 
 const SearchRoute = (props: RouteComponentProps) => {
   const [showFilters, setShowFilters] = React.useState(false);
 
   const { currentResource, hasParams } = getParams(props.history);
+  console.log("currentResource", currentResource);
 
   const setSearchParams = (newURL: string) => {
     const url = new URL(newURL);
@@ -93,7 +94,9 @@ const SearchRoute = (props: RouteComponentProps) => {
               transitionLeaveTimeout={200}
             >
               {currentResource && hasParams && (
-                <SideDrawer>Render PDF here plox</SideDrawer>
+                <SideDrawer>
+                  <PDFViewer url={currentResource} key={currentResource} />
+                </SideDrawer>
               )}
             </ReactCSSTransitionGroup>
           </div>

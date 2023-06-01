@@ -8,8 +8,6 @@ const paths = {
   devMail: "mailto:joep@ontola.io",
   ontola: "https://ontola.io/nl",
   openstate: "https://openstate.eu/nl",
-  oriIdBase: "https://id.openraadsinformatie.nl/",
-  oriId: (id: number | string) => `${paths.oriIdBase}${id}`,
   oriSearchGithub: "https://github.com/ontola/ori-search/",
   oriBackEndGithub: "https://github.com/openstate/open-raadsinformatie/",
   projectMail: "mailto:sander.bakker@vng.nl",

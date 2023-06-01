@@ -36,25 +36,25 @@ const renderComponent = (props: ORIItemType) => {
   }
 };
 
-const ResultCard: React.FunctionComponent<ResultCardProps & RouteComponentProps> = (props) => {
-  const {
-    currentResource,
-  } = getParams(props.history);
+const ResultCard: React.FunctionComponent<
+  ResultCardProps & RouteComponentProps
+> = (props) => {
+  const { currentResource } = getParams(props.history);
 
   const className = `ResultCard ${
-    (props["@id"] && (currentResource === paths.oriId(props["@id"])))
-      ? "ResultCard--active" : "" }`;
+    props["@id"] && currentResource === props["@id"] ? "ResultCard--active" : ""
+  }`;
 
   const header = props.name || props.label || props.title || "Geen naam";
   return (
     <div key={props["@id"]} className={className}>
       <Button
         onClick={() => {
-          openResource((paths.oriId(props["@id"]) || ""), props.history);
+          openResource(props["original_url"] || "", props.history);
         }}
       >
         {/* This is not ideal - it makes injection possible in ORI data, bu */}
-        <h2 dangerouslySetInnerHTML={{ __html: `${header}` }}/>
+        <h2 dangerouslySetInnerHTML={{ __html: `${header}` }} />
       </Button>
       {renderComponent(props)}
     </div>
