@@ -1,9 +1,5 @@
 # OpenBesluitvorming Search
 
-_As of december 23rd 2022, OpenBesluitvorming.nl is [offline](https://github.com/ontola/openbesluitvorming/issues/142), but it will be back online in June._
-
-[![Build Status](https://semaphoreci.com/api/v1/argu/ori-search-2/branches/master/badge.svg)](https://semaphoreci.com/argu/ori-search-2)
-
 Search through meeting documents of 140+ Dutch local governments. Powered by [Open Raadsinformatie](https://github.com/openstate/open-raadsinformatie/).
 
 Check it out at [OpenBesuitvorming.nl](http://openbesluitvorming.nl)!
