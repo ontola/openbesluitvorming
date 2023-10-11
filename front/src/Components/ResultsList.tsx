@@ -15,29 +15,32 @@ interface ResultsType {
   displayedResults: number;
 }
 
-const ResultStats = (props: ResultsType) =>
+const ResultStats = (props: ResultsType) => (
   <div className="bottom-margin">
-    {(props.numberOfResults === 10000) ? "meer dan 10.000" : props.numberOfResults}
+    {props.numberOfResults === 10000
+      ? "meer dan 10.000"
+      : props.numberOfResults}
     {" resultaten gevonden"}
-  </div>;
+  </div>
+);
 
-export const LoadingWithSpinner = () =>
+export const LoadingWithSpinner = () => (
   <div className="Results__loader">
     <FontAwesomeIcon icon={faSpinner} spin />
-    <span>
-      {" Laden..."}
-    </span>
-  </div>;
+    <span>{" Laden..."}</span>
+  </div>
+);
 
-const DualLoader = () =>
+const DualLoader = () => (
   <div className="Results__dual-loader">
     <div className="Results__dual-loader-top">
-      <LoadingWithSpinner/>
+      <LoadingWithSpinner />
     </div>
     <div className="Results__dual-loader-bottom">
-      <LoadingWithSpinner/>
+      <LoadingWithSpinner />
     </div>
-  </div>;
+  </div>
+);
 
 interface SortOption {
   label: string;
@@ -47,13 +50,13 @@ interface SortOption {
 
 export const sortOptions: SortOption[] = [
   {
-    label: "Meest relevant",
-    dataField: "_score",
+    label: "Nieuwste",
+    dataField: "last_discussed_at",
     sortBy: "desc",
   },
   {
-    label: "Nieuwste",
-    dataField: "last_discussed_at",
+    label: "Meest relevant",
+    dataField: "_score",
     sortBy: "desc",
   },
 ];
@@ -68,14 +71,15 @@ const ResultsList: React.FunctionComponent = () => {
       size={20}
       pagination={false}
       onNoResults={"Geen resultaten gevonden."}
-      renderResultStats={props => <ResultStats {...props}/>}
-      loader={<DualLoader/>}
+      renderResultStats={(props) => <ResultStats {...props} />}
+      loader={<DualLoader />}
       sortOptions={sortOptions}
       renderError={(error: Error) => {
         handle(error);
         return (
           <div>
-            Something went wrong!<br/>
+            Something went wrong!
+            <br />
             {printAndHandle(error)}
           </div>
         );
@@ -84,7 +88,7 @@ const ResultsList: React.FunctionComponent = () => {
         // When these components change, update the results
         and: allComponentIds,
       }}
-      renderItem={props => <ResultCard key={props['@id']} {...props} />}
+      renderItem={(props) => <ResultCard key={props["@id"]} {...props} />}
     />
   );
 };
