@@ -52,7 +52,7 @@
     "react-hotkeys": "^2.0.0-pre9",
     "react-intl": "^2.8.0",
     "react-leaflet": "^2.6.0",
-    "react-pdf": "^7.0.2",
+    "react-pdf": "^7.5.0",
     "react-router": "^5.0.0",
     "react-router-dom": "^5.0.0",
     "react-scripts": "^5.0.1",

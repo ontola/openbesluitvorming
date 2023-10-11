@@ -216,11 +216,12 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
                 error={<PDFErrorComponent />}
                 pageIndex={pageNumber - 1}
                 width={drawer.width}
-                customTextRenderer={
-                  currentSearchTerm &&
-                  useHighlighter &&
-                  makeTextRenderer(currentSearchTerm)
-                }
+                renderTextLayer={false}
+                // customTextRenderer={
+                //   currentSearchTerm &&
+                //   useHighlighter &&
+                //   makeTextRenderer(currentSearchTerm)
+                // }
               />
             </Document>
           </div>
@@ -251,32 +252,6 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
               </Button>
               <Button onClick={setFillWidth} title="Scherm vullen (F)">
                 <FontAwesomeIcon icon={faExpand} />
-              </Button>
-              <Button
-                title={glossIsOpen ? "Sluit glossarium" : "Open glossarium"}
-                onClick={
-                  glossIsOpen
-                    ? () => setGlossIsOpen(false)
-                    : () => setGlossIsOpen(true)
-                }
-              >
-                <FontAwesomeIcon
-                  // If text is selected, bounce this bad boy
-                  className={
-                    selectedText.length > 1 && !glossIsOpen ? "bounce" : ""
-                  }
-                  icon={faBook}
-                />
-              </Button>
-              <Button
-                onClick={() => setHighlighter(!useHighlighter)}
-                title={
-                  useHighlighter
-                    ? "Resultaten niet onderstrepen"
-                    : "Resultaten onderstrepen"
-                }
-              >
-                <FontAwesomeIcon icon={faHighlighter} />
               </Button>
             </div>
           </div>
