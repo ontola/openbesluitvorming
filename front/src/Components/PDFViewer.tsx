@@ -179,6 +179,12 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
     }
   };
 
+  // replace "https://api1.ibabs.eu/publicdownload.aspx" with "/ibabs"
+  const urlProxy = props.url.replace(
+    "https://api1.ibabs.eu/publicdownload.aspx",
+    "/ibabs"
+  );
+
   return (
     <HotKeys
       allowChanges={true}
@@ -198,7 +204,7 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
           >
             <Document
               error={<PDFErrorComponent />}
-              file={props.url}
+              file={urlProxy}
               loading={<LoadingComponent />}
               inputRef={(ref: any) => {
                 setDocRef(ref);

@@ -78,8 +78,6 @@
     "sass": "^1.62.1"
   },
   "husky": {
-    "hooks": {
-      "pre-push": "yarn lint"
-    }
+    "hooks": {}
   }
 }

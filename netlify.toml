@@ -1,0 +1,12 @@
+
+
+# [[edge_functions]]
+# function = "transform-response"
+# path = "/proxy"
+
+[[redirects]]
+  from = "/ibabs"
+  to = "https://api1.ibabs.eu/publicdownload.aspx"
+  status = 200
+  force = true
+  headers = {X-From = "Netlify"}
