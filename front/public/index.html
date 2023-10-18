@@ -55,7 +55,8 @@
   <script>
     document.addEventListener('DOMContentLoaded', function () {
       swetrix.init('hyr4nEEBGweQ')
-      swetrix.trackViews()
+      swetrix.track({ ev: 'navigate', meta: { url: window.location } })
+      swetrix.trackViews({ search: true })
     })
   </script>
 
