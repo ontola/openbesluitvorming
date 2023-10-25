@@ -42,12 +42,16 @@ const Home = () => {
     <div className="Home">
       <div className="Home__wrapper">
         <h1 className="Home__header">
-          Doorzoek vergaderstukken van gemeenten en provincies
+          Doorzoek vergaderstukken van gemeenten, provincies en waterschappen
         </h1>
         <p>
-          Met deze app zoek je door de openbare vergaderingen, agendapunten,
-          moties en documenten van meer dan 140 deelnemende gemeenten en zes
-          provincies.
+          Open Raadsinformatie is een initiatief om de besluitvorming van
+          Nederlandse decentrale bestuursorganen transparanter te maken middels
+          open data. Dit wordt gedaan door automatisch uit de bestaande
+          vergadersoftware (raadsinformatiesystemen) de vergaderingen en
+          documenten te halen en deze vervolgens middels een API te ontsluiten
+          op een gestandaardiseerde manier. Daarmee is het nu mogelijk om in
+          méér dan 1 miljoen documenten te zoeken naar relevante informatie.
         </p>
         {IS_ORI ? (
           <div>
@@ -66,8 +70,10 @@ const Home = () => {
               samenwerking met de{" "}
               <a href={paths.openstate}>Open State Foundation</a> aan het
               openstellen van besluitvorming van gemeenten en provincies als
-              open data. Lees <a href={paths.vngProject}>hier</a> meer over het
-              project.
+              open data. Inmiddels is de Wet Open Overheid van kracht en heeft
+              VNG het informatiemodel mede in dat licht verder aangescherpt en
+              verrijkt in samenwerking met IPO en UvW en ook toepasbaar gemaakt
+              voor provincies en waterschappen.
             </p>
             <p>
               De techniek is gemaakt door <a href={paths.ontola}>Ontola</a> en{" "}
@@ -105,6 +111,29 @@ const Home = () => {
             </p>
           </div>
         )}
+        <h2>Toekomst</h2>
+        <p>
+          Momenteel wordt de laatste hand gelegd aan de laatste versie van de
+          ORI API. Documentatie over deze ontwikkeling is op{" "}
+          <a href="https://vng-realisatie.github.io/ODS-Open-Raadsinformatie/Informatiemodel">
+            GitHub
+          </a>{" "}
+          na te lezen.
+        </p>
+        <p>
+          Door het gebruik van deze ORI API zullen de bestuursorganen in staat
+          zijn deze rijke informatiestroom geautomatiseerd actief openbaar te
+          maken in de geest van de Wet Open Overheid en heel specifiek de
+          informatiecategorieën 3.3 2a. en 3.3 2c. Aan de andere kant kan elke
+          partij zich hierdoor gedragen als hergebruiker en gebruik maken van
+          deze rijke collectie.
+        </p>
+        <p>
+          Het uiteindelijke doel is dat PLOOI conform de Common Ground principes
+          de data bij de bron zal ophalen middels deze ORI API . Dit stelt PLOOI
+          in staat de raadpleegfunctie over te nemen voor deze raadpleegomgeving
+          die als overbrugging geldt tot dat moment.
+        </p>
         <h2>Voor wie is deze app?</h2>
         <ul>
           <li>
@@ -156,7 +185,9 @@ const Home = () => {
           <li>
             Jouw app hier? Ga aan de slag met de{" "}
             <a href={paths.apiDocs}>documentatie</a> en{" "}
-            <a href={paths.appList}>dien een PR in!</a>
+            <a href={paths.appList}>
+              mail <a href={paths.projectMail}>Sander Bakker</a>!
+            </a>
           </li>
         </ul>
         <h2>Contact</h2>
@@ -188,11 +219,11 @@ const Home = () => {
         <p>
           De data in deze zoekmachine komt uit Open Raadsinformatie en Open
           Stateninformatie. Deze data is met toestemming van de deelnemende
-          gemeenten en provincies geïmporteerd uit diverse vergadersystemen. De
-          data kan door het importeren incompleet, onjuist of niet up to date
-          zijn. Het eigenaarschap van de data ligt bij de organisaties die de
-          data hebben aangemaakt, of de respectievelijke auteurs van de
-          documenten.
+          gemeenten, provincies en waterschappen geïmporteerd uit diverse
+          vergadersystemen. De data kan door het importeren incompleet, onjuist
+          of niet up to date zijn. Het eigenaarschap van de data ligt bij de
+          organisaties die de data hebben aangemaakt, of de respectievelijke
+          auteurs van de documenten.
         </p>
         {IS_ORI ? null : (
           <React.Fragment>
