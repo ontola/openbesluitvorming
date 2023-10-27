@@ -23,7 +23,6 @@ const SearchRoute = (props: RouteComponentProps) => {
   const [showFilters, setShowFilters] = React.useState(false);
 
   const { currentResource, hasParams } = getParams(props.history);
-  console.log("currentResource", currentResource);
 
   const setSearchParams = (newURL: string) => {
     const url = new URL(newURL);

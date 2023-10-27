@@ -44,15 +44,6 @@ const Home = () => {
         <h1 className="Home__header">
           Doorzoek vergaderstukken van gemeenten, provincies en waterschappen
         </h1>
-        <p>
-          Open Raadsinformatie is een initiatief om de besluitvorming van
-          Nederlandse decentrale bestuursorganen transparanter te maken middels
-          open data. Dit wordt gedaan door automatisch uit de bestaande
-          vergadersoftware (raadsinformatiesystemen) de vergaderingen en
-          documenten te halen en deze vervolgens middels een API te ontsluiten
-          op een gestandaardiseerde manier. Daarmee is het nu mogelijk om in
-          méér dan 1 miljoen documenten te zoeken naar relevante informatie.
-        </p>
         {IS_ORI ? (
           <div>
             <p>
