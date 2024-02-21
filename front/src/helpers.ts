@@ -101,6 +101,9 @@ export const indexToLabel = (_index: string) => {
   if (parts[0] === "ori") {
     return `Gemeente ${stitchedName}`;
   }
+  if (parts[0] === "owi") {
+    return `Waterschap ${stitchedName}`;
+  }
   if (parts[0] === "ggm") {
     return `Tweede Kamer`;
   }
