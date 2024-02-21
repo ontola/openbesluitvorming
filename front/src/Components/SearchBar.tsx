@@ -52,7 +52,7 @@ export const queryGenerator = (searchTerm: string) => {
           queryPart,
           {
             terms: {
-              _index: ["ori_*", "osi_*", "ggm_*"],
+              _index: ["ori_*", "osi_*", "owi_"],
             },
           },
         ],
