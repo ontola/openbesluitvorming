@@ -17,8 +17,7 @@ const query = {
       },
       filter: {
         terms: {
-          // "classification": IS_ORI ? ["municipality"] : ["municipality", "province"]
-          classification: ["municipality", "province", "Water board"],
+          classification: ["municipality", "province", "water board"],
         },
       },
     },
