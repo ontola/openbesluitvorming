@@ -224,7 +224,7 @@ content-type: application/json
           },
           "filter": {
               "terms": {
-                  "classification": ["municipality", "province", "water board"]
+                  "classification": ["municipality", "province", "water"]
               }
           }
       }
