@@ -92,6 +92,7 @@ export const getParams = (history: History) => {
 export const indexToLabel = (_index: string) => {
   const parts = _index.split("_");
   const stitchedName = parts
+    .filter((s) => (s != 'fixed'))
     .slice(1, parts.length - 1)
     .map((s) => `${s.charAt(0).toLocaleUpperCase()}${s.substring(1)}`)
     .join(" ");
