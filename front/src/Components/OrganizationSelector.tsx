@@ -17,7 +17,7 @@ const query = {
       },
       filter: {
         terms: {
-          classification: ["municipality", "province", "water board"],
+          classification: ["municipality", "province", "water"],
         },
       },
     },
