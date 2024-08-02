@@ -2,33 +2,9 @@
 
 OpenBesluitvorming aims to make governmental decision making more transparent
 by aggregating and standardizing meeting & decision data.
-Currently, the API includes data from more than 140 municipalities (gemeenten) and 5 provinces.
+Currently, the API includes data from more than 300 municipalities and provinces.
 
-## Endpoints
-
-The ORI API has several endpoints for different goals:
-
-- the **REST API** for fetching individual resources
-- an **Elastic** endpoint for full-text search
-
-### REST API
-
-Endpoint: [`https://id.openraadsinformatie.nl`](https://id.openraadsinformatie.nl)
-
-The ORI REST API is hofsted at the `id.openraadsinformatie.nl` subdomain.
-Use this to get individual meetings / motions / agenda items / persons / etc, such as [`https://id.openraadsinformatie.nl/243815`](https://id.openraadsinformatie.nl/243815).
-It is by far the most performant API for ORI, as it stores the various representations (TTL, RDF/XML, N3, N-Triples, JSON-LD) as static files.
-Since this API serves RDF, it might be a good idea to [get familiar with linked data](https://ontola.io/what-is-linked-data/).
-
-There is a special endpoint for getting all organizations: [`https://api.openraadsinformatie.nl/v1/organizations`](https://api.openraadsinformatie.nl/v1/organizations)
-
-Read more about the REST API in its [github repo](https://github.com/ontola/ori_api) and its [documentation](https://id.openraadsinformatie.nl/).
-
-If you want to see some examples of how to query this endpoint, check out [`example_requests.http`](/example_requests.http).
-
-_A new REST API is being tested that aims to replace the current one. It is available at `id.openbesluitvorming.nl` (check out the 'random' endpoint [here](https://id.openbesluitvorming.nl/random))._
-
-### Elastic
+## Elastic Endpoint
 
 Endpoint: `https://api.openraadsinformatie.nl/v1/elastic/`
 
