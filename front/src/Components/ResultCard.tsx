@@ -3,13 +3,12 @@ import * as React from "react";
 import { ORIItemType } from "../types";
 import { RouteComponentProps, withRouter } from "react-router";
 import { getParams, openResource } from "../helpers";
-import paths from "../paths";
 import Document from "./Cards/Document";
-import Meeting from "./Cards/Meeting";
-import AgendaItem from "./Cards/AgendaItem";
-import CreativeWork from "./Cards/CreativeWork";
-import Organization from "./Cards/Organization";
-import Person from "./Cards/Person";
+// import Meeting from "./Cards/Meeting";
+// import AgendaItem from "./Cards/AgendaItem";
+// import CreativeWork from "./Cards/CreativeWork";
+// import Organization from "./Cards/Organization";
+// import Person from "./Cards/Person";
 import Button from "./Button";
 
 interface ResultCardProps extends ORIItemType {
@@ -20,19 +19,20 @@ interface ResultCardProps extends ORIItemType {
 const renderComponent = (props: ORIItemType) => {
   switch (props["@type"]) {
     case "MediaObject":
+      // We should only see MediaObjects in the search results now!
       return <Document {...props} />;
-    case "Meeting":
-      return <Meeting {...props} />;
-    case "AgendaItem":
-      return <AgendaItem {...props} />;
-    case "CreativeWork":
-      return <CreativeWork {...props} />;
-    case "Organization":
-      return <Organization {...props} />;
-    case "Person":
-      return <Person {...props} />;
-    default:
-      return <p>No component for type {[props["@type"]]}</p>;
+      // case "Meeting":
+      //   return <Meeting {...props} />;
+      // case "AgendaItem":
+      //   return <AgendaItem {...props} />;
+      // case "CreativeWork":
+      //   return <CreativeWork {...props} />;
+      // case "Organization":
+      //   return <Organization {...props} />;
+      // case "Person":
+      //   return <Person {...props} />;
+      // default:
+      return null;
   }
 };
 

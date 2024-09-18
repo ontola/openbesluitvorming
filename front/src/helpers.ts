@@ -92,23 +92,23 @@ export const getParams = (history: History) => {
 export const indexToLabel = (_index: string) => {
   const parts = _index.split("_");
   const stitchedName = parts
-    .filter((s) => (s != 'fixed'))
-    .slice(1, parts.length - 1)
-    .map((s) => `${s.charAt(0).toLocaleUpperCase()}${s.substring(1)}`)
+    .filter((s) => s !== "fixed")
+    .slice(1, -1) // Remove the last part (usually the number)
+    .map((s) => s.charAt(0).toUpperCase() + s.substring(1))
     .join(" ");
-  if (parts[0] === "osi") {
-    return `Provincie ${stitchedName}`;
+
+  switch (parts[0]) {
+    case "osi":
+      return `Provincie ${stitchedName}`;
+    case "ori":
+      return `Gemeente ${stitchedName}`;
+    case "owi":
+      return `Waterschap ${stitchedName}`;
+    case "ggm":
+      return "Tweede Kamer";
+    default:
+      return stitchedName;
   }
-  if (parts[0] === "ori") {
-    return `Gemeente ${stitchedName}`;
-  }
-  if (parts[0] === "owi") {
-    return `Waterschap ${stitchedName}`;
-  }
-  if (parts[0] === "ggm") {
-    return `Tweede Kamer`;
-  }
-  return stitchedName;
 };
 
 // Sets the URL to the selected resource

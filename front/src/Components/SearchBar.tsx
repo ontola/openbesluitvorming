@@ -55,6 +55,12 @@ export const queryGenerator = (searchTerm: string) => {
               _index: ["ori_*", "osi_*", "owi_*"],
             },
           },
+          // Add the MediaObject filter here
+          {
+            term: {
+              "@type": "MediaObject",
+            },
+          },
         ],
         must_not: mustNot,
       },

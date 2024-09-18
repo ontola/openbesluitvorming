@@ -60,7 +60,7 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
         props.display ? "FilterBar__visible" : "FilterBar__hidden"
       }`}
     >
-      <MultiList
+      {/* <MultiList
         title={
           <FilterTitle helper="Het type item, zoals Document of Vergadering.">
             Type
@@ -68,7 +68,6 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
         }
         componentId={ids.type}
         dataField="@type"
-        defaultValue={["MediaObject"]}
         filterLabel="Type"
         className="Filter__item"
         size={500}
@@ -84,7 +83,7 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
         }}
         showFilter={true}
         URLParams={true}
-      />
+      /> */}
       {/* For now disable this #39 */}
       {/* {!showDateRange && <DateRange
         componentId={ids.daterange}
