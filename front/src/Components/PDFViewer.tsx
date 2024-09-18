@@ -106,7 +106,7 @@ const PDFViewer = (props: PDFViewerProps) => {
       .replace(/[^\w\d%]/g, "");
     const patternRewrite = escapeRegExp(patternPlaceholder).replace(
       /%/g,
-      "[\\s\\-－﹣֊᐀‐–︲—﹘―⸺⸻⸗⹀〜゠⸚]+"
+      "[\\s\\-－﹣֊᐀‐–︲—﹘―⸺⸻⸗⹀〜゠⸚]+",
     );
     const safePattern = new RegExp(patternRewrite, "gui");
     const splitText = text.split(safePattern);
@@ -128,7 +128,7 @@ const PDFViewer = (props: PDFViewerProps) => {
         }
         return [...arr, element];
       },
-      []
+      [],
     );
 
     return <React.Fragment>{whatever}</React.Fragment>;
@@ -149,7 +149,7 @@ const PDFViewer = (props: PDFViewerProps) => {
             behavior: "smooth",
             block: "start",
           }),
-        100
+        100,
       );
     }
   };
@@ -166,7 +166,7 @@ const PDFViewer = (props: PDFViewerProps) => {
   // replace "https://api1.ibabs.eu/publicdownload.aspx" with "/ibabs"
   const urlProxy = props.url.replace(
     "https://api1.ibabs.eu/publicdownload.aspx",
-    "/ibabs"
+    "/ibabs",
   );
 
   return (
@@ -200,11 +200,11 @@ const PDFViewer = (props: PDFViewerProps) => {
                 error={<PDFErrorComponent />}
                 pageIndex={pageNumber - 1}
                 width={drawer.width}
-                renderTextLayer={true}
-                renderAnnotationLayer={true}
-                customTextRenderer={
-                  currentSearchTerm && makeTextRenderer(currentSearchTerm)
-                }
+                renderTextLayer={false}
+                renderAnnotationLayer={false}
+                // customTextRenderer={
+                //   currentSearchTerm && makeTextRenderer(currentSearchTerm)
+                // }
               />
             </Document>
           </div>
