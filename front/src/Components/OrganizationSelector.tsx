@@ -1,9 +1,10 @@
 import * as React from "react";
-import { getApiURL, useFetch } from "../helpers";
+import { useFetch } from "../helpers";
 import Creatable from "react-select/creatable";
-import { withRouter, RouteComponentProps } from "react-router-dom";
 import paths from "../paths";
 import { handle } from "../helpers/logging";
+import { API } from "../config";
+import { useNavigate } from "react-router";
 
 /** The amount of participating municipalities / provinces */
 export const defaultOrgsCount = "143";
@@ -49,8 +50,8 @@ interface Municipality {
   };
 }
 
-const OrganizationSelector = (props: RouteComponentProps) => {
-  const result: ResultType = useFetch(`${getApiURL().toString()}/_search?`, {
+const OrganizationSelector = () => {
+  const result: ResultType = useFetch(`${API}/_search?`, {
     method: "POST",
     headers: {
       Accept: "application/json",
@@ -70,12 +71,14 @@ const OrganizationSelector = (props: RouteComponentProps) => {
   };
   let isLoading = true;
 
+  const navigate = useNavigate();
+
   if (result.response != null) {
     isLoading = false;
     onSelectOrg = (event: any) => {
       const municipalityIndex = event.value;
       const pathWithQueryParams = `?zoekterm="*"&organisaties=%5B"${municipalityIndex}"%5D`;
-      props.history.push(pathWithQueryParams);
+      navigate(pathWithQueryParams);
     };
 
     const hits = result.response.hits.hits;
@@ -106,4 +109,4 @@ const OrganizationSelector = (props: RouteComponentProps) => {
   );
 };
 
-export default withRouter(OrganizationSelector);
+export default OrganizationSelector;

@@ -1,18 +1,19 @@
 import React, { Component } from "react";
-import { Router } from "react-router";
 import { Helmet } from "react-helmet";
 
 import SearchRoute from "./Routes/SearchRoute";
-import history from "./helpers/history";
 import "./App.scss";
-import "./Components/Views";
 import { IS_ORI } from "./config";
+import { BrowserRouter } from "react-router-dom";
+
+const title = IS_ORI ? "Open Raadsinformatie" : "OpenBesluitvorming.nl";
 
 class App extends Component {
   render() {
     return (
       <React.Fragment>
         <Helmet>
+          <title>{title}</title>
           <meta
             property="og:description"
             content="Doorzoek vergaderstukken van meer dan 120 gemeenten en provincies."
@@ -31,9 +32,9 @@ class App extends Component {
             }
           />
         </Helmet>
-        <Router history={history}>
+        <BrowserRouter>
           <SearchRoute />
-        </Router>
+        </BrowserRouter>
       </React.Fragment>
     );
   }

@@ -2,7 +2,6 @@ import * as React from "react";
 import { ORIItemType } from "../../types";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCode } from "@fortawesome/free-solid-svg-icons";
-import paths from "../../paths";
 
 const SpacingLevelJSON = 2;
 

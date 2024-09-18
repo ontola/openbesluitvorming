@@ -1,5 +1,5 @@
 import * as React from "react";
-import { withRouter, RouteComponentProps } from "react-router";
+import { useNavigate } from "react-router";
 import ReactCSSTransitionGroup from "react-addons-css-transition-group";
 
 import Button from "../Components/Button";
@@ -7,7 +7,7 @@ import Filtersbar from "../Components/FiltersBar";
 import Home from "../Components/Home";
 import NavBarTop from "../Components/NavBarTop";
 import ResultsList from "../Components/ResultsList";
-import { getParams, getApiURL } from "../helpers";
+import { getParams } from "../helpers";
 import SearchBar from "../Components/SearchBar";
 import OrganizationSelector from "../Components/OrganizationSelector";
 import { ReactiveBase, SelectedFilters } from "@appbaseio/reactivesearch";
@@ -17,23 +17,24 @@ import { GlobalHotKeys } from "react-hotkeys";
 
 import { keyMap } from "../helpers/keyMap";
 import PDFViewer from "../Components/PDFViewer";
-// import CustomSelectedFilters from '../Components/CustomSelectedFilters';
+import { API } from "../config";
 
-const SearchRoute = (props: RouteComponentProps) => {
+const SearchRoute = () => {
   const [showFilters, setShowFilters] = React.useState(false);
 
-  const { currentResource, hasParams } = getParams(props.history);
+  const navigate = useNavigate();
+  const { currentResource, hasParams } = getParams();
 
   const setSearchParams = (newURL: string) => {
     const url = new URL(newURL);
-    props.history.push(url.toString().substring(url.origin.length));
+    navigate(url.toString().substring(url.origin.length));
   };
 
   const closeDocument = () => {
     const currentURL = new URL(window.location.href);
     const params = new URLSearchParams(currentURL.search);
     params.delete("showResource");
-    props.history.push(`/search?${params.toString()}`);
+    navigate(`/search?${params.toString()}`);
   };
 
   const globalKeyHandlers = {
@@ -46,7 +47,7 @@ const SearchRoute = (props: RouteComponentProps) => {
         theme={theme}
         // app={IS_ORI ? "ori_*" : "*"}
         app="*"
-        url={getApiURL().toString()}
+        url={API}
         setSearchParams={setSearchParams as () => string}
       >
         <div
@@ -105,4 +106,4 @@ const SearchRoute = (props: RouteComponentProps) => {
   );
 };
 
-export default withRouter(SearchRoute);
+export default SearchRoute;

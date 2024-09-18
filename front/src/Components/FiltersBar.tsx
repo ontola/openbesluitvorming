@@ -9,7 +9,6 @@ import {
 } from "../helpers";
 import Button from "./Button";
 import { topTag } from "../types";
-import MapFilter from "./MapFilter";
 import FilterTitle from "./FilterTitle";
 
 interface FiltersbarProps {
@@ -162,7 +161,6 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
           <h3>{`${showMap ? "Sluit" : "Toon"} kaart`}</h3>
         </Button>
       </div>
-      {showMap && <MapFilter />}
       <div className="Filter__item">
         <Button
           onClick={() => setShowDateRange(!showDateRange)}

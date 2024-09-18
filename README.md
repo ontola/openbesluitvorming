@@ -11,14 +11,14 @@ Check out the [API docs](/docs.md) and the [example requests](/example_requests.
 ## Run front-end
 
 - `cd front`
-- `yarn`
-- `yarn dev`
+- `pnpm`
+- `pnpm dev`
 
 ## Run server
 
 - `cd server`
-- `yarn`
-- `yarn dev`
+- `pnpm`
+- `pnpm dev`
 
 ## Run using docker
 
@@ -65,5 +65,3 @@ Make sure ES has the [correct proxy settings](https://opensource.appbase.io/reac
 
 
 <video src="https://user-images.githubusercontent.com/2183313/208661302-385fb00d-5be2-4c50-8159-591c7805e51c.mov"></video>
-
-

@@ -7,21 +7,17 @@ import {
   faSpinner,
   faDownload,
   faExpand,
-  faHighlighter,
-  faBook,
 } from "@fortawesome/free-solid-svg-icons";
 import escapeRegExp from "lodash.escaperegexp";
-import { withRouter, RouteComponentProps } from "react-router";
 import { SideDrawerContext } from "./SideDrawer";
-import { getParams, usePersistedState } from "../helpers";
+import { getParams } from "../helpers";
 import { handle } from "../helpers/logging";
 import { HotKeys } from "react-hotkeys";
 import { keyMap } from "../helpers/keyMap";
 
-// eslint-disable-next-line
-const { Document, Page, pdfjs } = require("react-pdf");
+import { Document, Page, pdfjs } from "react-pdf";
 // tslint:disable-next-line:max-line-length
-pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.js`;
+pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
 export interface PDFViewerProps {
   url: string;
@@ -59,17 +55,14 @@ export const LoadingComponent = () => (
   </div>
 );
 
-const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
+const PDFViewer = (props: PDFViewerProps) => {
   const [pageNumber, setPageNumber] = React.useState<number>(0);
   const [docRef, setDocRef] = React.useState<any>(null);
   const [numPages, setNumPages] = React.useState<number>(0);
   const [maxWidth] = React.useState<number>(calcMaxWidth(window.innerWidth));
   const [showButtons, setShowButtons] = React.useState<boolean>(false);
-  const [useHighlighter, setHighlighter] = React.useState<boolean>(true);
   const drawer = React.useContext(SideDrawerContext);
   const pdfWrapper = React.createRef<HTMLInputElement>();
-  const [glossIsOpen, setGlossIsOpen] = React.useState<boolean>(true);
-  const [selectedText, setSelectedText] = React.useState<string>("");
 
   const handlePreviousPage = () => {
     if (pageNumber === 1) {
@@ -85,7 +78,7 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
     setPageNumber(pageNumber + 1);
   };
 
-  const { currentSearchTerm } = getParams(props.history);
+  const { currentSearchTerm } = getParams();
 
   const onDocumentLoadSuccess = (e: OnLoadSuccessType) => {
     setNumPages(e.numPages);
@@ -102,6 +95,7 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
           Download het bestand.
         </a>
         {/* If the PDF does not render, show the plaintext */}
+        <pre>{JSON.stringify(error, null, 2)}</pre>
       </div>
     );
   };
@@ -169,16 +163,6 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
     FULLSCREEN: setFillWidth,
   };
 
-  const handleCheckSelect = (_e: React.MouseEvent) => {
-    const selection = window.getSelection();
-    if (selection !== null && selection.toString() !== "") {
-      const selectionString = selection.toString();
-      setSelectedText(selectionString);
-    } else {
-      setSelectedText("");
-    }
-  };
-
   // replace "https://api1.ibabs.eu/publicdownload.aspx" with "/ibabs"
   const urlProxy = props.url.replace(
     "https://api1.ibabs.eu/publicdownload.aspx",
@@ -200,10 +184,10 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
             tabIndex={-1}
             style={{ width: "100%" }}
             ref={pdfWrapper}
-            onMouseUp={handleCheckSelect}
           >
             <Document
               error={<PDFErrorComponent />}
+              // file={urlProxy}
               file={urlProxy}
               loading={<LoadingComponent />}
               inputRef={(ref: any) => {
@@ -216,12 +200,11 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
                 error={<PDFErrorComponent />}
                 pageIndex={pageNumber - 1}
                 width={drawer.width}
-                renderTextLayer={false}
-                // customTextRenderer={
-                //   currentSearchTerm &&
-                //   useHighlighter &&
-                //   makeTextRenderer(currentSearchTerm)
-                // }
+                renderTextLayer={true}
+                renderAnnotationLayer={true}
+                customTextRenderer={
+                  currentSearchTerm && makeTextRenderer(currentSearchTerm)
+                }
               />
             </Document>
           </div>
@@ -261,4 +244,4 @@ const PDFViewer = (props: PDFViewerProps & RouteComponentProps) => {
   );
 };
 
-export default withRouter(PDFViewer);
+export default PDFViewer;

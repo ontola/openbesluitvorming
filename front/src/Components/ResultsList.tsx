@@ -66,7 +66,7 @@ const ResultsList: React.FunctionComponent = () => {
     <ReactiveList
       componentId="ResultList01"
       dataField="_score"
-      stream={false}
+      // stream={false}
       sortBy="desc"
       size={20}
       pagination={false}

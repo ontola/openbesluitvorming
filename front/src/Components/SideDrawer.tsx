@@ -3,10 +3,8 @@ import throttle from "lodash.throttle";
 import { Resizable } from "re-resizable";
 import Button from "./Button";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import {
-  faGripHorizontal,
-} from "@fortawesome/free-solid-svg-icons";
-import { withRouter, RouteComponentProps } from "react-router";
+import { faGripHorizontal } from "@fortawesome/free-solid-svg-icons";
+import { useNavigate } from "react-router-dom";
 import { usePersistedState } from "../helpers";
 
 interface SideDrawerProps {
@@ -37,16 +35,22 @@ const determineInitialWith = (windowWidth: number) => {
   return windowWidth;
 };
 
-const Handler = () =>
+const Handler = () => (
   <div className="SideDrawer__handler">
     <FontAwesomeIcon icon={faGripHorizontal} />
-  </div>;
+  </div>
+);
 
-const SideDrawer = (props: SideDrawerProps & RouteComponentProps) => {
-  const [width, setWidth] =
-    usePersistedState<number>("orisearch.pdfviewer.width", determineInitialWith(window.innerWidth));
+const SideDrawer = (props: SideDrawerProps) => {
+  const navigate = useNavigate();
+  const [width, setWidth] = usePersistedState<number>(
+    "orisearch.pdfviewer.width",
+    determineInitialWith(window.innerWidth)
+  );
 
-  const [maxWidth, setMaxWidth] = React.useState<number>(calcMaxWidth(window.innerWidth));
+  const [maxWidth, setMaxWidth] = React.useState<number>(
+    calcMaxWidth(window.innerWidth)
+  );
 
   const pdfWrapper = React.createRef<HTMLInputElement>();
 
@@ -54,7 +58,7 @@ const SideDrawer = (props: SideDrawerProps & RouteComponentProps) => {
     const currentURL = new URL(window.location.href);
     const params = new URLSearchParams(currentURL.search);
     params.delete("showResource");
-    props.history.push(`/?${params.toString()}`);
+    navigate(`/?${params.toString()}`);
   };
 
   React.useLayoutEffect(() => {
@@ -78,9 +82,7 @@ const SideDrawer = (props: SideDrawerProps & RouteComponentProps) => {
         setWidth,
       }}
     >
-      <div
-        className="SideDrawer__wrapper"
-      >
+      <div className="SideDrawer__wrapper">
         <Resizable
           size={{ width, height: "100%" }}
           className="SideDrawer"
@@ -96,25 +98,24 @@ const SideDrawer = (props: SideDrawerProps & RouteComponentProps) => {
             event: MouseEvent | TouchEvent,
             direction: any,
             refToElement: HTMLDivElement,
-            delta: any,
+            delta: any
           ) => {
             setWidth(width + delta.width);
           }}
           enable={{ left: true }}
         >
-          <Button
-            className="Button__close"
-            onClick={closeDocument}
-          >
+          <Button className="Button__close" onClick={closeDocument}>
             Sluiten
           </Button>
-          <div
-            className="SideDrawer__scroller"
-            ref={pdfWrapper}
-          >
-            {typeof props.children === "function" ?
-              props.children(width, setWidth) : props.children
-            }
+          <div className="SideDrawer__scroller" ref={pdfWrapper}>
+            {typeof props.children === "function"
+              ? (
+                  props.children as (
+                    width: number,
+                    setWidth: (width: number) => void
+                  ) => React.ReactNode
+                )(width, setWidth)
+              : props.children}
           </div>
         </Resizable>
       </div>
@@ -124,12 +125,12 @@ const SideDrawer = (props: SideDrawerProps & RouteComponentProps) => {
 
 export interface SideDrawerContextType {
   width: number;
-  setWidth: Function;
+  setWidth: (width: number) => void;
 }
 
 export const SideDrawerContext = React.createContext<SideDrawerContextType>({
   width: 250,
-  setWidth: () => null,
+  setWidth: () => {},
 });
 
-export default withRouter(SideDrawer);
+export default SideDrawer;

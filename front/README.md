@@ -5,16 +5,16 @@ It uses [reactivesearch](https://github.com/appbaseio/reactivesearch/) for searc
 
 ## Usage
 
-`$ yarn` get all node dependencies, run after pulling
+`$ pnpm` get all node dependencies, run after pulling
 
-`$ yarn dev` starts a local development server uses react-scripts.
+`$ pnpm dev` starts a local development server uses react-scripts.
 This has a built-in proxy, which forwards all /api request to the `../server` app at :8080.
 
 Visit [localhost:4000](http://localhost:4000/)
 
 ## Build
 
-`$ yarn build`, and serve the static files using the `../server` app.
+`$ pnpm build`, and serve the static files using the `../server` app.
 
 ## Envs
 

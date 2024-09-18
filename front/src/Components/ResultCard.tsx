@@ -1,8 +1,7 @@
 import * as React from "react";
 
 import { ORIItemType } from "../types";
-import { RouteComponentProps, withRouter } from "react-router";
-import { getParams, openResource } from "../helpers";
+import { getParams, useOpenResource } from "../helpers";
 import Document from "./Cards/Document";
 // import Meeting from "./Cards/Meeting";
 // import AgendaItem from "./Cards/AgendaItem";
@@ -36,21 +35,21 @@ const renderComponent = (props: ORIItemType) => {
   }
 };
 
-const ResultCard: React.FunctionComponent<
-  ResultCardProps & RouteComponentProps
-> = (props) => {
-  const { currentResource } = getParams(props.history);
+const ResultCard: React.FunctionComponent<ResultCardProps> = (props) => {
+  const { currentResource } = getParams();
 
   const className = `ResultCard ${
     props["@id"] && currentResource === props["@id"] ? "ResultCard--active" : ""
   }`;
+
+  const openResource = useOpenResource();
 
   const header = props.name || props.label || props.title || "Geen naam";
   return (
     <div key={props["@id"]} className={className}>
       <Button
         onClick={() => {
-          openResource(props["original_url"] || "", props.history);
+          openResource(props["original_url"] || "");
         }}
       >
         {/* This is not ideal - it makes injection possible in ORI data, bu */}
@@ -60,4 +59,4 @@ const ResultCard: React.FunctionComponent<
     </div>
   );
 };
-export default withRouter(ResultCard);
+export default ResultCard;

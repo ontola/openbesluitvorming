@@ -1,5 +1,5 @@
 import React from "react";
-import { NODE_ENV, SERVER_PORT } from "./config";
+import { useLocation, useNavigate } from "react-router";
 
 /** Mapping for consistent component Ids, used by reactivesearch */
 export const ids = {
@@ -55,8 +55,20 @@ export function myPersistedState<T>(key: string, initial: T): T {
   return JSON.parse(storageValue);
 }
 
-export const getParams = (history: History) => {
-  const searchObject = history.location.search;
+export const getParams = () => {
+  const location = useLocation();
+
+  // Handle case where location might be undefined
+  if (!location) {
+    return {
+      currentResource: null,
+      currentSearchTerm: null,
+      hasParams: false,
+      documentID: null,
+    };
+  }
+
+  const searchObject = location.search;
   const hasParams = searchObject !== "";
   const params = new URLSearchParams(searchObject);
 
@@ -111,12 +123,15 @@ export const indexToLabel = (_index: string) => {
   }
 };
 
-// Sets the URL to the selected resource
-export const openResource = (url: string, history: History) => {
-  console.log("open resource", url);
-  const currentURL = new URL(window.location.href);
-  currentURL.searchParams.set("showResource", encodeURIComponent(url));
-  history.push(currentURL.toString().substring(currentURL.origin.length));
+// Custom hook to open a resource
+export const useOpenResource = () => {
+  const navigate = useNavigate();
+
+  return (url: string) => {
+    const currentURL = new URL(window.location.href);
+    currentURL.searchParams.set("showResource", encodeURIComponent(url));
+    navigate(currentURL.toString().substring(currentURL.origin.length));
+  };
 };
 
 // Turns MediaObject into Document
@@ -139,25 +154,6 @@ export const typeToLabel = (type: string) => {
     default:
       return type || "Geen type";
   }
-};
-
-export const getApiURL = (): URL => {
-  const url = new URL(window.location.origin);
-  url.pathname = "/api";
-  if (NODE_ENV === "development") {
-    url.port = SERVER_PORT.toString();
-  }
-  return "https://api.openraadsinformatie.nl/v1/elastic";
-  return url;
-};
-
-export const getTopicsApiURL = (relUrl: string): URL => {
-  const url = new URL(window.location.origin);
-  url.pathname = `/topics_api/dev${relUrl}`;
-  if (NODE_ENV === "development") {
-    url.port = SERVER_PORT.toString();
-  }
-  return url;
 };
 
 // Custom react hook for data fetching with error handling

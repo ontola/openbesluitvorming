@@ -576,6 +576,7 @@ p {
 // fix scrollbar pushing absolute text for selection
 .react-pdf__Page__textContent {
   width: 100% !important;
+  top: 0 !important;
 }
 
 .Resource {

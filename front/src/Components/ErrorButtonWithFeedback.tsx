@@ -1,4 +1,3 @@
-import { unstable, LinkReduxLRSType } from "link-redux";
 import React from "react";
 // import {
 // INTERNAL_SERVER_ERROR,
@@ -18,7 +17,6 @@ interface ErrorButtonProps {
   location?: {
     pathname: string;
   };
-  lrs?: LinkReduxLRSType;
   reloadLinkedObject?: Function;
   reset: Function;
 }
@@ -29,8 +27,6 @@ interface ErrorButtonProps {
 // ];
 
 class ErrorButtonWithFeedback extends React.Component<ErrorButtonProps> {
-  static contextType = unstable.LRSCtx;
-
   constructor(props: ErrorButtonProps) {
     super(props);
 
