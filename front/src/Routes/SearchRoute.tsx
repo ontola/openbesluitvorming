@@ -1,6 +1,5 @@
 import * as React from "react";
 import { useNavigate } from "react-router";
-import ReactCSSTransitionGroup from "react-addons-css-transition-group";
 
 import Button from "../Components/Button";
 import Filtersbar from "../Components/FiltersBar";
@@ -88,17 +87,11 @@ const SearchRoute = () => {
               </div>
             )}
             {!hasParams && <Home />}
-            <ReactCSSTransitionGroup
-              transitionName="SideDrawer__wrapper"
-              transitionEnterTimeout={200}
-              transitionLeaveTimeout={200}
-            >
-              {currentResource && hasParams && (
-                <SideDrawer>
-                  <PDFViewer url={currentResource} key={currentResource} />
-                </SideDrawer>
-              )}
-            </ReactCSSTransitionGroup>
+            {currentResource && hasParams && (
+              <SideDrawer>
+                <PDFViewer url={currentResource} key={currentResource} />
+              </SideDrawer>
+            )}
           </div>
         </div>
       </ReactiveBase>
