@@ -16,8 +16,13 @@ const query = {
         match_all: {},
       },
       filter: {
-        terms: {
-          classification: ["municipality", "province", "water"],
+        bool: {
+          should: [
+            { match: { classification: "municipality" } },
+            { match: { classification: "province" } },
+            { match: { classification: "water" } },
+          ],
+          minimum_should_match: 1,
         },
       },
     },
