@@ -22,7 +22,7 @@ export const queryGenerator = (searchTerm: string) => {
     return null;
   }
 
-  let queryPart: {} = {
+  let queryPart: { [key: string]: any } = {
     multi_match: {
       fields,
       type: "best_fields",
@@ -80,15 +80,16 @@ const SearchBar: React.FunctionComponent = () => {
       // When the component unmounts, remove the timer.
       clearTimeout(timer);
     },
-    [timer]
+    [timer],
   );
 
   const handlers = {
     // SEARCH: () => ref && ref.focus(),
     SEARCH: (e: KeyboardEvent | undefined) => {
-      const wrapper = document.getElementsByClassName("SearchBar")[0];
-      // @ts-ignore
-      const inputElement = wrapper.getElementsByTagName("input")[0];
+      const wrapper = document.getElementsByClassName(
+        "SearchBar",
+      )[0] as HTMLElement;
+      const inputElement = wrapper.querySelector("input") as HTMLInputElement;
       if (e !== undefined) {
         e.preventDefault();
       }
@@ -96,7 +97,7 @@ const SearchBar: React.FunctionComponent = () => {
     },
   };
 
-  const handleKey = (e: KeyboardEvent, triggerQuery: Function) => {
+  const handleKey = (e: KeyboardEvent, triggerQuery: () => void) => {
     if (e.key === "Enter") {
       triggerQuery();
       // Reset the timer for debouncing.
@@ -104,7 +105,7 @@ const SearchBar: React.FunctionComponent = () => {
     }
   };
 
-  const handleChange = (value: string, triggerQuery: Function) => {
+  const handleChange = (value: string, triggerQuery: () => void) => {
     setQuery(value);
     // Set a timer for debouncing, if it's passed, call triggerQuery.
     setTimer(setTimeout(triggerQuery, debounce));

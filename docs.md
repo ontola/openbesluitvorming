@@ -4,6 +4,9 @@ OpenBesluitvorming aims to make governmental decision making more transparent
 by aggregating and standardizing meeting & decision data.
 Currently, the API includes data from more than 300 municipalities and provinces.
 
+As of March 2023, we only support the `Documents` class.
+Other classes (like meetings, agenda items, persons) are often still imported if they work, but we will not prioritize fixing these if there are import issues with them.
+
 ## Elastic Endpoint
 
 Endpoint: `https://api.openraadsinformatie.nl/v1/elastic/`
