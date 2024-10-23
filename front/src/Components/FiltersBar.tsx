@@ -18,7 +18,7 @@ interface FiltersbarProps {
 const startDate = new Date(2000, 1);
 // Set endDate one year in the future - we might want to see meetings that haven't happened yet
 const endDate = new Date(
-  Date.now() + 1000 /*sec*/ * 60 /*min*/ * 60 /*hour*/ * 24 /*day*/ * 365
+  Date.now() + 1000 /*sec*/ * 60 /*min*/ * 60 /*hour*/ * 24 /*day*/ * 365,
 );
 
 const dateLabel = (date: Date) => `${date.getFullYear()}-${date.getMonth()}`;
@@ -51,7 +51,7 @@ export const DateToolTip = (data: string) => (
 
 const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
   const [showDateRange, setShowDateRange] = React.useState(false);
-  const [showMap, setShowMap] = React.useState(false);
+  // const [showMap, setShowMap] = React.useState(false);
 
   return (
     <div
@@ -148,7 +148,7 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
         URLParams={true}
         className="Filter__item"
       />
-      <div className="Filter__item">
+      {/* <div className="Filter__item">
         <Button
           onClick={() => setShowMap(!showMap)}
           className={`Button__toggle ${
@@ -160,7 +160,7 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
         >
           <h3>{`${showMap ? "Sluit" : "Toon"} kaart`}</h3>
         </Button>
-      </div>
+      </div> */}
       <div className="Filter__item">
         <Button
           onClick={() => setShowDateRange(!showDateRange)}
