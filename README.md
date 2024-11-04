@@ -1,6 +1,6 @@
 # OpenBesluitvorming Search
 
-Search through meeting documents of 140+ Dutch local governments. Powered by [Open Raadsinformatie](https://github.com/openstate/open-raadsinformatie/).
+Search through meeting documents of 320+ Dutch local governments. Powered by [Open Raadsinformatie](https://github.com/openstate/open-raadsinformatie/).
 
 Check it out at [OpenBesuitvorming.nl](http://openbesluitvorming.nl)!
 
@@ -38,9 +38,7 @@ Semaphore tracks the master branch and deploys succesful builds to a public [doc
 ## Architecture
 
 The [front-end](/front) is a search and browse GUI.
-It's a typescript react application that uses [reactiveserach](https://github.com/appbaseio/reactivesearch) for search components, [link-redux](https://github.com/fletcher91/link-redux) for linked data (RDF) resource rendering and [react-pdf](https://github.com/wojtekmaj/react-pdf) to display PDF files.
-
-The [server](/server) is a node express application that serves as both a static file server and a proxy that forward elasticsearch queries to the elastic endpoint of open raadsinformatie.
+It's a typescript react application that uses [reactiveserach](https://github.com/appbaseio/reactivesearch) for search components and [react-pdf](https://github.com/wojtekmaj/react-pdf) to display PDF files.
 
 ## Re-using OpenBesluitvorming components in your stack
 

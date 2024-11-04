@@ -3,7 +3,8 @@ const paths = {
     "https://www.open-overheid.nl/over-open-overheid/actieplan-open-overheid",
   appList:
     "https://github.com/ontola/ori-search/edit/master/front/src/Components/Home.tsx#L10",
-  apiDocs: "https://github.com/ontola/openbesluitvorming/blob/master/docs.md",
+  apiDocs:
+    "https://github.com/openstate/open-raadsinformatie/blob/master/API-docs.md",
   argu: "http://argu.co/",
   devMail: "mailto:joep@ontola.io",
   ontola: "https://ontola.io/nl",
