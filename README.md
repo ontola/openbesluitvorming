@@ -6,7 +6,7 @@ Check it out at [OpenBesuitvorming.nl](http://openbesluitvorming.nl)!
 
 ## Using the ORI API
 
-Check out the [API docs](/docs.md) and the [example requests](/example_requests.http).
+Check out the [API docs](https://github.com/openstate/open-raadsinformatie/blob/master/API-docs.md).
 
 ## Run front-end
 
@@ -14,38 +14,18 @@ Check out the [API docs](/docs.md) and the [example requests](/example_requests.
 - `pnpm`
 - `pnpm dev`
 
-## Run server
-
-- `cd server`
-- `pnpm`
-- `pnpm dev`
-
-## Run using docker
-
-- Buid the docker image `docker build . -t argu/ori-search`
-- ... Or pull it from [dockerhub](https://hub.docker.com/r/argu/ori-search): `docker pull argu/ori-search`
-- Run it `docker run -it -p 8080:8080 -e PORT=8080 argu/ori-search`
-- Visit `http://localhost:8080`
-
 ## Contribution guidelines
 
 Read [contribute.md](/CONTRIBUTE.md)
 
 ## Deployment
 
-Semaphore tracks the master branch and deploys succesful builds to a public [docker hub](https://hub.docker.com/r/argu/ori-search) repository.
+Netlify tracks the `master` branch and deploys succesful builds to the [OpenBesluitvorming.nl](https://openbesluitvorming.nl) site.
 
 ## Architecture
 
 The [front-end](/front) is a search and browse GUI.
 It's a typescript react application that uses [reactiveserach](https://github.com/appbaseio/reactivesearch) for search components and [react-pdf](https://github.com/wojtekmaj/react-pdf) to display PDF files.
-
-## Re-using OpenBesluitvorming components in your stack
-
-The `/front/components/views/` library contains react components that use `link-redux` to render the data from the [Open-Raadsinformatie API](https://github.com/openstate/open-raadsinformatie/).
-This repo is MIT licensed, so feel free to use these components in your own application.
-If you need any help during development, please check out the `link-redux` [wiki](https://github.com/fletcher91/link-redux/wiki).
-Feel free to create an issue or reach out to joep@ontola.io.
 
 ## Connecting with Elasticsearch
 
@@ -59,7 +39,5 @@ Make sure ES has the [correct proxy settings](https://opensource.appbase.io/reac
 - Feedback from @breyten, @aolieman, @fletcher91, @jurrian
 - Various open source projects that we're using, most notably ReactiveSearch and Link-Lib. Check out the `package.json` files to see which projects were used.
 - [@aolieman](http://github.com/aolieman) and [Hendrik](http://github.com/henkieeeee) fpr implementing the Glossary feature (select text in PDF to view definition).
-
-
 
 <video src="https://user-images.githubusercontent.com/2183313/208661302-385fb00d-5be2-4c50-8159-591c7805e51c.mov"></video>
