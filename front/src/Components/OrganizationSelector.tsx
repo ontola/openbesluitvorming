@@ -7,7 +7,7 @@ import { API } from "../config";
 import { useNavigate } from "react-router";
 
 /** The amount of participating municipalities / provinces */
-export const defaultOrgsCount = "143";
+export const defaultOrgsCount = "317";
 
 const query = {
   size: 500,
