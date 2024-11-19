@@ -3,6 +3,8 @@ import paths from "../paths";
 import { TITLE, IS_ORI } from "../config";
 import { poweredBy, OrgType } from "../poweredBy";
 import { colors } from "../sharedStyles";
+import DocumentCounter from "./DocumentCounter";
+import useDocumentCounter from "./DocumentCounter";
 
 interface AppType {
   name: string;
@@ -38,11 +40,14 @@ const Home = () => {
     document.title = TITLE;
   }, []);
 
+  const counter = useDocumentCounter();
+
   return (
     <div className="Home">
       <div className="Home__wrapper">
         <h1 className="Home__header">
-          Doorzoek vergaderstukken van gemeenten, provincies en waterschappen
+          Doorzoek {counter} vergaderstukken van gemeenten, provincies en
+          waterschappen
         </h1>
         {IS_ORI ? (
           <div>
