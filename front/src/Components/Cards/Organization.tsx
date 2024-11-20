@@ -14,12 +14,11 @@ const Organization: React.FunctionComponent<OrgProps> = (props) => {
   return (
     <React.Fragment>
       <div className="ResultCard__details">
-        <div className="ResultCard__detail" >{indexToLabel(props._index)}</div>
+        <div className="ResultCard__detail">{indexToLabel(props._index)}</div>
         <DetailType type={props["@type"]} />
       </div>
       {props.classification &&
-        <p>Soort: {props.classification}</p>
-      }
+        <p>Soort: {props.classification}</p>}
     </React.Fragment>
   );
 };

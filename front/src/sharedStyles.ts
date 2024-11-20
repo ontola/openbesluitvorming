@@ -9,6 +9,6 @@ export const colors = {
   bluedark: "#054279",
   bluelight: "#A4D2EB",
   bluemark: "#d1f0ff",
-}
+};
 
-export const borderRadius = "5px"
+export const borderRadius = "5px";

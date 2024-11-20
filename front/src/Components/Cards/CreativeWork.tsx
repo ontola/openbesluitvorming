@@ -13,14 +13,14 @@ const CreativeWork: React.FunctionComponent<CreativeWorkProps> = (props) => {
   return (
     <React.Fragment>
       {props.highlight.text && props.highlight.text.map(
-        ((text: string) => (
+        (text: string) => (
           <div key={text} className="ResultCard__highlight">
-            <span dangerouslySetInnerHTML={{ __html: `${text}...` }}/>
+            <span dangerouslySetInnerHTML={{ __html: `${text}...` }} />
           </div>
-        )))
-      }
+        ),
+      )}
       <div className="ResultCard__details">
-        <div className="ResultCard__detail" >{indexToLabel(props._index)}</div>
+        <div className="ResultCard__detail">{indexToLabel(props._index)}</div>
         <DetailType type={props["@type"]} />
       </div>
     </React.Fragment>

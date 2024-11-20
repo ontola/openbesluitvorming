@@ -7,7 +7,7 @@ interface FTProps {
 
 const FilterTitle: React.FunctionComponent<FTProps> = ({
   children,
-  helper
+  helper,
 }) => {
   return (
     <span title={helper} className="Filter__Title">

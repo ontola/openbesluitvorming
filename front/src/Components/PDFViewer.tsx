@@ -2,11 +2,11 @@ import React from "react";
 import Button from "./Button";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-  faArrowRight,
   faArrowLeft,
-  faSpinner,
+  faArrowRight,
   faDownload,
   faExpand,
+  faSpinner,
 } from "@fortawesome/free-solid-svg-icons";
 import escapeRegExp from "lodash.escaperegexp";
 import { SideDrawerContext } from "./SideDrawer";
@@ -17,7 +17,8 @@ import { keyMap } from "../helpers/keyMap";
 
 import { Document, Page, pdfjs } from "react-pdf";
 // tslint:disable-next-line:max-line-length
-pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+pdfjs.GlobalWorkerOptions.workerSrc =
+  `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
 export interface PDFViewerProps {
   url: string;

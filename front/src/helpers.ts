@@ -29,7 +29,7 @@ export const capitalize = (s: string) => {
 
 export function usePersistedState<T>(
   key: string,
-  initial: T
+  initial: T,
 ): [T, React.Dispatch<React.SetStateAction<T>>] {
   const [value, setValue] = React.useState<T>(() => {
     const storageValue = sessionStorage.getItem(key);
@@ -82,7 +82,7 @@ export const getParams = () => {
   if (currentSearchTerm) {
     currentSearchTerm = currentSearchTerm.substr(
       1,
-      currentSearchTerm.length - 2
+      currentSearchTerm.length - 2,
     );
   }
 

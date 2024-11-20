@@ -77,7 +77,8 @@ const OrganizationSelector = () => {
     isLoading = false;
     onSelectOrg = (event: any) => {
       const municipalityIndex = event.value;
-      const pathWithQueryParams = `?zoekterm="*"&organisaties=%5B"${municipalityIndex}"%5D`;
+      const pathWithQueryParams =
+        `?zoekterm="*"&organisaties=%5B"${municipalityIndex}"%5D`;
       navigate(pathWithQueryParams);
     };
 

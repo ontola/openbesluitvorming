@@ -25,11 +25,9 @@ class App extends Component {
           />
           <meta
             property="og:url"
-            content={
-              IS_ORI
-                ? "https://zoek.openraadsinformatie.nl"
-                : "https://openbesluitvorming.nl"
-            }
+            content={IS_ORI
+              ? "https://zoek.openraadsinformatie.nl"
+              : "https://openbesluitvorming.nl"}
           />
         </Helmet>
         <BrowserRouter>

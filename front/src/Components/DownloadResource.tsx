@@ -4,8 +4,9 @@ interface DownloadResourceProps {
   url: string;
 }
 
-const DownloadResource: React.FunctionComponent<DownloadResourceProps> = (props) => {
-
+const DownloadResource: React.FunctionComponent<DownloadResourceProps> = (
+  props,
+) => {
   const [extension, setExtension] = useState("ttl");
 
   return (
@@ -18,8 +19,8 @@ const DownloadResource: React.FunctionComponent<DownloadResourceProps> = (props)
       >
         Download data
       </a>
-      <span> als </span>
-      <select value={extension} onChange={e => setExtension(e.target.value)}>
+      <span>als</span>
+      <select value={extension} onChange={(e) => setExtension(e.target.value)}>
         <option value="ttl">Turtle</option>
         <option value="nt">N-Triples</option>
         <option value="nq">N-Quads</option>
