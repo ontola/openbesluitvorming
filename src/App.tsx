@@ -1,15 +1,14 @@
 import React, { Component } from "react";
 import { Helmet } from "react-helmet";
-
-import SearchRoute from "./Routes/SearchRoute";
-import "./App.scss";
-import { IS_ORI } from "./config";
 import { BrowserRouter } from "react-router-dom";
+import SearchRoute from "./Routes/SearchRoute.tsx";
+import "./App.scss";
+import { IS_ORI } from "./config.ts";
 
 const title = IS_ORI ? "Open Raadsinformatie" : "OpenBesluitvorming.nl";
 
 class App extends Component {
-  render() {
+  override render() {
     return (
       <React.Fragment>
         <Helmet>

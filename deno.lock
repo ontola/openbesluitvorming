@@ -3,7 +3,7 @@
   "specifiers": {
     "npm:@appbaseio/reactivesearch@^3.43.8": "3.45.0_react@18.3.1_react-dom@18.2.0__react@18.3.1_@emotion+core@10.3.1__react@18.3.1_prop-types@15.8.1_echarts@5.5.1",
     "npm:@fortawesome/fontawesome-svg-core@^6.7.0": "6.7.0",
-    "npm:@fortawesome/free-solid-svg-icons@^5.8.1": "5.15.4",
+    "npm:@fortawesome/free-solid-svg-icons@^6.7.0": "6.7.0",
     "npm:@fortawesome/react-fontawesome@~0.2.2": "0.2.2_@fortawesome+fontawesome-svg-core@6.7.0_react@18.3.1",
     "npm:@types/elasticsearch@^5.0.31": "5.0.43",
     "npm:@types/jest@24.0.17": "24.0.17",
@@ -32,7 +32,6 @@
     "npm:lodash.escaperegexp@^4.1.1": "4.1.2",
     "npm:lodash.throttle@^4.1.1": "4.1.1",
     "npm:re-resizable@^5.0.1": "5.0.1",
-    "npm:react-app-polyfill@^1.0.1": "1.0.6",
     "npm:react-dom@18.2.0": "18.2.0_react@18.3.1",
     "npm:react-helmet@^6.1.0": "6.1.0_react@18.3.1",
     "npm:react-hotkeys@^2.0.0-pre9": "2.0.0_react@18.3.1",
@@ -1483,22 +1482,19 @@
     "@eslint/js@8.57.1": {
       "integrity": "sha512-d9zaMRSTIKDLhctzH12MtXvJKSSUhaHcjV+2Z+GK+EEY7XKpP5yR4x+N3TAcHTcu963nIr+TMcCb4DBCYX1z6Q=="
     },
-    "@fortawesome/fontawesome-common-types@0.2.36": {
-      "integrity": "sha512-a/7BiSgobHAgBWeN7N0w+lAhInrGxksn13uK7231n2m8EDPE3BMCl9NZLTGrj9ZXfCmC6LM0QLqXidIizVQ6yg=="
-    },
     "@fortawesome/fontawesome-common-types@6.7.0": {
       "integrity": "sha512-AUetZXU6cQdAe21p8j3mg2aD40MMDKfFNUNgq/G7gR3HMDp0BsQskAudLDSgq6d0SbCY0QKP0g4s5Y02S1kkhw=="
     },
     "@fortawesome/fontawesome-svg-core@6.7.0": {
       "integrity": "sha512-v6YZjSPuxriC7lYxCzKFbgZ1iaf60AVX2CsfZXSc0U9+mqVd8VGVtMEqDqz5GxDpNUQ8bMDfW+gspVMYGlRpUA==",
       "dependencies": [
-        "@fortawesome/fontawesome-common-types@6.7.0"
+        "@fortawesome/fontawesome-common-types"
       ]
     },
-    "@fortawesome/free-solid-svg-icons@5.15.4": {
-      "integrity": "sha512-JLmQfz6tdtwxoihXLg6lT78BorrFyCf59SAwBM6qV/0zXyVeDygJVb3fk+j5Qat+Yvcxp1buLTY5iDh1ZSAQ8w==",
+    "@fortawesome/free-solid-svg-icons@6.7.0": {
+      "integrity": "sha512-9ww5hQ3OzEehUrSXAlPTJ73xDub73fnxr+se5PU0MFQor2nZBO0m7HNm5Q4KD9XMYjwRqh2BnBNR2/9EFbGqmg==",
       "dependencies": [
-        "@fortawesome/fontawesome-common-types@0.2.36"
+        "@fortawesome/fontawesome-common-types"
       ]
     },
     "@fortawesome/react-fontawesome@0.2.2_@fortawesome+fontawesome-svg-core@6.7.0_react@18.3.1": {
@@ -7585,17 +7581,6 @@
         "fast-memoize"
       ]
     },
-    "react-app-polyfill@1.0.6": {
-      "integrity": "sha512-OfBnObtnGgLGfweORmdZbyEz+3dgVePQBb3zipiaDsMHV1NpWm0rDFYIVXFV/AK+x4VIIfWHhrdMIeoTLyRr2g==",
-      "dependencies": [
-        "core-js",
-        "object-assign",
-        "promise",
-        "raf",
-        "regenerator-runtime@0.13.11",
-        "whatwg-fetch"
-      ]
-    },
     "react-app-polyfill@3.0.0": {
       "integrity": "sha512-sZ41cxiU5llIB003yxxQBYrARBqe0repqPTTYBTmMqTz9szeBbE37BehCE891NZsmdZqqP+xWKdT3eo3vOzN8w==",
       "dependencies": [
@@ -7787,7 +7772,7 @@
         "postcss-preset-env",
         "prompts",
         "react@18.3.1",
-        "react-app-polyfill@3.0.0",
+        "react-app-polyfill",
         "react-dev-utils",
         "react-refresh@0.11.0",
         "resolve@1.22.8",
@@ -9617,7 +9602,7 @@
       "dependencies": [
         "npm:@appbaseio/reactivesearch@^3.43.8",
         "npm:@fortawesome/fontawesome-svg-core@^6.7.0",
-        "npm:@fortawesome/free-solid-svg-icons@^5.8.1",
+        "npm:@fortawesome/free-solid-svg-icons@^6.7.0",
         "npm:@fortawesome/react-fontawesome@~0.2.2",
         "npm:@types/elasticsearch@^5.0.31",
         "npm:@types/jest@24.0.17",
@@ -9646,7 +9631,6 @@
         "npm:lodash.escaperegexp@^4.1.1",
         "npm:lodash.throttle@^4.1.1",
         "npm:re-resizable@^5.0.1",
-        "npm:react-app-polyfill@^1.0.1",
         "npm:react-dom@18.2.0",
         "npm:react-helmet@^6.1.0",
         "npm:react-hotkeys@^2.0.0-pre9",

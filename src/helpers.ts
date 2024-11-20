@@ -73,7 +73,7 @@ export const getParams = () => {
   const params = new URLSearchParams(searchObject);
 
   const currentResourceBase = params.get("showResource");
-  let currentResource = null;
+  let currentResource: null | string = null;
   if (currentResourceBase !== null) {
     currentResource = decodeURIComponent(currentResourceBase);
   }
@@ -86,7 +86,7 @@ export const getParams = () => {
     );
   }
 
-  let documentID = null;
+  let documentID: string | null = null;
   if (currentResource !== null) {
     documentID = currentResource.split("/")[3];
   }

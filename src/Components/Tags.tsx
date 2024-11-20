@@ -1,5 +1,5 @@
-import { topTag, TopTags } from "../types";
-import { colors } from "../sharedStyles";
+import { topTag, TopTags } from "../types.ts";
+import { colors } from "../sharedStyles.ts";
 
 const Tags = (props: { tags: TopTags | undefined }) => {
   if (!props.tags) {

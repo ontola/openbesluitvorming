@@ -1,4 +1,4 @@
-import paths from "./paths";
+import paths from "./paths.ts";
 
 export interface OrgType {
   /** Relative to /public/orglogos/ */

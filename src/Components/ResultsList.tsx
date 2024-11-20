@@ -1,11 +1,11 @@
 import * as React from "react";
 import { ReactiveList } from "@appbaseio/reactivesearch";
 
-import { allComponentIds } from "../helpers";
-import ResultCard from "../Components/ResultCard";
+import { allComponentIds } from "../helpers.ts";
+import ResultCard from "../Components/ResultCard.tsx";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSpinner } from "@fortawesome/free-solid-svg-icons";
-import { handle, printAndHandle } from "../helpers/logging";
+import { handle, printAndHandle } from "../helpers/logging.ts";
 
 interface ResultsType {
   numberOfResults: number;

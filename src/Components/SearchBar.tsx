@@ -1,8 +1,8 @@
 import * as React from "react";
 import { DataSearch } from "@appbaseio/reactivesearch";
 import { GlobalHotKeys } from "react-hotkeys";
-import { ids } from "../helpers";
-import { keyMap } from "../helpers/keyMap";
+import { ids } from "../helpers.ts";
+import { keyMap } from "../helpers/keyMap.ts";
 
 const simpleQueryStringChars = ['"', "+", ",", "|", "*", "~", "(", ")"];
 
