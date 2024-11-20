@@ -1,4 +1,3 @@
-import * as React from "react";
 import { useFetch } from "../helpers";
 import Creatable from "react-select/creatable";
 import paths from "../paths";
@@ -61,7 +60,7 @@ const OrganizationSelector = () => {
   });
 
   const handleCreateOption = () => {
-    window.location.href = paths.vngNewForm;
+    globalThis.location.href = paths.vngNewForm;
   };
 
   let totalCount = defaultOrgsCount;

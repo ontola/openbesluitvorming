@@ -1,22 +1,22 @@
 import * as React from "react";
 import { useNavigate } from "react-router";
 
-import Button from "../Components/Button";
-import Filtersbar from "../Components/FiltersBar";
-import Home from "../Components/Home";
-import NavBarTop from "../Components/NavBarTop";
+import Button from "../Components/Button.tsx";
+import Filtersbar from "../Components/FiltersBar.tsx";
+import Home from "../Components/Home.tsx";
+import NavBarTop from "../Components/NavBarTop.tsx";
 import ResultsList from "../Components/ResultsList";
-import { getParams } from "../helpers";
-import SearchBar from "../Components/SearchBar";
-import OrganizationSelector from "../Components/OrganizationSelector";
+import { getParams } from "../helpers.ts";
+import SearchBar from "../Components/SearchBar.tsx";
+import OrganizationSelector from "../Components/OrganizationSelector.tsx";
 import { ReactiveBase, SelectedFilters } from "@appbaseio/reactivesearch";
 import theme from "../theme";
-import SideDrawer from "../Components/SideDrawer";
+import SideDrawer from "../Components/SideDrawer.tsx";
 import { GlobalHotKeys } from "react-hotkeys";
 
-import { keyMap } from "../helpers/keyMap";
-import PDFViewer from "../Components/PDFViewer";
-import { API } from "../config";
+import { keyMap } from "../helpers/keyMap.ts";
+import PDFViewer from "../Components/PDFViewer.tsx";
+import { API } from "../config.ts";
 
 const SearchRoute = () => {
   const [showFilters, setShowFilters] = React.useState(false);
@@ -30,7 +30,7 @@ const SearchRoute = () => {
   };
 
   const closeDocument = () => {
-    const currentURL = new URL(window.location.href);
+    const currentURL = new URL(globalThis.location.href);
     const params = new URLSearchParams(currentURL.search);
     params.delete("showResource");
     navigate(`/search?${params.toString()}`);

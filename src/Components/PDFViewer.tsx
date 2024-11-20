@@ -8,9 +8,9 @@ import {
   faExpand,
   faSpinner,
 } from "@fortawesome/free-solid-svg-icons";
-import escapeRegExp from "lodash.escaperegexp";
+// import escapeRegExp from "lodash.escaperegexp";
 import { SideDrawerContext } from "./SideDrawer";
-import { getParams } from "../helpers";
+// import { getParams } from "../helpers";
 import { handle } from "../helpers/logging";
 import { HotKeys } from "react-hotkeys";
 import { keyMap } from "../helpers/keyMap";
@@ -60,7 +60,9 @@ const PDFViewer = (props: PDFViewerProps) => {
   const [pageNumber, setPageNumber] = React.useState<number>(0);
   const [docRef, setDocRef] = React.useState<any>(null);
   const [numPages, setNumPages] = React.useState<number>(0);
-  const [maxWidth] = React.useState<number>(calcMaxWidth(window.innerWidth));
+  const [maxWidth] = React.useState<number>(
+    calcMaxWidth(globalThis.innerWidth),
+  );
   const [showButtons, setShowButtons] = React.useState<boolean>(false);
   const drawer = React.useContext(SideDrawerContext);
   const pdfWrapper = React.createRef<HTMLInputElement>();
@@ -79,7 +81,7 @@ const PDFViewer = (props: PDFViewerProps) => {
     setPageNumber(pageNumber + 1);
   };
 
-  const { currentSearchTerm } = getParams();
+  // const { currentSearchTerm } = getParams();
 
   const onDocumentLoadSuccess = (e: OnLoadSuccessType) => {
     setNumPages(e.numPages);
@@ -101,44 +103,44 @@ const PDFViewer = (props: PDFViewerProps) => {
     );
   };
 
-  const highlightPattern = (text: string, pattern: string): React.ReactNode => {
-    const patternPlaceholder = pattern
-      .replace(/[\s\-－﹣֊᐀‐–︲—﹘―⸺⸻⸗⹀〜゠⸚]+/g, "%")
-      .replace(/[^\w\d%]/g, "");
-    const patternRewrite = escapeRegExp(patternPlaceholder).replace(
-      /%/g,
-      "[\\s\\-－﹣֊᐀‐–︲—﹘―⸺⸻⸗⹀〜゠⸚]+",
-    );
-    const safePattern = new RegExp(patternRewrite, "gui");
-    const splitText = text.split(safePattern);
+  // const highlightPattern = (text: string, pattern: string): React.ReactNode => {
+  //   const patternPlaceholder = pattern
+  //     .replace(/[\s\-－﹣֊᐀‐–︲—﹘―⸺⸻⸗⹀〜゠⸚]+/g, "%")
+  //     .replace(/[^\w\d%]/g, "");
+  //   const patternRewrite = escapeRegExp(patternPlaceholder).replace(
+  //     /%/g,
+  //     "[\\s\\-－﹣֊᐀‐–︲—﹘―⸺⸻⸗⹀〜゠⸚]+",
+  //   );
+  //   const safePattern = new RegExp(patternRewrite, "gui");
+  //   const splitText = text.split(safePattern);
 
-    if (splitText.length <= 1) {
-      return text;
-    }
+  //   if (splitText.length <= 1) {
+  //     return text;
+  //   }
 
-    const matches = text.match(safePattern);
+  //   const matches = text.match(safePattern);
 
-    const whatever = splitText.reduce<React.ReactNode[]>(
-      (arr, element, index) => {
-        if (matches && matches[index]) {
-          return [
-            ...arr,
-            element,
-            <mark key={`mark-${index}`}>{matches[index]}</mark>,
-          ];
-        }
-        return [...arr, element];
-      },
-      [],
-    );
+  //   const whatever = splitText.reduce<React.ReactNode[]>(
+  //     (arr, element, index) => {
+  //       if (matches && matches[index]) {
+  //         return [
+  //           ...arr,
+  //           element,
+  //           <mark key={`mark-${index}`}>{matches[index]}</mark>,
+  //         ];
+  //       }
+  //       return [...arr, element];
+  //     },
+  //     [],
+  //   );
 
-    return <React.Fragment>{whatever}</React.Fragment>;
-  };
+  //   return <React.Fragment>{whatever}</React.Fragment>;
+  // };
 
   const setFillWidth = () => {
     if (docRef !== null) {
       const docRatio = docRef.clientWidth / docRef.clientHeight;
-      const newWidth = window.innerHeight * docRatio;
+      const newWidth = globalThis.innerHeight * docRatio;
       if (newWidth < maxWidth) {
         drawer.setWidth(newWidth);
       } else {
@@ -155,8 +157,8 @@ const PDFViewer = (props: PDFViewerProps) => {
     }
   };
 
-  const makeTextRenderer = (searchText: string) => (textItem: TextLayerItem) =>
-    highlightPattern(textItem.str, searchText);
+  // const makeTextRenderer = (searchText: string) => (textItem: TextLayerItem) =>
+  //   highlightPattern(textItem.str, searchText);
 
   const keyHandlers = {
     PREVIOUS: handlePreviousPage,
@@ -229,7 +231,7 @@ const PDFViewer = (props: PDFViewerProps) => {
                 <FontAwesomeIcon icon={faArrowRight} />
               </Button>
               <Button
-                onClick={() => window.open(props.url)}
+                onClick={() => globalThis.open(props.url)}
                 title="Download bestand (D)"
               >
                 <FontAwesomeIcon icon={faDownload} />

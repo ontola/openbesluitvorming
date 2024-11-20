@@ -1,13 +1,11 @@
 // This must be the first line in src/index.js
 import "react-app-polyfill/ie11";
 import "react-app-polyfill/stable";
-import "./polyfill/textencoder";
-import React from "react";
-import ReactDOM from "react-dom";
 import "./index.css";
 import App from "./App";
 import * as serviceWorker from "./serviceWorker";
 import "@ungap/global-this";
+import ReactDOM from "react-dom";
 
 ReactDOM.render(<App />, document.getElementById("root"));
 
