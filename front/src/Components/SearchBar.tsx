@@ -73,15 +73,6 @@ const debounce = 500;
 
 const SearchBar: React.FunctionComponent = () => {
   const [query, setQuery] = React.useState<string>("");
-  const [timer, setTimer] = React.useState<number>();
-
-  React.useEffect(
-    () => () => {
-      // When the component unmounts, remove the timer.
-      clearTimeout(timer);
-    },
-    [timer],
-  );
 
   const handlers = {
     // SEARCH: () => ref && ref.focus(),
@@ -97,20 +88,6 @@ const SearchBar: React.FunctionComponent = () => {
     },
   };
 
-  const handleKey = (e: KeyboardEvent, triggerQuery: () => void) => {
-    if (e.key === "Enter") {
-      triggerQuery();
-      // Reset the timer for debouncing.
-      clearTimeout(timer);
-    }
-  };
-
-  const handleChange = (value: string, triggerQuery: () => void) => {
-    setQuery(value);
-    // Set a timer for debouncing, if it's passed, call triggerQuery.
-    setTimer(setTimeout(triggerQuery, debounce));
-  };
-
   return (
     <GlobalHotKeys
       keyMap={keyMap}
@@ -124,8 +101,7 @@ const SearchBar: React.FunctionComponent = () => {
         className="SearchBar"
         componentId={ids.searchbox}
         debounce={debounce}
-        onKeyPress={handleKey}
-        onChange={handleChange}
+        onChange={setQuery}
         showFilter={false}
         dataField={fields}
         highlight
