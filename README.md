@@ -10,9 +10,8 @@ Check out the [API docs](https://github.com/openstate/open-raadsinformatie/blob/
 
 ## Run front-end
 
-- `cd front`
-- `pnpm`
-- `pnpm dev`
+- `deno install`
+- `deno run dev`
 
 ## Contribution guidelines
 
