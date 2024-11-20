@@ -1,9 +1,10 @@
-import { useFetch } from "../helpers";
+import { useFetch } from "../helpers.ts";
 import Creatable from "react-select/creatable";
-import paths from "../paths";
-import { handle } from "../helpers/logging";
-import { API } from "../config";
+import paths from "../paths.ts";
+import { handle } from "../helpers/logging.ts";
+import { API } from "../config.ts";
 import { useNavigate } from "react-router";
+import React from "react";
 
 /** The amount of participating municipalities / provinces */
 export const defaultOrgsCount = "317";
@@ -76,8 +77,7 @@ const OrganizationSelector = () => {
     isLoading = false;
     onSelectOrg = (event: any) => {
       const municipalityIndex = event.value;
-      const pathWithQueryParams =
-        `?zoekterm="*"&organisaties=%5B"${municipalityIndex}"%5D`;
+      const pathWithQueryParams = `?zoekterm="*"&organisaties=%5B"${municipalityIndex}"%5D`;
       navigate(pathWithQueryParams);
     };
 

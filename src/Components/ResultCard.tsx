@@ -1,14 +1,14 @@
 import * as React from "react";
 
-import { ORIItemType } from "../types";
-import { getParams, useOpenResource } from "../helpers";
-import Document from "./Cards/Document";
+import { ORIItemType } from "../types.ts";
+import { getParams, useOpenResource } from "../helpers.ts";
+import Document from "./Cards/Document.tsx";
 // import Meeting from "./Cards/Meeting";
 // import AgendaItem from "./Cards/AgendaItem";
 // import CreativeWork from "./Cards/CreativeWork";
 // import Organization from "./Cards/Organization";
 // import Person from "./Cards/Person";
-import Button from "./Button";
+import Button from "./Button.tsx";
 
 interface ResultCardProps extends ORIItemType {
   label?: string;

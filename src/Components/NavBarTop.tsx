@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import vngLogo from "../vnglogo.svg";
-import { IS_ORI } from "../config";
+import { IS_ORI } from "../config.ts";
 
 const NavBarTop = () => {
   return (

@@ -1,17 +1,5 @@
 {
-  "eslint.enable": true,
-  "atlascode.jira.workingSite": {
-    "baseUrlSuffix": "atlassian.net"
-  },
-  "eslint.workingDirectories": [
-    {
-      "directory": "front",
-      "changeProcessCWD": true
-    },
-    {
-      "directory": "server",
-      "changeProcessCWD": true
-    }
-  ],
+  "typescript.validate.enable": false, // Let Deno handle TypeScript validation
+  "javascript.validate.enable": false,
   "deno.enable": true
 }

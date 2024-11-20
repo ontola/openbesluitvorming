@@ -1,5 +1,5 @@
 import React from "react";
-import Button from "./Button";
+import Button from "./Button.tsx";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faArrowLeft,
@@ -9,11 +9,11 @@ import {
   faSpinner,
 } from "@fortawesome/free-solid-svg-icons";
 // import escapeRegExp from "lodash.escaperegexp";
-import { SideDrawerContext } from "./SideDrawer";
+import { SideDrawerContext } from "./SideDrawer.tsx";
 // import { getParams } from "../helpers";
-import { handle } from "../helpers/logging";
+import { handle } from "../helpers/logging.ts";
 import { HotKeys } from "react-hotkeys";
-import { keyMap } from "../helpers/keyMap";
+import { keyMap } from "../helpers/keyMap.ts";
 
 import { Document, Page, pdfjs } from "react-pdf";
 // tslint:disable-next-line:max-line-length

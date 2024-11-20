@@ -14,7 +14,7 @@
   "dependencies": {
     "@appbaseio/reactivesearch": "^3.43.8",
     "@fortawesome/fontawesome-svg-core": "^6.7.0",
-    "@fortawesome/free-solid-svg-icons": "^5.8.1",
+    "@fortawesome/free-solid-svg-icons": "^6.7.0",
     "@fortawesome/react-fontawesome": "^0.2.2",
     "@types/elasticsearch": "^5.0.31",
     "@types/jest": "24.0.17",
@@ -43,7 +43,6 @@
     "lodash.throttle": "^4.1.1",
     "re-resizable": "^5.0.1",
     "react": "^18.2.0",
-    "react-app-polyfill": "^1.0.1",
     "react-dom": "18.2.0",
     "react-helmet": "^6.1.0",
     "react-hotkeys": "^2.0.0-pre9",

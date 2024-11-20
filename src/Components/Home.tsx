@@ -1,9 +1,9 @@
 import * as React from "react";
-import paths from "../paths";
-import { IS_ORI, TITLE } from "../config";
-import { OrgType, poweredBy } from "../poweredBy";
-import { colors } from "../sharedStyles";
-import useDocumentCounter from "./DocumentCounter";
+import paths from "../paths.ts";
+import { IS_ORI, TITLE } from "../config.ts";
+import { colors } from "../sharedStyles.ts";
+import useDocumentCounter from "./DocumentCounter.tsx";
+import { OrgType, poweredBy } from "../poweredBy.tsx";
 
 interface AppType {
   name: string;
