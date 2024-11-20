@@ -1,4 +1,3 @@
-import * as React from "react";
 import { topTag, TopTags } from "../types";
 import { colors } from "../sharedStyles";
 

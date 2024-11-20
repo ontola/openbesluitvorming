@@ -20,18 +20,6 @@ const renderComponent = (props: ORIItemType) => {
     case "MediaObject":
       // We should only see MediaObjects in the search results now!
       return <Document {...props} />;
-      // case "Meeting":
-      //   return <Meeting {...props} />;
-      // case "AgendaItem":
-      //   return <AgendaItem {...props} />;
-      // case "CreativeWork":
-      //   return <CreativeWork {...props} />;
-      // case "Organization":
-      //   return <Organization {...props} />;
-      // case "Person":
-      //   return <Person {...props} />;
-      // default:
-      return null;
   }
 };
 

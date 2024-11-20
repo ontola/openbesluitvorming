@@ -128,7 +128,7 @@ export const useOpenResource = () => {
   const navigate = useNavigate();
 
   return (url: string) => {
-    const currentURL = new URL(window.location.href);
+    const currentURL = new URL(globalThis.location.href);
     currentURL.searchParams.set("showResource", encodeURIComponent(url));
     navigate(currentURL.toString().substring(currentURL.origin.length));
   };

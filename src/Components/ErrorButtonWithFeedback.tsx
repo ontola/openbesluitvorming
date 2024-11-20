@@ -17,8 +17,8 @@ interface ErrorButtonProps {
   location?: {
     pathname: string;
   };
-  reloadLinkedObject?: Function;
-  reset: Function;
+  reloadLinkedObject?: () => void;
+  reset: () => void;
 }
 
 // const RETRYABLE_ERRORS = [

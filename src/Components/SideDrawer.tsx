@@ -45,17 +45,17 @@ const SideDrawer = (props: SideDrawerProps) => {
   const navigate = useNavigate();
   const [width, setWidth] = usePersistedState<number>(
     "orisearch.pdfviewer.width",
-    determineInitialWith(window.innerWidth),
+    determineInitialWith(globalThis.innerWidth),
   );
 
   const [maxWidth, setMaxWidth] = React.useState<number>(
-    calcMaxWidth(window.innerWidth),
+    calcMaxWidth(globalThis.innerWidth),
   );
 
   const pdfWrapper = React.createRef<HTMLInputElement>();
 
   const closeDocument = () => {
-    const currentURL = new URL(window.location.href);
+    const currentURL = new URL(globalThis.location.href);
     const params = new URLSearchParams(currentURL.search);
     params.delete("showResource");
     navigate(`/?${params.toString()}`);
@@ -65,14 +65,14 @@ const SideDrawer = (props: SideDrawerProps) => {
     const handleResize = () => {
       if (pdfWrapper.current) {
         setWidth(pdfWrapper.current.getBoundingClientRect().width);
-        setMaxWidth(calcMaxWidth(window.innerWidth));
+        setMaxWidth(calcMaxWidth(globalThis.innerWidth));
       }
     };
 
     const listener = throttle(handleResize, 500);
-    window.addEventListener("resize", listener);
+    globalThis.addEventListener("resize", listener);
 
-    return () => window.removeEventListener("resize", listener);
+    return () => globalThis.removeEventListener("resize", listener);
   });
 
   return (
@@ -94,12 +94,7 @@ const SideDrawer = (props: SideDrawerProps) => {
           }}
           maxWidth={maxWidth}
           minWidth={200}
-          onResizeStop={(
-            event: MouseEvent | TouchEvent,
-            direction: any,
-            refToElement: HTMLDivElement,
-            delta: any,
-          ) => {
+          onResizeStop={(_event: MouseEvent | TouchEvent, delta: any) => {
             setWidth(width + delta.width);
           }}
           enable={{ left: true }}

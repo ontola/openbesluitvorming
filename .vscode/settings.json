@@ -4,7 +4,14 @@
     "baseUrlSuffix": "atlassian.net"
   },
   "eslint.workingDirectories": [
-    { "directory": "front", "changeProcessCWD": true },
-    { "directory": "server", "changeProcessCWD": true }
+    {
+      "directory": "front",
+      "changeProcessCWD": true
+    },
+    {
+      "directory": "server",
+      "changeProcessCWD": true
+    }
   ],
+  "deno.enable": true
 }

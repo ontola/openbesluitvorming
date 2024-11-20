@@ -1,4 +1,3 @@
-import * as React from "react";
 import { Link } from "react-router-dom";
 import vngLogo from "../vnglogo.svg";
 import { IS_ORI } from "../config";
@@ -6,11 +5,7 @@ import { IS_ORI } from "../config";
 const NavBarTop = () => {
   return (
     <div className="NavBar__top">
-      <Link
-        to="/"
-        title="Homepage"
-        className="Logo"
-      >
+      <Link to="/" title="Homepage" className="Logo">
         <span className="Logo__first">Open</span>
         {IS_ORI ? <span>Raadsinformatie</span> : <span>Besluitvorming.nl</span>}
       </Link>
@@ -37,14 +32,9 @@ const NavBarTop = () => {
         <span>github</span>
       </a> */
       }
-      {IS_ORI &&
-        (
-          <img
-            className="NavBar__vng-logo"
-            src={vngLogo}
-            alt="VNG logo"
-          />
-        )}
+      {IS_ORI && (
+        <img className="NavBar__vng-logo" src={vngLogo} alt="VNG logo" />
+      )}
     </div>
   );
 };
