@@ -9,15 +9,21 @@
   transition: opacity 4s ease-in;
   transition-delay: 8s;
   -webkit-animation: fadein 4s; /* Safari, Chrome and Opera > 12.1 */
-   -ms-animation: fadein 4s; /* Internet Explorer */
-       animation: fadein 4s;
+  -ms-animation: fadein 4s; /* Internet Explorer */
+  animation: fadein 4s;
   animation-fill-mode: forwards;
   padding: 1rem;
 }
 @keyframes fadein {
-  0% { opacity: 0; }
-  80% { opacity: 0; }
-  100%   { opacity: 1; }
+  0% {
+    opacity: 0;
+  }
+  80% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
 }
 .lds-roller {
   display: block;
@@ -37,7 +43,7 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #279DDD;
+  background: #279ddd;
   margin: -3px 0 0 -3px;
 }
 .lds-roller div:nth-child(1) {
