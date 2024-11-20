@@ -7,8 +7,6 @@ interface DetailTypeProps {
 }
 
 const DetailType: React.FunctionComponent<DetailTypeProps> = (props) => {
-  return (
-    <div className="ResultCard__detail" >{typeToLabel(props.type)}</div>
-  );
+  return <div className="ResultCard__detail">{typeToLabel(props.type)}</div>;
 };
 export default DetailType;

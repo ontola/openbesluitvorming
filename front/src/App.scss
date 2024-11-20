@@ -1,20 +1,17 @@
-@import 'shared';
+@import "shared";
 
-::-webkit-scrollbar
-{
-  width: 6px;  /* for vertical scrollbars */
+::-webkit-scrollbar {
+  width: 6px; /* for vertical scrollbars */
   height: 6px; /* for horizontal scrollbars */
   position: relative;
 }
 
-::-webkit-scrollbar-track
-{
+::-webkit-scrollbar-track {
   position: absolute;
   background: rgba(0, 0, 0, 0);
 }
 
-::-webkit-scrollbar-thumb
-{
+::-webkit-scrollbar-thumb {
   background: $blue_light;
   border-radius: 99px;
 
@@ -61,11 +58,11 @@ p {
   &__close {
     color: $blue;
     font-weight: bold;
-    padding: .5rem;
+    padding: 0.5rem;
     position: absolute;
-    top: .5rem;
-    right: .5rem;
-    background-color: transparentize(white, .1);
+    top: 0.5rem;
+    right: 0.5rem;
+    background-color: transparentize(white, 0.1);
     z-index: 1;
   }
 
@@ -73,11 +70,11 @@ p {
     font-weight: bold;
     color: $blue;
     border-radius: $border-radius;
-    padding: .5rem;
+    padding: 0.5rem;
     background-color: white;
 
     &:hover {
-      color: $blue_dark
+      color: $blue_dark;
     }
 
     &:active {
@@ -86,8 +83,8 @@ p {
   }
 
   &__toggle {
-  color: $g4;
-  position: relative;
+    color: $g4;
+    position: relative;
 
     h3 {
       display: inline;
@@ -150,14 +147,14 @@ p {
 }
 
 .Filter__Title {
-  margin-bottom: .3rem;
+  margin-bottom: 0.3rem;
   margin-top: 0;
 }
 
 .FilterBar {
   position: fixed;
   border-right: $border;
-  transition: .2s all;
+  transition: 0.2s all;
   padding: 0;
   padding-top: 1rem;
   z-index: 2;
@@ -194,7 +191,7 @@ p {
 
   h2 {
     color: $g4;
-    margin-bottom: .5rem;
+    margin-bottom: 0.5rem;
   }
 
   p {
@@ -208,7 +205,7 @@ p {
     color: $blue;
   }
 
-  a:hover{
+  a:hover {
     text-decoration: underline;
   }
 
@@ -220,7 +217,7 @@ p {
     padding-left: 1.2rem;
 
     li {
-      margin-bottom: .3rem;
+      margin-bottom: 0.3rem;
     }
   }
 }
@@ -231,8 +228,7 @@ p {
 
 .LabelItem__label {
   font-weight: bold;
-  font-size: .8rem;
-
+  font-size: 0.8rem;
 }
 
 .Logo, .NavBar__link {
@@ -258,12 +254,12 @@ p {
 .NavBar__searchbar {
   display: flex;
   width: 100%;
-  margin-bottom: .3rem;
+  margin-bottom: 0.3rem;
 }
 
 .Logo {
   color: $blue;
-  transition: .5s font-size;
+  transition: 0.5s font-size;
   font-size: 2rem;
 
   .SearchRoute--search & {
@@ -283,7 +279,7 @@ p {
   left: 0;
   right: 0;
   background-color: white;
-  transition: .5s all;
+  transition: 0.5s all;
   height: $navbar-height-big;
 
   .SearchRoute--search & {
@@ -308,15 +304,15 @@ p {
 
   &__top,
   &__bottom {
-    transition: .5s all;
+    transition: 0.5s all;
     margin-left: calc(50% - #{$result-width / 2});
   }
 
   &__vng-logo {
-    transition: .5s all;
+    transition: 0.5s all;
     margin-left: auto;
     width: 3rem;
-    margin-right: .2rem;
+    margin-right: 0.2rem;
 
     .SearchRoute--search & {
       width: 2rem;
@@ -340,7 +336,7 @@ p {
   top: 50%;
   border: solid 1px $blue;
   color: $blue;
-  transition: .2s all ease-in-out;
+  transition: 0.2s all ease-in-out;
 }
 
 .SideDrawer__scroller {
@@ -364,7 +360,6 @@ p {
   background-color: $blue;
 }
 
-
 .SideDrawer__wrapper {
   position: fixed;
   border-left: solid 1px $blue;
@@ -383,7 +378,7 @@ p {
   &-enter-active {
     opacity: 1;
     right: 0;
-    transition: right 200ms ease-out, opacity .2s;
+    transition: right 200ms ease-out, opacity 0.2s;
   }
 
   &-leave {
@@ -394,7 +389,7 @@ p {
   &-leave-active {
     opacity: 0;
     right: -20%;
-    transition: right 200ms ease-in-out, opacity .2s;
+    transition: right 200ms ease-in-out, opacity 0.2s;
   }
 }
 
@@ -407,7 +402,7 @@ p {
   text-align: center;
   pointer-events: none;
 
-  &-inner{
+  &-inner {
     pointer-events: auto;
     display: inline-block;
     background: white;
@@ -416,7 +411,7 @@ p {
     border-top-left-radius: $border-radius;
 
     .Button {
-      padding: .5rem;
+      padding: 0.5rem;
       color: $blue;
 
       &:hover {
@@ -448,7 +443,7 @@ p {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: .2s all;
+  transition: 0.2s all;
   color: $blue;
   height: 100vh;
 }
@@ -464,11 +459,11 @@ p {
 }
 
 .PropertyValue {
-  font-size: .9rem;
+  font-size: 0.9rem;
 }
 
 .SideDrawer__resize-handle {
-  transition: .2s all;
+  transition: 0.2s all;
   z-index: 2;
 
   &:hover {
@@ -482,7 +477,7 @@ p {
 
 .PDFViewer_number-input {
   -webkit-appearance: none;
-  -moz-appearance:textfield;
+  -moz-appearance: textfield;
   border: none;
   margin: 0;
   width: 2rem;
@@ -503,7 +498,7 @@ p {
   left: 0;
   bottom: 0;
   -webkit-overflow-scrolling: touch;
-  transition: .2s all;
+  transition: 0.2s all;
   min-height: calc(100vh - #{$navbar-height});
   position: relative;
   padding-bottom: 3rem;
@@ -542,7 +537,7 @@ p {
 
 .Results__dual-loader-top {
   position: absolute;
-  top: -.5rem;
+  top: -0.5rem;
 }
 
 .Results__dual-loader-bottom {
@@ -558,7 +553,7 @@ p {
     display: flex;
 
     span {
-      margin-left: .4rem;
+      margin-left: 0.4rem;
     }
   }
 }
@@ -586,7 +581,7 @@ p {
 
   h1 {
     margin: 0;
-    font-size: 1.4rem;;
+    font-size: 1.4rem;
     color: $blue;
   }
 }
@@ -602,7 +597,7 @@ p {
   display: block;
   // padding: .2rem;
   border-radius: $border-radius;
-  font-size: .9rem;
+  font-size: 0.9rem;
 
   &:hover {
     text-decoration: underline;
@@ -617,7 +612,7 @@ mark {
   background-color: transparent;
   color: inherit;
 
-  &:before{
+  &:before {
     width: 100%;
     bottom: 0;
     left: 0;
@@ -635,7 +630,7 @@ mark {
   background-color: white;
   max-width: $result-width;
   margin-bottom: 1rem;
-  padding: .5rem 1rem 0;
+  padding: 0.5rem 1rem 0;
   border-radius: $border-radius;
   border: $border;
   word-break: break-word;
@@ -650,8 +645,8 @@ mark {
 
   h2 {
     margin-top: 0;
-    margin-bottom: .2rem;
-    font-size: .9rem;
+    margin-bottom: 0.2rem;
+    font-size: 0.9rem;
   }
 
   button h2 {
@@ -679,13 +674,13 @@ mark {
   }
 
   &__highlight {
-    margin-bottom: .5rem;
+    margin-bottom: 0.5rem;
   }
 
-  &__details{
+  &__details {
     display: flex;
     flex-wrap: wrap;
-    margin-bottom: .3rem;
+    margin-bottom: 0.3rem;
 
     & .ResultCard__detail {
       display: inline;
@@ -698,7 +693,7 @@ mark {
 }
 
 .SearchRoute {
-  transition: .5s padding-top;
+  transition: 0.5s padding-top;
   padding-top: $navbar-height-big;
 
   &.SearchRoute--search {
@@ -721,7 +716,7 @@ mark {
     align-self: center;
     border-radius: $border-radius;
     background-color: white;
-    transition: border-color .2s;
+    transition: border-color 0.2s;
     display: flex;
     flex: 1;
 
@@ -750,7 +745,7 @@ mark {
     }
   }
   // When the filter button is hidden, round the corners
-  .SearchRoute--search & input{
+  .SearchRoute--search & input {
     border-radius: 0;
     border-top-left-radius: $border-radius;
     border-bottom-left-radius: $border-radius;
@@ -790,7 +785,7 @@ mark {
 
 @media only screen and (max-width: 400px) {
   .Logo {
-    font-size: 1.5rem
+    font-size: 1.5rem;
   }
 }
 
@@ -817,7 +812,7 @@ mark {
 }
 
 // Detect touch devices
-@media (pointer:coarse) {
+@media (pointer: coarse) {
   .PDFViewer__button-bar-inner {
     transform: scale(1.2);
   }
@@ -861,24 +856,38 @@ mark {
 .wiki-image {
   float: right;
   max-width: 10rem;
-  padding-left: .4rem;
-  padding-bottom: .4rem;
+  padding-left: 0.4rem;
+  padding-bottom: 0.4rem;
 }
 
 .bounce {
   align-self: flex-end;
-  animation-duration: .67s;
+  animation-duration: 0.67s;
   animation-iteration-count: infinite;
   animation-name: bounce;
   animation-timing-function: ease;
   transform-origin: bottom;
 }
 @keyframes bounce {
-  0%   { transform: scale(1,1)      translateY(0); }
-  10%  { transform: scale(1.1,.9)   translateY(0); }
-  30%  { transform: scale(.9,1.1)   translateY(-0.4em); }
-  48%  { transform: scale(1.05,.95) translateY(0); }
-  55%  { transform: scale(1,1)      translateY(-0.03em); }
-  67%  { transform: scale(1,1)      translateY(0); }
-  100% { transform: scale(1,1)      translateY(0); }
+  0% {
+    transform: scale(1, 1) translateY(0);
+  }
+  10% {
+    transform: scale(1.1, 0.9) translateY(0);
+  }
+  30% {
+    transform: scale(0.9, 1.1) translateY(-0.4em);
+  }
+  48% {
+    transform: scale(1.05, 0.95) translateY(0);
+  }
+  55% {
+    transform: scale(1, 1) translateY(-0.03em);
+  }
+  67% {
+    transform: scale(1, 1) translateY(0);
+  }
+  100% {
+    transform: scale(1, 1) translateY(0);
+  }
 }

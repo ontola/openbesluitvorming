@@ -1,11 +1,11 @@
 import * as React from "react";
 import { MultiList, RangeSlider } from "@appbaseio/reactivesearch";
 import {
+  allIdsBut,
+  capitalize,
+  ids,
   indexToLabel,
   typeToLabel,
-  ids,
-  capitalize,
-  allIdsBut,
 } from "../helpers";
 import Button from "./Button";
 import { topTag } from "../types";
@@ -18,7 +18,7 @@ interface FiltersbarProps {
 const startDate = new Date(2000, 1);
 // Set endDate one year in the future - we might want to see meetings that haven't happened yet
 const endDate = new Date(
-  Date.now() + 1000 /*sec*/ * 60 /*min*/ * 60 /*hour*/ * 24 /*day*/ * 365
+  Date.now() + 1000 /*sec*/ * 60 /*min*/ * 60 /*hour*/ * 24 /*day*/ * 365,
 );
 
 const dateLabel = (date: Date) => `${date.getFullYear()}-${date.getMonth()}`;
@@ -59,7 +59,8 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
         props.display ? "FilterBar__visible" : "FilterBar__hidden"
       }`}
     >
-      {/* <MultiList
+      {
+        /* <MultiList
         title={
           <FilterTitle helper="Het type item, zoals Document of Vergadering.">
             Type
@@ -82,9 +83,11 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
         }}
         showFilter={true}
         URLParams={true}
-      /> */}
+      /> */
+      }
       {/* For now disable this #39 */}
-      {/* {!showDateRange && <DateRange
+      {
+        /* {!showDateRange && <DateRange
         componentId={ids.daterange}
         dataField="last_discussed_at"
         className="Filter__item"
@@ -100,7 +103,8 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
         showFilter={true}
         filterLabel={capitalize(ids.daterange)}
         URLParams={true}
-      />} */}
+      />} */
+      }
       <MultiList
         title={
           <FilterTitle helper="De organisatie waar het document vandaan komt.">
@@ -148,7 +152,8 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
         URLParams={true}
         className="Filter__item"
       />
-      {/* <div className="Filter__item">
+      {
+        /* <div className="Filter__item">
         <Button
           onClick={() => setShowMap(!showMap)}
           className={`Button__toggle ${
@@ -160,7 +165,8 @@ const Filtersbar: React.FunctionComponent<FiltersbarProps> = (props) => {
         >
           <h3>{`${showMap ? "Sluit" : "Toon"} kaart`}</h3>
         </Button>
-      </div> */}
+      </div> */
+      }
       <div className="Filter__item">
         <Button
           onClick={() => setShowDateRange(!showDateRange)}

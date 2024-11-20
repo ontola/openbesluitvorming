@@ -2,7 +2,8 @@
 const theme: any = {
   typography: {
     // tslint:disable-next-line
-    fontFamily: "\"Open Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", \"Roboto\", \"Noto Sans\", \"Ubuntu\", \"Droid Sans\", \"Helvetica Neue\", sans-serif",
+    fontFamily:
+      '"Open Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Noto Sans", "Ubuntu", "Droid Sans", "Helvetica Neue", sans-serif',
     fontSize: "14px",
   },
   colors: {

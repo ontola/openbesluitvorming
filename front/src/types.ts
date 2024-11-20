@@ -33,4 +33,4 @@ export interface TopTags {
   "http://www.w3.org/1999/02/22-rdf-syntax-ns#_8": Tag;
 }
 
-export const topTag = "http://www.w3.org/1999/02/22-rdf-syntax-ns#_8"
+export const topTag = "http://www.w3.org/1999/02/22-rdf-syntax-ns#_8";

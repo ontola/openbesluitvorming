@@ -22,22 +22,24 @@ const Meeting: React.FunctionComponent<MeetingProps> = (props) => {
   return (
     <React.Fragment>
       {props.highlight.text && props.highlight.text.map(
-        ((text: string) => (
+        (text: string) => (
           <div key={text} className="ResultCard__highlight">
-            <span dangerouslySetInnerHTML={{ __html: `${text}...` }}/>
+            <span dangerouslySetInnerHTML={{ __html: `${text}...` }} />
           </div>
-        )))
-      }
+        ),
+      )}
       <div className="ResultCard__details">
-        <div className="ResultCard__detail" >{indexToLabel(props._index)}</div>
+        <div className="ResultCard__detail">{indexToLabel(props._index)}</div>
         <DetailType type={props["@type"]} />
         {date &&
-          <div className="ResultCard__detail" >{date.toLocaleDateString("nl-NL")}</div>
-        }
+          (
+            <div className="ResultCard__detail">
+              {date.toLocaleDateString("nl-NL")}
+            </div>
+          )}
       </div>
       {props.description &&
-        <p dangerouslySetInnerHTML={{ __html: `${props.description}...` }}/>
-      }
+        <p dangerouslySetInnerHTML={{ __html: `${props.description}...` }} />}
     </React.Fragment>
   );
 };

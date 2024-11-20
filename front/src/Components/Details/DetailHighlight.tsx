@@ -8,12 +8,12 @@ const DetailHighlight: React.FunctionComponent<DetailTypeProps> = (props) => {
   return (
     <React.Fragment>
       {props.textArray && props.textArray.map(
-        ((text: string) => (
+        (text: string) => (
           <div key={text} className="ResultCard__highlight">
-            <span dangerouslySetInnerHTML={{ __html: `${text}...` }}/>
+            <span dangerouslySetInnerHTML={{ __html: `${text}...` }} />
           </div>
-        )))
-      }
+        ),
+      )}
     </React.Fragment>
   );
 };

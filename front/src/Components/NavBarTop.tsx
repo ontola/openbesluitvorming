@@ -12,13 +12,10 @@ const NavBarTop = () => {
         className="Logo"
       >
         <span className="Logo__first">Open</span>
-        {IS_ORI ?
-          <span>Raadsinformatie</span>
-          :
-          <span>Besluitvorming.nl</span>
-        }
+        {IS_ORI ? <span>Raadsinformatie</span> : <span>Besluitvorming.nl</span>}
       </Link>
-      {/* <a
+      {
+        /* <a
         href={paths.vngProject}
         title="Projectwebsite van VNG Realisatie"
         className="NavBar__link"
@@ -38,14 +35,16 @@ const NavBarTop = () => {
         title="Broncode van deze zoekmachine"
       >
         <span>github</span>
-      </a> */}
-      {IS_ORI &&
-        <img
-          className="NavBar__vng-logo"
-          src={vngLogo}
-          alt="VNG logo"
-        />
+      </a> */
       }
+      {IS_ORI &&
+        (
+          <img
+            className="NavBar__vng-logo"
+            src={vngLogo}
+            alt="VNG logo"
+          />
+        )}
     </div>
   );
 };

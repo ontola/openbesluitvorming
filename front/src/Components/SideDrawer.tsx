@@ -45,11 +45,11 @@ const SideDrawer = (props: SideDrawerProps) => {
   const navigate = useNavigate();
   const [width, setWidth] = usePersistedState<number>(
     "orisearch.pdfviewer.width",
-    determineInitialWith(window.innerWidth)
+    determineInitialWith(window.innerWidth),
   );
 
   const [maxWidth, setMaxWidth] = React.useState<number>(
-    calcMaxWidth(window.innerWidth)
+    calcMaxWidth(window.innerWidth),
   );
 
   const pdfWrapper = React.createRef<HTMLInputElement>();
@@ -98,7 +98,7 @@ const SideDrawer = (props: SideDrawerProps) => {
             event: MouseEvent | TouchEvent,
             direction: any,
             refToElement: HTMLDivElement,
-            delta: any
+            delta: any,
           ) => {
             setWidth(width + delta.width);
           }}
@@ -110,11 +110,11 @@ const SideDrawer = (props: SideDrawerProps) => {
           <div className="SideDrawer__scroller" ref={pdfWrapper}>
             {typeof props.children === "function"
               ? (
-                  props.children as (
-                    width: number,
-                    setWidth: (width: number) => void
-                  ) => React.ReactNode
-                )(width, setWidth)
+                props.children as (
+                  width: number,
+                  setWidth: (width: number) => void,
+                ) => React.ReactNode
+              )(width, setWidth)
               : props.children}
           </div>
         </Resizable>

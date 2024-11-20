@@ -22,7 +22,6 @@ const useDocumentCounter = () => {
   let totalCount: number = defaultDocsCount;
 
   if (result.response != null) {
-    console.log("result", result.response);
     totalCount = result.response.count;
   }
 
