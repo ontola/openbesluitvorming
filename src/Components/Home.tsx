@@ -45,75 +45,82 @@ const Home = () => {
     <div className="Home">
       <div className="Home__wrapper">
         <h1 className="Home__header">
-          Doorzoek {counter} vergaderstukken van gemeenten, provincies en
-          waterschappen
+          Doorzoek {counter}{" "}
+          vergaderstukken van gemeenten, provincies en waterschappen
         </h1>
-        {IS_ORI ? (
-          <div>
-            <p>
-              Open Raadsinformatie is een initiatief om de besluitvorming van
-              decentrale overheden transparanter te maken en een bijdrage te
-              leveren aan de lokale democratie. Dit doen we door de vergaderdata
-              samen te brengen in één zoekomgeving. Dit wordt gedaan door
-              automatisch uit de bestaande vergadersoftware
-              (raadsinformatiesystemen) de vergaderingen en documenten te halen
-              en deze vervolgens middels een API te ontsluiten op een
-              gestandaardiseerde manier.
-            </p>
-            <p>
-              Met deze toepassing zoek je door de openbare vergaderingen,
-              agendapunten, moties en documenten van meer dan 300 deelnemende
-              gemeenten, 7 provincies en 5 waterschappen. Naast documenten zijn
-              ook rijkere data beschikbaar over onder andere stemgedrag.
-            </p>
-            <h2>Door wie</h2>
-            <p>
-              Vanuit het <a href={paths.actieplan}>actieplan open overheid</a>{" "}
-              werkt <a href={paths.vngRealisatie}>VNG Realisatie</a> in
-              samenwerking met de{" "}
-              <a href={paths.openstate}>Open State Foundation</a> aan het
-              openstellen van besluitvorming van gemeenten en provincies als
-              open data. Inmiddels is de Wet Open Overheid van kracht en heeft
-              VNG het informatiemodel mede in dat licht verder aangescherpt en
-              verrijkt in samenwerking met IPO en UvW en daarmee ook toepasbaar
-              gemaakt voor provincies en waterschappen.
-            </p>
-            <p>
-              De techniek is gemaakt door <a href={paths.ontola}>Ontola</a> en{" "}
-              <a href={paths.openstate}>Open State</a>. De broncode van zowel
-              deze <a href={paths.oriSearchGithub}>zoekmachine</a> als de{" "}
-              <a href={paths.oriBackEndGithub}>server</a> van {TITLE} zijn open
-              source beschikbaar op Github.
-            </p>
-          </div>
-        ) : (
-          <div>
-            <h2>Door wie?</h2>
-            <p>
-              OpenBesluitvorming.nl is een initiatief om data van gemeenten,
-              provincies en andere overheden samen te brengen in één
-              zoekomgeving. Zowel deze{" "}
-              <a href={paths.oriSearchGithub}>zoekmachine</a> als de{" "}
-              <a href={paths.oriBackEndGithub}>server</a> zijn open source.
-            </p>
-            <p>
-              Vanuit het <a href={paths.actieplan}>actieplan open overheid</a>{" "}
-              werkt het Ministerie van Binnenlandse Zaken aan het transparanter
-              maken van overheden. Actiepunt 1 uit dit plan is het openen van
-              besluitvormingsdata. De{" "}
-              <a href={paths.openstate}>Open State Foundation</a> is samen met{" "}
-              <a href={paths.vngRealisatie}>VNG Realisatie</a> het project{" "}
-              <a href={paths.vngProject}>Open Raadsinformatie</a> gestart om
-              data uit gemeenteraden te verzamelen. Voor de provincies is Open
-              Stateninformatie gestart.
-            </p>
-            <p>
-              Argu heeft als missie om besluitvorming zo open en toegankelijk
-              mogelijk te maken. Als technisch ontwikkelaar en beheerder raakte
-              Argu betrokken bij deze projecten.
-            </p>
-          </div>
-        )}
+        {IS_ORI
+          ? (
+            <div>
+              <p>
+                Open Raadsinformatie is een initiatief om de besluitvorming van
+                decentrale overheden transparanter te maken en een bijdrage te
+                leveren aan de lokale democratie. Dit doen we door de
+                vergaderdata samen te brengen in één zoekomgeving. Dit wordt
+                gedaan door automatisch uit de bestaande vergadersoftware
+                (raadsinformatiesystemen) de vergaderingen en documenten te
+                halen en deze vervolgens middels een API te ontsluiten op een
+                gestandaardiseerde manier.
+              </p>
+              <p>
+                Met deze toepassing zoek je door de openbare vergaderingen,
+                agendapunten, moties en documenten van meer dan 300 deelnemende
+                gemeenten, 7 provincies en 5 waterschappen. Naast documenten
+                zijn ook rijkere data beschikbaar over onder andere stemgedrag.
+              </p>
+              <h2>Door wie</h2>
+              <p>
+                Vanuit het <a href={paths.actieplan}>actieplan open overheid</a>
+                {" "}
+                werkt <a href={paths.vngRealisatie}>VNG Realisatie</a>{" "}
+                in samenwerking met de{" "}
+                <a href={paths.openstate}>Open State Foundation</a>{" "}
+                aan het openstellen van besluitvorming van gemeenten en
+                provincies als open data. Inmiddels is de Wet Open Overheid van
+                kracht en heeft VNG het informatiemodel mede in dat licht verder
+                aangescherpt en verrijkt in samenwerking met IPO en UvW en
+                daarmee ook toepasbaar gemaakt voor provincies en waterschappen.
+              </p>
+              <p>
+                De techniek is gemaakt door <a href={paths.ontola}>Ontola</a> en
+                {" "}
+                <a href={paths.openstate}>Open State</a>. De broncode van zowel
+                deze <a href={paths.oriSearchGithub}>zoekmachine</a> als de{" "}
+                <a href={paths.oriBackEndGithub}>server</a> van {TITLE}{" "}
+                zijn open source beschikbaar op Github.
+              </p>
+            </div>
+          )
+          : (
+            <div>
+              <h2>Door wie?</h2>
+              <p>
+                OpenBesluitvorming.nl is een initiatief om data van gemeenten,
+                provincies en andere overheden samen te brengen in één
+                zoekomgeving. Zowel deze{" "}
+                <a href={paths.oriSearchGithub}>zoekmachine</a> als de{" "}
+                <a href={paths.oriBackEndGithub}>server</a> zijn open source.
+              </p>
+              <p>
+                Vanuit het <a href={paths.actieplan}>actieplan open overheid</a>
+                {" "}
+                werkt het Ministerie van Binnenlandse Zaken aan het
+                transparanter maken van overheden. Actiepunt 1 uit dit plan is
+                het openen van besluitvormingsdata. De{" "}
+                <a href={paths.openstate}>Open State Foundation</a> is samen met
+                {" "}
+                <a href={paths.vngRealisatie}>VNG Realisatie</a> het project
+                {" "}
+                <a href={paths.vngProject}>Open Raadsinformatie</a>{" "}
+                gestart om data uit gemeenteraden te verzamelen. Voor de
+                provincies is Open Stateninformatie gestart.
+              </p>
+              <p>
+                Argu heeft als missie om besluitvorming zo open en toegankelijk
+                mogelijk te maken. Als technisch ontwikkelaar en beheerder
+                raakte Argu betrokken bij deze projecten.
+              </p>
+            </div>
+          )}
         <h2>Toekomst</h2>
         <p>
           Momenteel wordt in samenwerking met IPO, UvW, BZK, KOOP en
@@ -123,10 +130,10 @@ const Home = () => {
           geautomatiseerd actief openbaar te maken in het kader van de Wet Open
           Overheid. Heel concreet betreft het de informatiecategorieën 3.3 2a
           (ingekomen stukken) en 3.3 2c (vergaderstukken en verslagen) die
-          hiermee vindbaar worden in de Woo- index en zoekfunctie.
+          hiermee vindbaar worden in de Woo-index en zoekfunctie.
         </p>
         <p>
-          Daarbovenop kan elke partij, net als de Woo-iondex, zich door deze API
+          Daarbovenop kan elke partij, net als de Woo-index, zich door deze API
           gedragen als hergebruiker en gebruik maken van deze rijke collectie.
         </p>
         <p>
@@ -141,38 +148,38 @@ const Home = () => {
           <a href="https://vng-realisatie.github.io/ODS-Open-Raadsinformatie/">
             GitHub
           </a>{" "}
-          na te lezen. Specifiek voor de Woo-index en zoekfunctie is dit op de{" "}
+          na te lezen. Specifiek voor de Woo-index en zoekfunctie is dit op de
+          {" "}
           <a href="https://gitlab.com/koop/woo">GitLab</a> terug te lezen.
         </p>
         <h2>Voor wie is deze app?</h2>
         <ul>
           <li>
-            <b>Ambtenaren</b> zoeken naar hoe andere overheden bepaalde
-            problemen oplossen.
+            <b>Ambtenaren</b>{" "}
+            zoeken naar hoe andere overheden bepaalde problemen oplossen.
           </li>
           <li>
-            <b>Ontwikkelaars</b> gaan aan de slag met deze data om eigen apps te
-            maken.
+            <b>Ontwikkelaars</b>{" "}
+            gaan aan de slag met deze data om eigen apps te maken.
           </li>
           <li>
-            <b>Betrokken burgers</b> zoeken wat overheden hebben gezegd over een
-            bepaald onderwerp.
+            <b>Betrokken burgers</b>{" "}
+            zoeken wat overheden hebben gezegd over een bepaald onderwerp.
           </li>
           <li>
-            <b>Belangenbehartigers</b> kunnen volgen waar beslissingen over
-            (gaan) worden gemaakt.
+            <b>Belangenbehartigers</b>{" "}
+            kunnen volgen waar beslissingen over (gaan) worden gemaakt.
           </li>
           <li>
-            <b>Journalisten</b> zien hoe besluitvorming zich heeft ontwikkeld
-            over tijd.
+            <b>Journalisten</b>{" "}
+            zien hoe besluitvorming zich heeft ontwikkeld over tijd.
           </li>
         </ul>
         <h2>Jouw gemeente, provincie of waterschap toevoegen</h2>
         <p>
           Als je wil dat ook jouw organisatie aangesloten wordt op Open
-          Raadsinformatie, vraag dan de griffie van je gemeenteraad dit
-          formulier in te vullen. <a href={paths.vngNewForm}>dit formulier</a>{" "}
-          in te vullen.
+          Raadsinformatie, vraag dan de griffie van je gemeenteraad om{" "}
+          <a href={paths.vngNewForm}>dit formulier</a> in te vullen.
         </p>
         <h2>Andere apps gemaakt met deze data</h2>
         <p>
@@ -218,7 +225,7 @@ const Home = () => {
         <h2>Privacy</h2>
         <p>
           We gebruiken Swetrix (een privacy-vriendelijk alternatief voor Google
-          analytics) om bezoekersstatistieken te verzamelen. We gebruiken deze
+          Analytics) om bezoekersstatistieken te verzamelen. We gebruiken deze
           gegevens alleen om anonieme rapportages te maken van bezoekers, en
           verkopen deze data aan niemand door. We slaan de laatste zes getallen
           van IP adressen niet op om jouw privacy te beschermen.
@@ -238,8 +245,8 @@ const Home = () => {
             <p>
               OpenBesluitvorming.nl is tot stand gekomen door de tijd en moeite
               van de onderstaande organisaties. Hover met je muis over de
-              logo&apos;s om te zien wat hoe de organisaties hebben bijgedragen,
-              en klik er op om er meer over te lezen.
+              logo&apos;s om te zien hoe de organisaties hebben bijgedragen, en
+              klik er op om er meer over te lezen.
             </p>
           </React.Fragment>
         )}
@@ -263,9 +270,9 @@ const Home = () => {
             <a
               href={org.url}
               key={org.name}
-              title={
-                org.toelichting ? `${org.name}: ${org.toelichting}` : org.name
-              }
+              title={org.toelichting
+                ? `${org.name}: ${org.toelichting}`
+                : org.name}
               style={{
                 display: "flex",
                 margin: "1rem",
