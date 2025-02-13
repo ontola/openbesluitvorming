@@ -12,8 +12,9 @@ Check out the
 
 ## Run front-end
 
-- `deno install`
-- `deno run dev`
+- `pnpm install`
+- `pnpm run dev`
+- `pnpm run lint`
 
 ## Contribution guidelines
 

@@ -1,6 +1,6 @@
 [build]
   publish = "dist"
-  command = "deno run build"
+  command = "pnpm run build"
 
 # [[edge_functions]]
 # function = "transform-response"
