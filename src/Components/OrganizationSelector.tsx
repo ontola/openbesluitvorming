@@ -50,6 +50,17 @@ interface Municipality {
   };
 }
 
+// https://github.com/openstate/open-raadsinformatie/issues/489
+function UpdateBrokenNames(name: string) {
+  if (name === "Aa en Maas") {
+    return "Waterschap Aa en Maas";
+  }
+  if (name === "De Dommel") {
+    return "Waterschap De Dommel";
+  }
+  return name;
+}
+
 const OrganizationSelector = () => {
   const result: ResultType = useFetch(`${API}/_search?`, {
     method: "POST",
@@ -77,7 +88,8 @@ const OrganizationSelector = () => {
     isLoading = false;
     onSelectOrg = (event: any) => {
       const municipalityIndex = event.value;
-      const pathWithQueryParams = `?zoekterm="*"&organisaties=%5B"${municipalityIndex}"%5D`;
+      const pathWithQueryParams =
+        `?zoekterm="*"&organisaties=%5B"${municipalityIndex}"%5D`;
       navigate(pathWithQueryParams);
     };
 
@@ -86,7 +98,7 @@ const OrganizationSelector = () => {
 
     hits.forEach(function (h: Municipality) {
       options.push({
-        label: h._source.name,
+        label: UpdateBrokenNames(h._source.name),
         value: h._index,
       });
     });
