@@ -58,6 +58,16 @@ function UpdateBrokenNames(name: string) {
   if (name === "De Dommel") {
     return "Waterschap De Dommel";
   }
+  if (name === "Zuiderzeeland") {
+    return "Waterschap Zuiderzeeland";
+  }
+  if (name === "Hollandse Delta") {
+    return "Waterschap Hollandse Delta";
+  }
+  if (name === "Hollands Scheldestromen") {
+    return "Waterschap Hollands Scheldestromen";
+  }
+
   return name;
 }
 
