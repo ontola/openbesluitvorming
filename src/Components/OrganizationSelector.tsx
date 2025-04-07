@@ -114,8 +114,7 @@ const OrganizationSelector = () => {
     });
   }
 
-  // const placeholderEnd = IS_ORI ? `gemeenten...` : `gemeenten en provincies...`
-  const placeholderEnd = `gemeenten en provincies...`;
+  const placeholderEnd = `gemeenten, provincies en waterschappen...`;
 
   return (
     <div className="OrganizationSelector">

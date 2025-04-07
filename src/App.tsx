@@ -15,7 +15,7 @@ class App extends Component {
           <title>{title}</title>
           <meta
             property="og:description"
-            content="Doorzoek vergaderstukken van meer dan 120 gemeenten en provincies."
+            content="Doorzoek vergaderstukken van meer dan 320 gemeenten, provincies en waterschappen."
           />
           <meta property="og:image" content="/screenshot.png" />
           <meta
