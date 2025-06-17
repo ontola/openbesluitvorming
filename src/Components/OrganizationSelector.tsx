@@ -67,6 +67,10 @@ function UpdateBrokenNames(name: string) {
   if (name === "Hollands Scheldestromen") {
     return "Waterschap Hollands Scheldestromen";
   }
+  // temp fix https://github.com/openstate/open-raadsinformatie/issues/512#issuecomment-2823986500
+  if (name === "Drents Overijsselse Delta") {
+    return "Waterschap Hollandse Delta";
+  }
 
   return name;
 }
