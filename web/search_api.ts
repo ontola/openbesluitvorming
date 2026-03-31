@@ -12,11 +12,14 @@ type SearchHit = {
   start_date?: string;
   content?: string;
   file_name?: string;
+  content_type?: string;
   source_key?: string;
   payload?: {
     original_url?: string;
     media_urls?: Array<{
       url?: string;
+      content_type?: string;
+      original_url?: string;
     }>;
     derived_content?: {
       markdown_key?: string;
@@ -34,6 +37,25 @@ type IndexedHit = {
   hit: SearchHit;
   snippet?: SearchSnippet;
 };
+
+function looksLikePdf(options: { contentType?: string; fileName?: string; url?: string }): boolean {
+  const contentType = options.contentType?.toLowerCase();
+  if (contentType?.includes("application/pdf")) {
+    return true;
+  }
+
+  const fileName = options.fileName?.toLowerCase();
+  if (fileName?.endsWith(".pdf")) {
+    return true;
+  }
+
+  const url = options.url?.toLowerCase();
+  if (!url) {
+    return false;
+  }
+
+  return url.includes(".pdf") || url.includes("content-type=application/pdf");
+}
 
 function escapeTerm(term: string): string {
   return `"${term.replaceAll('"', '\\"')}"`;
@@ -307,6 +329,17 @@ export async function getEntityContent(entityId: string): Promise<EntityContentR
     return null;
   }
 
+  const mediaUrl = hit.payload?.media_urls?.[0];
+  const downloadUrl = mediaUrl?.url ?? hit.payload?.original_url;
+  const contentType = mediaUrl?.content_type ?? hit.content_type;
+  const pdfUrl = looksLikePdf({
+    contentType,
+    fileName: hit.file_name,
+    url: downloadUrl,
+  })
+    ? downloadUrl
+    : undefined;
+
   let markdownText = hit.payload?.md_text?.join("\n\n");
   const markdownKey = hit.payload?.derived_content?.markdown_key;
 
@@ -319,6 +352,8 @@ export async function getEntityContent(entityId: string): Promise<EntityContentR
     entityId: hit.entity_id ?? entityId,
     entityType: hit.entity_type ?? "Unknown",
     markdownText,
-    downloadUrl: hit.payload?.media_urls?.[0]?.url ?? hit.payload?.original_url,
+    downloadUrl,
+    contentType,
+    pdfUrl,
   };
 }

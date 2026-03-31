@@ -29,6 +29,7 @@ export function createSourcePicker(config: SourcePickerConfig): SourcePicker {
     emptyMessage = "Geen bronnen gevonden.",
   } = config;
   const byLabel = new Map<string, AdminSourceOption>();
+  const pickerRoot = input.closest<HTMLElement>(".source-picker, .admin-source-picker");
 
   for (const option of options) {
     byLabel.set(option.label, option);
@@ -38,10 +39,15 @@ export function createSourcePicker(config: SourcePickerConfig): SourcePicker {
     hiddenInput.value = "";
   }
 
+  function setOpenState(isOpen: boolean): void {
+    results.hidden = !isOpen;
+    pickerRoot?.classList.toggle("source-picker--open", isOpen);
+  }
+
   function selectSource(source: AdminSourceOption): void {
     input.value = source.label;
     hiddenInput.value = valueSelector(source);
-    results.hidden = true;
+    setOpenState(false);
   }
 
   function render(query = ""): void {
@@ -49,7 +55,7 @@ export function createSourcePicker(config: SourcePickerConfig): SourcePicker {
     results.replaceChildren();
 
     if (!normalizedQuery) {
-      results.hidden = true;
+      setOpenState(false);
       return;
     }
 
@@ -65,7 +71,7 @@ export function createSourcePicker(config: SourcePickerConfig): SourcePicker {
       emptyState.className = "source-picker__empty";
       emptyState.textContent = emptyMessage;
       results.appendChild(emptyState);
-      results.hidden = false;
+      setOpenState(true);
       return;
     }
 
@@ -87,14 +93,14 @@ export function createSourcePicker(config: SourcePickerConfig): SourcePicker {
       results.appendChild(button);
     }
 
-    results.hidden = false;
+    setOpenState(true);
   }
 
   input.addEventListener("input", () => {
     const selected = byLabel.get(input.value.trim());
     if (selected?.implemented) {
       hiddenInput.value = valueSelector(selected);
-      results.hidden = true;
+      setOpenState(false);
       return;
     }
 
@@ -108,7 +114,7 @@ export function createSourcePicker(config: SourcePickerConfig): SourcePicker {
 
   input.addEventListener("blur", () => {
     window.setTimeout(() => {
-      results.hidden = true;
+      setOpenState(false);
     }, 120);
   });
 
@@ -129,7 +135,7 @@ export function createSourcePicker(config: SourcePickerConfig): SourcePicker {
     clear(): void {
       input.value = "";
       hiddenInput.value = "";
-      results.hidden = true;
+      setOpenState(false);
     },
   };
 }

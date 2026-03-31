@@ -71,6 +71,43 @@ Deno.test("extractDocumentMarkdown propagates non-missing unpdf failures", async
   }
 });
 
+Deno.test("extractDocumentMarkdown strips unpdf update noise from successful CLI output", async () => {
+  const tempScript = await Deno.makeTempFile({ suffix: ".sh" });
+  await Deno.writeTextFile(
+    tempScript,
+    [
+      "#!/bin/sh",
+      "printf 'Update: 0.2.3 → 0.2.4 available!\\n'",
+      "printf \"Run 'unpdf update' to update.\\n\"",
+      "printf '# Titel\\n\\nInhoud van het document.\\n'",
+      "exit 0",
+    ].join("\n"),
+  );
+  await Deno.chmod(tempScript, 0o755);
+
+  const previous = Deno.env.get("WOOZI_UNPDF_BIN");
+  Deno.env.set("WOOZI_UNPDF_BIN", tempScript);
+
+  try {
+    const result = await extractDocumentMarkdown(new TextEncoder().encode("%PDF-1.4 ok"), {
+      contentType: "application/pdf",
+      fileName: "clean.pdf",
+    });
+
+    assert(
+      result.markdown === "# Titel\n\nInhoud van het document.",
+      "CLI update noise should be stripped from successful markdown output",
+    );
+  } finally {
+    if (previous === undefined) {
+      Deno.env.delete("WOOZI_UNPDF_BIN");
+    } else {
+      Deno.env.set("WOOZI_UNPDF_BIN", previous);
+    }
+    await Deno.remove(tempScript).catch(() => undefined);
+  }
+});
+
 Deno.test("deriveMarkdownFromText preserves simple headings and list blocks", () => {
   const markdown = deriveMarkdownFromText("Agenda\n\n- punt 1\n- punt 2\n\nBesluitvorming");
 

@@ -285,4 +285,6 @@ export interface EntityContentResponse {
   entityType: string;
   markdownText?: string;
   downloadUrl?: string;
+  contentType?: string;
+  pdfUrl?: string;
 }

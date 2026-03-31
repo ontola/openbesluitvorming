@@ -141,6 +141,11 @@ function renderMarkdown(markdown?: string): string {
   }) as string;
 }
 
+function pdfViewerUrl(url: string): string {
+  const hash = "toolbar=0&navpanes=0&view=FitH";
+  return url.includes("#") ? `${url}&${hash}` : `${url}#${hash}`;
+}
+
 function loadingMarkdownSkeleton(): string {
   return `
     <div class="detail-sheet__loading" aria-hidden="true">
@@ -337,6 +342,31 @@ export async function bootstrapSearchApp({
   const detailType = requiredElement<HTMLElement>(document, '[data-role="detail-type"]');
   const detailDate = requiredElement<HTMLElement>(document, '[data-role="detail-date"]');
   const detailText = requiredElement<HTMLElement>(document, '[data-role="detail-text"]');
+  const detailPdf = requiredElement<HTMLElement>(document, '[data-role="detail-pdf"]');
+  const detailPdfFrame = requiredElement<HTMLIFrameElement>(
+    document,
+    '[data-role="detail-pdf-frame"]',
+  );
+  const detailPdfFallback = requiredElement<HTMLElement>(
+    document,
+    '[data-role="detail-pdf-fallback"]',
+  );
+  const detailPdfOpen = requiredElement<HTMLAnchorElement>(
+    document,
+    '[data-role="detail-pdf-open"]',
+  );
+  const detailViewSwitch = requiredElement<HTMLElement>(
+    document,
+    '[data-role="detail-view-switch"]',
+  );
+  const detailViewText = requiredElement<HTMLButtonElement>(
+    document,
+    '[data-role="detail-view-text"]',
+  );
+  const detailViewPdf = requiredElement<HTMLButtonElement>(
+    document,
+    '[data-role="detail-view-pdf"]',
+  );
   const detailDownload = requiredElement<HTMLAnchorElement>(
     document,
     '[data-role="detail-download"]',
@@ -348,6 +378,8 @@ export async function bootstrapSearchApp({
   const detailCache = new Map<string, EntityContentResponse | null>();
   let organizationPicker: ReturnType<typeof createSourcePicker> | null = null;
   let filtersOpen = hasAdvancedSearchFilters(currentSearchState);
+  let currentDetailMode: "text" | "pdf" = "text";
+  let currentDetailPdfUrl: string | null = null;
 
   function syncFilterVisibility(): void {
     advancedFilters.hidden = !filtersOpen;
@@ -418,11 +450,24 @@ export async function bootstrapSearchApp({
     const { updateUrl = true, mode = "push" } = options;
     detailOverlay.hidden = true;
     document.body.classList.remove("body--locked");
+    detailPdfFrame.removeAttribute("src");
+    detailPdfFallback.hidden = true;
+    detailPdfOpen.removeAttribute("href");
+    currentDetailPdfUrl = null;
 
     if (updateUrl && currentSearchState.view) {
       currentSearchState = { ...currentSearchState, view: "" };
       writeRouteState(currentSearchState, mode);
     }
+  }
+
+  function syncDetailModeUi(mode: "text" | "pdf"): void {
+    currentDetailMode = mode;
+    const showPdf = mode === "pdf";
+    detailText.hidden = showPdf;
+    detailPdf.hidden = !showPdf;
+    detailViewText.setAttribute("aria-pressed", String(!showPdf));
+    detailViewPdf.setAttribute("aria-pressed", String(showPdf));
   }
 
   async function loadDetailContent(entityId: string): Promise<EntityContentResponse | null> {
@@ -456,6 +501,14 @@ export async function bootstrapSearchApp({
     detailType.textContent = item.entityTypeLabel;
     detailDate.textContent = item.date;
     detailText.innerHTML = loadingMarkdownSkeleton();
+    detailText.hidden = false;
+    detailPdf.hidden = true;
+    detailPdfFrame.removeAttribute("src");
+    detailPdfFallback.hidden = true;
+    detailPdfOpen.removeAttribute("href");
+    currentDetailPdfUrl = null;
+    detailViewSwitch.hidden = true;
+    syncDetailModeUi("text");
     detailDownload.hidden = !item.downloadUrl;
     if (item.downloadUrl) {
       detailDownload.href = item.downloadUrl;
@@ -484,7 +537,23 @@ export async function bootstrapSearchApp({
     detailText.innerHTML = renderMarkdown(content?.markdownText);
     highlightElementText(detailText, currentSearchState.query);
 
+    const hasPdf = Boolean(content?.pdfUrl);
+    currentDetailPdfUrl = content?.pdfUrl ?? null;
+    detailViewSwitch.hidden = !hasPdf;
+    if (hasPdf && currentDetailPdfUrl) {
+      detailPdfOpen.href = currentDetailPdfUrl;
+    }
+
+    const preferredMode: "text" | "pdf" = !content?.markdownText?.trim() && hasPdf ? "pdf" : "text";
+    syncDetailModeUi(preferredMode);
+    if (preferredMode === "pdf" && currentDetailPdfUrl) {
+      detailPdfFrame.src = pdfViewerUrl(currentDetailPdfUrl);
+    }
+
     requestAnimationFrame(() => {
+      if (currentDetailMode === "pdf") {
+        return;
+      }
       const firstMatch = detailText.querySelector<HTMLElement>("mark");
       if (firstMatch) {
         firstMatch.scrollIntoView({ block: "center", behavior: "smooth" });
@@ -602,6 +671,24 @@ export async function bootstrapSearchApp({
 
   closeDetailButtons.forEach((button: HTMLElement) => {
     button.addEventListener("click", () => closeDetail());
+  });
+
+  detailViewText.addEventListener("click", () => {
+    syncDetailModeUi("text");
+  });
+
+  detailViewPdf.addEventListener("click", () => {
+    if (!currentDetailPdfUrl) {
+      return;
+    }
+    if (!detailPdfFrame.getAttribute("src")) {
+      detailPdfFrame.src = pdfViewerUrl(currentDetailPdfUrl);
+    }
+    syncDetailModeUi("pdf");
+  });
+
+  detailPdfFrame.addEventListener("error", () => {
+    detailPdfFallback.hidden = false;
   });
 
   document.addEventListener("keydown", (event: KeyboardEvent) => {

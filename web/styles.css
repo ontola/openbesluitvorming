@@ -423,6 +423,12 @@ select {
 .source-picker,
 .admin-source-picker {
   position: relative;
+  z-index: 1;
+}
+
+.source-picker--open,
+.admin-source-picker.source-picker--open {
+  z-index: 40;
 }
 
 .admin-field {
@@ -439,7 +445,7 @@ select {
   top: calc(100% + 0.45rem);
   left: 0;
   right: 0;
-  z-index: 120;
+  z-index: 41;
   max-height: 22rem;
   overflow: auto;
   border: 1px solid var(--line);
@@ -875,7 +881,10 @@ select {
 }
 
 .detail-sheet__body {
-  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  overflow: hidden;
   max-height: calc(100vh - 8rem);
   padding: 1.4rem;
 }
@@ -899,8 +908,41 @@ select {
   box-shadow: none;
 }
 
+.detail-sheet__view-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0.25rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(246, 248, 251, 0.92);
+  align-self: flex-start;
+}
+
+.detail-sheet__view-toggle {
+  min-height: 2.25rem;
+  padding: 0 0.95rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition:
+    background-color 180ms ease,
+    color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.detail-sheet__view-toggle[aria-pressed="true"] {
+  background: white;
+  color: var(--accent-deep);
+  box-shadow: 0 4px 14px rgba(37, 89, 168, 0.1);
+}
+
 .detail-sheet__text {
   margin: 0;
+  flex: 1 1 auto;
   color: var(--text);
   background: rgba(246, 248, 251, 0.92);
   border: 1px solid var(--line);
@@ -913,6 +955,34 @@ select {
 
 .detail-sheet--reader .detail-sheet__text {
   min-height: min(30rem, calc(100vh - 15rem));
+}
+
+.detail-sheet__pdf {
+  margin-top: 0;
+  flex: 1 1 auto;
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  background: rgba(246, 248, 251, 0.92);
+  overflow: hidden;
+}
+
+.detail-sheet__pdf-frame {
+  display: block;
+  width: 100%;
+  min-height: min(30rem, calc(100vh - 15rem));
+  height: min(68vh, 52rem);
+  border: 0;
+  background: white;
+}
+
+.detail-sheet__pdf-fallback {
+  margin: 0;
+  padding: 1rem 1.1rem;
+  color: var(--muted);
+}
+
+.detail-sheet__pdf-fallback a {
+  color: var(--accent-deep);
 }
 
 .detail-sheet__loading {
@@ -1165,5 +1235,13 @@ select {
     width: 100%;
     flex-direction: column-reverse;
     align-items: stretch;
+  }
+
+  .detail-sheet__view-switch {
+    width: 100%;
+  }
+
+  .detail-sheet__view-toggle {
+    flex: 1 1 0;
   }
 }

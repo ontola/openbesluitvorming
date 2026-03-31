@@ -28,6 +28,26 @@ function fileExtension(fileName?: string): string {
   return fileName.slice(fileName.lastIndexOf(".")).toLowerCase();
 }
 
+function stripUnpdfCliNoise(text: string): string {
+  return text
+    .replaceAll(/\r\n/g, "\n")
+    .split("\n")
+    .filter((line) => {
+      const trimmed = line.trim();
+      if (!trimmed) {
+        return true;
+      }
+      if (/^Update:\s.*available!/.test(trimmed)) {
+        return false;
+      }
+      if (/^Run 'unpdf update' to update\.$/.test(trimmed)) {
+        return false;
+      }
+      return true;
+    })
+    .join("\n");
+}
+
 async function writeTempFile(bytes: Uint8Array, extension: string): Promise<string> {
   const path = await Deno.makeTempFile({ suffix: extension });
   await Deno.writeFile(path, bytes);
@@ -61,14 +81,16 @@ async function extractPdfMarkdownWithCli(bytes: Uint8Array): Promise<string> {
   const tempPath = await writeTempFile(bytes, ".pdf");
   try {
     return normalizeWhitespace(
-      await readCommandOutput(unpdfBinary(), [
-        "markdown",
-        tempPath,
-        "--cleanup",
-        "standard",
-        "--table-mode",
-        "html",
-      ]),
+      stripUnpdfCliNoise(
+        await readCommandOutput(unpdfBinary(), [
+          "markdown",
+          tempPath,
+          "--cleanup",
+          "standard",
+          "--table-mode",
+          "html",
+        ]),
+      ),
     );
   } finally {
     await Deno.remove(tempPath).catch(() => undefined);

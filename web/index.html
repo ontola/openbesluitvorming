@@ -209,7 +209,38 @@
 
         <div class="detail-sheet__body">
           <h2 id="detail-title" data-role="detail-title"></h2>
+          <div class="detail-sheet__view-switch" data-role="detail-view-switch" hidden>
+            <button
+              type="button"
+              class="detail-sheet__view-toggle"
+              data-role="detail-view-text"
+              aria-pressed="true"
+            >
+              Tekst
+            </button>
+            <button
+              type="button"
+              class="detail-sheet__view-toggle"
+              data-role="detail-view-pdf"
+              aria-pressed="false"
+            >
+              PDF
+            </button>
+          </div>
           <div class="detail-sheet__text prose-detail" data-role="detail-text"></div>
+          <div class="detail-sheet__pdf" data-role="detail-pdf" hidden>
+            <iframe
+              class="detail-sheet__pdf-frame"
+              title="PDF-weergave"
+              data-role="detail-pdf-frame"
+            ></iframe>
+            <p class="detail-sheet__pdf-fallback" data-role="detail-pdf-fallback" hidden>
+              De ingebouwde PDF-weergave kon niet worden geladen.
+              <a data-role="detail-pdf-open" target="_blank" rel="noopener"
+                >Open PDF in nieuw tabblad</a
+              >
+            </p>
+          </div>
         </div>
       </article>
     </section>
