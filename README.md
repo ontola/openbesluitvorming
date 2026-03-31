@@ -26,33 +26,41 @@ docker compose up -d
 For frontend iteration with HMR, use one command:
 
 ```sh
-pnpm run dev:hmr
+pnpm run dev
 ```
 
 That does two things:
 
-- starts the local infra in Docker: `minio`, `minio-setup`, and `quickwit`
-- starts the local Deno API and Vite HMR frontend on the host
+- starts the full Docker backend: `minio`, `minio-setup`, `quickwit`, and `openbesluitvorming`
+- starts the Vite HMR frontend on the host
 
 That gives you:
 
-- the Deno API server on `http://127.0.0.1:8788`
+- the Docker backend on `http://127.0.0.1:8787`
 - the Vite dev server with HMR on `http://127.0.0.1:4317`
 
-Vite proxies `/api/*` calls to the Deno server, so you can work on the
-search UI and admin UI with hot reload while reusing the existing backend.
+Vite proxies `/api/*` calls to the Docker backend, so reruns and extraction use
+the same environment as the containerized app, including the installed `unpdf`
+binary.
 Open `http://127.0.0.1:4317` while iterating on the frontend.
 
 Important:
 
-- the local dev API now uses `8788` by default specifically so it can coexist with the `openbesluitvorming` container on `8787`
-- `pnpm run dev:hmr` is the intended development entrypoint
-- `pnpm run dev` now clears stale listeners on its own dev ports before starting, so leftover Vite/Deno processes do not usually require manual cleanup
+- `pnpm run dev` is the intended development entrypoint
+- `pnpm run dev:hmr` is an explicit alias for the same Docker-backed flow
+- `pnpm run dev:local` is still available if you explicitly want the host Deno API on `8788`
+- `pnpm run dev` and `pnpm run dev:local` clear stale listeners on their own dev ports before starting, so leftover Vite/Deno processes do not usually require manual cleanup
 
 If you only want the infra:
 
 ```sh
 pnpm run dev:infra
+```
+
+If you explicitly want the host API instead of the Docker backend:
+
+```sh
+pnpm run dev:local
 ```
 
 To stop the Docker side again:
@@ -67,10 +75,10 @@ If you want a different dev port:
 WOOZI_WEB_PORT=4401 pnpm run dev:web
 ```
 
-If you also want a different API port:
+If you want a different HMR web port:
 
 ```sh
-WOOZI_API_PORT=8799 WOOZI_WEB_PORT=4401 pnpm run dev:hmr
+WOOZI_WEB_PORT=4401 pnpm run dev:hmr
 ```
 
 ## Architecture

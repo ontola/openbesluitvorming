@@ -46,7 +46,6 @@ select {
   position: relative;
   overflow: hidden;
   padding: 6rem 1.5rem 4rem;
-  border-bottom: 1px solid var(--line);
 }
 
 .hero__glow {
@@ -110,6 +109,11 @@ select {
   letter-spacing: -0.04em;
 }
 
+.brand__link {
+  color: inherit;
+  text-decoration: none;
+}
+
 .brand__dark {
   color: var(--accent-deep);
 }
@@ -130,13 +134,20 @@ select {
 .search-panel {
   max-width: 48rem;
   margin: 0 auto;
-  padding: 1rem;
-  border: 1px solid var(--line-strong);
+  padding: 1.1rem;
+  border: 1px solid rgba(41, 88, 153, 0.1);
   border-radius: 1.75rem;
-  background: rgba(255, 255, 255, 0.78);
-  box-shadow: var(--shadow);
-  backdrop-filter: blur(18px);
+  background: rgba(255, 255, 255, 0.68);
+  box-shadow: 0 14px 34px rgba(31, 62, 116, 0.08);
+  backdrop-filter: blur(14px);
   animation: rise 600ms ease-out both;
+}
+
+.search-panel__query-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  align-items: center;
 }
 
 .search-results {
@@ -149,7 +160,15 @@ select {
 }
 
 .search-results__heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 12.5rem;
+  align-items: end;
+  gap: 1rem;
   margin-bottom: 1rem;
+}
+
+.search-results__title-group {
+  min-width: 0;
 }
 
 .search-results__heading h2 {
@@ -159,14 +178,20 @@ select {
   letter-spacing: -0.04em;
 }
 
+.search-results__sort {
+  width: 12.5rem;
+  max-width: 12.5rem;
+  justify-self: end;
+}
+
 .search-field,
 .select-field {
   display: flex;
   align-items: center;
   width: 100%;
-  border: 1px solid var(--line);
+  border: 1px solid rgba(41, 88, 153, 0.12);
   border-radius: 1rem;
-  background: var(--bg-strong);
+  background: rgba(255, 255, 255, 0.88);
   transition:
     transform 180ms ease,
     border-color 180ms ease,
@@ -185,11 +210,15 @@ select {
   padding: 0 1rem;
 }
 
+.search-field--primary {
+  margin-bottom: 0;
+}
+
 .search-panel__options {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.8rem;
-  margin-top: 0.2rem;
+  grid-template-columns: minmax(0, 1.45fr) minmax(0, 0.9fr);
+  gap: 0.65rem;
+  margin-top: 0.7rem;
 }
 
 .search-field__icon {
@@ -232,10 +261,21 @@ select {
   font-size: 0.96rem;
 }
 
-.search-panel__actions {
-  display: flex;
-  gap: 0.8rem;
-  margin-top: 0.9rem;
+.select-field--subtle {
+  border-color: rgba(41, 88, 153, 0.08);
+  background: rgba(255, 255, 255, 0.58);
+}
+
+.select-field--subtle select {
+  min-height: 2.95rem;
+  font-size: 0.94rem;
+  color: var(--muted);
+}
+
+.search-panel__submit {
+  min-width: 10.5rem;
+  min-height: 4rem;
+  padding-inline: 1.45rem;
 }
 
 .primary-button,
@@ -517,7 +557,7 @@ select {
 
 .result-list {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 1rem;
 }
 
@@ -587,6 +627,59 @@ select {
 .pill--soft {
   background: rgba(37, 89, 168, 0.08);
   color: var(--muted);
+}
+
+.status-running {
+  background: rgba(78, 166, 255, 0.16);
+  color: #2559a8;
+  position: relative;
+  overflow: hidden;
+}
+
+.status-running::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    110deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.18) 35%,
+    rgba(255, 255, 255, 0.48) 50%,
+    rgba(255, 255, 255, 0.18) 65%,
+    transparent 100%
+  );
+  transform: translateX(-130%);
+  animation: status-running-sheen 1.6s ease-in-out infinite;
+}
+
+.status-succeeded {
+  background: rgba(29, 160, 98, 0.14);
+  color: #17764a;
+}
+
+.status-partial {
+  background: rgba(244, 177, 47, 0.18);
+  color: #9a6400;
+}
+
+.status-failed {
+  background: rgba(214, 71, 82, 0.14);
+  color: #9d2231;
+}
+
+.status-unknown {
+  background: rgba(37, 89, 168, 0.08);
+  color: var(--muted);
+}
+
+@keyframes status-running-sheen {
+  0% {
+    transform: translateX(-130%);
+  }
+
+  100% {
+    transform: translateX(130%);
+  }
 }
 
 .detail-overlay {
@@ -813,7 +906,6 @@ select {
     padding-top: 4.5rem;
   }
 
-  .search-panel__actions,
   .admin-grid,
   .feature-grid,
   .result-list {
@@ -833,6 +925,24 @@ select {
 
   .search-panel__options {
     grid-template-columns: 1fr;
+  }
+
+  .search-panel__query-row {
+    grid-template-columns: 1fr;
+  }
+
+  .search-results__heading {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .search-results__sort {
+    width: 100%;
+  }
+
+  .search-panel__submit {
+    width: 100%;
+    min-height: 3.4rem;
   }
 
   .admin-detail__grid {

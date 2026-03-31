@@ -84,6 +84,10 @@ function canonicalDocumentId(source: NotubizSourceDefinition, documentId: number
   return `document:notubiz:${source.key}:${documentId}`;
 }
 
+function canonicalDocumentDownloadUrl(documentId: string): string {
+  return `https://api.notubiz.nl/document/${documentId}/1`;
+}
+
 function collectAgendaDocuments(agendaItems: unknown[]): Record<string, unknown>[] {
   const result: Record<string, unknown>[] = [];
 
@@ -271,7 +275,10 @@ export function normalizeNotubizDocuments(
         ? document.title
         : (normalizeFileName(document) ?? `Document ${documentId}`),
     classification: documentClassification(document),
-    original_url: typeof document.url === "string" ? document.url : undefined,
+    // The supplier payload sometimes includes municipality-hosted document URLs that return 4xx
+    // even though the document metadata itself is valid. Use the stable API download endpoint
+    // for retrieval and keep the original source URL only as metadata.
+    original_url: canonicalDocumentDownloadUrl(documentId),
     identifier_url:
       typeof document.self === "string"
         ? `https://${document.self.replace(/^https?:\/\//, "")}`
@@ -287,10 +294,7 @@ export function normalizeNotubizDocuments(
       supplier: "notubiz",
       source: source.key,
       canonical_id: documentId,
-      canonical_iri:
-        typeof document.url === "string"
-          ? document.url
-          : `https://api.notubiz.nl/document/${documentId}/1`,
+      canonical_iri: canonicalDocumentDownloadUrl(documentId),
       source_iri: meeting.source_info.canonical_iri,
     },
     raw: document,

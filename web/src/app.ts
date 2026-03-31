@@ -240,6 +240,14 @@ function sameSearchState(left: SearchRouteState, right: SearchRouteState): boole
   );
 }
 
+function hasActiveSearchFilters(state: SearchRouteState): boolean {
+  return (
+    state.query.trim().length > 0 ||
+    state.organization.trim().length > 0 ||
+    state.entityType.trim().length > 0
+  );
+}
+
 export async function bootstrapSearchApp({
   document,
   fetchImpl = fetch,
@@ -250,11 +258,11 @@ export async function bootstrapSearchApp({
   windowImpl?: WindowLike;
 }): Promise<void> {
   const form = requiredElement<HTMLFormElement>(document, "#search-form");
+  const brandHome = requiredElement<HTMLAnchorElement>(document, "#brand-home");
   const queryInput = requiredElement<HTMLInputElement>(document, "#query");
   const organizationSelect = requiredElement<HTMLSelectElement>(document, "#organization");
   const entityTypeSelect = requiredElement<HTMLSelectElement>(document, "#entity-type");
   const sortSelect = requiredElement<HTMLSelectElement>(document, "#sort");
-  const fillExampleButton = requiredElement<HTMLButtonElement>(document, "#fill-example");
   const resultsSection = requiredElement<HTMLElement>(document, "#search-results");
   const resultsTitle = requiredElement<HTMLElement>(document, "#results-title");
   const content = requiredElement<HTMLElement>(document, "#content");
@@ -276,10 +284,45 @@ export async function bootstrapSearchApp({
   let currentSearchState: SearchRouteState = routeStateFromUrl(new URL(windowImpl.location.href));
   const detailCache = new Map<string, EntityContentResponse | null>();
 
-  function setSearchedState(searched: boolean, title: string): void {
-    resultsSection.hidden = false;
+  function setResultsTitle(title: string, count?: number): void {
+    if (typeof count === "number" && count >= 0) {
+      resultsTitle.textContent = `${title} (${count})`;
+      return;
+    }
+
     resultsTitle.textContent = title;
+  }
+
+  function setSearchedState(searched: boolean, title: string): void {
+    resultsSection.hidden = !searched;
+    setResultsTitle(title);
     content.hidden = searched;
+  }
+
+  function isHomeState(state: SearchRouteState): boolean {
+    return !hasActiveSearchFilters(state);
+  }
+
+  function clearToHome(mode: "push" | "replace" = "push"): void {
+    const homeState: SearchRouteState = {
+      query: "",
+      organization: "",
+      entityType: "",
+      sort: "date_desc",
+      view: "",
+    };
+    applyRouteStateToForm(homeState, {
+      queryInput,
+      organizationSelect,
+      entityTypeSelect,
+      sortSelect,
+    });
+    currentSearchState = homeState;
+    currentResults = [];
+    setSearchedState(false, "Zoek op organisatie of onderwerp");
+    resultList.textContent = "";
+    closeDetail({ updateUrl: false, mode: "replace" });
+    writeRouteState(homeState, mode);
   }
 
   function writeRouteState(state: SearchRouteState, mode: "push" | "replace"): void {
@@ -378,16 +421,30 @@ export async function bootstrapSearchApp({
     options: { updateUrl?: boolean; mode?: "push" | "replace" } = {},
   ): Promise<void> {
     const { updateUrl = true, mode = "push" } = options;
-    const hasQuery = state.query.trim().length > 0;
-    const hasOrganization = state.organization.trim().length > 0;
-    const hasEntityType = state.entityType.trim().length > 0;
-    const title =
-      hasQuery || hasOrganization || hasEntityType
-        ? "Resultaten"
-        : "Zoek op organisatie of onderwerp";
+    const hasFilters = hasActiveSearchFilters(state);
+    const title = hasFilters ? "Resultaten" : "Zoek op organisatie of onderwerp";
 
     currentSearchState = state;
-    setSearchedState(hasQuery || hasOrganization || hasEntityType, title);
+    setSearchedState(hasFilters, title);
+
+    if (!hasFilters) {
+      currentResults = [];
+      resultList.textContent = "";
+      closeDetail({ updateUrl: false, mode: "replace" });
+      if (updateUrl) {
+        writeRouteState(
+          {
+            ...state,
+            organization: "",
+            entityType: "",
+            view: "",
+          },
+          mode,
+        );
+      }
+      return;
+    }
+
     renderState(document, resultList, "Zoeken...");
 
     if (updateUrl) {
@@ -403,6 +460,7 @@ export async function bootstrapSearchApp({
     }
 
     currentResults = payload.results ?? [];
+    setResultsTitle("Resultaten", currentResults.length);
     renderResults(resultList, template, currentResults, (item) => {
       void openDetail(item);
     });
@@ -442,17 +500,8 @@ export async function bootstrapSearchApp({
       return;
     }
 
-    if (
-      !nextState.query.trim() &&
-      !nextState.organization.trim() &&
-      !nextState.entityType.trim() &&
-      !nextState.view
-    ) {
-      currentSearchState = nextState;
-      currentResults = [];
-      setSearchedState(false, "Zoek op organisatie of onderwerp");
-      renderState(document, resultList, "Importeer data en zoek daarna in de GUI.");
-      closeDetail({ updateUrl: false, mode: "replace" });
+    if (isHomeState(nextState) && !nextState.view) {
+      clearToHome("replace");
       return;
     }
 
@@ -503,35 +552,25 @@ export async function bootstrapSearchApp({
     }
   });
 
-  fillExampleButton.addEventListener("click", async () => {
-    const exampleState: SearchRouteState = {
-      query: "Raadsvergadering",
-      organization: "haarlem",
-      entityType: "",
-      sort: "date_desc",
-      view: "",
-    };
-    applyRouteStateToForm(exampleState, {
-      queryInput,
-      organizationSelect,
-      entityTypeSelect,
-      sortSelect,
-    });
-
-    try {
-      await runSearch(exampleState);
-    } catch (error) {
-      renderState(
-        document,
-        resultList,
-        error instanceof Error ? error.message : "De zoekmachine reageert niet.",
-      );
-      setSearchedState(true, "Resultaten");
+  queryInput.addEventListener("input", () => {
+    if (queryInput.value.trim().length === 0) {
+      clearToHome("replace");
     }
   });
 
+  queryInput.addEventListener("search", () => {
+    if (queryInput.value.trim().length === 0) {
+      clearToHome("replace");
+    }
+  });
+
+  brandHome.addEventListener("click", (event: MouseEvent) => {
+    event.preventDefault();
+    clearToHome();
+  });
+
   setSearchedState(false, "Zoek op organisatie of onderwerp");
-  renderState(document, resultList, "Importeer data en zoek daarna in de GUI.");
+  resultList.textContent = "";
   await syncFromUrl({ replace: true });
 }
 

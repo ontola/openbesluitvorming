@@ -20,8 +20,28 @@ function statusLabel(status: string): string {
   return labels[status] ?? status;
 }
 
+function statusClassName(status: string): string {
+  const suffixes: Record<string, string> = {
+    running: "status-running",
+    succeeded: "status-succeeded",
+    partial: "status-partial",
+    failed: "status-failed",
+  };
+
+  return suffixes[status] ?? "status-unknown";
+}
+
 function periodLabel(run: IngestRunRecord): string {
   return `${run.date_from} t/m ${run.date_to}`;
+}
+
+function searchUrlForRun(run: IngestRunRecord): string {
+  const params = new URLSearchParams({
+    organization: run.source_key,
+    sort: "date_desc",
+  });
+
+  return `/?${params.toString()}`;
 }
 
 function runSummary(run: IngestRunRecord): string {
@@ -63,7 +83,7 @@ function renderRuns(
       <div class="admin-run__header">
         <div class="admin-run__meta">
           <span class="pill">${run.source_key}</span>
-          <span class="pill pill--soft">${statusLabel(run.status)}</span>
+          <span class="pill pill--soft ${statusClassName(run.status)}">${statusLabel(run.status)}</span>
           <span class="admin-run__date">${periodLabel(run)}</span>
         </div>
       </div>
@@ -144,6 +164,9 @@ async function bootstrapAdmin(): Promise<void> {
   const detailPeriod = requiredElement<HTMLElement>('[data-role="admin-detail-period"]');
   const detailBody = requiredElement<HTMLElement>('[data-role="admin-detail-body"]');
   const detailRerun = requiredElement<HTMLButtonElement>('[data-role="admin-detail-rerun"]');
+  const detailViewResults = requiredElement<HTMLAnchorElement>(
+    '[data-role="admin-detail-view-results"]',
+  );
   const closeButtons = document.querySelectorAll<HTMLElement>('[data-role="close-admin-detail"]');
   let openRun: IngestRunRecord | null = null;
   let currentRuns: IngestRunRecord[] = [];
@@ -179,8 +202,10 @@ async function bootstrapAdmin(): Promise<void> {
   function openDetail(detail: AdminRunDetailResponse): void {
     openRun = detail.run;
     detailSource.textContent = detail.run.source_key;
+    detailStatus.className = `pill pill--soft ${statusClassName(detail.run.status)}`;
     detailStatus.textContent = statusLabel(detail.run.status);
     detailPeriod.textContent = periodLabel(detail.run);
+    detailViewResults.href = searchUrlForRun(detail.run);
     renderRunDetail(detailBody, detail);
     detailOverlay.hidden = false;
     document.body.classList.add("body--locked");

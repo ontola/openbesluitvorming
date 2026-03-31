@@ -16,44 +16,52 @@
       <header class="hero">
         <div class="hero__glow hero__glow--left"></div>
         <div class="hero__glow hero__glow--right"></div>
-        <p class="hero__eyebrow">Woozi prototype</p>
         <p class="hero__admin-link"><a href="/admin.html">Admin</a></p>
         <h1 class="brand">
-          <span class="brand__dark">Open</span><span class="brand__light">Besluitvorming</span>
+          <a class="brand__link" href="/" id="brand-home">
+            <span class="brand__dark">Open</span><span class="brand__light">Besluitvorming</span>
+          </a>
         </h1>
         <p class="hero__intro">
           Vind vergaderingen, documenten en besluiten van Nederlandse overheden in een rustige,
           snelle zoekomgeving.
         </p>
+        <ul class="hero__meta">
+          <li><strong>5.153.921</strong> vergaderstukken</li>
+          <li><strong>330+</strong> organisaties</li>
+        </ul>
 
         <form class="search-panel" id="search-form">
-          <label class="search-field">
-            <span class="search-field__icon" aria-hidden="true">⌕</span>
-            <input
-              id="query"
-              name="query"
-              type="search"
-              placeholder="Zoeken naar moties, agenda's, toezeggingen of besluiten..."
-              autocomplete="off"
-            />
-          </label>
-
-          <label class="select-field">
-            <span class="sr-only">Bestuurslaag of organisatie</span>
-            <select id="organization" name="organization">
-              <option value="">Kies een gemeente, provincie of waterschap...</option>
-              <option value="alkmaar">Gemeente Alkmaar</option>
-              <option value="amsterdam">Gemeente Amsterdam</option>
-              <option value="amersfoort">Gemeente Amersfoort</option>
-              <option value="delft">Gemeente Delft</option>
-              <option value="haarlem">Gemeente Haarlem</option>
-              <option value="leiden">Gemeente Leiden</option>
-              <option value="zaanstad">Gemeente Zaanstad</option>
-            </select>
-          </label>
+          <div class="search-panel__query-row">
+            <label class="search-field search-field--primary">
+              <span class="search-field__icon" aria-hidden="true">⌕</span>
+              <input
+                id="query"
+                name="query"
+                type="search"
+                placeholder="Zoeken naar moties, agenda's, toezeggingen of besluiten..."
+                autocomplete="off"
+              />
+            </label>
+            <button type="submit" class="primary-button search-panel__submit">Doorzoeken</button>
+          </div>
 
           <div class="search-panel__options">
-            <label class="select-field select-field--compact">
+            <label class="select-field select-field--subtle select-field--compact">
+              <span class="sr-only">Bestuurslaag of organisatie</span>
+              <select id="organization" name="organization">
+                <option value="">Alle organisaties</option>
+                <option value="alkmaar">Gemeente Alkmaar</option>
+                <option value="amsterdam">Gemeente Amsterdam</option>
+                <option value="amersfoort">Gemeente Amersfoort</option>
+                <option value="delft">Gemeente Delft</option>
+                <option value="haarlem">Gemeente Haarlem</option>
+                <option value="leiden">Gemeente Leiden</option>
+                <option value="zaanstad">Gemeente Zaanstad</option>
+              </select>
+            </label>
+
+            <label class="select-field select-field--subtle select-field--compact">
               <span class="sr-only">Type resultaat</span>
               <select id="entity-type" name="entityType">
                 <option value="">Alles</option>
@@ -61,8 +69,15 @@
                 <option value="Meeting">Vergaderingen</option>
               </select>
             </label>
+          </div>
+        </form>
 
-            <label class="select-field select-field--compact">
+        <section class="search-results search-results--hero" id="search-results" aria-live="polite">
+          <div class="search-results__heading">
+            <div class="search-results__title-group">
+              <h2 id="results-title">Zoek op organisatie of onderwerp</h2>
+            </div>
+            <label class="select-field select-field--compact search-results__sort">
               <span class="sr-only">Sorteren</span>
               <select id="sort" name="sort">
                 <option value="date_desc">Nieuwste eerst</option>
@@ -71,26 +86,8 @@
               </select>
             </label>
           </div>
-
-          <div class="search-panel__actions">
-            <button type="submit" class="primary-button">Doorzoeken</button>
-            <button type="button" class="ghost-button" id="fill-example">Probeer voorbeeld</button>
-          </div>
-        </form>
-
-        <section class="search-results search-results--hero" id="search-results" aria-live="polite">
-          <div class="search-results__heading">
-            <p class="section__label" id="results-label">Zoekresultaten</p>
-            <h2 id="results-title">Zoek op organisatie of onderwerp</h2>
-          </div>
           <div class="result-list" id="result-list"></div>
         </section>
-
-        <ul class="hero__meta">
-          <li><strong>5.153.921</strong> vergaderstukken</li>
-          <li><strong>330+</strong> organisaties</li>
-          <li><strong>Open</strong> architectuur op events en Quickwit</li>
-        </ul>
       </header>
 
       <main class="content" id="content">
@@ -141,17 +138,6 @@
               </p>
             </article>
           </div>
-        </section>
-
-        <section class="section section--results">
-          <div class="section__heading">
-            <p class="section__label">Voorbeeldresultaten</p>
-            <h2>Recente openbare vergaderingen</h2>
-          </div>
-          <p class="prose">
-            Zodra je zoekt, verschuiven de resultaten naar boven zodat de pagina zich gedraagt als
-            een echte zoekervaring in plaats van een landingspagina met een losse resultatenlijst.
-          </p>
         </section>
       </main>
     </div>
