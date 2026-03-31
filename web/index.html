@@ -46,20 +46,32 @@
             <button type="submit" class="primary-button search-panel__submit">Doorzoeken</button>
           </div>
 
-          <div class="search-panel__options">
-            <label class="select-field select-field--subtle select-field--compact">
-              <span class="sr-only">Bestuurslaag of organisatie</span>
-              <select id="organization" name="organization">
-                <option value="">Alle organisaties</option>
-                <option value="alkmaar">Gemeente Alkmaar</option>
-                <option value="amsterdam">Gemeente Amsterdam</option>
-                <option value="amersfoort">Gemeente Amersfoort</option>
-                <option value="delft">Gemeente Delft</option>
-                <option value="haarlem">Gemeente Haarlem</option>
-                <option value="leiden">Gemeente Leiden</option>
-                <option value="zaanstad">Gemeente Zaanstad</option>
-              </select>
-            </label>
+          <div class="search-panel__actions">
+            <button
+              type="button"
+              class="ghost-button ghost-button--subtle search-panel__toggle"
+              id="filters-toggle"
+              aria-expanded="false"
+              aria-controls="search-advanced-filters"
+            >
+              Filters tonen
+            </button>
+          </div>
+
+          <div class="search-panel__options" id="search-advanced-filters" hidden>
+            <div class="source-picker search-panel__source-picker">
+              <label class="search-field search-field--subtle search-field--compact">
+                <span class="sr-only">Bestuurslaag of organisatie</span>
+                <input
+                  id="organization-query"
+                  type="search"
+                  autocomplete="off"
+                  placeholder="Alle organisaties"
+                />
+                <input id="organization" name="organization" type="hidden" />
+              </label>
+              <div class="source-picker__results" id="organization-results" hidden></div>
+            </div>
 
             <label class="select-field select-field--subtle select-field--compact">
               <span class="sr-only">Type resultaat</span>
@@ -68,6 +80,16 @@
                 <option value="Document">Documenten</option>
                 <option value="Meeting">Vergaderingen</option>
               </select>
+            </label>
+
+            <label class="search-field search-field--subtle search-field--compact">
+              <span class="sr-only">Van datum</span>
+              <input id="date-from" name="dateFrom" type="date" />
+            </label>
+
+            <label class="search-field search-field--subtle search-field--compact">
+              <span class="sr-only">Tot datum</span>
+              <input id="date-to" name="dateTo" type="date" />
             </label>
           </div>
         </form>

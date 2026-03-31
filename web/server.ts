@@ -49,6 +49,14 @@ Deno.serve({ port }, async (request) => {
     });
   }
 
+  if (url.pathname === "/api/sources") {
+    const implementedOnly = url.searchParams.get("implemented") === "true";
+    const sources = listAdminSourceOptions().filter((source) =>
+      implementedOnly ? source.implemented : true,
+    );
+    return Response.json<AdminSourcesResponse>({ sources });
+  }
+
   if (url.pathname === "/api/admin/runs" && request.method === "GET") {
     try {
       const runs = await listRuns({
@@ -110,6 +118,8 @@ Deno.serve({ port }, async (request) => {
         organization: url.searchParams.get("organization") ?? "",
         entityType: url.searchParams.get("entityType") ?? "",
         sort: url.searchParams.get("sort") ?? "date_desc",
+        dateFrom: url.searchParams.get("dateFrom") ?? "",
+        dateTo: url.searchParams.get("dateTo") ?? "",
       });
 
       return Response.json<SearchResponse>({ results });

@@ -10,6 +10,7 @@ import type {
   IngestRunIssueRecord,
   IngestRunRecord,
 } from "../../src/types.ts";
+import { createSourcePicker } from "./source_picker.ts";
 
 function statusLabel(status: string): string {
   const labels: Record<string, string> = {
@@ -75,6 +76,8 @@ function formatRelativeTime(dateValue?: string): string {
 function searchUrlForRun(run: IngestRunRecord): string {
   const params = new URLSearchParams({
     organization: run.source_key,
+    dateFrom: run.date_from,
+    dateTo: run.date_to,
     sort: "date_desc",
   });
 
@@ -231,7 +234,6 @@ async function bootstrapAdmin(): Promise<void> {
   let openRun: IngestRunRecord | null = null;
   let currentRuns: IngestRunRecord[] = [];
   let allAdminSources: AdminSourceOption[] = [];
-  const sourceByLabel = new Map<string, AdminSourceOption>();
   let pollTimer: number | null = null;
 
   importDateTo.value = formatDateInputValue(new Date());
@@ -288,74 +290,9 @@ async function bootstrapAdmin(): Promise<void> {
     }
   });
 
-  function clearImportSourceSelection(): void {
-    importSourceRef.value = "";
-  }
-
-  function selectImportSource(source: AdminSourceOption): void {
-    importSourceQuery.value = source.label;
-    importSourceRef.value = source.sourceRef;
-    importSourceResults.hidden = true;
-  }
-
-  function renderImportSourceOptions(query = ""): void {
-    const normalizedQuery = query.trim().toLowerCase();
-    importSourceResults.replaceChildren();
-
-    if (!normalizedQuery) {
-      importSourceResults.hidden = true;
-      return;
-    }
-
-    const filteredSources = allAdminSources.filter((source) => {
-      if (!normalizedQuery) {
-        return true;
-      }
-
-      return [source.label, source.key, source.sourceRef, source.supplier, source.organizationType]
-        .join(" ")
-        .toLowerCase()
-        .includes(normalizedQuery);
-    });
-
-    if (filteredSources.length === 0) {
-      importSourceResults.hidden = false;
-      const emptyState = document.createElement("div");
-      emptyState.className = "admin-source-results__empty";
-      emptyState.textContent = "Geen bronnen gevonden.";
-      importSourceResults.appendChild(emptyState);
-      return;
-    }
-
-    for (const source of filteredSources) {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "admin-source-option";
-      button.disabled = !source.implemented;
-      button.innerHTML = `
-        <strong>${source.label}</strong>
-        <span>${source.supplier} · ${source.organizationType}${source.implemented ? "" : " · nog niet ondersteund"}</span>
-      `;
-      button.addEventListener("click", () => {
-        if (!source.implemented) {
-          return;
-        }
-        selectImportSource(source);
-      });
-      importSourceResults.appendChild(button);
-    }
-
-    importSourceResults.hidden = false;
-  }
-
   async function loadSources(): Promise<void> {
     const payload = await fetchJson<AdminSourcesResponse>("/api/admin/sources");
     allAdminSources = payload.sources ?? [];
-    sourceByLabel.clear();
-    for (const source of allAdminSources) {
-      sourceByLabel.set(source.label, source);
-    }
-    renderImportSourceOptions();
     for (const source of allAdminSources.filter((item) => item.implemented)) {
       const option = document.createElement("option");
       option.value = source.key;
@@ -413,31 +350,10 @@ async function bootstrapAdmin(): Promise<void> {
   filterStatus.addEventListener("change", () => {
     void loadRuns();
   });
-  importSourceQuery.addEventListener("input", () => {
-    const selectedSource = sourceByLabel.get(importSourceQuery.value.trim());
-    if (selectedSource?.implemented) {
-      importSourceRef.value = selectedSource.sourceRef;
-      importSourceResults.hidden = true;
-      return;
-    }
-
-    clearImportSourceSelection();
-    renderImportSourceOptions(importSourceQuery.value);
-  });
-  importSourceQuery.addEventListener("focus", () => {
-    renderImportSourceOptions(importSourceQuery.value);
-  });
-  importSourceQuery.addEventListener("blur", () => {
-    window.setTimeout(() => {
-      importSourceResults.hidden = true;
-    }, 120);
-  });
 
   importForm.addEventListener("submit", async (event: SubmitEvent) => {
     event.preventDefault();
-    const selectedSource =
-      sourceByLabel.get(importSourceQuery.value.trim()) ??
-      allAdminSources.find((source) => source.sourceRef === importSourceRef.value);
+    const selectedSource = importSourcePicker.getSelected();
     if (!selectedSource) {
       importStatus.textContent = "Kies eerst een bron uit de suggesties.";
       return;
@@ -519,6 +435,15 @@ async function bootstrapAdmin(): Promise<void> {
   });
 
   await loadSources();
+  const importSourcePicker = createSourcePicker({
+    input: importSourceQuery,
+    hiddenInput: importSourceRef,
+    results: importSourceResults,
+    options: allAdminSources,
+    valueSelector: (source) => source.sourceRef,
+    subtitle: (source) =>
+      `${source.supplier} · ${source.organizationType}${source.implemented ? "" : " · nog niet ondersteund"}`,
+  });
   await loadRuns();
 }
 

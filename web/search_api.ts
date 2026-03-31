@@ -118,6 +118,34 @@ function sortResults(results: SearchResult[], sort: string): SearchResult[] {
   return items;
 }
 
+function filterResultsByDateRange(
+  results: SearchResult[],
+  options: {
+    dateFrom?: string;
+    dateTo?: string;
+  },
+): SearchResult[] {
+  const dateFrom = options.dateFrom?.trim();
+  const dateTo = options.dateTo?.trim();
+  if (!dateFrom && !dateTo) {
+    return results;
+  }
+
+  return results.filter((result) => {
+    const value = result.sortDate?.slice(0, 10);
+    if (!value) {
+      return false;
+    }
+    if (dateFrom && value < dateFrom) {
+      return false;
+    }
+    if (dateTo && value > dateTo) {
+      return false;
+    }
+    return true;
+  });
+}
+
 function summarizeContent(content?: string): string {
   if (!content) {
     return "Geen samenvatting beschikbaar.";
@@ -223,12 +251,16 @@ export async function searchMeetings(
     organization?: string;
     entityType?: string;
     sort?: string;
+    dateFrom?: string;
+    dateTo?: string;
   } = {},
 ): Promise<SearchResult[]> {
   const query = options.query?.trim() ?? "";
   const organization = options.organization?.trim() ?? "";
   const entityType = options.entityType?.trim() ?? "";
   const sort = options.sort?.trim() ?? "date_desc";
+  const dateFrom = options.dateFrom?.trim() ?? "";
+  const dateTo = options.dateTo?.trim() ?? "";
   const quickwit = new QuickwitClient();
   const response = await quickwit.search(buildQuickwitQuery(query, organization, entityType), 96, {
     snippetFields: query ? ["content", "name"] : [],
@@ -263,7 +295,7 @@ export async function searchMeetings(
     };
   });
 
-  return sortResults(results, sort).slice(0, 24);
+  return sortResults(filterResultsByDateRange(results, { dateFrom, dateTo }), sort).slice(0, 24);
 }
 
 export async function getEntityContent(entityId: string): Promise<EntityContentResponse | null> {

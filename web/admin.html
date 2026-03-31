@@ -11,52 +11,44 @@
     <div class="page-shell">
       <main class="content content--admin">
         <section class="section">
+          <a class="admin-back-link" href="/">← Terug naar zoeken</a>
           <div class="section__heading">
             <h2>Admin</h2>
           </div>
-          <p class="prose">
-            Bekijk welke gemeenten zijn verwerkt, waar imports faalden of gedeeltelijk slaagden, en
-            start handmatig een nieuwe import voor een datumrange.
-          </p>
         </section>
 
         <section class="section">
           <div class="section__heading">
             <h2>Import starten</h2>
           </div>
-          <article class="surface-card feature-card">
-            <form id="import-form" class="admin-form admin-form--rerun">
-              <div class="admin-source-picker">
-                <label class="search-field admin-field admin-field--source-picker">
-                  <span class="sr-only">Bron zoeken</span>
-                  <input
-                    id="import-source-query"
-                    type="search"
-                    autocomplete="off"
-                    placeholder="Zoek bron, leverancier of bestuurslaag..."
-                  />
-                  <input id="import-source-ref" name="sourceRef" type="hidden" />
-                </label>
-                <div class="admin-source-results" id="import-source-results" hidden></div>
-              </div>
-              <label class="search-field admin-field">
-                <input id="import-date-from" name="dateFrom" type="date" />
+          <form id="import-form" class="admin-form admin-form--rerun">
+            <div class="admin-source-picker">
+              <label class="search-field admin-field admin-field--source-picker">
+                <span class="sr-only">Bron zoeken</span>
+                <input
+                  id="import-source-query"
+                  type="search"
+                  autocomplete="off"
+                  placeholder="Zoek bron, leverancier of bestuurslaag..."
+                />
+                <input id="import-source-ref" name="sourceRef" type="hidden" />
               </label>
-              <label class="search-field admin-field">
-                <input id="import-date-to" name="dateTo" type="date" />
-              </label>
-              <button type="submit" class="primary-button">Import uitvoeren</button>
-            </form>
-            <p id="import-status" class="admin-status"></p>
-          </article>
+              <div class="admin-source-results" id="import-source-results" hidden></div>
+            </div>
+            <label class="search-field admin-field">
+              <input id="import-date-from" name="dateFrom" type="date" />
+            </label>
+            <label class="search-field admin-field">
+              <input id="import-date-to" name="dateTo" type="date" />
+            </label>
+            <button type="submit" class="primary-button">Import uitvoeren</button>
+          </form>
+          <p id="import-status" class="admin-status"></p>
         </section>
 
         <section class="section">
           <div class="section__heading admin-section-heading">
-            <div>
-              <h2>Recente imports</h2>
-              <p class="admin-inline-note">Deze filters beperken de getoonde imports hieronder.</p>
-            </div>
+            <h2>Recente imports</h2>
           </div>
           <div class="admin-form admin-form--filters">
             <label class="select-field select-field--compact">

@@ -1,13 +1,22 @@
 /// <reference lib="dom" />
 
 import { marked } from "marked";
-import type { EntityContentResponse, SearchResponse, SearchResult } from "../../src/types.ts";
+import type {
+  AdminSourceOption,
+  AdminSourcesResponse,
+  EntityContentResponse,
+  SearchResponse,
+  SearchResult,
+} from "../../src/types.ts";
+import { createSourcePicker } from "./source_picker.ts";
 
 type SearchRouteState = {
   query: string;
   organization: string;
   entityType: string;
   sort: string;
+  dateFrom: string;
+  dateTo: string;
   view: string;
 };
 
@@ -206,6 +215,8 @@ function routeStateFromUrl(url: URL): SearchRouteState {
     organization: url.searchParams.get("organization") ?? "",
     entityType: url.searchParams.get("entityType") ?? "",
     sort: url.searchParams.get("sort") ?? "date_desc",
+    dateFrom: url.searchParams.get("dateFrom") ?? "",
+    dateTo: url.searchParams.get("dateTo") ?? "",
     view: url.searchParams.get("view") ?? "",
   };
 }
@@ -214,15 +225,28 @@ function applyRouteStateToForm(
   state: SearchRouteState,
   controls: {
     queryInput: HTMLInputElement;
-    organizationSelect: HTMLSelectElement;
+    organizationInput: HTMLInputElement;
     entityTypeSelect: HTMLSelectElement;
+    dateFromInput: HTMLInputElement;
+    dateToInput: HTMLInputElement;
     sortSelect: HTMLSelectElement;
   },
 ): void {
   controls.queryInput.value = state.query;
-  controls.organizationSelect.value = state.organization;
+  controls.organizationInput.value = state.organization;
   controls.entityTypeSelect.value = state.entityType;
+  controls.dateFromInput.value = state.dateFrom;
+  controls.dateToInput.value = state.dateTo;
   controls.sortSelect.value = state.sort;
+}
+
+async function fetchJson<TPayload>(fetchImpl: typeof fetch, url: string): Promise<TPayload> {
+  const response = await fetchImpl(url);
+  const payload = (await response.json()) as TPayload & { error?: string };
+  if (!response.ok) {
+    throw new Error(payload.error ?? "Verzoek mislukt");
+  }
+  return payload;
 }
 
 function routeStateToSearchParams(state: SearchRouteState): URLSearchParams {
@@ -239,6 +263,12 @@ function routeStateToSearchParams(state: SearchRouteState): URLSearchParams {
   if (state.sort) {
     params.set("sort", state.sort);
   }
+  if (state.dateFrom) {
+    params.set("dateFrom", state.dateFrom);
+  }
+  if (state.dateTo) {
+    params.set("dateTo", state.dateTo);
+  }
   if (state.view) {
     params.set("view", state.view);
   }
@@ -250,6 +280,8 @@ function sameSearchState(left: SearchRouteState, right: SearchRouteState): boole
     left.query === right.query &&
     left.organization === right.organization &&
     left.entityType === right.entityType &&
+    left.dateFrom === right.dateFrom &&
+    left.dateTo === right.dateTo &&
     left.sort === right.sort
   );
 }
@@ -258,7 +290,18 @@ function hasActiveSearchFilters(state: SearchRouteState): boolean {
   return (
     state.query.trim().length > 0 ||
     state.organization.trim().length > 0 ||
-    state.entityType.trim().length > 0
+    state.entityType.trim().length > 0 ||
+    state.dateFrom.trim().length > 0 ||
+    state.dateTo.trim().length > 0
+  );
+}
+
+function hasAdvancedSearchFilters(state: SearchRouteState): boolean {
+  return (
+    state.organization.trim().length > 0 ||
+    state.entityType.trim().length > 0 ||
+    state.dateFrom.trim().length > 0 ||
+    state.dateTo.trim().length > 0
   );
 }
 
@@ -274,8 +317,14 @@ export async function bootstrapSearchApp({
   const form = requiredElement<HTMLFormElement>(document, "#search-form");
   const brandHome = requiredElement<HTMLAnchorElement>(document, "#brand-home");
   const queryInput = requiredElement<HTMLInputElement>(document, "#query");
-  const organizationSelect = requiredElement<HTMLSelectElement>(document, "#organization");
+  const filtersToggle = requiredElement<HTMLButtonElement>(document, "#filters-toggle");
+  const advancedFilters = requiredElement<HTMLElement>(document, "#search-advanced-filters");
+  const organizationQueryInput = requiredElement<HTMLInputElement>(document, "#organization-query");
+  const organizationInput = requiredElement<HTMLInputElement>(document, "#organization");
+  const organizationResults = requiredElement<HTMLElement>(document, "#organization-results");
   const entityTypeSelect = requiredElement<HTMLSelectElement>(document, "#entity-type");
+  const dateFromInput = requiredElement<HTMLInputElement>(document, "#date-from");
+  const dateToInput = requiredElement<HTMLInputElement>(document, "#date-to");
   const sortSelect = requiredElement<HTMLSelectElement>(document, "#sort");
   const resultsSection = requiredElement<HTMLElement>(document, "#search-results");
   const resultsTitle = requiredElement<HTMLElement>(document, "#results-title");
@@ -297,6 +346,14 @@ export async function bootstrapSearchApp({
   let currentResults: SearchResult[] = [];
   let currentSearchState: SearchRouteState = routeStateFromUrl(new URL(windowImpl.location.href));
   const detailCache = new Map<string, EntityContentResponse | null>();
+  let organizationPicker: ReturnType<typeof createSourcePicker> | null = null;
+  let filtersOpen = hasAdvancedSearchFilters(currentSearchState);
+
+  function syncFilterVisibility(): void {
+    advancedFilters.hidden = !filtersOpen;
+    filtersToggle.setAttribute("aria-expanded", String(filtersOpen));
+    filtersToggle.textContent = filtersOpen ? "Filters verbergen" : "Filters tonen";
+  }
 
   function setResultsTitle(title: string, count?: number): void {
     if (typeof count === "number" && count >= 0) {
@@ -323,14 +380,21 @@ export async function bootstrapSearchApp({
       organization: "",
       entityType: "",
       sort: "date_desc",
+      dateFrom: "",
+      dateTo: "",
       view: "",
     };
     applyRouteStateToForm(homeState, {
       queryInput,
-      organizationSelect,
+      organizationInput,
       entityTypeSelect,
+      dateFromInput,
+      dateToInput,
       sortSelect,
     });
+    organizationPicker?.clear();
+    filtersOpen = false;
+    syncFilterVisibility();
     currentSearchState = homeState;
     currentResults = [];
     setSearchedState(false, "Zoek op organisatie of onderwerp");
@@ -495,10 +559,15 @@ export async function bootstrapSearchApp({
     const nextState = routeStateFromUrl(new URL(windowImpl.location.href));
     applyRouteStateToForm(nextState, {
       queryInput,
-      organizationSelect,
+      organizationInput,
       entityTypeSelect,
+      dateFromInput,
+      dateToInput,
       sortSelect,
     });
+    organizationPicker?.setValue(nextState.organization);
+    filtersOpen = hasAdvancedSearchFilters(nextState);
+    syncFilterVisibility();
 
     if (sameSearchState(nextState, currentSearchState) && currentResults.length > 0) {
       currentSearchState = nextState;
@@ -551,8 +620,10 @@ export async function bootstrapSearchApp({
     try {
       await runSearch({
         query: queryInput.value.trim(),
-        organization: organizationSelect.value.trim(),
+        organization: organizationInput.value.trim(),
         entityType: entityTypeSelect.value.trim(),
+        dateFrom: dateFromInput.value.trim(),
+        dateTo: dateToInput.value.trim(),
         sort: sortSelect.value.trim() || "date_desc",
         view: "",
       });
@@ -583,6 +654,28 @@ export async function bootstrapSearchApp({
     clearToHome();
   });
 
+  filtersToggle.addEventListener("click", () => {
+    filtersOpen = !filtersOpen;
+    syncFilterVisibility();
+  });
+
+  const sourcePayload = await fetchJson<AdminSourcesResponse>(
+    fetchImpl,
+    "/api/sources?implemented=true",
+  );
+  const sourceOptions = (sourcePayload.sources ?? []).filter(
+    (source: AdminSourceOption) => source.implemented,
+  );
+  organizationPicker = createSourcePicker({
+    input: organizationQueryInput,
+    hiddenInput: organizationInput,
+    results: organizationResults,
+    options: sourceOptions,
+    valueSelector: (source) => source.key,
+    subtitle: (source) => `${source.supplier} · ${source.organizationType}`,
+  });
+
+  syncFilterVisibility();
   setSearchedState(false, "Zoek op organisatie of onderwerp");
   resultList.textContent = "";
   await syncFromUrl({ replace: true });
