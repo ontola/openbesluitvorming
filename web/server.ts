@@ -77,7 +77,8 @@ Deno.serve({ port }, async (request) => {
   if (url.pathname === "/api/admin/rerun" && request.method === "POST") {
     try {
       const payload = (await request.json()) as AdminRerunRequest;
-      if (!payload.sourceKey?.trim()) {
+      const sourceSelector = payload.sourceRef?.trim() || payload.sourceKey?.trim();
+      if (!sourceSelector) {
         return Response.json({ error: "Kies eerst een bron." }, { status: 400 });
       }
       if (!payload.dateFrom?.trim() || !payload.dateTo?.trim()) {
@@ -89,7 +90,7 @@ Deno.serve({ port }, async (request) => {
           { status: 400 },
         );
       }
-      const run = await startIngest(payload.sourceKey, payload.dateFrom, payload.dateTo, {
+      const run = await startIngest(sourceSelector, payload.dateFrom, payload.dateTo, {
         ingestToQuickwit: true,
         trigger: "api",
       });

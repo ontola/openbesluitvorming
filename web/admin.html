@@ -25,20 +25,29 @@
             <h2>Import starten</h2>
           </div>
           <article class="surface-card feature-card">
-            <form id="rerun-form" class="admin-form admin-form--rerun">
-              <label class="select-field select-field--compact">
-                <span class="sr-only">Bron</span>
-                <select id="rerun-source" name="sourceKey"></select>
+            <form id="import-form" class="admin-form admin-form--rerun">
+              <div class="admin-source-picker">
+                <label class="search-field admin-field admin-field--source-picker">
+                  <span class="sr-only">Bron zoeken</span>
+                  <input
+                    id="import-source-query"
+                    type="search"
+                    autocomplete="off"
+                    placeholder="Zoek bron, leverancier of bestuurslaag..."
+                  />
+                  <input id="import-source-ref" name="sourceRef" type="hidden" />
+                </label>
+                <div class="admin-source-results" id="import-source-results" hidden></div>
+              </div>
+              <label class="search-field admin-field">
+                <input id="import-date-from" name="dateFrom" type="date" />
               </label>
               <label class="search-field admin-field">
-                <input id="rerun-date-from" name="dateFrom" type="date" />
-              </label>
-              <label class="search-field admin-field">
-                <input id="rerun-date-to" name="dateTo" type="date" />
+                <input id="import-date-to" name="dateTo" type="date" />
               </label>
               <button type="submit" class="primary-button">Import uitvoeren</button>
             </form>
-            <p id="rerun-status" class="admin-status"></p>
+            <p id="import-status" class="admin-status"></p>
           </article>
         </section>
 
@@ -60,10 +69,10 @@
               <span class="sr-only">Filter status</span>
               <select id="filter-status">
                 <option value="">Alle statussen</option>
-                <option value="running">Running</option>
-                <option value="succeeded">Succeeded</option>
-                <option value="partial">Partial</option>
-                <option value="failed">Failed</option>
+                <option value="running">Draait</option>
+                <option value="succeeded">Geslaagd</option>
+                <option value="partial">Gedeeltelijk</option>
+                <option value="failed">Mislukt</option>
               </select>
             </label>
             <button type="button" class="ghost-button" id="refresh-runs">Verversen</button>
@@ -106,7 +115,7 @@
             <button
               class="primary-button detail-sheet__download"
               type="button"
-              data-role="admin-detail-rerun"
+              data-role="admin-detail-import"
             >
               Import uitvoeren
             </button>

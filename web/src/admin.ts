@@ -4,6 +4,7 @@ import type {
   AdminRunDetailResponse,
   AdminRerunRequest,
   AdminRerunResponse,
+  AdminSourceOption,
   AdminRunsResponse,
   AdminSourcesResponse,
   IngestRunIssueRecord,
@@ -154,7 +155,7 @@ function renderRunDetail(container: HTMLElement, detail: AdminRunDetailResponse)
   const issues = detail.issues ?? [];
   container.innerHTML = `
     <div class="admin-detail__grid">
-      <div><strong>Run ID</strong><p>${detail.run.id}</p></div>
+      <div><strong>Import-ID</strong><p>${detail.run.id}</p></div>
       <div><strong>Bron</strong><p>${detail.run.source_key}</p></div>
       <div><strong>Status</strong><p>${statusLabel(detail.run.status)}</p></div>
       <div><strong>Periode</strong><p>${periodLabel(detail.run)}</p></div>
@@ -198,29 +199,45 @@ function requiredElement<TElement extends Element>(selector: string): TElement {
   return element;
 }
 
+function formatDateInputValue(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 async function bootstrapAdmin(): Promise<void> {
   const runsList = requiredElement<HTMLElement>("#runs-list");
   const filterSource = requiredElement<HTMLSelectElement>("#filter-source");
   const filterStatus = requiredElement<HTMLSelectElement>("#filter-status");
   const refreshRuns = requiredElement<HTMLButtonElement>("#refresh-runs");
-  const rerunForm = requiredElement<HTMLFormElement>("#rerun-form");
-  const rerunSource = requiredElement<HTMLSelectElement>("#rerun-source");
-  const rerunDateFrom = requiredElement<HTMLInputElement>("#rerun-date-from");
-  const rerunDateTo = requiredElement<HTMLInputElement>("#rerun-date-to");
-  const rerunStatus = requiredElement<HTMLElement>("#rerun-status");
+  const importForm = requiredElement<HTMLFormElement>("#import-form");
+  const importSourceQuery = requiredElement<HTMLInputElement>("#import-source-query");
+  const importSourceRef = requiredElement<HTMLInputElement>("#import-source-ref");
+  const importSourceResults = requiredElement<HTMLElement>("#import-source-results");
+  const importDateFrom = requiredElement<HTMLInputElement>("#import-date-from");
+  const importDateTo = requiredElement<HTMLInputElement>("#import-date-to");
+  const importStatus = requiredElement<HTMLElement>("#import-status");
   const detailOverlay = requiredElement<HTMLElement>("#admin-detail-overlay");
   const detailSource = requiredElement<HTMLElement>('[data-role="admin-detail-source"]');
   const detailStatus = requiredElement<HTMLElement>('[data-role="admin-detail-status"]');
   const detailPeriod = requiredElement<HTMLElement>('[data-role="admin-detail-period"]');
   const detailBody = requiredElement<HTMLElement>('[data-role="admin-detail-body"]');
-  const detailRerun = requiredElement<HTMLButtonElement>('[data-role="admin-detail-rerun"]');
+  const detailImport = requiredElement<HTMLButtonElement>('[data-role="admin-detail-import"]');
   const detailViewResults = requiredElement<HTMLAnchorElement>(
     '[data-role="admin-detail-view-results"]',
   );
   const closeButtons = document.querySelectorAll<HTMLElement>('[data-role="close-admin-detail"]');
   let openRun: IngestRunRecord | null = null;
   let currentRuns: IngestRunRecord[] = [];
+  let allAdminSources: AdminSourceOption[] = [];
+  const sourceByLabel = new Map<string, AdminSourceOption>();
   let pollTimer: number | null = null;
+
+  importDateTo.value = formatDateInputValue(new Date());
+  const lastWeek = new Date();
+  lastWeek.setDate(lastWeek.getDate() - 7);
+  importDateFrom.value = formatDateInputValue(lastWeek);
 
   function hasActiveRuns(runs: IngestRunRecord[]): boolean {
     return runs.some((run) => run.status === "running");
@@ -271,13 +288,78 @@ async function bootstrapAdmin(): Promise<void> {
     }
   });
 
+  function clearImportSourceSelection(): void {
+    importSourceRef.value = "";
+  }
+
+  function selectImportSource(source: AdminSourceOption): void {
+    importSourceQuery.value = source.label;
+    importSourceRef.value = source.sourceRef;
+    importSourceResults.hidden = true;
+  }
+
+  function renderImportSourceOptions(query = ""): void {
+    const normalizedQuery = query.trim().toLowerCase();
+    importSourceResults.replaceChildren();
+
+    if (!normalizedQuery) {
+      importSourceResults.hidden = true;
+      return;
+    }
+
+    const filteredSources = allAdminSources.filter((source) => {
+      if (!normalizedQuery) {
+        return true;
+      }
+
+      return [source.label, source.key, source.sourceRef, source.supplier, source.organizationType]
+        .join(" ")
+        .toLowerCase()
+        .includes(normalizedQuery);
+    });
+
+    if (filteredSources.length === 0) {
+      importSourceResults.hidden = false;
+      const emptyState = document.createElement("div");
+      emptyState.className = "admin-source-results__empty";
+      emptyState.textContent = "Geen bronnen gevonden.";
+      importSourceResults.appendChild(emptyState);
+      return;
+    }
+
+    for (const source of filteredSources) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "admin-source-option";
+      button.disabled = !source.implemented;
+      button.innerHTML = `
+        <strong>${source.label}</strong>
+        <span>${source.supplier} · ${source.organizationType}${source.implemented ? "" : " · nog niet ondersteund"}</span>
+      `;
+      button.addEventListener("click", () => {
+        if (!source.implemented) {
+          return;
+        }
+        selectImportSource(source);
+      });
+      importSourceResults.appendChild(button);
+    }
+
+    importSourceResults.hidden = false;
+  }
+
   async function loadSources(): Promise<void> {
     const payload = await fetchJson<AdminSourcesResponse>("/api/admin/sources");
-    for (const source of payload.sources) {
+    allAdminSources = payload.sources ?? [];
+    sourceByLabel.clear();
+    for (const source of allAdminSources) {
+      sourceByLabel.set(source.label, source);
+    }
+    renderImportSourceOptions();
+    for (const source of allAdminSources.filter((item) => item.implemented)) {
       const option = document.createElement("option");
       option.value = source.key;
       option.textContent = source.label;
-      rerunSource.appendChild(option.cloneNode(true));
       filterSource.appendChild(option);
     }
   }
@@ -331,22 +413,48 @@ async function bootstrapAdmin(): Promise<void> {
   filterStatus.addEventListener("change", () => {
     void loadRuns();
   });
+  importSourceQuery.addEventListener("input", () => {
+    const selectedSource = sourceByLabel.get(importSourceQuery.value.trim());
+    if (selectedSource?.implemented) {
+      importSourceRef.value = selectedSource.sourceRef;
+      importSourceResults.hidden = true;
+      return;
+    }
 
-  rerunForm.addEventListener("submit", async (event: SubmitEvent) => {
+    clearImportSourceSelection();
+    renderImportSourceOptions(importSourceQuery.value);
+  });
+  importSourceQuery.addEventListener("focus", () => {
+    renderImportSourceOptions(importSourceQuery.value);
+  });
+  importSourceQuery.addEventListener("blur", () => {
+    window.setTimeout(() => {
+      importSourceResults.hidden = true;
+    }, 120);
+  });
+
+  importForm.addEventListener("submit", async (event: SubmitEvent) => {
     event.preventDefault();
-    if (!rerunSource.value.trim()) {
-      rerunStatus.textContent = "Kies eerst een bron.";
+    const selectedSource =
+      sourceByLabel.get(importSourceQuery.value.trim()) ??
+      allAdminSources.find((source) => source.sourceRef === importSourceRef.value);
+    if (!selectedSource) {
+      importStatus.textContent = "Kies eerst een bron uit de suggesties.";
       return;
     }
-    if (!rerunDateFrom.value.trim() || !rerunDateTo.value.trim()) {
-      rerunStatus.textContent = "Vul zowel een start- als einddatum in.";
+    if (!selectedSource.implemented) {
+      importStatus.textContent = "Deze bron is nog niet ondersteund in Woozi.";
       return;
     }
-    if (rerunDateFrom.value > rerunDateTo.value) {
-      rerunStatus.textContent = "De startdatum moet op of voor de einddatum liggen.";
+    if (!importDateFrom.value.trim() || !importDateTo.value.trim()) {
+      importStatus.textContent = "Vul zowel een start- als einddatum in.";
       return;
     }
-    rerunStatus.textContent = "Import gestart...";
+    if (importDateFrom.value > importDateTo.value) {
+      importStatus.textContent = "De startdatum moet op of voor de einddatum liggen.";
+      return;
+    }
+    importStatus.textContent = "Import gestart...";
 
     try {
       const payload = await fetchJson<AdminRerunResponse>("/api/admin/rerun", {
@@ -355,12 +463,12 @@ async function bootstrapAdmin(): Promise<void> {
           "content-type": "application/json",
         },
         body: JSON.stringify({
-          sourceKey: rerunSource.value,
-          dateFrom: rerunDateFrom.value,
-          dateTo: rerunDateTo.value,
+          sourceRef: selectedSource.sourceRef,
+          dateFrom: importDateFrom.value,
+          dateTo: importDateTo.value,
         } satisfies AdminRerunRequest),
       });
-      rerunStatus.textContent = `Import ${payload.run.id} gestart.`;
+      importStatus.textContent = `Import ${payload.run.id} gestart.`;
       currentRuns = [payload.run, ...currentRuns];
       renderRuns(runsList, currentRuns, new Map(), async (runId) => {
         const detail = await fetchJson<AdminRunDetailResponse>(`/api/admin/runs/${runId}`);
@@ -369,17 +477,17 @@ async function bootstrapAdmin(): Promise<void> {
       schedulePolling();
       await loadRuns();
     } catch (error) {
-      rerunStatus.textContent = error instanceof Error ? error.message : "Import mislukt.";
+      importStatus.textContent = error instanceof Error ? error.message : "Import mislukt.";
     }
   });
 
-  detailRerun.addEventListener("click", async () => {
+  detailImport.addEventListener("click", async () => {
     if (!openRun) {
       return;
     }
 
-    detailRerun.disabled = true;
-    rerunStatus.textContent = "Import gestart...";
+    detailImport.disabled = true;
+    importStatus.textContent = "Import gestart...";
 
     try {
       const payload = await fetchJson<AdminRerunResponse>("/api/admin/rerun", {
@@ -394,7 +502,7 @@ async function bootstrapAdmin(): Promise<void> {
         } satisfies AdminRerunRequest),
       });
 
-      rerunStatus.textContent = `Import ${payload.run.id} gestart.`;
+      importStatus.textContent = `Import ${payload.run.id} gestart.`;
       currentRuns = [payload.run, ...currentRuns];
       renderRuns(runsList, currentRuns, new Map(), async (runId) => {
         const detail = await fetchJson<AdminRunDetailResponse>(`/api/admin/runs/${runId}`);
@@ -404,9 +512,9 @@ async function bootstrapAdmin(): Promise<void> {
       schedulePolling();
       await loadRuns();
     } catch (error) {
-      rerunStatus.textContent = error instanceof Error ? error.message : "Import mislukt.";
+      importStatus.textContent = error instanceof Error ? error.message : "Import mislukt.";
     } finally {
-      detailRerun.disabled = false;
+      detailImport.disabled = false;
     }
   });
 

@@ -115,11 +115,12 @@ export interface ExtractionIssue {
 }
 
 export type OrganizationType = "gemeente" | "provincie" | "waterschap";
+export type Supplier = "notubiz" | "ibabs" | "gemeenteoplossingen" | "parlaeus";
 
 export interface SourceDefinitionBase {
   key: string;
   label?: string;
-  supplier: "notubiz" | "ibabs";
+  supplier: Supplier;
   organizationType: OrganizationType;
   allmanakId: number;
   cbsId?: string;
@@ -140,6 +141,18 @@ export interface IbabsSourceDefinition extends SourceDefinitionBase {
 }
 
 export type SourceDefinition = NotubizSourceDefinition | IbabsSourceDefinition;
+
+export interface SourceCatalogEntry extends SourceDefinitionBase {
+  sourceRef: string;
+  sourceName?: string;
+  legacyConfigFile: string;
+  legacyConfigRoot: string;
+  implemented: boolean;
+  notubizOrganizationId?: number;
+  ibabsSitename?: string;
+  baseUrl?: string;
+  sessionId?: string;
+}
 
 export interface IbabsMeetingType {
   Id: string;
@@ -219,7 +232,11 @@ export interface IngestRunIssueRecord {
 
 export interface AdminSourceOption {
   key: string;
+  sourceRef: string;
   label: string;
+  supplier: Supplier;
+  organizationType: OrganizationType;
+  implemented: boolean;
 }
 
 export interface AdminRunsResponse {
@@ -236,7 +253,8 @@ export interface AdminSourcesResponse {
 }
 
 export interface AdminRerunRequest {
-  sourceKey: string;
+  sourceKey?: string;
+  sourceRef?: string;
   dateFrom: string;
   dateTo: string;
 }
