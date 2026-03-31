@@ -6,7 +6,7 @@ import type {
 } from "../src/types.ts";
 import { startIngest } from "../src/ingest.ts";
 import { getRunDetails, listRuns } from "../src/ops/store.ts";
-import { notubizSources } from "../src/sources/notubiz.ts";
+import { listAdminSourceOptions } from "../src/sources/index.ts";
 import { getEntityContent, searchMeetings } from "./search_api.ts";
 
 const root = new URL("./", import.meta.url);
@@ -45,10 +45,7 @@ Deno.serve({ port }, async (request) => {
 
   if (url.pathname === "/api/admin/sources") {
     return Response.json<AdminSourcesResponse>({
-      sources: Object.values(notubizSources).map((source) => ({
-        key: source.key,
-        label: source.key.replaceAll("_", " "),
-      })),
+      sources: listAdminSourceOptions(),
     });
   }
 

@@ -1,9 +1,18 @@
 import { buildEntityCommitEvent } from "./events/entity_commit.ts";
+import { IbabsMeetingExtractor } from "./ibabs/extractor.ts";
 import { NotubizMeetingExtractor } from "./notubiz/extractor.ts";
 import { updateRun, appendRunIssue, createRun, getRunDetails } from "./ops/store.ts";
 import { QuickwitClient } from "./quickwit/client.ts";
-import { getNotubizSource } from "./sources/notubiz.ts";
-import type { IngestRunRecord } from "./types.ts";
+import { getSource } from "./sources/index.ts";
+import type { IngestRunRecord, SourceDefinition } from "./types.ts";
+
+function getExtractor(source: SourceDefinition): NotubizMeetingExtractor | IbabsMeetingExtractor {
+  if (source.supplier === "notubiz") {
+    return new NotubizMeetingExtractor();
+  }
+
+  return new IbabsMeetingExtractor();
+}
 
 async function executeIngest(
   run: IngestRunRecord,
@@ -19,8 +28,8 @@ async function executeIngest(
   quickwit_index_id?: string;
 }> {
   try {
-    const source = getNotubizSource(sourceKey);
-    const extractor = new NotubizMeetingExtractor();
+    const source = getSource(sourceKey);
+    const extractor = getExtractor(source);
     let currentRun = run;
     const extraction = await extractor.extractForDateRange(source, dateFrom, dateTo, {
       onProgress: async (stats) => {
@@ -107,7 +116,7 @@ export async function runIngest(
   run: IngestRunRecord;
   quickwit_index_id?: string;
 }> {
-  const source = getNotubizSource(sourceKey);
+  const source = getSource(sourceKey);
   const run = await createRun({
     source_key: source.key,
     supplier: source.supplier,
@@ -128,7 +137,7 @@ export async function startIngest(
     trigger?: "manual" | "api";
   } = {},
 ): Promise<IngestRunRecord> {
-  const source = getNotubizSource(sourceKey);
+  const source = getSource(sourceKey);
   const run = await createRun({
     source_key: source.key,
     supplier: source.supplier,

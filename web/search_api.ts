@@ -1,5 +1,6 @@
 import type { EntityContentResponse, SearchResult } from "../src/types.ts";
 import { QuickwitClient } from "../src/quickwit/client.ts";
+import { listSources } from "../src/sources/index.ts";
 import { ObjectStorageClient } from "../src/storage/s3.ts";
 
 type SearchHit = {
@@ -165,15 +166,9 @@ function formatDate(dateValue?: string): string {
 }
 
 function displayOrganization(hit: SearchHit): string {
-  const labels: Record<string, string> = {
-    alkmaar: "Gemeente Alkmaar",
-    amsterdam: "Gemeente Amsterdam",
-    amersfoort: "Gemeente Amersfoort",
-    delft: "Gemeente Delft",
-    haarlem: "Gemeente Haarlem",
-    leiden: "Gemeente Leiden",
-    zaanstad: "Gemeente Zaanstad",
-  };
+  const labels = Object.fromEntries(
+    listSources().map((source) => [source.key, source.label ?? source.key]),
+  );
 
   if (hit.source_key && labels[hit.source_key]) {
     return labels[hit.source_key];

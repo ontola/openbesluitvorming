@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+  <s:Body>
+    <GetMeetingsByDateRangeResponse xmlns="http://tempuri.org/">
+      <GetMeetingsByDateRangeResult xmlns:a="http://schemas.datacontract.org/2004/07/iBabsWCFObjects.Public">
+        <Message xmlns="http://schemas.datacontract.org/2004/07/iBabsWCFObjects.Base">OK</Message>
+        <Status xmlns="http://schemas.datacontract.org/2004/07/iBabsWCFObjects.Base">OK</Status>
+        <a:Meetings>
+          <a:iBabsMeeting>
+            <a:Id>meeting-123</a:Id>
+            <a:MeetingtypeId>11</a:MeetingtypeId>
+            <a:MeetingDate>2025-01-14T19:30:00</a:MeetingDate>
+            <a:StartTime>19:30</a:StartTime>
+            <a:EndTime>21:00</a:EndTime>
+            <a:Location>Raadzaal</a:Location>
+            <a:Chairman>Burgemeester</a:Chairman>
+            <a:Explanation>Bespreking van de agenda.</a:Explanation>
+            <a:PublishDate>2025-01-10T12:00:00</a:PublishDate>
+            <a:Invitees>
+              <a:iBabsUserBasic>
+                <a:UniqueId>user-1</a:UniqueId>
+                <a:Name>Jan Jansen</a:Name>
+                <a:Emailaddress>jan@example.test</a:Emailaddress>
+              </a:iBabsUserBasic>
+            </a:Invitees>
+            <a:Attendees>
+              <a:iBabsUserBasic>
+                <a:UniqueId>user-2</a:UniqueId>
+                <a:Name>Piet Pieters</a:Name>
+                <a:Emailaddress>piet@example.test</a:Emailaddress>
+              </a:iBabsUserBasic>
+            </a:Attendees>
+            <a:MeetingItems>
+              <a:iBabsMeetingItem>
+                <a:Id>agenda-7</a:Id>
+                <a:Features>1.1</a:Features>
+                <a:Title>Opening</a:Title>
+                <a:Explanation>Opening van de vergadering.</a:Explanation>
+                <a:Documents>
+                  <a:iBabsDocument>
+                    <a:Id>doc-43</a:Id>
+                    <a:FileName>besluitvorming.txt</a:FileName>
+                    <a:DisplayName>Besluitvorming</a:DisplayName>
+                    <a:PublicDownloadURL>https://files.example.test/doc-43.txt</a:PublicDownloadURL>
+                    <a:FileSize>1200</a:FileSize>
+                  </a:iBabsDocument>
+                </a:Documents>
+              </a:iBabsMeetingItem>
+            </a:MeetingItems>
+            <a:Documents>
+              <a:iBabsDocument>
+                <a:Id>doc-42</a:Id>
+                <a:FileName>memo-participatie.txt</a:FileName>
+                <a:DisplayName>Memo participatie</a:DisplayName>
+                <a:PublicDownloadURL>https://files.example.test/doc-42.txt</a:PublicDownloadURL>
+                <a:FileSize>139780</a:FileSize>
+              </a:iBabsDocument>
+            </a:Documents>
+          </a:iBabsMeeting>
+        </a:Meetings>
+      </GetMeetingsByDateRangeResult>
+    </GetMeetingsByDateRangeResponse>
+  </s:Body>
+</s:Envelope>

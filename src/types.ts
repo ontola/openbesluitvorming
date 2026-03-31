@@ -114,16 +114,78 @@ export interface ExtractionIssue {
   message: string;
 }
 
-export interface NotubizSourceDefinition {
+export type OrganizationType = "gemeente" | "provincie" | "waterschap";
+
+export interface SourceDefinitionBase {
   key: string;
-  supplier: "notubiz";
-  organizationType: "gemeente" | "provincie" | "waterschap";
-  notubizOrganizationId: number;
+  label?: string;
+  supplier: "notubiz" | "ibabs";
+  organizationType: OrganizationType;
   allmanakId: number;
+  cbsId?: string;
+}
+
+export interface NotubizSourceDefinition extends SourceDefinitionBase {
+  supplier: "notubiz";
+  notubizOrganizationId: number;
 }
 
 export interface NotubizOrganizationAttributes {
   attributes: Record<string, string>;
+}
+
+export interface IbabsSourceDefinition extends SourceDefinitionBase {
+  supplier: "ibabs";
+  ibabsSitename: string;
+}
+
+export type SourceDefinition = NotubizSourceDefinition | IbabsSourceDefinition;
+
+export interface IbabsMeetingType {
+  Id: string;
+  Description?: string;
+  Meetingtype?: string;
+}
+
+export interface IbabsUserBasic {
+  UniqueId: string;
+  Name?: string;
+  Emailaddress?: string;
+}
+
+export interface IbabsDocument {
+  Id: string;
+  FileName?: string;
+  DisplayName?: string;
+  Confidential?: boolean;
+  PublicDownloadURL?: string;
+  FileSize?: number;
+}
+
+export interface IbabsMeetingItem {
+  Id: string;
+  Features?: string;
+  Title?: string;
+  Explanation?: string;
+  Confidential?: boolean;
+  Documents?: IbabsDocument[];
+}
+
+export interface IbabsMeeting {
+  Id: string;
+  MeetingtypeId?: string;
+  Meetingtype?: string;
+  MeetingDate?: string;
+  StartTime?: string;
+  EndTime?: string;
+  Location?: string;
+  Chairman?: string;
+  Explanation?: string;
+  PublishDate?: string;
+  Invitees?: IbabsUserBasic[];
+  Attendees?: IbabsUserBasic[];
+  MeetingItems?: IbabsMeetingItem[];
+  Documents?: IbabsDocument[];
 }
 
 export interface IngestRunRecord {

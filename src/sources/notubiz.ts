@@ -3,6 +3,7 @@ import type { NotubizSourceDefinition } from "../types.ts";
 export const notubizSources: Record<string, NotubizSourceDefinition> = {
   alkmaar: {
     key: "alkmaar",
+    label: "Gemeente Alkmaar",
     supplier: "notubiz",
     organizationType: "gemeente",
     notubizOrganizationId: 987,
@@ -10,6 +11,7 @@ export const notubizSources: Record<string, NotubizSourceDefinition> = {
   },
   amsterdam: {
     key: "amsterdam",
+    label: "Gemeente Amsterdam",
     supplier: "notubiz",
     organizationType: "gemeente",
     notubizOrganizationId: 281,
@@ -17,6 +19,7 @@ export const notubizSources: Record<string, NotubizSourceDefinition> = {
   },
   amersfoort: {
     key: "amersfoort",
+    label: "Gemeente Amersfoort",
     supplier: "notubiz",
     organizationType: "gemeente",
     notubizOrganizationId: 867,
@@ -24,6 +27,7 @@ export const notubizSources: Record<string, NotubizSourceDefinition> = {
   },
   delft: {
     key: "delft",
+    label: "Gemeente Delft",
     supplier: "notubiz",
     organizationType: "gemeente",
     notubizOrganizationId: 550,
@@ -31,6 +35,7 @@ export const notubizSources: Record<string, NotubizSourceDefinition> = {
   },
   haarlem: {
     key: "haarlem",
+    label: "Gemeente Haarlem",
     supplier: "notubiz",
     organizationType: "gemeente",
     notubizOrganizationId: 544,
@@ -38,6 +43,7 @@ export const notubizSources: Record<string, NotubizSourceDefinition> = {
   },
   leiden: {
     key: "leiden",
+    label: "Gemeente Leiden",
     supplier: "notubiz",
     organizationType: "gemeente",
     notubizOrganizationId: 271,
@@ -45,6 +51,7 @@ export const notubizSources: Record<string, NotubizSourceDefinition> = {
   },
   zaanstad: {
     key: "zaanstad",
+    label: "Gemeente Zaanstad",
     supplier: "notubiz",
     organizationType: "gemeente",
     notubizOrganizationId: 801,

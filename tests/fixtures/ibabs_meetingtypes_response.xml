@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+  <s:Body>
+    <GetMeetingtypesResponse xmlns="http://tempuri.org/">
+      <GetMeetingtypesResult xmlns:a="http://schemas.datacontract.org/2004/07/iBabsWCFObjects.Common">
+        <Message xmlns="http://schemas.datacontract.org/2004/07/iBabsWCFObjects.Base">OK</Message>
+        <Status xmlns="http://schemas.datacontract.org/2004/07/iBabsWCFObjects.Base">OK</Status>
+        <a:Meetingtypes>
+          <a:iBabsMeetingtype>
+            <a:Id>11</a:Id>
+            <a:Description>Raadscommissie Ruimte</a:Description>
+            <a:Meetingtype>Commissie</a:Meetingtype>
+          </a:iBabsMeetingtype>
+          <a:iBabsMeetingtype>
+            <a:Id>22</a:Id>
+            <a:Description>Raadsvergadering</a:Description>
+            <a:Meetingtype>Raad</a:Meetingtype>
+          </a:iBabsMeetingtype>
+        </a:Meetingtypes>
+      </GetMeetingtypesResult>
+    </GetMeetingtypesResponse>
+  </s:Body>
+</s:Envelope>
