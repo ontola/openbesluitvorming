@@ -52,6 +52,39 @@ Deno.test("iBabs SOAP parsers extract meeting types and meetings from fixture XM
   );
 });
 
+Deno.test("iBabs SOAP parsers fail when the service returns Status ERR", () => {
+  const deniedMeetingTypesXml =
+    '<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body><GetMeetingtypesResponse xmlns="http://tempuri.org/"><GetMeetingtypesResult xmlns:a="http://schemas.datacontract.org/2004/07/iBabsWCFObjects.Common"><Message xmlns="http://schemas.datacontract.org/2004/07/iBabsWCFObjects.Base">IPaddress 82.172.191.240 has no access to site amstelveen!</Message><Status xmlns="http://schemas.datacontract.org/2004/07/iBabsWCFObjects.Base">ERR</Status><a:Meetingtypes xmlns:b="http://schemas.datacontract.org/2004/07/iBabsWCFObjects"/></GetMeetingtypesResult></GetMeetingtypesResponse></s:Body></s:Envelope>';
+  const deniedMeetingsXml =
+    '<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body><GetMeetingsByDateRangeResponse xmlns="http://tempuri.org/"><GetMeetingsByDateRangeResult xmlns:a="http://schemas.datacontract.org/2004/07/iBabsWCFObjects.Public"><Message xmlns="http://schemas.datacontract.org/2004/07/iBabsWCFObjects.Base">IPaddress 82.172.191.240 has no access to site amstelveen!</Message><Status xmlns="http://schemas.datacontract.org/2004/07/iBabsWCFObjects.Base">ERR</Status><a:Meetings/></GetMeetingsByDateRangeResult></GetMeetingsByDateRangeResponse></s:Body></s:Envelope>';
+
+  let meetingTypesError: unknown;
+  let meetingsError: unknown;
+
+  try {
+    ibabsClientTest.parseMeetingTypesXml(deniedMeetingTypesXml);
+  } catch (error) {
+    meetingTypesError = error;
+  }
+
+  try {
+    ibabsClientTest.parseMeetingsXml(deniedMeetingsXml);
+  } catch (error) {
+    meetingsError = error;
+  }
+
+  assert(
+    meetingTypesError instanceof Error &&
+      meetingTypesError.message.includes("has no access to site amstelveen"),
+    "expected GetMeetingtypes ERR response to throw the SOAP message",
+  );
+  assert(
+    meetingsError instanceof Error &&
+      meetingsError.message.includes("has no access to site amstelveen"),
+    "expected GetMeetingsByDateRange ERR response to throw the SOAP message",
+  );
+});
+
 Deno.test("normalizeIbabsMeeting and normalizeIbabsDocuments use the canonical Woozi id grammar", async () => {
   const source = getIbabsSource("amstelveen");
   const meetingsXml = await Deno.readTextFile(

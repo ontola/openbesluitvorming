@@ -75,7 +75,21 @@ function nestedValue(record: unknown, path: string[]): unknown {
 
 function textValue(record: unknown, localName: string): string | undefined {
   const value = valueForLocalName(record, localName);
-  return typeof value === "string" && value.length > 0 ? value : undefined;
+  if (typeof value === "string" && value.length > 0) {
+    return value;
+  }
+
+  if (
+    value &&
+    typeof value === "object" &&
+    "#text" in value &&
+    typeof (value as Record<string, unknown>)["#text"] === "string"
+  ) {
+    const text = (value as Record<string, unknown>)["#text"] as string;
+    return text.length > 0 ? text : undefined;
+  }
+
+  return undefined;
 }
 
 function parseBoolean(value?: string): boolean | undefined {
@@ -97,6 +111,19 @@ function parseNumber(value?: string): number | undefined {
   }
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function assertIbabsResultOk(result: unknown, context: string): void {
+  const status = textValue(result, "Status");
+  const message = textValue(result, "Message");
+
+  if (status === "ERR") {
+    throw new Error(message || `iBabs ${context} returned status ERR`);
+  }
+
+  if (message?.includes("has no access")) {
+    throw new Error(message);
+  }
 }
 
 function parseUsers(parent?: unknown): IbabsUserBasic[] {
@@ -159,10 +186,7 @@ function parseMeetingTypesXml(xml: string): IbabsMeetingType[] {
     throw new Error("Invalid iBabs GetMeetingtypes response");
   }
 
-  const message = textValue(result, "Message");
-  if (message?.includes("has no access")) {
-    throw new Error(message);
-  }
+  assertIbabsResultOk(result, "GetMeetingtypes");
 
   const meetingTypes = valueForLocalName(result, "Meetingtypes");
   if (!meetingTypes) {
@@ -190,10 +214,7 @@ function parseMeetingsXml(xml: string): IbabsMeeting[] {
     throw new Error("Invalid iBabs GetMeetingsByDateRange response");
   }
 
-  const message = textValue(result, "Message");
-  if (message?.includes("has no access")) {
-    throw new Error(message);
-  }
+  assertIbabsResultOk(result, "GetMeetingsByDateRange");
 
   const meetings = valueForLocalName(result, "Meetings");
   if (!meetings) {
