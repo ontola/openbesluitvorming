@@ -116,21 +116,21 @@
             <h2>Een eenvoudige startpagina voor publieke zoektoegang</h2>
           </div>
           <div class="feature-grid">
-            <article class="feature-card">
+            <article class="surface-card feature-card">
               <h3>Snel zoeken</h3>
               <p>
                 Eén zoekveld voor besluiten, agenda's, documenten en vergaderstukken. Gericht op
                 publieke vindbaarheid, niet op intern beheer.
               </p>
             </article>
-            <article class="feature-card">
+            <article class="surface-card feature-card">
               <h3>Open bronnen</h3>
               <p>
                 Notubiz en andere leveranciers worden via extractors opgehaald, genormaliseerd en
                 als herbruikbare events gepubliceerd.
               </p>
             </article>
-            <article class="feature-card">
+            <article class="surface-card feature-card">
               <h3>Schaalbaar zoeken</h3>
               <p>
                 Zoekdocumenten landen in Quickwit als projectie. De bron van waarheid blijft buiten
@@ -143,7 +143,7 @@
     </div>
 
     <template id="result-template">
-      <article class="result-card">
+      <article class="surface-card surface-card--lift result-card">
         <div class="result-card__meta">
           <div class="result-card__tags">
             <span class="pill" data-role="org"></span>
@@ -158,7 +158,12 @@
 
     <section class="detail-overlay" id="detail-overlay" hidden>
       <div class="detail-overlay__backdrop" data-role="close-detail"></div>
-      <article class="detail-sheet" aria-modal="true" aria-labelledby="detail-title" role="dialog">
+      <article
+        class="detail-sheet detail-sheet--reader"
+        aria-modal="true"
+        aria-labelledby="detail-title"
+        role="dialog"
+      >
         <div class="detail-sheet__header">
           <div class="detail-sheet__meta">
             <span class="pill" data-role="detail-org"></span>

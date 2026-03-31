@@ -60,6 +60,22 @@ function isSkippableMeetingError(error: unknown): boolean {
   );
 }
 
+function issueStepForDocumentError(error: unknown): ExtractionIssue["step"] {
+  if (!(error instanceof Error)) {
+    return "download_document";
+  }
+
+  if (
+    error.message.includes("unpdf failed") ||
+    error.message.includes("Office document extraction is not supported yet") ||
+    error.message.includes("PDF parsing error")
+  ) {
+    return "extract_text";
+  }
+
+  return "download_document";
+}
+
 export class NotubizMeetingExtractor {
   constructor(private readonly client = new NotubizClient()) {}
 
@@ -147,13 +163,13 @@ export class NotubizMeetingExtractor {
         async (document) => {
           try {
             return await materializeDocument(document, {
-              download: (url) => this.client.downloadDocument(url),
+              download: (documentEntity) => this.client.downloadDocument(documentEntity),
               storage,
             });
           } catch (error) {
             issues.push({
               severity: "error",
-              step: "download_document",
+              step: issueStepForDocumentError(error),
               entity_id: document.id,
               message: error instanceof Error ? error.message : "Document processing failed",
             });

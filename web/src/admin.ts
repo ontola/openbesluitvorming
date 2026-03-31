@@ -35,6 +35,42 @@ function periodLabel(run: IngestRunRecord): string {
   return `${run.date_from} t/m ${run.date_to}`;
 }
 
+const relativeTimeFormatter = new Intl.RelativeTimeFormat("nl-NL", {
+  numeric: "auto",
+});
+
+function formatRelativeTime(dateValue?: string): string {
+  if (!dateValue) {
+    return "Onbekend moment";
+  }
+
+  const target = new Date(dateValue);
+  if (Number.isNaN(target.getTime())) {
+    return dateValue;
+  }
+
+  const diffMs = target.getTime() - Date.now();
+  const diffSeconds = Math.round(diffMs / 1000);
+
+  const units: Array<[Intl.RelativeTimeFormatUnit, number]> = [
+    ["year", 60 * 60 * 24 * 365],
+    ["month", 60 * 60 * 24 * 30],
+    ["week", 60 * 60 * 24 * 7],
+    ["day", 60 * 60 * 24],
+    ["hour", 60 * 60],
+    ["minute", 60],
+    ["second", 1],
+  ];
+
+  for (const [unit, secondsPerUnit] of units) {
+    if (Math.abs(diffSeconds) >= secondsPerUnit || unit === "second") {
+      return relativeTimeFormatter.format(Math.round(diffSeconds / secondsPerUnit), unit);
+    }
+  }
+
+  return dateValue;
+}
+
 function searchUrlForRun(run: IngestRunRecord): string {
   const params = new URLSearchParams({
     organization: run.source_key,
@@ -44,21 +80,23 @@ function searchUrlForRun(run: IngestRunRecord): string {
   return `/?${params.toString()}`;
 }
 
-function runSummary(run: IngestRunRecord): string {
-  return `${run.meeting_count} vergaderingen · ${run.document_count} documenten · ${run.cache_hits} cache hits · ${run.downloaded_count} downloads`;
-}
-
-function previewIssue(
+function summarizeIssueTypes(
   run: IngestRunRecord,
   issuesByRun: Map<string, IngestRunIssueRecord[]>,
-): string {
+): Array<{ label: string; count: number }> {
   const issues = issuesByRun.get(run.id) ?? [];
   if (issues.length === 0) {
-    return "";
+    return [];
   }
 
-  const first = issues[0];
-  return `${first.step}${first.entity_id ? ` (${first.entity_id})` : ""}: ${first.message}`;
+  const counts = new Map<string, number>();
+  for (const issue of issues) {
+    counts.set(issue.step, (counts.get(issue.step) ?? 0) + 1);
+  }
+
+  return [...counts.entries()]
+    .map(([label, count]) => ({ label, count }))
+    .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label, "nl"));
 }
 
 function renderRuns(
@@ -76,22 +114,34 @@ function renderRuns(
 
   runs.forEach((run) => {
     const button = document.createElement("button");
-    button.className = "admin-run";
+    button.className = "surface-card admin-run";
     button.type = "button";
-    const issuePreview = previewIssue(run, issuesByRun);
+    const issueSummary = summarizeIssueTypes(run, issuesByRun);
     button.innerHTML = `
-      <div class="admin-run__header">
-        <div class="admin-run__meta">
-          <span class="pill">${run.source_key}</span>
-          <span class="pill pill--soft ${statusClassName(run.status)}">${statusLabel(run.status)}</span>
-          <span class="admin-run__date">${periodLabel(run)}</span>
+      <div class="admin-run__row">
+        <div class="admin-run__primary">
+          <div class="admin-run__meta">
+            <span class="pill">${run.source_key}</span>
+            <span class="pill pill--soft ${statusClassName(run.status)}">${statusLabel(run.status)}</span>
+            <span class="admin-run__date">${periodLabel(run)}</span>
+          </div>
+        </div>
+        <div class="admin-run__metric"><strong>${run.meeting_count}</strong></div>
+        <div class="admin-run__metric"><strong>${run.document_count}</strong></div>
+        <div class="admin-run__metric"><strong>${run.cache_hits}</strong></div>
+        <div class="admin-run__metric"><strong>${run.downloaded_count}</strong></div>
+        <div class="admin-run__time">
+          <small title="${run.started_at}">${formatRelativeTime(run.started_at)}</small>
         </div>
       </div>
-      <p>${runSummary(run)}</p>
-      <small>${run.started_at}</small>
       ${
-        issuePreview
-          ? `<div class="admin-run__issue"><strong>${run.issue_count} issue${run.issue_count === 1 ? "" : "s"}</strong><span>${issuePreview}</span></div>`
+        issueSummary.length > 0
+          ? `<div class="admin-run__issue"><strong>${run.issue_count} issue${run.issue_count === 1 ? "" : "s"}</strong><div class="admin-run__issue-list">${issueSummary
+              .map(
+                (issue) =>
+                  `<span class="admin-run__issue-chip"><span class="admin-run__issue-count">${issue.count}×</span> ${issue.label}</span>`,
+              )
+              .join("")}</div></div>`
           : ""
       }
     `;

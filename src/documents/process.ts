@@ -98,7 +98,7 @@ async function readCachedDocument(
 export async function materializeDocument(
   document: DocumentEntity,
   options: {
-    download: (url: string) => Promise<Uint8Array>;
+    download: (document: DocumentEntity) => Promise<Uint8Array>;
     storage?: CachedStorage;
   },
 ): Promise<MaterializedDocumentResult> {
@@ -113,7 +113,7 @@ export async function materializeDocument(
     }
   }
 
-  const bytes = await options.download(document.original_url);
+  const bytes = await options.download(document);
   const extraction = await extractDocumentMarkdown(bytes, {
     contentType: document.content_type,
     fileName: document.file_name,

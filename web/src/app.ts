@@ -132,6 +132,20 @@ function renderMarkdown(markdown?: string): string {
   }) as string;
 }
 
+function loadingMarkdownSkeleton(): string {
+  return `
+    <div class="detail-sheet__loading" aria-hidden="true">
+      <span class="detail-sheet__loading-line detail-sheet__loading-line--title"></span>
+      <span class="detail-sheet__loading-line"></span>
+      <span class="detail-sheet__loading-line"></span>
+      <span class="detail-sheet__loading-line detail-sheet__loading-line--short"></span>
+      <span class="detail-sheet__loading-line"></span>
+      <span class="detail-sheet__loading-line"></span>
+      <span class="detail-sheet__loading-line detail-sheet__loading-line--medium"></span>
+    </div>
+  `;
+}
+
 function highlightElementText(root: HTMLElement, query: string): void {
   const terms = getHighlightTerms(query);
   if (terms.length === 0) {
@@ -377,7 +391,7 @@ export async function bootstrapSearchApp({
     detailOrg.textContent = item.organization;
     detailType.textContent = item.entityTypeLabel;
     detailDate.textContent = item.date;
-    detailText.innerHTML = "<p>Document laden...</p>";
+    detailText.innerHTML = loadingMarkdownSkeleton();
     detailDownload.hidden = !item.downloadUrl;
     if (item.downloadUrl) {
       detailDownload.href = item.downloadUrl;

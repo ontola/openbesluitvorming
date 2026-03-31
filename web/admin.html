@@ -24,7 +24,7 @@
           <div class="section__heading">
             <h2>Rerun starten</h2>
           </div>
-          <article class="feature-card">
+          <article class="surface-card feature-card">
             <form id="rerun-form" class="admin-form admin-form--rerun">
               <label class="select-field select-field--compact">
                 <span class="sr-only">Bron</span>
@@ -67,6 +67,14 @@
               </select>
             </label>
             <button type="button" class="ghost-button" id="refresh-runs">Verversen</button>
+          </div>
+          <div class="admin-runs-table" aria-hidden="true">
+            <div>Run</div>
+            <div>Verg.</div>
+            <div>Doc.</div>
+            <div>Cache</div>
+            <div>Download</div>
+            <div>Tijd</div>
           </div>
           <div class="admin-runs" id="runs-list"></div>
         </section>

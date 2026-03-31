@@ -5,6 +5,13 @@ export interface DocumentMarkdownExtractionResult {
   warnings: string[];
 }
 
+function isCommandMissing(error: unknown): boolean {
+  return (
+    error instanceof Deno.errors.NotFound ||
+    (error instanceof Error && error.message.includes("No such file or directory"))
+  );
+}
+
 function normalizeWhitespace(text: string): string {
   return text
     .replaceAll(/\r\n/g, "\n")
@@ -81,10 +88,7 @@ async function extractPdfMarkdown(bytes: Uint8Array): Promise<DocumentMarkdownEx
       warnings: [],
     };
   } catch (error) {
-    if (
-      error instanceof Deno.errors.NotFound ||
-      (error instanceof Error && error.message.includes("No such file or directory"))
-    ) {
+    if (isCommandMissing(error)) {
       // The Rust unpdf CLI is the preferred PDF->Markdown path. Keep this fallback so host-side
       // development and tests still work before the CLI is installed everywhere.
       return {
@@ -95,15 +99,6 @@ async function extractPdfMarkdown(bytes: Uint8Array): Promise<DocumentMarkdownEx
       };
     }
     throw error;
-  }
-}
-
-async function extractWithTextutil(bytes: Uint8Array, extension: string): Promise<string> {
-  const tempPath = await writeTempFile(bytes, extension);
-  try {
-    return await readCommandOutput("/usr/bin/textutil", ["-convert", "txt", "-stdout", tempPath]);
-  } finally {
-    await Deno.remove(tempPath).catch(() => undefined);
   }
 }
 
@@ -153,6 +148,7 @@ export async function extractDocumentMarkdown(
   const contentType = options.contentType?.toLowerCase() ?? "";
   const extension = fileExtension(options.fileName);
   let text = "";
+  const warnings: string[] = [];
 
   if (contentType.includes("pdf") || extension === ".pdf") {
     return await extractPdf(bytes);
@@ -167,7 +163,13 @@ export async function extractDocumentMarkdown(
     extension === ".html" ||
     extension === ".htm"
   ) {
-    text = normalizeWhitespace(await extractWithTextutil(bytes, extension || ".docx"));
+    if (extension === ".html" || extension === ".htm" || contentType.includes("html")) {
+      text = normalizeWhitespace(new TextDecoder().decode(bytes));
+    } else {
+      warnings.push(
+        `Office document extraction is not supported yet for ${extension || contentType || "this file type"}.`,
+      );
+    }
   } else if (
     contentType.startsWith("text/") ||
     contentType.includes("json") ||
@@ -180,6 +182,6 @@ export async function extractDocumentMarkdown(
 
   return {
     markdown: deriveMarkdownFromText(text),
-    warnings: [],
+    warnings,
   };
 }

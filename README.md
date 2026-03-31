@@ -322,7 +322,8 @@ pnpm run web
 The host-side ingest command currently uses:
 
 - the Rust `unpdf` CLI for PDFs
-- `textutil` for `.doc`, `.docx`, `.rtf`, `.odt`, and HTML-like office documents
+- direct text decoding for `.txt`, `.md`, `.json`, and HTML-like documents
+- office formats like `.doc`, `.docx`, `.rtf`, and `.odt` are not supported yet and are logged as extraction warnings
 
 In Docker and compose, the `unpdf` CLI is installed in the image automatically.
 On the host, Woozi will try to call `unpdf` from `PATH` or from `WOOZI_UNPDF_BIN`.
@@ -339,4 +340,5 @@ sudo mv unpdf /usr/local/bin/unpdf
 There is still a narrow JavaScript fallback for PDFs when the CLI is missing, but that is only a
 development fallback and not the intended production extractor.
 
-The remaining host dependency is `textutil` for Office-style documents.
+There is no remaining host-only Office extractor in the runtime anymore. Unsupported office
+formats are currently skipped with an explicit extraction warning.

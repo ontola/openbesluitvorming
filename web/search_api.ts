@@ -3,6 +3,7 @@ import { QuickwitClient } from "../src/quickwit/client.ts";
 import { ObjectStorageClient } from "../src/storage/s3.ts";
 
 type SearchHit = {
+  time?: string;
   entity_id?: string;
   entity_type?: string;
   name?: string;
@@ -176,6 +177,28 @@ function displayOrganization(hit: SearchHit): string {
   return hit.organization ?? "Onbekende organisatie";
 }
 
+function compareRecency(left?: string, right?: string): number {
+  return (right ?? "").localeCompare(left ?? "");
+}
+
+function dedupeLatestHits(hits: SearchHit[]): SearchHit[] {
+  const byEntityId = new Map<string, SearchHit>();
+
+  for (const hit of hits) {
+    const entityId = hit.entity_id;
+    if (!entityId) {
+      continue;
+    }
+
+    const existing = byEntityId.get(entityId);
+    if (!existing || compareRecency(existing.time, hit.time) > 0) {
+      byEntityId.set(entityId, hit);
+    }
+  }
+
+  return [...byEntityId.values()];
+}
+
 export async function searchMeetings(
   options: {
     query?: string;
@@ -189,13 +212,25 @@ export async function searchMeetings(
   const entityType = options.entityType?.trim() ?? "";
   const sort = options.sort?.trim() ?? "date_desc";
   const quickwit = new QuickwitClient();
-  const response = await quickwit.search(buildQuickwitQuery(query, organization, entityType), 24, {
+  const response = await quickwit.search(buildQuickwitQuery(query, organization, entityType), 96, {
     snippetFields: query ? ["content", "name"] : [],
   });
 
-  const results = response.hits.map((hit, index) => {
-    const document = hit as SearchHit;
-    const snippets = response.snippets?.[index] as SearchSnippet | undefined;
+  const dedupedHits = dedupeLatestHits(response.hits as SearchHit[]);
+  const snippetsByEntityId = new Map<string, SearchSnippet>();
+
+  (response.hits as SearchHit[]).forEach((hit, index) => {
+    if (!hit.entity_id || snippetsByEntityId.has(hit.entity_id)) {
+      return;
+    }
+    const snippet = response.snippets?.[index] as SearchSnippet | undefined;
+    if (snippet) {
+      snippetsByEntityId.set(hit.entity_id, snippet);
+    }
+  });
+
+  const results = dedupedHits.map((document) => {
+    const snippets = document.entity_id ? snippetsByEntityId.get(document.entity_id) : undefined;
     const snippetHtml = sanitizeSnippet(snippets?.content?.[0] ?? snippets?.name?.[0]);
 
     return {
@@ -218,13 +253,13 @@ export async function searchMeetings(
     };
   });
 
-  return sortResults(results, sort);
+  return sortResults(results, sort).slice(0, 24);
 }
 
 export async function getEntityContent(entityId: string): Promise<EntityContentResponse | null> {
   const quickwit = new QuickwitClient();
-  const response = await quickwit.search(`entity_id:${escapeTerm(entityId)}`, 1);
-  const hit = response.hits[0] as SearchHit | undefined;
+  const response = await quickwit.search(`entity_id:${escapeTerm(entityId)}`, 8);
+  const hit = dedupeLatestHits(response.hits as SearchHit[])[0];
 
   if (!hit) {
     return null;

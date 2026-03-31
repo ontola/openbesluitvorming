@@ -91,6 +91,15 @@ async function fetchBytes(url: string): Promise<Uint8Array> {
   throw lastError instanceof Error ? lastError : new Error(`Request failed for ${url}`);
 }
 
+function fallbackDocumentUrl(document: unknown): string | undefined {
+  if (!document || typeof document !== "object") {
+    return undefined;
+  }
+
+  const value = (document as Record<string, unknown>).url;
+  return typeof value === "string" ? value : undefined;
+}
+
 export class NotubizClient {
   async getOrganizationAttributes(organizationId: number): Promise<NotubizOrganizationAttributes> {
     type OrganizationsResponse = {
@@ -148,8 +157,32 @@ export class NotubizClient {
     return await fetchJson(buildUrl(`events/meetings/${meetingId}`));
   }
 
-  async downloadDocument(url: string): Promise<Uint8Array> {
-    const target = url.includes("format=") ? url : `${url}?${DEFAULT_QUERY}`;
-    return await fetchBytes(target);
+  async downloadDocument(document: unknown): Promise<Uint8Array> {
+    const record =
+      document && typeof document === "object" ? (document as Record<string, unknown>) : {};
+    const primaryUrl = typeof record.original_url === "string" ? record.original_url : undefined;
+    if (!primaryUrl) {
+      throw new Error("Document has no download URL");
+    }
+
+    const target = primaryUrl.includes("format=") ? primaryUrl : `${primaryUrl}?${DEFAULT_QUERY}`;
+
+    try {
+      return await fetchBytes(target);
+    } catch (error) {
+      const fallbackUrl = fallbackDocumentUrl(record.raw);
+      if (
+        error instanceof Error &&
+        error.message.includes("Request failed 403") &&
+        fallbackUrl &&
+        fallbackUrl !== primaryUrl
+      ) {
+        const fallbackTarget = fallbackUrl.includes("format=")
+          ? fallbackUrl
+          : `${fallbackUrl}?${DEFAULT_QUERY}`;
+        return await fetchBytes(fallbackTarget);
+      }
+      throw error;
+    }
   }
 }

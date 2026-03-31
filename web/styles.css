@@ -70,7 +70,6 @@ select {
   background: radial-gradient(circle, rgba(37, 89, 168, 0.18), transparent 66%);
 }
 
-.hero__eyebrow,
 .hero__intro,
 .search-panel,
 .search-results,
@@ -78,16 +77,6 @@ select {
 .content {
   position: relative;
   z-index: 1;
-}
-
-.hero__eyebrow {
-  margin: 0 0 0.8rem;
-  text-align: center;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  font-size: 0.74rem;
-  font-weight: 700;
-  color: var(--accent-deep);
 }
 
 .hero__admin-link {
@@ -279,11 +268,9 @@ select {
 }
 
 .primary-button,
-.ghost-button {
+.ghost-button,
+.detail-sheet__close {
   border-radius: 999px;
-  min-height: 3rem;
-  padding: 0 1.2rem;
-  border: 1px solid transparent;
   cursor: pointer;
   transition:
     transform 180ms ease,
@@ -292,17 +279,23 @@ select {
 }
 
 .primary-button:hover,
-.ghost-button:hover {
+.ghost-button:hover,
+.detail-sheet__close:hover {
   transform: translateY(-1px);
 }
 
 .primary-button {
+  min-height: 3rem;
+  padding: 0 1.2rem;
+  border: 1px solid transparent;
   background: linear-gradient(135deg, var(--accent-deep), var(--accent));
   color: white;
   box-shadow: 0 12px 30px rgba(37, 89, 168, 0.22);
 }
 
 .ghost-button {
+  min-height: 3rem;
+  padding: 0 1.2rem;
   background: rgba(255, 255, 255, 0.84);
   color: var(--accent-deep);
   border-color: var(--line);
@@ -319,10 +312,6 @@ select {
   color: var(--muted);
 }
 
-.hero__meta strong {
-  color: var(--text);
-}
-
 .content {
   max-width: 64rem;
   margin: 0 auto;
@@ -331,6 +320,16 @@ select {
 
 .content--admin {
   max-width: 72rem;
+  padding-top: 2rem;
+  padding-bottom: 3.5rem;
+}
+
+.content--admin .section + .section {
+  margin-top: 2rem;
+}
+
+.content--admin .feature-card {
+  padding: 1rem 1.1rem;
 }
 
 .section + .section {
@@ -368,30 +367,9 @@ select {
   margin-top: 1.4rem;
 }
 
-.admin-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1rem;
-}
-
-.admin-section-heading {
-  display: block;
-}
-
 .admin-inline-note {
   margin: 0.55rem 0 0;
   color: var(--muted);
-}
-
-.admin-filter-card {
-  margin-top: 1rem;
-  max-width: 42rem;
-  padding: 1rem 1.1rem;
-}
-
-.admin-filter-card h3 {
-  margin: 0 0 0.75rem;
-  font-size: 1rem;
 }
 
 .admin-form {
@@ -423,12 +401,27 @@ select {
   gap: 0.8rem;
 }
 
-.admin-run {
-  text-align: left;
+.admin-runs-table {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) repeat(4, 5.25rem) 11rem;
+  gap: 0.75rem;
+  margin: 1rem 0 0.55rem;
+  padding: 0 0.9rem;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.surface-card {
   border: 1px solid var(--line);
-  border-radius: 1rem;
-  background: rgba(255, 255, 255, 0.9);
-  padding: 1rem;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 14px 30px rgba(35, 71, 128, 0.08);
+  border-radius: 1.2rem;
+}
+
+.admin-run,
+.result-card {
   color: inherit;
   cursor: pointer;
   transition:
@@ -437,16 +430,40 @@ select {
     border-color 180ms ease;
 }
 
-.admin-run:hover,
-.admin-run:focus-visible {
+.admin-run,
+.feature-card {
+  padding: 1rem 1.1rem;
+}
+
+.result-card {
+  padding: 1.25rem 1.25rem 1.35rem;
+  animation: rise 520ms ease-out both;
+}
+
+.surface-card--lift:hover,
+.surface-card--lift:focus-visible {
   transform: translateY(-2px);
   box-shadow: 0 18px 36px rgba(35, 71, 128, 0.12);
   border-color: rgba(78, 166, 255, 0.28);
   outline: none;
 }
 
-.admin-run__header {
-  margin-bottom: 0.7rem;
+.admin-run:hover,
+.admin-run:focus-visible {
+  box-shadow: 0 14px 30px rgba(35, 71, 128, 0.08);
+  border-color: rgba(78, 166, 255, 0.28);
+  outline: none;
+}
+
+.admin-run__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) repeat(4, 5.25rem) 11rem;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.admin-run__primary {
+  min-width: 0;
 }
 
 .admin-run__meta {
@@ -461,35 +478,61 @@ select {
   font-size: 0.95rem;
 }
 
-.admin-run p,
-.admin-run small {
-  margin: 0;
+.admin-run__metric {
+  text-align: center;
   color: var(--muted);
 }
 
-.admin-run p {
+.admin-run__metric strong {
+  color: var(--text);
   font-size: 1rem;
-  line-height: 1.6;
+  font-weight: 700;
+}
+
+.admin-run__time {
+  text-align: right;
+  white-space: nowrap;
 }
 
 .admin-run small {
-  display: block;
-  margin-top: 0.3rem;
+  margin: 0;
+  color: var(--muted);
   font-size: 0.92rem;
 }
 
 .admin-run__issue {
   margin-top: 0.8rem;
-  padding: 0.7rem 0.85rem;
-  border-radius: 0.85rem;
-  background: rgba(37, 89, 168, 0.06);
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(41, 88, 153, 0.1);
   color: var(--muted);
   display: grid;
-  gap: 0.2rem;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: flex-start;
+  gap: 0.75rem;
+  text-align: left;
 }
 
 .admin-run__issue strong {
   color: var(--accent-deep);
+  flex: 0 0 auto;
+}
+
+.admin-run__issue-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem 0.55rem;
+}
+
+.admin-run__issue-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  font-size: 0.92rem;
+}
+
+.admin-run__issue-count {
+  color: var(--text);
+  font-weight: 700;
 }
 
 .admin-detail__grid {
@@ -524,18 +567,6 @@ select {
   color: var(--muted);
   font-size: 1rem;
   line-height: 1.6;
-}
-
-.feature-card,
-.result-card {
-  border: 1px solid var(--line);
-  border-radius: 1.35rem;
-  background: rgba(255, 255, 255, 0.86);
-  box-shadow: 0 14px 30px rgba(35, 71, 128, 0.08);
-}
-
-.feature-card {
-  padding: 1.35rem;
 }
 
 .feature-card h3,
@@ -573,24 +604,6 @@ select {
 
 .content[hidden] {
   display: none;
-}
-
-.result-card {
-  padding: 1.25rem 1.25rem 1.35rem;
-  animation: rise 520ms ease-out both;
-  cursor: pointer;
-  transition:
-    transform 180ms ease,
-    box-shadow 180ms ease,
-    border-color 180ms ease;
-}
-
-.result-card:hover,
-.result-card:focus-visible {
-  transform: translateY(-2px);
-  box-shadow: 0 18px 36px rgba(35, 71, 128, 0.12);
-  border-color: rgba(78, 166, 255, 0.28);
-  outline: none;
 }
 
 .result-card__meta {
@@ -713,6 +726,10 @@ select {
   box-shadow: 0 24px 60px rgba(17, 32, 61, 0.22);
 }
 
+.detail-sheet--reader {
+  min-height: min(44rem, calc(100vh - 3rem));
+}
+
 .detail-sheet__header {
   display: flex;
   justify-content: space-between;
@@ -744,16 +761,18 @@ select {
   border: 1px solid var(--line);
   background: white;
   color: var(--accent-deep);
-  border-radius: 999px;
   min-height: 2.8rem;
   padding: 0 1rem;
-  cursor: pointer;
 }
 
 .detail-sheet__body {
   overflow: auto;
   max-height: calc(100vh - 8rem);
   padding: 1.4rem;
+}
+
+.detail-sheet--reader .detail-sheet__body {
+  min-height: min(36rem, calc(100vh - 9rem));
 }
 
 .detail-sheet__body h2 {
@@ -781,6 +800,52 @@ select {
   line-height: 1.65;
   font-size: 1rem;
   overflow: auto;
+}
+
+.detail-sheet--reader .detail-sheet__text {
+  min-height: min(30rem, calc(100vh - 15rem));
+}
+
+.detail-sheet__loading {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.detail-sheet__loading-line {
+  display: block;
+  height: 1rem;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    rgba(37, 89, 168, 0.08),
+    rgba(78, 166, 255, 0.18),
+    rgba(37, 89, 168, 0.08)
+  );
+  background-size: 200% 100%;
+  animation: detail-loading-sheen 1.5s ease-in-out infinite;
+}
+
+.detail-sheet__loading-line--title {
+  width: 48%;
+  height: 1.25rem;
+}
+
+.detail-sheet__loading-line--short {
+  width: 62%;
+}
+
+.detail-sheet__loading-line--medium {
+  width: 76%;
+}
+
+@keyframes detail-loading-sheen {
+  0% {
+    background-position: 200% 0;
+  }
+
+  100% {
+    background-position: -200% 0;
+  }
 }
 
 .detail-sheet__text mark {
@@ -906,21 +971,10 @@ select {
     padding-top: 4.5rem;
   }
 
-  .admin-grid,
   .feature-grid,
-  .result-list {
-    grid-template-columns: 1fr;
-    flex-direction: column;
-  }
-
-  .feature-grid,
-  .admin-grid,
   .result-list {
     display: grid;
-  }
-
-  .search-panel__actions > * {
-    width: 100%;
+    grid-template-columns: 1fr;
   }
 
   .search-panel__options {
@@ -949,16 +1003,25 @@ select {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .admin-section-heading {
-    display: block;
-  }
-
   .admin-form--rerun {
     grid-template-columns: 1fr;
   }
 
   .admin-form--filters {
     grid-template-columns: 1fr;
+  }
+
+  .admin-runs-table {
+    display: none;
+  }
+
+  .admin-run__row {
+    grid-template-columns: 1fr 3.8rem 3.8rem 3.8rem 4.8rem;
+  }
+
+  .admin-run__time {
+    grid-column: 1 / -1;
+    text-align: left;
   }
 }
 
