@@ -826,8 +826,9 @@ select {
   inset: 0;
   z-index: 20;
   display: grid;
-  place-items: center;
+  place-items: start center;
   padding: 1.5rem;
+  overflow: auto;
 }
 
 .detail-overlay[hidden] {
@@ -843,6 +844,8 @@ select {
 
 .detail-sheet {
   position: relative;
+  display: flex;
+  flex-direction: column;
   width: min(72rem, 100%);
   max-height: calc(100vh - 3rem);
   overflow: hidden;
@@ -854,7 +857,6 @@ select {
 
 .detail-sheet--reader {
   min-height: 0;
-  height: min(44rem, calc(100vh - 3rem));
 }
 
 .detail-sheet__header {
@@ -922,13 +924,14 @@ select {
 .detail-sheet__body {
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow: hidden;
-  max-height: calc(100vh - 8rem);
   padding: 1.1rem 1.25rem 1.25rem;
 }
 
 .detail-sheet--reader .detail-sheet__body {
-  min-height: min(36rem, calc(100vh - 10rem));
+  min-height: 0;
 }
 
 .detail-sheet__download {
@@ -984,7 +987,7 @@ select {
 }
 
 .detail-sheet--reader .detail-sheet__text {
-  min-height: min(30rem, calc(100vh - 15rem));
+  min-height: 0;
 }
 
 .detail-sheet__pdf {
@@ -1000,8 +1003,8 @@ select {
 .detail-sheet__pdf-frame {
   display: block;
   width: 100%;
-  min-height: min(30rem, calc(100vh - 15rem));
-  height: min(68vh, 52rem);
+  min-height: 0;
+  height: 100%;
   border: 0;
   background: white;
 }
