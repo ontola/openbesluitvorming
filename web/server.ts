@@ -1,3 +1,6 @@
+import { runIngest } from "../src/ingest.ts";
+import { getRunDetails, listRuns } from "../src/ops/store.ts";
+import { notubizSources } from "../src/sources/notubiz.ts";
 import { searchMeetings } from "./search_api.ts";
 
 const root = new URL("./", import.meta.url);
@@ -13,6 +16,56 @@ function contentType(pathname) {
 
 Deno.serve({ port }, async (request) => {
   const url = new URL(request.url);
+
+  if (url.pathname === "/api/admin/sources") {
+    return Response.json({
+      sources: Object.values(notubizSources).map((source) => ({
+        key: source.key,
+        label: source.key.replaceAll("_", " "),
+      })),
+    });
+  }
+
+  if (url.pathname === "/api/admin/runs" && request.method === "GET") {
+    try {
+      const runs = await listRuns({
+        sourceKey: url.searchParams.get("source") ?? undefined,
+        status: url.searchParams.get("status") ?? undefined,
+        limit: Number(url.searchParams.get("limit") ?? "50"),
+      });
+      return Response.json({ runs });
+    } catch (error) {
+      return Response.json(
+        { error: error instanceof Error ? error.message : "Runs ophalen mislukt" },
+        { status: 500 },
+      );
+    }
+  }
+
+  if (url.pathname.startsWith("/api/admin/runs/") && request.method === "GET") {
+    const runId = url.pathname.split("/").at(-1) ?? "";
+    const details = await getRunDetails(runId);
+    if (!details) {
+      return Response.json({ error: "Run niet gevonden" }, { status: 404 });
+    }
+    return Response.json(details);
+  }
+
+  if (url.pathname === "/api/admin/rerun" && request.method === "POST") {
+    try {
+      const payload = await request.json();
+      const result = await runIngest(payload.sourceKey, payload.dateFrom, payload.dateTo, {
+        ingestToQuickwit: true,
+        trigger: "api",
+      });
+      return Response.json({ run: result.run });
+    } catch (error) {
+      return Response.json(
+        { error: error instanceof Error ? error.message : "Rerun mislukt" },
+        { status: 500 },
+      );
+    }
+  }
 
   if (url.pathname === "/api/search") {
     try {
@@ -34,7 +87,8 @@ Deno.serve({ port }, async (request) => {
     }
   }
 
-  const pathname = url.pathname === "/" ? "/index.html" : url.pathname;
+  const pathname =
+    url.pathname === "/" ? "/index.html" : url.pathname === "/admin" ? "/admin.html" : url.pathname;
   const fileUrl = new URL(`.${pathname}`, root);
 
   try {

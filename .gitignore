@@ -4,3 +4,4 @@ quickwit/data/
 
 .zed/
 .env
+woozi-ops.sqlite3

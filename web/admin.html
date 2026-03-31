@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="nl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>OpenBesluitvorming Admin</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <main class="content content--admin">
+        <section class="section">
+          <div class="section__heading">
+            <p class="section__label">Admin</p>
+            <h2>Extractieruns beheren</h2>
+          </div>
+          <p class="prose">
+            Bekijk welke gemeenten zijn verwerkt, waar runs faalden of gedeeltelijk slaagden, en
+            start een handmatige rerun voor een datumrange.
+          </p>
+        </section>
+
+        <section class="section">
+          <div class="section__heading admin-section-heading">
+            <div>
+              <p class="section__label">Runs</p>
+              <h2>Recente extracties</h2>
+              <p class="admin-inline-note">Deze filters beperken de getoonde runs hieronder.</p>
+            </div>
+          </div>
+          <div class="feature-card admin-filter-card">
+            <h3>Runlijst filteren</h3>
+            <div class="admin-form admin-form--filters">
+              <label class="select-field select-field--compact">
+                <span class="sr-only">Filter bron</span>
+                <select id="filter-source">
+                  <option value="">Alle bronnen</option>
+                </select>
+              </label>
+              <label class="select-field select-field--compact">
+                <span class="sr-only">Filter status</span>
+                <select id="filter-status">
+                  <option value="">Alle statussen</option>
+                  <option value="running">Running</option>
+                  <option value="succeeded">Succeeded</option>
+                  <option value="partial">Partial</option>
+                  <option value="failed">Failed</option>
+                </select>
+              </label>
+              <button type="button" class="ghost-button" id="refresh-runs">Verversen</button>
+            </div>
+          </div>
+          <div class="admin-runs" id="runs-list"></div>
+        </section>
+
+        <section class="section">
+          <div class="section__heading">
+            <p class="section__label">Actie</p>
+            <h2>Rerun starten</h2>
+          </div>
+          <article class="feature-card">
+            <form id="rerun-form" class="admin-form admin-form--rerun">
+              <label class="select-field select-field--compact">
+                <span class="sr-only">Bron</span>
+                <select id="rerun-source" name="sourceKey"></select>
+              </label>
+              <label class="search-field admin-field">
+                <input id="rerun-date-from" name="dateFrom" type="date" />
+              </label>
+              <label class="search-field admin-field">
+                <input id="rerun-date-to" name="dateTo" type="date" />
+              </label>
+              <button type="submit" class="primary-button">Rerun uitvoeren</button>
+            </form>
+            <p id="rerun-status" class="admin-status"></p>
+          </article>
+        </section>
+      </main>
+    </div>
+
+    <section class="detail-overlay" id="admin-detail-overlay" hidden>
+      <div class="detail-overlay__backdrop" data-role="close-admin-detail"></div>
+      <article
+        class="detail-sheet admin-detail-sheet"
+        aria-modal="true"
+        aria-labelledby="admin-detail-title"
+        role="dialog"
+      >
+        <div class="detail-sheet__header">
+          <div class="detail-sheet__meta">
+            <span class="pill" data-role="admin-detail-source"></span>
+            <span class="pill pill--soft" data-role="admin-detail-status"></span>
+            <span class="detail-sheet__date" data-role="admin-detail-started"></span>
+          </div>
+          <button class="detail-sheet__close" type="button" data-role="close-admin-detail">
+            Sluiten
+          </button>
+        </div>
+        <div class="detail-sheet__body">
+          <h2 id="admin-detail-title" data-role="admin-detail-title"></h2>
+          <div class="admin-detail" data-role="admin-detail-body"></div>
+        </div>
+      </article>
+    </section>
+
+    <script type="module" src="/admin.js"></script>
+  </body>
+</html>

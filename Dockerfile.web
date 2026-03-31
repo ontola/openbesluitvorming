@@ -3,6 +3,7 @@ FROM denoland/deno:2.7.7
 WORKDIR /app
 
 COPY deno.json ./
+COPY quickwit ./quickwit
 COPY src ./src
 COPY web ./web
 

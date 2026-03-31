@@ -72,8 +72,12 @@ export class ObjectStorageClient {
     return {
       bucket: this.bucket,
       key,
-      url: `${this.endpoint}/${this.bucket}/${key}`,
+      url: this.urlForKey(key),
     };
+  }
+
+  urlForKey(key: string): string {
+    return `${this.endpoint}/${this.bucket}/${key}`;
   }
 
   async hasObject(key: string): Promise<boolean> {

@@ -1,7 +1,4 @@
-import { buildEntityCommitEvent } from "./events/entity_commit.ts";
-import { getNotubizSource } from "./sources/notubiz.ts";
-import { NotubizMeetingExtractor } from "./notubiz/extractor.ts";
-import { QuickwitClient } from "./quickwit/client.ts";
+import { runIngest } from "./ingest.ts";
 
 if (import.meta.main) {
   const args = [...Deno.args];
@@ -14,58 +11,37 @@ if (import.meta.main) {
     Deno.exit(1);
   }
 
-  const source = getNotubizSource(sourceKey);
-  const extractor = new NotubizMeetingExtractor();
-  const extraction = await extractor.extractForDateRange(source, dateFrom, dateTo);
-  const events = await Promise.all(
-    [...extraction.meetings, ...extraction.documents].map((entity) =>
-      buildEntityCommitEvent(entity),
-    ),
-  );
-
-  if (shouldIngestToQuickwit) {
-    const quickwit = new QuickwitClient();
-    const configPath = new URL("../quickwit/index-config.json", import.meta.url);
-    await quickwit.waitUntilReady();
-    await quickwit.ensureIndex(configPath.pathname);
-    await quickwit.ingestEvents(events);
+  try {
+    const result = await runIngest(sourceKey, dateFrom, dateTo, {
+      ingestToQuickwit: shouldIngestToQuickwit,
+      trigger: "manual",
+    });
 
     console.log(
       JSON.stringify(
         {
-          source: source.key,
-          supplier: source.supplier,
-          date_from: dateFrom,
-          date_to: dateTo,
-          meeting_count: extraction.meetings.length,
-          document_count: extraction.documents.length,
-          count: extraction.meetings.length + extraction.documents.length,
-          ingested_to_quickwit: true,
-          quickwit_index_id: "woozi-events",
+          source: result.run.source_key,
+          supplier: result.run.supplier,
+          date_from: result.run.date_from,
+          date_to: result.run.date_to,
+          meeting_count: result.run.meeting_count,
+          document_count: result.run.document_count,
+          count: result.run.meeting_count + result.run.document_count,
+          cache_hits: result.run.cache_hits,
+          downloaded_count: result.run.downloaded_count,
+          issue_count: result.run.issue_count,
+          status: result.run.status,
+          run_id: result.run.id,
+          ingested_to_quickwit: shouldIngestToQuickwit,
+          quickwit_index_id: result.quickwit_index_id,
         },
         null,
         2,
       ),
     );
-    Deno.exit(0);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Ingest failed";
+    console.error(message);
+    Deno.exit(1);
   }
-
-  console.log(
-    JSON.stringify(
-      {
-        source: source.key,
-        supplier: source.supplier,
-        date_from: dateFrom,
-        date_to: dateTo,
-        meeting_count: extraction.meetings.length,
-        document_count: extraction.documents.length,
-        count: extraction.meetings.length + extraction.documents.length,
-        meetings: extraction.meetings,
-        documents: extraction.documents,
-        events,
-      },
-      null,
-      2,
-    ),
-  );
 }

@@ -84,6 +84,29 @@ export type WooziEntity = MeetingEntity | DocumentEntity;
 export interface ExtractionBundle {
   meetings: MeetingEntity[];
   documents: DocumentEntity[];
+  stats: ExtractionStats;
+  issues: ExtractionIssue[];
+}
+
+export interface ExtractionStats {
+  meeting_count: number;
+  document_count: number;
+  cache_hits: number;
+  downloaded_count: number;
+  issue_count: number;
+}
+
+export interface ExtractionIssue {
+  severity: "warning" | "error";
+  step:
+    | "list_events"
+    | "get_meeting"
+    | "download_document"
+    | "extract_text"
+    | "upload_s3"
+    | "ingest_quickwit";
+  entity_id?: string;
+  message: string;
 }
 
 export interface NotubizSourceDefinition {
@@ -95,4 +118,23 @@ export interface NotubizSourceDefinition {
 
 export interface NotubizOrganizationAttributes {
   attributes: Record<string, string>;
+}
+
+export interface IngestRunRecord {
+  id: string;
+  source_key: string;
+  supplier: string;
+  date_from: string;
+  date_to: string;
+  trigger: "manual" | "api";
+  status: "running" | "succeeded" | "partial" | "failed";
+  started_at: string;
+  finished_at?: string;
+  meeting_count: number;
+  document_count: number;
+  cache_hits: number;
+  downloaded_count: number;
+  issue_count: number;
+  quickwit_index_id?: string;
+  error_message?: string;
 }

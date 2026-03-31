@@ -5,6 +5,7 @@ import { normalizeNotubizDocuments, normalizeNotubizMeeting } from "./normalize.
 import { ObjectStorageClient } from "../storage/s3.ts";
 import type {
   EntityCommitEvent,
+  ExtractionIssue,
   ExtractionBundle,
   NotubizSourceDefinition,
   WooziEntity,
@@ -45,6 +46,9 @@ export class NotubizMeetingExtractor {
 
     const meetings = [];
     const documents = [];
+    const issues: ExtractionIssue[] = [];
+    let cacheHits = 0;
+    let downloadedCount = 0;
     let page = 1;
     const storage = await ObjectStorageClient.fromEnvironment();
 
@@ -78,6 +82,12 @@ export class NotubizMeetingExtractor {
           meetingResponse = (await this.client.getMeeting(meetingId)) as NotubizMeetingResponse;
         } catch (error) {
           if (isSkippableMeetingError(error)) {
+            issues.push({
+              severity: "warning",
+              step: "get_meeting",
+              entity_id: `meeting:notubiz:${source.key}:${meetingId}`,
+              message: error instanceof Error ? error.message : "Meeting detail not accessible",
+            });
             continue;
           }
           throw error;
@@ -92,12 +102,25 @@ export class NotubizMeetingExtractor {
         const meeting = meetings[meetings.length - 1];
         const extractedDocuments = normalizeNotubizDocuments(source, meeting);
         for (const document of extractedDocuments) {
-          documents.push(
-            await materializeDocument(document, {
+          try {
+            const materialized = await materializeDocument(document, {
               download: (url) => this.client.downloadDocument(url),
               storage,
-            }),
-          );
+            });
+            documents.push(materialized.document);
+            if (materialized.cacheHit) {
+              cacheHits += 1;
+            } else {
+              downloadedCount += 1;
+            }
+          } catch (error) {
+            issues.push({
+              severity: "error",
+              step: "download_document",
+              entity_id: document.id,
+              message: error instanceof Error ? error.message : "Document processing failed",
+            });
+          }
         }
       }
 
@@ -108,7 +131,18 @@ export class NotubizMeetingExtractor {
       page += 1;
     }
 
-    return { meetings, documents };
+    return {
+      meetings,
+      documents,
+      issues,
+      stats: {
+        meeting_count: meetings.length,
+        document_count: documents.length,
+        cache_hits: cacheHits,
+        downloaded_count: downloadedCount,
+        issue_count: issues.length,
+      },
+    };
   }
 
   async extractCommitEventsForDateRange(
