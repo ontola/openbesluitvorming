@@ -1,0 +1,9 @@
+FROM denoland/deno:2.7.7
+
+WORKDIR /app
+
+COPY deno.json ./
+COPY src ./src
+COPY web ./web
+
+CMD ["run", "-A", "web/server.ts"]

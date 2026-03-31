@@ -1,0 +1,58 @@
+{
+  "version": "0.8",
+  "index_id": "woozi-events",
+  "doc_mapping": {
+    "mode": "dynamic",
+    "timestamp_field": "time",
+    "field_mappings": [
+      {
+        "name": "time",
+        "type": "datetime",
+        "input_formats": ["rfc3339"],
+        "fast": true
+      },
+      {
+        "name": "event_id",
+        "type": "text",
+        "tokenizer": "raw",
+        "fast": true
+      },
+      {
+        "name": "entity_id",
+        "type": "text",
+        "tokenizer": "raw",
+        "fast": true
+      },
+      {
+        "name": "entity_type",
+        "type": "text",
+        "tokenizer": "raw",
+        "fast": true
+      },
+      {
+        "name": "source",
+        "type": "text",
+        "tokenizer": "raw",
+        "fast": true
+      },
+      {
+        "name": "name",
+        "type": "text"
+      },
+      {
+        "name": "classification",
+        "type": "array<text>"
+      },
+      {
+        "name": "content",
+        "type": "text"
+      }
+    ]
+  },
+  "search_settings": {
+    "default_search_fields": ["name", "classification", "content"]
+  },
+  "indexing_settings": {
+    "commit_timeout_secs": 1
+  }
+}

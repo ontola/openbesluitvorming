@@ -1,0 +1,5 @@
+.git
+.zed
+node_modules
+quickwit/data
+tests

@@ -1,4 +1,5 @@
 {
+  "nodeModulesDir": "auto",
   "fmt": {
     "lineWidth": 100,
     "indentWidth": 2,

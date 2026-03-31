@@ -10,6 +10,14 @@ existing ORI codebase.
 The first step is a minimal schema package based on current model and
 transformer output, not a full redesign of the domain model.
 
+## Running locally
+
+```sh
+pnpm i
+pnpm test
+docker compose up -d
+```
+
 ## Architecture
 
 Woozi is designed as an event-driven indexing system.
@@ -158,8 +166,55 @@ This folder currently contains:
 
 - minimal entity schemas
 - a first Deno-based Notubiz extractor slice
-- a live e2e test for one day of Haarlem meetings
+- `entity.commit` events for canonical meetings
+- a local Quickwit setup and projection client
+- a live e2e that ingests Haarlem Notubiz meetings into Quickwit
 
-The next step is to add the first event contract:
+## Commands
 
-- `entity.commit`
+From [`woozi/`](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi):
+
+- `pnpm run web`
+- `pnpm test`
+- `pnpm test:e2e`
+- `pnpm test:gui`
+- `pnpm test:quickwit`
+- `pnpm run extract:haarlem`
+- `pnpm run ingest:haarlem`
+- `pnpm run lint`
+- `pnpm run format`
+- `pnpm run check-format`
+
+Quickwit helpers live in [`quickwit/`](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/quickwit).
+
+For real S3-compatible storage, put these values in [`.env.example`](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/.env.example) copied to `.env`:
+
+- `S3_ACCESS_KEY`
+- `S3_SECRET_KEY`
+- `S3_STORAGE_BUCKET_NAME`
+- `S3_STORAGE_ENDPOINT`
+- `S3_STORAGE_REGION`
+
+To run against external S3-compatible storage:
+
+```bash
+docker compose up -d
+```
+
+To run the local stack with MinIO for development and tests:
+
+```bash
+docker compose --profile local-s3 up -d
+```
+
+To extract one Haarlem day and ingest the resulting commit events into Quickwit:
+
+```bash
+pnpm run ingest:haarlem
+```
+
+To start the frontend prototype:
+
+```bash
+docker compose up -d openbesluitvorming
+```

@@ -1,0 +1,65 @@
+services:
+  minio:
+    profiles: ["local-s3"]
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-woozi}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-woozi-dev-secret}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+
+  minio-setup:
+    profiles: ["local-s3"]
+    image: minio/mc:latest
+    depends_on:
+      - minio
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-woozi}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-woozi-dev-secret}
+      S3_STORAGE_BUCKET_NAME: ${S3_STORAGE_BUCKET_NAME:-woozi}
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        until /usr/bin/mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD"; do
+          sleep 1
+        done
+        /usr/bin/mc mb --ignore-existing local/$$S3_STORAGE_BUCKET_NAME
+
+  quickwit:
+    image: quickwit/quickwit:0.8.1
+    command:
+      - run
+      - --config
+      - /quickwit/config/quickwit.yaml
+    environment:
+      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY:-woozi}
+      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_KEY:-woozi-dev-secret}
+      S3_STORAGE_BUCKET_NAME: ${S3_STORAGE_BUCKET_NAME:-woozi}
+      S3_STORAGE_ENDPOINT: ${S3_STORAGE_ENDPOINT:-http://minio:9000}
+      S3_STORAGE_REGION: ${S3_STORAGE_REGION:-us-east-1}
+    ports:
+      - "7280:7280"
+    volumes:
+      - quickwit-data:/quickwit/qwdata
+      - ./quickwit/quickwit.yaml:/quickwit/config/quickwit.yaml:ro
+
+  openbesluitvorming:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    depends_on:
+      - quickwit
+    environment:
+      PORT: 8787
+      QUICKWIT_URL: http://quickwit:7280
+    ports:
+      - "8787:8787"
+
+volumes:
+  minio-data:
+  quickwit-data:

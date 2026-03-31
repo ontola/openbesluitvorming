@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="nl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>OpenBesluitvorming</title>
+    <meta
+      name="description"
+      content="Doorzoek openbare besluitvorming van gemeenten, provincies en waterschappen."
+    />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="hero">
+        <div class="hero__glow hero__glow--left"></div>
+        <div class="hero__glow hero__glow--right"></div>
+        <p class="hero__eyebrow">Woozi prototype</p>
+        <h1 class="brand">
+          <span class="brand__dark">Open</span><span class="brand__light">Besluitvorming</span>
+        </h1>
+        <p class="hero__intro">
+          Vind vergaderingen, documenten en besluiten van Nederlandse overheden in een rustige,
+          snelle zoekomgeving.
+        </p>
+
+        <form class="search-panel" id="search-form">
+          <label class="search-field">
+            <span class="search-field__icon" aria-hidden="true">⌕</span>
+            <input
+              id="query"
+              name="query"
+              type="search"
+              placeholder="Zoeken naar moties, agenda's, toezeggingen of besluiten..."
+              autocomplete="off"
+            />
+          </label>
+
+          <label class="select-field">
+            <span class="sr-only">Bestuurslaag of organisatie</span>
+            <select id="organization" name="organization">
+              <option value="">Kies een gemeente, provincie of waterschap...</option>
+              <option value="haarlem">Gemeente Haarlem</option>
+              <option value="utrecht">Gemeente Utrecht</option>
+              <option value="zuid-holland">Provincie Zuid-Holland</option>
+              <option value="amstel-gooi-vecht">Waterschap Amstel, Gooi en Vecht</option>
+            </select>
+          </label>
+
+          <div class="search-panel__actions">
+            <button type="submit" class="primary-button">Doorzoeken</button>
+            <button type="button" class="ghost-button" id="fill-example">Probeer voorbeeld</button>
+          </div>
+        </form>
+
+        <section class="search-results search-results--hero" id="search-results" aria-live="polite">
+          <div class="search-results__heading">
+            <p class="section__label" id="results-label">Zoekresultaten</p>
+            <h2 id="results-title">Zoek op organisatie of onderwerp</h2>
+          </div>
+          <div class="result-list" id="result-list"></div>
+        </section>
+
+        <ul class="hero__meta">
+          <li><strong>5.153.921</strong> vergaderstukken</li>
+          <li><strong>330+</strong> organisaties</li>
+          <li><strong>Open</strong> architectuur op events en Quickwit</li>
+        </ul>
+      </header>
+
+      <main class="content" id="content">
+        <section class="section section--intro">
+          <div class="section__heading">
+            <p class="section__label">Waarom dit bestaat</p>
+            <h2>Doorzoek besluitvorming zonder omwegen</h2>
+          </div>
+          <div class="prose">
+            <p>
+              OpenBesluitvorming brengt agenda's, vergaderingen, documenten en stemmingen samen in
+              één zoekmachine. Niet als gesloten loket, maar als open infrastructuur die
+              herbruikbaar is voor publieke verantwoording, journalistiek en lokaal bestuur.
+            </p>
+            <p>
+              De nieuwe Woozi-architectuur zet bronextractie, events en zoekprojecties los van
+              elkaar. Daardoor blijft de keten beheersbaar, ook als het aantal documenten fors
+              groeit.
+            </p>
+          </div>
+        </section>
+
+        <section class="section section--cards">
+          <div class="section__heading">
+            <p class="section__label">Wat je hier ziet</p>
+            <h2>Een eenvoudige startpagina voor publieke zoektoegang</h2>
+          </div>
+          <div class="feature-grid">
+            <article class="feature-card">
+              <h3>Snel zoeken</h3>
+              <p>
+                Eén zoekveld voor besluiten, agenda's, documenten en vergaderstukken. Gericht op
+                publieke vindbaarheid, niet op intern beheer.
+              </p>
+            </article>
+            <article class="feature-card">
+              <h3>Open bronnen</h3>
+              <p>
+                Notubiz en andere leveranciers worden via extractors opgehaald, genormaliseerd en
+                als herbruikbare events gepubliceerd.
+              </p>
+            </article>
+            <article class="feature-card">
+              <h3>Schaalbaar zoeken</h3>
+              <p>
+                Zoekdocumenten landen in Quickwit als projectie. De bron van waarheid blijft buiten
+                de zoekindex.
+              </p>
+            </article>
+          </div>
+        </section>
+
+        <section class="section section--results">
+          <div class="section__heading">
+            <p class="section__label">Voorbeeldresultaten</p>
+            <h2>Recente openbare vergaderingen</h2>
+          </div>
+          <p class="prose">
+            Zodra je zoekt, verschuiven de resultaten naar boven zodat de pagina zich gedraagt als
+            een echte zoekervaring in plaats van een landingspagina met een losse resultatenlijst.
+          </p>
+        </section>
+      </main>
+    </div>
+
+    <template id="result-template">
+      <article class="result-card">
+        <div class="result-card__meta">
+          <span class="pill" data-role="org"></span>
+          <span class="result-card__date" data-role="date"></span>
+        </div>
+        <h3 data-role="title"></h3>
+        <p data-role="summary"></p>
+      </article>
+    </template>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
