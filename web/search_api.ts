@@ -1,3 +1,4 @@
+import type { SearchResult } from "../src/types.ts";
 import { QuickwitClient } from "../src/quickwit/client.ts";
 
 type SearchHit = {
@@ -15,18 +16,6 @@ type SearchHit = {
       url?: string;
     }>;
   };
-};
-
-export type SearchResult = {
-  entityType: string;
-  entityTypeLabel: string;
-  organization: string;
-  date: string;
-  title: string;
-  summary: string;
-  sortDate?: string;
-  fullText: string;
-  downloadUrl?: string;
 };
 
 function escapeTerm(term: string): string {

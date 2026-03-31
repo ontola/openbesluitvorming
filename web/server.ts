@@ -1,24 +1,45 @@
+import type { AdminRerunRequest, AdminSourcesResponse, SearchResponse } from "../src/types.ts";
 import { runIngest } from "../src/ingest.ts";
 import { getRunDetails, listRuns } from "../src/ops/store.ts";
 import { notubizSources } from "../src/sources/notubiz.ts";
 import { searchMeetings } from "./search_api.ts";
 
 const root = new URL("./", import.meta.url);
+const distRoot = new URL("./dist/", import.meta.url);
 const port = Number(Deno.env.get("PORT") ?? "8787");
 
 function contentType(pathname) {
   if (pathname.endsWith(".css")) return "text/css; charset=utf-8";
   if (pathname.endsWith(".js")) return "application/javascript; charset=utf-8";
+  if (pathname.endsWith(".mjs")) return "application/javascript; charset=utf-8";
   if (pathname.endsWith(".json")) return "application/json; charset=utf-8";
   if (pathname.endsWith(".svg")) return "image/svg+xml";
+  if (pathname.endsWith(".png")) return "image/png";
+  if (pathname.endsWith(".ico")) return "image/x-icon";
+  if (pathname.endsWith(".woff2")) return "font/woff2";
+  if (pathname.endsWith(".svg")) return "image/svg+xml";
   return "text/html; charset=utf-8";
+}
+
+async function readStaticFile(pathname: string): Promise<Uint8Array | null> {
+  const candidates = [new URL(`.${pathname}`, distRoot), new URL(`.${pathname}`, root)];
+
+  for (const candidate of candidates) {
+    try {
+      return await Deno.readFile(candidate);
+    } catch {
+      continue;
+    }
+  }
+
+  return null;
 }
 
 Deno.serve({ port }, async (request) => {
   const url = new URL(request.url);
 
   if (url.pathname === "/api/admin/sources") {
-    return Response.json({
+    return Response.json<AdminSourcesResponse>({
       sources: Object.values(notubizSources).map((source) => ({
         key: source.key,
         label: source.key.replaceAll("_", " "),
@@ -53,7 +74,7 @@ Deno.serve({ port }, async (request) => {
 
   if (url.pathname === "/api/admin/rerun" && request.method === "POST") {
     try {
-      const payload = await request.json();
+      const payload = (await request.json()) as AdminRerunRequest;
       const result = await runIngest(payload.sourceKey, payload.dateFrom, payload.dateTo, {
         ingestToQuickwit: true,
         trigger: "api",
@@ -76,7 +97,7 @@ Deno.serve({ port }, async (request) => {
         sort: url.searchParams.get("sort") ?? "date_desc",
       });
 
-      return Response.json({ results });
+      return Response.json<SearchResponse>({ results });
     } catch (error) {
       return Response.json(
         {
@@ -89,18 +110,17 @@ Deno.serve({ port }, async (request) => {
 
   const pathname =
     url.pathname === "/" ? "/index.html" : url.pathname === "/admin" ? "/admin.html" : url.pathname;
-  const fileUrl = new URL(`.${pathname}`, root);
+  const file = await readStaticFile(pathname);
 
-  try {
-    const file = await Deno.readFile(fileUrl);
+  if (file) {
     return new Response(file, {
       headers: {
         "content-type": contentType(pathname),
       },
     });
-  } catch {
-    return new Response("Niet gevonden", { status: 404 });
   }
+
+  return new Response("Niet gevonden", { status: 404 });
 });
 
 console.log(`OpenBesluitvorming draait op http://127.0.0.1:${port}`);

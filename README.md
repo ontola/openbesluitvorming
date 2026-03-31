@@ -10,13 +10,34 @@ existing ORI codebase.
 The first step is a minimal schema package based on current model and
 transformer output, not a full redesign of the domain model.
 
+The current implementation is split into:
+
+- a Deno backend for extraction, search APIs, admin APIs, and production serving
+- a Vite + TypeScript frontend for the public UI and admin UI
+- shared TypeScript contracts in [`src/types.ts`](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/src/types.ts)
+
 ## Running locally
 
 ```sh
 pnpm i
-pnpm test
 docker compose up -d
+pnpm test
 ```
+
+For frontend iteration with HMR:
+
+```sh
+pnpm run dev
+```
+
+That starts:
+
+- the Deno API server on `http://127.0.0.1:8787`
+- the Vite dev server with HMR on `http://127.0.0.1:5173`
+
+Vite proxies `/api/*` calls to the Deno server, so you can work on the
+search UI and admin UI with hot reload while reusing the existing backend.
+Open `http://127.0.0.1:5173` while iterating on the frontend.
 
 ## Architecture
 
@@ -114,7 +135,7 @@ Example object classes:
 
 ### 6. Metadata Store
 
-Woozi still uses a small metadata store.
+Woozi still needs a small metadata store.
 
 PostgreSQL remains useful for:
 
@@ -127,6 +148,11 @@ PostgreSQL remains useful for:
 
 PostgreSQL should be small and boring in Woozi.
 It is not the document store and not the search index.
+
+Current prototype note:
+
+- extraction/admin run state is currently stored in a local SQLite file
+- that is an implementation shortcut for the prototype, not the intended final metadata design
 
 ### 7. Projection Services
 
@@ -168,17 +194,25 @@ This folder currently contains:
 
 - minimal entity schemas
 - a first Deno-based Notubiz extractor slice
+- a Vite + TypeScript frontend with HMR for the public UI and admin UI
+- shared frontend/backend TypeScript API types
 - `entity.commit` events for canonical meetings and documents
 - attachment download into S3-compatible object storage
 - plain-text extraction for PDF and Word-style documents
 - a local Quickwit setup and projection client
+- a small admin UI for reruns and extraction run inspection
 - live e2e coverage that ingests Haarlem meetings and attached files into Quickwit and the GUI
 
 ## Commands
 
 From [`woozi/`](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi):
 
+- `pnpm run dev`
+- `pnpm run dev:web`
+- `pnpm run dev:api`
 - `pnpm run web`
+- `pnpm run serve:web`
+- `pnpm run build:web`
 - `pnpm test`
 - `pnpm test:e2e`
 - `pnpm test:gui`
@@ -230,6 +264,12 @@ To start the frontend prototype:
 
 ```bash
 docker compose up -d --build openbesluitvorming
+```
+
+For local production-style serving without Docker:
+
+```bash
+pnpm run web
 ```
 
 ## Local extractor requirements

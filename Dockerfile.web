@@ -1,3 +1,16 @@
+FROM node:24-bookworm-slim AS web-build
+
+WORKDIR /app
+
+COPY package.json pnpm-lock.yaml* ./
+RUN corepack enable && pnpm install --frozen-lockfile
+
+COPY tsconfig.json vite.config.ts ./
+COPY web ./web
+COPY src ./src
+
+RUN pnpm run build:web
+
 FROM denoland/deno:2.7.7
 
 WORKDIR /app
@@ -6,5 +19,6 @@ COPY deno.json ./
 COPY quickwit ./quickwit
 COPY src ./src
 COPY web ./web
+COPY --from=web-build /app/web/dist ./web/dist
 
 CMD ["run", "-A", "web/server.ts"]

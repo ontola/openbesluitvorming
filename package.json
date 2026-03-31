@@ -3,20 +3,28 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "web": "deno run -A web/server.ts",
+    "web": "pnpm run build:web && deno run -A web/server.ts",
+    "serve:web": "deno run -A web/server.ts",
+    "dev:api": "pnpm run serve:web",
+    "dev:web": "vite",
+    "dev": "concurrently -k -n api,web -c blue,green \"pnpm run dev:api\" \"pnpm run dev:web\"",
+    "build:web": "vite build",
     "test": "deno test -A",
     "test:e2e": "deno test -A tests/notubiz.test.ts",
     "test:quickwit": "deno test -A tests/quickwit.test.ts",
     "test:gui": "deno test -A tests/gui_e2e.test.ts",
     "extract:haarlem": "deno run -A src/main.ts haarlem 2025-01-14 2025-01-15",
     "ingest:haarlem": "deno run -A src/main.ts --quickwit haarlem 2025-01-14 2025-01-15",
-    "lint": "oxlint src tests web",
-    "format": "oxfmt --write src tests web",
-    "check-format": "oxfmt --check src tests web"
+    "lint": "oxlint src tests web/src",
+    "format": "oxfmt --write src tests web/src web/*.html web/*.css vite.config.ts tsconfig.json",
+    "check-format": "oxfmt --check src tests web/src web/*.html web/*.css vite.config.ts tsconfig.json"
   },
   "devDependencies": {
+    "concurrently": "^9.2.1",
     "happy-dom": "^20.8.9",
     "oxfmt": "^0.43.0",
-    "oxlint": "^1.58.0"
+    "oxlint": "^1.58.0",
+    "typescript": "^5.9.3",
+    "vite": "^7.1.10"
   }
 }

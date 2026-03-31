@@ -1,5 +1,5 @@
 import { Window } from "npm:happy-dom";
-import { bootstrapSearchApp } from "../web/app.js";
+import { bootstrapSearchApp } from "../web/src/app.ts";
 import { QuickwitClient } from "../src/quickwit/client.ts";
 import { NotubizMeetingExtractor } from "../src/notubiz/extractor.ts";
 import { getNotubizSource } from "../src/sources/notubiz.ts";
@@ -136,7 +136,7 @@ Deno.test({
       window.document.close();
 
       await bootstrapSearchApp({
-        document: window.document,
+        document: window.document as unknown as Document,
         fetchImpl: (input) => {
           const url =
             typeof input === "string" ? new URL(input, `http://127.0.0.1:${webPort}`) : input;

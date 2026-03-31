@@ -138,3 +138,57 @@ export interface IngestRunRecord {
   quickwit_index_id?: string;
   error_message?: string;
 }
+
+export interface IngestRunIssueRecord {
+  id: string;
+  run_id: string;
+  severity: ExtractionIssue["severity"];
+  step: ExtractionIssue["step"];
+  entity_id?: string;
+  message: string;
+  created_at: string;
+}
+
+export interface AdminSourceOption {
+  key: string;
+  label: string;
+}
+
+export interface AdminRunsResponse {
+  runs: IngestRunRecord[];
+}
+
+export interface AdminRunDetailResponse {
+  run: IngestRunRecord;
+  issues: IngestRunIssueRecord[];
+}
+
+export interface AdminSourcesResponse {
+  sources: AdminSourceOption[];
+}
+
+export interface AdminRerunRequest {
+  sourceKey: string;
+  dateFrom: string;
+  dateTo: string;
+}
+
+export interface AdminRerunResponse {
+  run: IngestRunRecord;
+}
+
+export interface SearchResult {
+  entityType: string;
+  entityTypeLabel: string;
+  organization: string;
+  date: string;
+  title: string;
+  summary: string;
+  sortDate?: string;
+  fullText: string;
+  downloadUrl?: string;
+}
+
+export interface SearchResponse {
+  results: SearchResult[];
+}
