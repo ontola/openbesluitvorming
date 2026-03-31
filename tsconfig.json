@@ -9,5 +9,5 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "types": ["vite/client"]
   },
-  "include": ["web/src/**/*.ts", "vite.config.ts"]
+  "include": ["web/src/**/*.ts", "web/src/**/*.svelte", "vite.config.ts"]
 }

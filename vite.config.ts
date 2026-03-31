@@ -1,3 +1,4 @@
+import { svelte } from "@sveltejs/vite-plugin-svelte";
 import { defineConfig } from "vite";
 
 const apiTarget =
@@ -5,6 +6,7 @@ const apiTarget =
   `http://127.0.0.1:${Number(process.env.WOOZI_API_PORT ?? "8788")}`;
 
 export default defineConfig({
+  plugins: [svelte()],
   root: "web",
   build: {
     outDir: "dist",
