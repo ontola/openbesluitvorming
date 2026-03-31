@@ -173,8 +173,9 @@ Deno.test({
     assert(pdfPane && !pdfPane.hidden, "expected PDF pane to become visible after switching");
     assert(textPane && textPane.hidden, "expected text pane to hide after switching to PDF");
     assert(
-      pdfFrame?.getAttribute("src") === "https://example.test/document.pdf",
-      "expected embedded PDF frame to use the PDF URL",
+      pdfFrame?.getAttribute("src") ===
+        "https://example.test/document.pdf#toolbar=0&navpanes=0&view=FitH",
+      "expected embedded PDF frame to use the clean viewer PDF URL",
     );
   },
 });

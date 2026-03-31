@@ -30,10 +30,20 @@ type WindowLike = {
     replaceState(data: unknown, unused: string, url?: string | URL | null): void;
   };
   addEventListener(type: "popstate", listener: () => void): void;
+  setTimeout(handler: TimerHandler, timeout?: number): unknown;
+  clearTimeout(id: unknown): void;
 };
 
-function renderState(document: Document, resultList: HTMLElement, message: string): void {
+function renderState(
+  document: Document,
+  resultList: HTMLElement,
+  resultsStatus: HTMLElement,
+  message: string,
+): void {
   resultList.textContent = "";
+  resultList.classList.remove("result-list--loading");
+  resultList.removeAttribute("aria-busy");
+  resultsStatus.hidden = true;
 
   const state = document.createElement("div");
   state.className = "result-state";
@@ -41,18 +51,35 @@ function renderState(document: Document, resultList: HTMLElement, message: strin
   resultList.appendChild(state);
 }
 
+function setResultsLoading(
+  resultList: HTMLElement,
+  resultsStatus: HTMLElement,
+  isLoading: boolean,
+): void {
+  resultList.classList.toggle("result-list--loading", isLoading);
+  resultsStatus.hidden = !isLoading;
+  if (isLoading) {
+    resultList.setAttribute("aria-busy", "true");
+    return;
+  }
+  resultList.removeAttribute("aria-busy");
+}
+
 function renderResults(
   resultList: HTMLElement,
+  resultsStatus: HTMLElement,
   template: HTMLTemplateElement,
   items: SearchResult[],
   onSelect: (item: SearchResult) => void,
 ): void {
   resultList.textContent = "";
+  setResultsLoading(resultList, resultsStatus, false);
 
   if (items.length === 0) {
     renderState(
       resultList.ownerDocument,
       resultList,
+      resultsStatus,
       "Geen resultaten gevonden voor deze zoekopdracht.",
     );
     return;
@@ -332,7 +359,8 @@ export async function bootstrapSearchApp({
   const dateToInput = requiredElement<HTMLInputElement>(document, "#date-to");
   const sortSelect = requiredElement<HTMLSelectElement>(document, "#sort");
   const resultsSection = requiredElement<HTMLElement>(document, "#search-results");
-  const resultsTitle = requiredElement<HTMLElement>(document, "#results-title");
+  const resultsTitleText = requiredElement<HTMLElement>(document, "#results-title-text");
+  const resultsStatus = requiredElement<HTMLElement>(document, "#results-status");
   const content = requiredElement<HTMLElement>(document, "#content");
   const resultList = requiredElement<HTMLElement>(document, "#result-list");
   const template = requiredElement<HTMLTemplateElement>(document, "#result-template");
@@ -380,6 +408,14 @@ export async function bootstrapSearchApp({
   let filtersOpen = hasAdvancedSearchFilters(currentSearchState);
   let currentDetailMode: "text" | "pdf" = "text";
   let currentDetailPdfUrl: string | null = null;
+  let pendingSearchTimer: unknown = null;
+
+  function focusQueryInput(): void {
+    windowImpl.setTimeout(() => {
+      queryInput.focus();
+      queryInput.select();
+    }, 0);
+  }
 
   function syncFilterVisibility(): void {
     advancedFilters.hidden = !filtersOpen;
@@ -389,11 +425,11 @@ export async function bootstrapSearchApp({
 
   function setResultsTitle(title: string, count?: number): void {
     if (typeof count === "number" && count >= 0) {
-      resultsTitle.textContent = `${title} (${count})`;
+      resultsTitleText.textContent = `${title} (${count})`;
       return;
     }
 
-    resultsTitle.textContent = title;
+    resultsTitleText.textContent = title;
   }
 
   function setSearchedState(searched: boolean, title: string): void {
@@ -433,6 +469,7 @@ export async function bootstrapSearchApp({
     resultList.textContent = "";
     closeDetail({ updateUrl: false, mode: "replace" });
     writeRouteState(homeState, mode);
+    focusQueryInput();
   }
 
   function writeRouteState(state: SearchRouteState, mode: "push" | "replace"): void {
@@ -444,6 +481,48 @@ export async function bootstrapSearchApp({
     } else {
       windowImpl.history.replaceState(null, "", nextUrl);
     }
+  }
+
+  function currentFormState(): SearchRouteState {
+    return {
+      query: queryInput.value.trim(),
+      organization: organizationInput.value.trim(),
+      entityType: entityTypeSelect.value.trim(),
+      dateFrom: dateFromInput.value.trim(),
+      dateTo: dateToInput.value.trim(),
+      sort: sortSelect.value.trim() || "date_desc",
+      view: "",
+    };
+  }
+
+  function cancelPendingSearch(): void {
+    if (pendingSearchTimer !== null) {
+      windowImpl.clearTimeout(pendingSearchTimer);
+      pendingSearchTimer = null;
+    }
+  }
+
+  async function performSearchFromForm(mode: "push" | "replace" = "push"): Promise<void> {
+    cancelPendingSearch();
+    try {
+      await runSearch(currentFormState(), { mode });
+    } catch (error) {
+      renderState(
+        document,
+        resultList,
+        resultsStatus,
+        error instanceof Error ? error.message : "De zoekmachine reageert niet.",
+      );
+      setSearchedState(true, "Resultaten");
+    }
+  }
+
+  function scheduleSearch(delayMs = 300): void {
+    cancelPendingSearch();
+    pendingSearchTimer = windowImpl.setTimeout(() => {
+      pendingSearchTimer = null;
+      void performSearchFromForm();
+    }, delayMs);
   }
 
   function closeDetail(options: { updateUrl?: boolean; mode?: "push" | "replace" } = {}): void {
@@ -592,7 +671,7 @@ export async function bootstrapSearchApp({
       return;
     }
 
-    renderState(document, resultList, "Zoeken...");
+    setResultsLoading(resultList, resultsStatus, true);
 
     if (updateUrl) {
       writeRouteState(currentSearchState, mode);
@@ -603,12 +682,13 @@ export async function bootstrapSearchApp({
     const payload = (await response.json()) as Partial<SearchResponse> & { error?: string };
 
     if (!response.ok) {
+      setResultsLoading(resultList, resultsStatus, false);
       throw new Error(payload.error ?? "Zoeken mislukt");
     }
 
     currentResults = payload.results ?? [];
     setResultsTitle("Resultaten", currentResults.length);
-    renderResults(resultList, template, currentResults, (item) => {
+    renderResults(resultList, resultsStatus, template, currentResults, (item) => {
       void openDetail(item);
     });
 
@@ -663,6 +743,7 @@ export async function bootstrapSearchApp({
       renderState(
         document,
         resultList,
+        resultsStatus,
         error instanceof Error ? error.message : "De zoekmachine reageert niet.",
       );
       setSearchedState(true, "Resultaten");
@@ -703,37 +784,25 @@ export async function bootstrapSearchApp({
 
   form.addEventListener("submit", async (event: SubmitEvent) => {
     event.preventDefault();
-
-    try {
-      await runSearch({
-        query: queryInput.value.trim(),
-        organization: organizationInput.value.trim(),
-        entityType: entityTypeSelect.value.trim(),
-        dateFrom: dateFromInput.value.trim(),
-        dateTo: dateToInput.value.trim(),
-        sort: sortSelect.value.trim() || "date_desc",
-        view: "",
-      });
-    } catch (error) {
-      renderState(
-        document,
-        resultList,
-        error instanceof Error ? error.message : "De zoekmachine reageert niet.",
-      );
-      setSearchedState(true, "Resultaten");
-    }
+    await performSearchFromForm();
   });
 
   queryInput.addEventListener("input", () => {
     if (queryInput.value.trim().length === 0) {
       clearToHome("replace");
+      cancelPendingSearch();
+      return;
     }
+    scheduleSearch();
   });
 
   queryInput.addEventListener("search", () => {
     if (queryInput.value.trim().length === 0) {
       clearToHome("replace");
+      cancelPendingSearch();
+      return;
     }
+    void performSearchFromForm("replace");
   });
 
   brandHome.addEventListener("click", (event: MouseEvent) => {
@@ -761,11 +830,33 @@ export async function bootstrapSearchApp({
     valueSelector: (source) => source.key,
     subtitle: (source) => `${source.supplier} · ${source.organizationType}`,
   });
+  organizationPicker.onSelect(() => {
+    void performSearchFromForm();
+  });
+
+  entityTypeSelect.addEventListener("change", () => {
+    void performSearchFromForm();
+  });
+
+  dateFromInput.addEventListener("change", () => {
+    void performSearchFromForm();
+  });
+
+  dateToInput.addEventListener("change", () => {
+    void performSearchFromForm();
+  });
+
+  sortSelect.addEventListener("change", () => {
+    void performSearchFromForm("replace");
+  });
 
   syncFilterVisibility();
   setSearchedState(false, "Zoek op organisatie of onderwerp");
   resultList.textContent = "";
   await syncFromUrl({ replace: true });
+  if (isHomeState(currentSearchState) && !currentSearchState.view) {
+    focusQueryInput();
+  }
 }
 
 if (typeof document !== "undefined") {

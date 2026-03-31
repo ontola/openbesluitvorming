@@ -34,7 +34,6 @@
         <form class="search-panel" id="search-form">
           <div class="search-panel__query-row">
             <label class="search-field search-field--primary">
-              <span class="search-field__icon" aria-hidden="true">⌕</span>
               <input
                 id="query"
                 name="query"
@@ -97,7 +96,10 @@
         <section class="search-results search-results--hero" id="search-results" aria-live="polite">
           <div class="search-results__heading">
             <div class="search-results__title-group">
-              <h2 id="results-title">Zoek op organisatie of onderwerp</h2>
+              <h2 class="search-results__title" id="results-title">
+                <span id="results-title-text">Zoek op organisatie of onderwerp</span>
+              </h2>
+              <p class="search-results__status" id="results-status" hidden>Zoeken...</p>
             </div>
             <label class="select-field select-field--compact search-results__sort">
               <span class="sr-only">Sorteren</span>

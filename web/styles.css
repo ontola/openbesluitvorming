@@ -174,6 +174,17 @@ select {
   letter-spacing: -0.04em;
 }
 
+.search-results__title {
+  display: inline-flex;
+  align-items: baseline;
+}
+
+.search-results__status {
+  margin: 0.35rem 0 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
 .search-results__sort {
   width: 12.5rem;
   max-width: 12.5rem;
@@ -219,12 +230,6 @@ select {
 
 .search-panel__options[hidden] {
   display: none;
-}
-
-.search-field__icon {
-  color: var(--accent);
-  font-size: 1.45rem;
-  margin-right: 0.8rem;
 }
 
 .search-field input,
@@ -702,9 +707,14 @@ select {
 }
 
 .result-list {
+  position: relative;
   display: grid;
   grid-template-columns: 1fr;
   gap: 1rem;
+}
+
+.result-list--loading .result-card {
+  opacity: 0.58;
 }
 
 .result-state {

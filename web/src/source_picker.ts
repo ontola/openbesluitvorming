@@ -16,6 +16,7 @@ export interface SourcePicker {
   setValue(value: string): void;
   getSelected(): AdminSourceOption | null;
   clear(): void;
+  onSelect(listener: (source: AdminSourceOption | null) => void): void;
 }
 
 export function createSourcePicker(config: SourcePickerConfig): SourcePicker {
@@ -30,6 +31,7 @@ export function createSourcePicker(config: SourcePickerConfig): SourcePicker {
   } = config;
   const byLabel = new Map<string, AdminSourceOption>();
   const pickerRoot = input.closest<HTMLElement>(".source-picker, .admin-source-picker");
+  let selectListener: ((source: AdminSourceOption | null) => void) | null = null;
 
   for (const option of options) {
     byLabel.set(option.label, option);
@@ -37,6 +39,7 @@ export function createSourcePicker(config: SourcePickerConfig): SourcePicker {
 
   function clearSelection(): void {
     hiddenInput.value = "";
+    selectListener?.(null);
   }
 
   function setOpenState(isOpen: boolean): void {
@@ -47,6 +50,7 @@ export function createSourcePicker(config: SourcePickerConfig): SourcePicker {
   function selectSource(source: AdminSourceOption): void {
     input.value = source.label;
     hiddenInput.value = valueSelector(source);
+    selectListener?.(source);
     setOpenState(false);
   }
 
@@ -136,6 +140,9 @@ export function createSourcePicker(config: SourcePickerConfig): SourcePicker {
       input.value = "";
       hiddenInput.value = "";
       setOpenState(false);
+    },
+    onSelect(listener: (source: AdminSourceOption | null) => void): void {
+      selectListener = listener;
     },
   };
 }
