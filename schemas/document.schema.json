@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openraadsinformatie.nl/schemas/document.schema.json",
+  "title": "Document",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "id": {
+      "$ref": "common.schema.json#/$defs/id"
+    },
+    "type": {
+      "enum": ["Document", "MediaObject", "Report"]
+    },
+    "ori_identifier": {
+      "$ref": "common.schema.json#/$defs/uri"
+    },
+    "name": {
+      "type": "string"
+    },
+    "classification": {
+      "$ref": "common.schema.json#/$defs/stringOrStringArray"
+    },
+    "original_url": {
+      "$ref": "common.schema.json#/$defs/uri"
+    },
+    "identifier_url": {
+      "type": "string"
+    },
+    "file_name": {
+      "type": "string"
+    },
+    "content_type": {
+      "type": "string"
+    },
+    "size_in_bytes": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "date_modified": {
+      "$ref": "common.schema.json#/$defs/dateTime"
+    },
+    "last_discussed_at": {
+      "$ref": "common.schema.json#/$defs/dateTime"
+    },
+    "is_referenced_by": {
+      "$ref": "common.schema.json#/$defs/entityRef"
+    },
+    "creator": {
+      "$ref": "common.schema.json#/$defs/entityRef"
+    },
+    "organization": {
+      "$ref": "common.schema.json#/$defs/entityRef"
+    },
+    "text": {
+      "$ref": "common.schema.json#/$defs/stringArray"
+    },
+    "md_text": {
+      "$ref": "common.schema.json#/$defs/stringArray"
+    },
+    "media_urls": {
+      "type": "array",
+      "items": {
+        "$ref": "common.schema.json#/$defs/mediaLink"
+      }
+    },
+    "source_info": {
+      "$ref": "common.schema.json#/$defs/sourceInfo"
+    }
+  },
+  "required": ["id", "type", "name"]
+}

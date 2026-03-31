@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openraadsinformatie.nl/schemas/meeting.schema.json",
+  "title": "Meeting",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "id": {
+      "$ref": "common.schema.json#/$defs/id"
+    },
+    "type": {
+      "const": "Meeting"
+    },
+    "ori_identifier": {
+      "$ref": "common.schema.json#/$defs/uri"
+    },
+    "name": {
+      "type": "string"
+    },
+    "classification": {
+      "$ref": "common.schema.json#/$defs/stringOrStringArray"
+    },
+    "status": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "location": {
+      "type": "string"
+    },
+    "start_date": {
+      "$ref": "common.schema.json#/$defs/dateTime"
+    },
+    "end_date": {
+      "$ref": "common.schema.json#/$defs/dateTime"
+    },
+    "last_discussed_at": {
+      "$ref": "common.schema.json#/$defs/dateTime"
+    },
+    "organization": {
+      "$ref": "common.schema.json#/$defs/entityRef"
+    },
+    "committee": {
+      "$ref": "common.schema.json#/$defs/entityRef"
+    },
+    "parent": {
+      "$ref": "common.schema.json#/$defs/entityRef"
+    },
+    "agenda": {
+      "$ref": "common.schema.json#/$defs/entityRefArray"
+    },
+    "attachment": {
+      "$ref": "common.schema.json#/$defs/entityRefArray"
+    },
+    "source_info": {
+      "$ref": "common.schema.json#/$defs/sourceInfo"
+    }
+  },
+  "required": ["id", "type", "name", "start_date"]
+}

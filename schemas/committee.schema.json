@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openraadsinformatie.nl/schemas/committee.schema.json",
+  "title": "Committee",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "id": {
+      "$ref": "common.schema.json#/$defs/id"
+    },
+    "type": {
+      "const": "Committee"
+    },
+    "ori_identifier": {
+      "$ref": "common.schema.json#/$defs/uri"
+    },
+    "name": {
+      "type": "string"
+    },
+    "classification": {
+      "$ref": "common.schema.json#/$defs/stringOrStringArray"
+    },
+    "description": {
+      "type": "string"
+    },
+    "subOrganizationOf": {
+      "$ref": "common.schema.json#/$defs/entityRef"
+    },
+    "homepage": {
+      "$ref": "common.schema.json#/$defs/uri"
+    },
+    "email": {
+      "type": "string"
+    },
+    "source_info": {
+      "$ref": "common.schema.json#/$defs/sourceInfo"
+    }
+  },
+  "required": ["id", "type", "name", "classification"]
+}

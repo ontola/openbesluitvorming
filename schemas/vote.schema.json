@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openraadsinformatie.nl/schemas/vote.schema.json",
+  "title": "Vote",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "id": {
+      "$ref": "common.schema.json#/$defs/id"
+    },
+    "type": {
+      "const": "Vote"
+    },
+    "ori_identifier": {
+      "$ref": "common.schema.json#/$defs/uri"
+    },
+    "option": {
+      "type": "string"
+    },
+    "weight": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "role": {
+      "type": "string"
+    },
+    "voter": {
+      "$ref": "common.schema.json#/$defs/entityRef"
+    },
+    "group": {
+      "$ref": "common.schema.json#/$defs/entityRef"
+    },
+    "vote_event": {
+      "$ref": "common.schema.json#/$defs/entityRef"
+    },
+    "source_info": {
+      "$ref": "common.schema.json#/$defs/sourceInfo"
+    }
+  },
+  "required": ["id", "type", "option", "vote_event"]
+}

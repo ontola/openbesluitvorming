@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openraadsinformatie.nl/schemas/common.schema.json",
+  "title": "ORI Common Definitions",
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "uri": {
+      "type": "string",
+      "format": "uri"
+    },
+    "dateTime": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "stringArray": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "stringOrStringArray": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "$ref": "#/$defs/stringArray"
+        }
+      ]
+    },
+    "entityRef": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/id"
+        },
+        {
+          "$ref": "#/$defs/uri"
+        }
+      ]
+    },
+    "entityRefArray": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/entityRef"
+      }
+    },
+    "sourceInfo": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "supplier": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "canonical_id": {
+          "type": "string"
+        },
+        "canonical_iri": {
+          "$ref": "#/$defs/uri"
+        },
+        "source_iri": {
+          "$ref": "#/$defs/uri"
+        }
+      }
+    },
+    "mediaLink": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "url": {
+          "$ref": "#/$defs/uri"
+        },
+        "original_url": {
+          "$ref": "#/$defs/uri"
+        },
+        "content_type": {
+          "type": "string"
+        }
+      },
+      "required": ["url"]
+    }
+  }
+}

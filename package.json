@@ -1,0 +1,17 @@
+{
+  "name": "woozi",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "deno test -A",
+    "test:e2e": "deno test -A tests/notubiz.test.ts",
+    "extract:haarlem": "deno run -A src/main.ts haarlem 2025-01-14 2025-01-15",
+    "lint": "oxlint src tests",
+    "format": "oxfmt --write src tests",
+    "check-format": "oxfmt --check src tests"
+  },
+  "devDependencies": {
+    "oxfmt": "^0.43.0",
+    "oxlint": "^1.58.0"
+  }
+}

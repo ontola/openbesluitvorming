@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openraadsinformatie.nl/schemas/entity-commit.schema.json",
+  "title": "Entity Commit Event",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "specversion": {
+      "const": "1.0"
+    },
+    "type": {
+      "const": "entity.commit"
+    },
+    "source": {
+      "type": "string",
+      "minLength": 1
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "time": {
+      "$ref": "common.schema.json#/$defs/dateTime"
+    },
+    "subject": {
+      "$ref": "common.schema.json#/$defs/id"
+    },
+    "datacontenttype": {
+      "const": "application/json"
+    },
+    "data": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "entity_type": {
+          "enum": ["Meeting", "Document", "Committee", "Vote"]
+        },
+        "entity_id": {
+          "$ref": "common.schema.json#/$defs/id"
+        },
+        "commit_id": {
+          "$ref": "common.schema.json#/$defs/id"
+        },
+        "parent_commit_id": {
+          "$ref": "common.schema.json#/$defs/id"
+        },
+        "op": {
+          "enum": ["upsert", "delete"]
+        },
+        "mode": {
+          "enum": ["replace", "merge"]
+        },
+        "schema_name": {
+          "enum": ["Meeting", "Document", "Committee", "Vote"]
+        },
+        "schema_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "content_hash": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source": {
+          "$ref": "common.schema.json#/$defs/sourceInfo"
+        },
+        "payload": {
+          "oneOf": [
+            {
+              "$ref": "meeting.schema.json"
+            },
+            {
+              "$ref": "document.schema.json"
+            },
+            {
+              "$ref": "committee.schema.json"
+            },
+            {
+              "$ref": "vote.schema.json"
+            }
+          ]
+        }
+      },
+      "required": [
+        "entity_type",
+        "entity_id",
+        "commit_id",
+        "op",
+        "mode",
+        "schema_name",
+        "schema_version",
+        "content_hash",
+        "source"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "op": {
+                "const": "upsert"
+              }
+            }
+          },
+          "then": {
+            "required": ["payload"]
+          }
+        }
+      ]
+    }
+  },
+  "required": ["specversion", "type", "source", "id", "time", "subject", "datacontenttype", "data"]
+}
