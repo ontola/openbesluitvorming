@@ -5,8 +5,10 @@ import { normalizeNotubizDocuments, normalizeNotubizMeeting } from "./normalize.
 import { ObjectStorageClient } from "../storage/s3.ts";
 import type {
   EntityCommitEvent,
+  DocumentEntity,
   ExtractionIssue,
   ExtractionBundle,
+  MeetingEntity,
   NotubizSourceDefinition,
   WooziEntity,
 } from "../types.ts";
@@ -83,13 +85,17 @@ export class NotubizMeetingExtractor {
     source: NotubizSourceDefinition,
     dateFrom: string,
     dateTo: string,
+    options: {
+      onProgress?: (stats: ExtractionBundle["stats"]) => Promise<void> | void;
+      onIssue?: (issue: ExtractionIssue, stats: ExtractionBundle["stats"]) => Promise<void> | void;
+    } = {},
   ): Promise<ExtractionBundle> {
     const organizationAttributes = await this.client.getOrganizationAttributes(
       source.notubizOrganizationId,
     );
 
-    const meetings = [];
-    const documents = [];
+    const meetings: MeetingEntity[] = [];
+    const documents: DocumentEntity[] = [];
     const issues: ExtractionIssue[] = [];
     let cacheHits = 0;
     let downloadedCount = 0;
@@ -101,6 +107,19 @@ export class NotubizMeetingExtractor {
     const documentConcurrency = Number(
       Deno.env.get("WOOZI_DOCUMENT_CONCURRENCY") ?? `${DEFAULT_DOCUMENT_CONCURRENCY}`,
     );
+
+    const currentStats = (): ExtractionBundle["stats"] => ({
+      meeting_count: meetings.length,
+      document_count: documents.length,
+      cache_hits: cacheHits,
+      downloaded_count: downloadedCount,
+      issue_count: issues.length,
+    });
+
+    const registerIssue = async (issue: ExtractionIssue): Promise<void> => {
+      issues.push(issue);
+      await options.onIssue?.(issue, currentStats());
+    };
 
     while (true) {
       const eventPage = (await this.client.listEvents(
@@ -132,10 +151,17 @@ export class NotubizMeetingExtractor {
             if (!meetingResponse.meeting) {
               return null;
             }
-            return normalizeNotubizMeeting(source, organizationAttributes, meetingResponse.meeting);
+            const meeting = normalizeNotubizMeeting(
+              source,
+              organizationAttributes,
+              meetingResponse.meeting,
+            );
+            meetings.push(meeting);
+            await options.onProgress?.(currentStats());
+            return meeting;
           } catch (error) {
             if (isSkippableMeetingError(error)) {
-              issues.push({
+              await registerIssue({
                 severity: "warning",
                 step: "get_meeting",
                 entity_id: `meeting:notubiz:${source.key}:${meetingId}`,
@@ -148,8 +174,6 @@ export class NotubizMeetingExtractor {
         })
       ).filter((meeting): meeting is NonNullable<typeof meeting> => Boolean(meeting));
 
-      meetings.push(...pageMeetings);
-
       const documentsById = new Map<string, ReturnType<typeof normalizeNotubizDocuments>[number]>();
       for (const meeting of pageMeetings) {
         for (const document of normalizeNotubizDocuments(source, meeting)) {
@@ -157,39 +181,31 @@ export class NotubizMeetingExtractor {
         }
       }
 
-      const materializedDocuments = await mapLimit(
-        [...documentsById.values()],
-        documentConcurrency,
-        async (document) => {
-          try {
-            return await materializeDocument(document, {
-              download: (documentEntity) => this.client.downloadDocument(documentEntity),
-              storage,
-            });
-          } catch (error) {
-            issues.push({
-              severity: "error",
-              step: issueStepForDocumentError(error),
-              entity_id: document.id,
-              message: error instanceof Error ? error.message : "Document processing failed",
-            });
-            return null;
+      await mapLimit([...documentsById.values()], documentConcurrency, async (document) => {
+        try {
+          const materialized = await materializeDocument(document, {
+            download: (documentEntity) => this.client.downloadDocument(documentEntity),
+            storage,
+          });
+          for (const issue of materialized.issues) {
+            await registerIssue(issue);
           }
-        },
-      );
-
-      for (const materialized of materializedDocuments) {
-        if (!materialized) {
-          continue;
+          documents.push(materialized.document);
+          if (materialized.cacheHit) {
+            cacheHits += 1;
+          } else {
+            downloadedCount += 1;
+          }
+          await options.onProgress?.(currentStats());
+        } catch (error) {
+          await registerIssue({
+            severity: "error",
+            step: issueStepForDocumentError(error),
+            entity_id: document.id,
+            message: error instanceof Error ? error.message : "Document processing failed",
+          });
         }
-        issues.push(...materialized.issues);
-        documents.push(materialized.document);
-        if (materialized.cacheHit) {
-          cacheHits += 1;
-        } else {
-          downloadedCount += 1;
-        }
-      }
+      });
 
       if (!eventPage.pagination?.has_more_pages) {
         break;
@@ -202,13 +218,7 @@ export class NotubizMeetingExtractor {
       meetings,
       documents,
       issues,
-      stats: {
-        meeting_count: meetings.length,
-        document_count: documents.length,
-        cache_hits: cacheHits,
-        downloaded_count: downloadedCount,
-        issue_count: issues.length,
-      },
+      stats: currentStats(),
     };
   }
 

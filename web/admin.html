@@ -15,14 +15,14 @@
             <h2>Admin</h2>
           </div>
           <p class="prose">
-            Bekijk welke gemeenten zijn verwerkt, waar runs faalden of gedeeltelijk slaagden, en
-            start een handmatige rerun voor een datumrange.
+            Bekijk welke gemeenten zijn verwerkt, waar imports faalden of gedeeltelijk slaagden, en
+            start handmatig een nieuwe import voor een datumrange.
           </p>
         </section>
 
         <section class="section">
           <div class="section__heading">
-            <h2>Rerun starten</h2>
+            <h2>Import starten</h2>
           </div>
           <article class="surface-card feature-card">
             <form id="rerun-form" class="admin-form admin-form--rerun">
@@ -36,7 +36,7 @@
               <label class="search-field admin-field">
                 <input id="rerun-date-to" name="dateTo" type="date" />
               </label>
-              <button type="submit" class="primary-button">Rerun uitvoeren</button>
+              <button type="submit" class="primary-button">Import uitvoeren</button>
             </form>
             <p id="rerun-status" class="admin-status"></p>
           </article>
@@ -45,8 +45,8 @@
         <section class="section">
           <div class="section__heading admin-section-heading">
             <div>
-              <h2>Recente extracties</h2>
-              <p class="admin-inline-note">Deze filters beperken de getoonde runs hieronder.</p>
+              <h2>Recente imports</h2>
+              <p class="admin-inline-note">Deze filters beperken de getoonde imports hieronder.</p>
             </div>
           </div>
           <div class="admin-form admin-form--filters">
@@ -69,7 +69,7 @@
             <button type="button" class="ghost-button" id="refresh-runs">Verversen</button>
           </div>
           <div class="admin-runs-table" aria-hidden="true">
-            <div>Run</div>
+            <div>Import</div>
             <div>Verg.</div>
             <div>Doc.</div>
             <div>Cache</div>
@@ -108,7 +108,7 @@
               type="button"
               data-role="admin-detail-rerun"
             >
-              Rerun uitvoeren
+              Import uitvoeren
             </button>
             <button class="detail-sheet__close" type="button" data-role="close-admin-detail">
               Sluiten

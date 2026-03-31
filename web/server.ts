@@ -99,7 +99,7 @@ Deno.serve({ port }, async (request) => {
       return Response.json({ run });
     } catch (error) {
       return Response.json(
-        { error: error instanceof Error ? error.message : "Rerun mislukt" },
+        { error: error instanceof Error ? error.message : "Import mislukt" },
         { status: 500 },
       );
     }

@@ -108,7 +108,7 @@ function renderRuns(
   container.textContent = "";
 
   if (runs.length === 0) {
-    container.textContent = "Nog geen runs gevonden.";
+    container.textContent = "Nog geen imports gevonden.";
     return;
   }
 
@@ -346,7 +346,7 @@ async function bootstrapAdmin(): Promise<void> {
       rerunStatus.textContent = "De startdatum moet op of voor de einddatum liggen.";
       return;
     }
-    rerunStatus.textContent = "Rerun gestart...";
+    rerunStatus.textContent = "Import gestart...";
 
     try {
       const payload = await fetchJson<AdminRerunResponse>("/api/admin/rerun", {
@@ -360,7 +360,7 @@ async function bootstrapAdmin(): Promise<void> {
           dateTo: rerunDateTo.value,
         } satisfies AdminRerunRequest),
       });
-      rerunStatus.textContent = `Run ${payload.run.id} gestart.`;
+      rerunStatus.textContent = `Import ${payload.run.id} gestart.`;
       currentRuns = [payload.run, ...currentRuns];
       renderRuns(runsList, currentRuns, new Map(), async (runId) => {
         const detail = await fetchJson<AdminRunDetailResponse>(`/api/admin/runs/${runId}`);
@@ -369,7 +369,7 @@ async function bootstrapAdmin(): Promise<void> {
       schedulePolling();
       await loadRuns();
     } catch (error) {
-      rerunStatus.textContent = error instanceof Error ? error.message : "Rerun mislukt.";
+      rerunStatus.textContent = error instanceof Error ? error.message : "Import mislukt.";
     }
   });
 
@@ -379,7 +379,7 @@ async function bootstrapAdmin(): Promise<void> {
     }
 
     detailRerun.disabled = true;
-    rerunStatus.textContent = "Rerun gestart...";
+    rerunStatus.textContent = "Import gestart...";
 
     try {
       const payload = await fetchJson<AdminRerunResponse>("/api/admin/rerun", {
@@ -394,7 +394,7 @@ async function bootstrapAdmin(): Promise<void> {
         } satisfies AdminRerunRequest),
       });
 
-      rerunStatus.textContent = `Run ${payload.run.id} gestart.`;
+      rerunStatus.textContent = `Import ${payload.run.id} gestart.`;
       currentRuns = [payload.run, ...currentRuns];
       renderRuns(runsList, currentRuns, new Map(), async (runId) => {
         const detail = await fetchJson<AdminRunDetailResponse>(`/api/admin/runs/${runId}`);
@@ -404,7 +404,7 @@ async function bootstrapAdmin(): Promise<void> {
       schedulePolling();
       await loadRuns();
     } catch (error) {
-      rerunStatus.textContent = error instanceof Error ? error.message : "Rerun mislukt.";
+      rerunStatus.textContent = error instanceof Error ? error.message : "Import mislukt.";
     } finally {
       detailRerun.disabled = false;
     }
