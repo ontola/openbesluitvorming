@@ -7,6 +7,7 @@ const DEFAULT_QUICKWIT_URL = "http://127.0.0.1:7280";
 type QuickwitSearchResponse = {
   num_hits: number;
   hits: Array<Record<string, unknown>>;
+  snippets?: Array<Record<string, string[]>>;
 };
 
 function isRetryableSearchError(error: unknown): boolean {
@@ -127,7 +128,15 @@ export class QuickwitClient {
     throw lastError instanceof Error ? lastError : new Error("Quickwit ingest failed");
   }
 
-  async search(query: string, maxHits = 10): Promise<QuickwitSearchResponse> {
+  async search(
+    query: string,
+    maxHits = 10,
+    options: {
+      snippetFields?: string[];
+    } = {},
+  ): Promise<QuickwitSearchResponse> {
+    const { snippetFields = [] } = options;
+
     return await fetchJson<QuickwitSearchResponse>(
       `${this.baseUrl}/api/v1/${this.indexId}/search`,
       {
@@ -138,6 +147,7 @@ export class QuickwitClient {
         body: JSON.stringify({
           query,
           max_hits: maxHits,
+          ...(snippetFields.length > 0 ? { snippet_fields: snippetFields.join(",") } : {}),
         }),
       },
     );

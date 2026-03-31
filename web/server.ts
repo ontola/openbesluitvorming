@@ -1,8 +1,13 @@
-import type { AdminRerunRequest, AdminSourcesResponse, SearchResponse } from "../src/types.ts";
-import { runIngest } from "../src/ingest.ts";
+import type {
+  AdminRerunRequest,
+  AdminSourcesResponse,
+  EntityContentResponse,
+  SearchResponse,
+} from "../src/types.ts";
+import { startIngest } from "../src/ingest.ts";
 import { getRunDetails, listRuns } from "../src/ops/store.ts";
 import { notubizSources } from "../src/sources/notubiz.ts";
-import { searchMeetings } from "./search_api.ts";
+import { getEntityContent, searchMeetings } from "./search_api.ts";
 
 const root = new URL("./", import.meta.url);
 const distRoot = new URL("./dist/", import.meta.url);
@@ -75,11 +80,23 @@ Deno.serve({ port }, async (request) => {
   if (url.pathname === "/api/admin/rerun" && request.method === "POST") {
     try {
       const payload = (await request.json()) as AdminRerunRequest;
-      const result = await runIngest(payload.sourceKey, payload.dateFrom, payload.dateTo, {
+      if (!payload.sourceKey?.trim()) {
+        return Response.json({ error: "Kies eerst een bron." }, { status: 400 });
+      }
+      if (!payload.dateFrom?.trim() || !payload.dateTo?.trim()) {
+        return Response.json({ error: "Vul zowel een start- als einddatum in." }, { status: 400 });
+      }
+      if (payload.dateFrom > payload.dateTo) {
+        return Response.json(
+          { error: "De startdatum moet op of voor de einddatum liggen." },
+          { status: 400 },
+        );
+      }
+      const run = await startIngest(payload.sourceKey, payload.dateFrom, payload.dateTo, {
         ingestToQuickwit: true,
         trigger: "api",
       });
-      return Response.json({ run: result.run });
+      return Response.json({ run });
     } catch (error) {
       return Response.json(
         { error: error instanceof Error ? error.message : "Rerun mislukt" },
@@ -102,6 +119,25 @@ Deno.serve({ port }, async (request) => {
       return Response.json(
         {
           error: error instanceof Error ? error.message : "Zoeken mislukt",
+        },
+        { status: 500 },
+      );
+    }
+  }
+
+  if (url.pathname.startsWith("/api/entities/") && request.method === "GET") {
+    const entityId = decodeURIComponent(url.pathname.replace("/api/entities/", ""));
+
+    try {
+      const content = await getEntityContent(entityId);
+      if (!content) {
+        return Response.json({ error: "Resultaat niet gevonden" }, { status: 404 });
+      }
+      return Response.json<EntityContentResponse>(content);
+    } catch (error) {
+      return Response.json(
+        {
+          error: error instanceof Error ? error.message : "Documentinhoud ophalen mislukt",
         },
         { status: 500 },
       );

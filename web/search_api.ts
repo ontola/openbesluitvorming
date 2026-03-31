@@ -1,7 +1,9 @@
-import type { SearchResult } from "../src/types.ts";
+import type { EntityContentResponse, SearchResult } from "../src/types.ts";
 import { QuickwitClient } from "../src/quickwit/client.ts";
+import { ObjectStorageClient } from "../src/storage/s3.ts";
 
 type SearchHit = {
+  entity_id?: string;
   entity_type?: string;
   name?: string;
   organization?: string;
@@ -11,11 +13,19 @@ type SearchHit = {
   source_key?: string;
   payload?: {
     original_url?: string;
-    text?: string[];
     media_urls?: Array<{
       url?: string;
     }>;
+    derived_content?: {
+      markdown_key?: string;
+    };
+    md_text?: string[];
   };
+};
+
+type SearchSnippet = {
+  content?: string[];
+  name?: string[];
 };
 
 function escapeTerm(term: string): string {
@@ -114,6 +124,23 @@ function summarizeContent(content?: string): string {
   return `${compact.slice(0, 237).trimEnd()}...`;
 }
 
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function sanitizeSnippet(snippet?: string): string | undefined {
+  if (!snippet) {
+    return undefined;
+  }
+
+  return escapeHtml(snippet).replaceAll("&lt;b&gt;", "<b>").replaceAll("&lt;/b&gt;", "</b>");
+}
+
 function formatDate(dateValue?: string): string {
   if (!dateValue) {
     return "Datum onbekend";
@@ -162,12 +189,17 @@ export async function searchMeetings(
   const entityType = options.entityType?.trim() ?? "";
   const sort = options.sort?.trim() ?? "date_desc";
   const quickwit = new QuickwitClient();
-  const response = await quickwit.search(buildQuickwitQuery(query, organization, entityType), 24);
+  const response = await quickwit.search(buildQuickwitQuery(query, organization, entityType), 24, {
+    snippetFields: query ? ["content", "name"] : [],
+  });
 
-  const results = response.hits.map((hit) => {
+  const results = response.hits.map((hit, index) => {
     const document = hit as SearchHit;
+    const snippets = response.snippets?.[index] as SearchSnippet | undefined;
+    const snippetHtml = sanitizeSnippet(snippets?.content?.[0] ?? snippets?.name?.[0]);
 
     return {
+      entityId: document.entity_id ?? "",
       organization: displayOrganization(document),
       entityType: document.entity_type ?? "Unknown",
       entityTypeLabel: entityTypeLabel(document.entity_type),
@@ -178,14 +210,38 @@ export async function searchMeetings(
         (document.entity_type === "Document"
           ? (document.file_name ?? "Ongetiteld document")
           : "Ongetitelde vergadering"),
-      summary: summarizeContent(document.content),
-      fullText:
-        document.payload?.text?.join("\n\n") ??
-        document.content ??
-        "Geen platte tekst beschikbaar voor dit resultaat.",
+      summary: snippetHtml
+        ? snippetHtml.replaceAll(/<\/?b>/g, "")
+        : summarizeContent(document.content),
+      summaryHtml: snippetHtml,
       downloadUrl: document.payload?.media_urls?.[0]?.url ?? document.payload?.original_url,
     };
   });
 
   return sortResults(results, sort);
+}
+
+export async function getEntityContent(entityId: string): Promise<EntityContentResponse | null> {
+  const quickwit = new QuickwitClient();
+  const response = await quickwit.search(`entity_id:${escapeTerm(entityId)}`, 1);
+  const hit = response.hits[0] as SearchHit | undefined;
+
+  if (!hit) {
+    return null;
+  }
+
+  let markdownText = hit.payload?.md_text?.join("\n\n");
+  const markdownKey = hit.payload?.derived_content?.markdown_key;
+
+  if (!markdownText && markdownKey) {
+    const storage = await ObjectStorageClient.fromEnvironment();
+    markdownText = await storage.getObjectText(markdownKey);
+  }
+
+  return {
+    entityId: hit.entity_id ?? entityId,
+    entityType: hit.entity_type ?? "Unknown",
+    markdownText,
+    downloadUrl: hit.payload?.media_urls?.[0]?.url ?? hit.payload?.original_url,
+  };
 }

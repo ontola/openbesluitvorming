@@ -1,5 +1,9 @@
 import { defineConfig } from "vite";
 
+const apiTarget =
+  process.env.WOOZI_API_TARGET ??
+  `http://127.0.0.1:${Number(process.env.WOOZI_API_PORT ?? "8788")}`;
+
 export default defineConfig({
   root: "web",
   build: {
@@ -13,10 +17,11 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5173,
+    port: Number(process.env.WOOZI_WEB_PORT ?? "4317"),
+    strictPort: true,
     proxy: {
       "/api": {
-        target: "http://127.0.0.1:8787",
+        target: apiTarget,
         changeOrigin: true,
       },
     },

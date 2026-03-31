@@ -102,8 +102,8 @@ Deno.test({
         "document should be stored in object storage",
       );
       assert(
-        (document.text?.[0]?.length ?? 0) > 200,
-        "document should include extracted plain text",
+        (document.md_text?.[0]?.length ?? 0) > 200,
+        "document should include extracted markdown text",
       );
     } finally {
       await runCommand(["docker", "compose", "down", "-v"], composeDir);
@@ -162,8 +162,8 @@ Deno.test({
       );
       assert(documentEvent.data.payload?.type === "Document", "expected Document payload");
       assert(
-        (documentEvent.data.payload?.text?.[0]?.length ?? 0) > 200,
-        "expected document payload text",
+        (documentEvent.data.payload?.md_text?.[0]?.length ?? 0) > 200,
+        "expected document payload markdown",
       );
     } finally {
       await runCommand(["docker", "compose", "down", "-v"], composeDir);

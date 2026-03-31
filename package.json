@@ -5,9 +5,15 @@
   "scripts": {
     "web": "pnpm run build:web && deno run -A web/server.ts",
     "serve:web": "deno run -A web/server.ts",
-    "dev:api": "pnpm run serve:web",
+    "dev:cleanup": "sh -c 'for port in ${WOOZI_WEB_PORT:-4317} ${WOOZI_API_PORT:-8788}; do pids=$(lsof -ti tcp:$port -sTCP:LISTEN 2>/dev/null || true); if [ -n \"$pids\" ]; then kill $pids; sleep 1; fi; done'",
+    "dev:api": "PORT=${WOOZI_API_PORT:-8788} pnpm run serve:web",
     "dev:web": "vite",
-    "dev": "concurrently -k -n api,web -c blue,green \"pnpm run dev:api\" \"pnpm run dev:web\"",
+    "dev": "pnpm run dev:cleanup && concurrently -k -n api,web -c blue,green \"pnpm run dev:api\" \"pnpm run dev:web\"",
+    "dev:infra": "docker compose --profile local-s3 up -d minio minio-setup quickwit",
+    "dev:hmr": "pnpm run dev:infra && pnpm run dev",
+    "dev:docker-api": "docker compose --profile local-s3 up -d --build minio minio-setup quickwit openbesluitvorming",
+    "dev:hmr:docker": "pnpm run dev:docker-api && WOOZI_API_TARGET=http://127.0.0.1:8787 pnpm run dev:web",
+    "dev:down": "docker compose down",
     "build:web": "vite build",
     "test": "deno test -A",
     "test:e2e": "deno test -A tests/notubiz.test.ts",
@@ -22,9 +28,11 @@
   "devDependencies": {
     "concurrently": "^9.2.1",
     "happy-dom": "^20.8.9",
+    "marked": "^16.4.1",
     "oxfmt": "^0.43.0",
     "oxlint": "^1.58.0",
     "typescript": "^5.9.3",
+    "unpdf": "^0.12.2",
     "vite": "^7.1.10"
   }
 }

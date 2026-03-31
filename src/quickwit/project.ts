@@ -40,7 +40,7 @@ function projectDocumentContent(payload?: DocumentEntity): string | undefined {
     payload?.name,
     ...(payload?.classification ?? []),
     payload?.file_name,
-    ...(payload?.text ?? []),
+    ...(payload?.md_text ?? []),
   ]
     .filter(Boolean)
     .join(" ");

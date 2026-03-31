@@ -137,6 +137,7 @@ Deno.test({
 
       await bootstrapSearchApp({
         document: window.document as unknown as Document,
+        windowImpl: window,
         fetchImpl: (input) => {
           const url =
             typeof input === "string" ? new URL(input, `http://127.0.0.1:${webPort}`) : input;

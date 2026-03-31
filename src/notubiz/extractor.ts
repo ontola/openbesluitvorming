@@ -22,6 +22,34 @@ type NotubizMeetingResponse = {
   meeting?: unknown;
 };
 
+const DEFAULT_MEETING_CONCURRENCY = 6;
+const DEFAULT_DOCUMENT_CONCURRENCY = 3;
+
+async function mapLimit<TInput, TOutput>(
+  items: TInput[],
+  limit: number,
+  task: (item: TInput) => Promise<TOutput>,
+): Promise<TOutput[]> {
+  const results = Array.from({ length: items.length }) as TOutput[];
+  let index = 0;
+
+  async function worker(): Promise<void> {
+    while (true) {
+      const current = index;
+      index += 1;
+      if (current >= items.length) {
+        return;
+      }
+      results[current] = await task(items[current]);
+    }
+  }
+
+  await Promise.all(
+    Array.from({ length: Math.max(1, Math.min(limit, items.length)) }, () => worker()),
+  );
+  return results;
+}
+
 function isSkippableMeetingError(error: unknown): boolean {
   if (!(error instanceof Error)) {
     return false;
@@ -51,6 +79,12 @@ export class NotubizMeetingExtractor {
     let downloadedCount = 0;
     let page = 1;
     const storage = await ObjectStorageClient.fromEnvironment();
+    const meetingConcurrency = Number(
+      Deno.env.get("WOOZI_MEETING_CONCURRENCY") ?? `${DEFAULT_MEETING_CONCURRENCY}`,
+    );
+    const documentConcurrency = Number(
+      Deno.env.get("WOOZI_DOCUMENT_CONCURRENCY") ?? `${DEFAULT_DOCUMENT_CONCURRENCY}`,
+    );
 
     while (true) {
       const eventPage = (await this.client.listEvents(
@@ -65,54 +99,57 @@ export class NotubizMeetingExtractor {
         break;
       }
 
-      for (const item of events) {
-        if (!item || typeof item !== "object") continue;
-        const eventRecord = item as Record<string, unknown>;
-        if (eventRecord.permission_group !== "public") {
-          continue;
-        }
+      const publicMeetingIds = events
+        .filter((item): item is Record<string, unknown> =>
+          Boolean(item && typeof item === "object"),
+        )
+        .filter((eventRecord) => eventRecord.permission_group === "public")
+        .map((eventRecord) => eventRecord.id)
+        .filter((meetingId): meetingId is number => typeof meetingId === "number");
 
-        const meetingId = eventRecord.id;
-        if (typeof meetingId !== "number") {
-          continue;
-        }
-
-        let meetingResponse: NotubizMeetingResponse;
-        try {
-          meetingResponse = (await this.client.getMeeting(meetingId)) as NotubizMeetingResponse;
-        } catch (error) {
-          if (isSkippableMeetingError(error)) {
-            issues.push({
-              severity: "warning",
-              step: "get_meeting",
-              entity_id: `meeting:notubiz:${source.key}:${meetingId}`,
-              message: error instanceof Error ? error.message : "Meeting detail not accessible",
-            });
-            continue;
-          }
-          throw error;
-        }
-        if (!meetingResponse.meeting) {
-          continue;
-        }
-
-        meetings.push(
-          normalizeNotubizMeeting(source, organizationAttributes, meetingResponse.meeting),
-        );
-        const meeting = meetings[meetings.length - 1];
-        const extractedDocuments = normalizeNotubizDocuments(source, meeting);
-        for (const document of extractedDocuments) {
+      const pageMeetings = (
+        await mapLimit(publicMeetingIds, meetingConcurrency, async (meetingId) => {
           try {
-            const materialized = await materializeDocument(document, {
+            const meetingResponse = (await this.client.getMeeting(
+              meetingId,
+            )) as NotubizMeetingResponse;
+            if (!meetingResponse.meeting) {
+              return null;
+            }
+            return normalizeNotubizMeeting(source, organizationAttributes, meetingResponse.meeting);
+          } catch (error) {
+            if (isSkippableMeetingError(error)) {
+              issues.push({
+                severity: "warning",
+                step: "get_meeting",
+                entity_id: `meeting:notubiz:${source.key}:${meetingId}`,
+                message: error instanceof Error ? error.message : "Meeting detail not accessible",
+              });
+              return null;
+            }
+            throw error;
+          }
+        })
+      ).filter((meeting): meeting is NonNullable<typeof meeting> => Boolean(meeting));
+
+      meetings.push(...pageMeetings);
+
+      const documentsById = new Map<string, ReturnType<typeof normalizeNotubizDocuments>[number]>();
+      for (const meeting of pageMeetings) {
+        for (const document of normalizeNotubizDocuments(source, meeting)) {
+          documentsById.set(document.id, document);
+        }
+      }
+
+      const materializedDocuments = await mapLimit(
+        [...documentsById.values()],
+        documentConcurrency,
+        async (document) => {
+          try {
+            return await materializeDocument(document, {
               download: (url) => this.client.downloadDocument(url),
               storage,
             });
-            documents.push(materialized.document);
-            if (materialized.cacheHit) {
-              cacheHits += 1;
-            } else {
-              downloadedCount += 1;
-            }
           } catch (error) {
             issues.push({
               severity: "error",
@@ -120,7 +157,21 @@ export class NotubizMeetingExtractor {
               entity_id: document.id,
               message: error instanceof Error ? error.message : "Document processing failed",
             });
+            return null;
           }
+        },
+      );
+
+      for (const materialized of materializedDocuments) {
+        if (!materialized) {
+          continue;
+        }
+        issues.push(...materialized.issues);
+        documents.push(materialized.document);
+        if (materialized.cacheHit) {
+          cacheHits += 1;
+        } else {
+          downloadedCount += 1;
         }
       }
 

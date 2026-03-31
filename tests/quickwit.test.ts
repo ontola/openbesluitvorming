@@ -91,6 +91,19 @@ Deno.test({
       assert(result.num_hits > 0, "expected at least one Document hit in Quickwit");
       assert(result.hits.length > 0, "expected Quickwit hits");
 
+      const snippetResult = await quickwit.search(
+        'entity_type:Document AND "garantiestelling"',
+        1,
+        {
+          snippetFields: ["content"],
+        },
+      );
+      assert(snippetResult.snippets?.length, "expected Quickwit snippets");
+      assert(
+        snippetResult.snippets?.[0]?.content?.[0]?.includes("<b>garantiestelling</b>"),
+        "expected highlighted snippet content",
+      );
+
       const documentEvent = events.find((event) => event.data.entity_type === "Document");
       assert(documentEvent?.data.payload?.type === "Document", "expected a document payload");
       const storedUrl = documentEvent.data.payload.media_urls?.[0]?.url;

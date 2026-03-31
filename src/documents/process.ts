@@ -1,5 +1,5 @@
-import type { DocumentEntity } from "../types.ts";
-import { extractDocumentText } from "./text.ts";
+import type { DocumentEntity, ExtractionIssue } from "../types.ts";
+import { extractDocumentMarkdown } from "./text.ts";
 
 interface CachedStorage {
   hasObject(key: string): Promise<boolean>;
@@ -18,6 +18,7 @@ interface CachedStorage {
 export interface MaterializedDocumentResult {
   document: DocumentEntity;
   cacheHit: boolean;
+  issues: ExtractionIssue[];
 }
 
 function sanitizedFileName(document: DocumentEntity): string {
@@ -32,8 +33,8 @@ function objectKey(document: DocumentEntity): string {
   return `documents/${source}/${canonicalId}/${version}/${sanitizedFileName(document)}`;
 }
 
-function extractedTextKey(document: DocumentEntity): string {
-  return `${objectKey(document)}.txt`;
+function extractedMarkdownKey(document: DocumentEntity): string {
+  return `${objectKey(document)}.md`;
 }
 
 function sanitizeToken(value: string): string {
@@ -63,22 +64,26 @@ async function readCachedDocument(
   storage: CachedStorage,
 ): Promise<MaterializedDocumentResult | null> {
   const fileKey = objectKey(document);
-  const textKey = extractedTextKey(document);
-  // We only reuse cache when both the stored source file and the extracted-text sidecar exist
+  const markdownKey = extractedMarkdownKey(document);
+  // We only reuse cache when both the stored source file and the derived markdown sidecar exist
   // for the same supplier-specific version token.
   const hasFile = await storage.hasObject(fileKey);
-  const hasText = await storage.hasObject(textKey);
+  const hasMarkdown = await storage.hasObject(markdownKey);
 
-  if (!hasFile || !hasText) {
+  if (!hasFile || !hasMarkdown) {
     return null;
   }
 
-  const text = await storage.getObjectText(textKey);
+  const mdText = await storage.getObjectText(markdownKey);
   return {
     cacheHit: true,
+    issues: [],
     document: {
       ...document,
-      text: text ? [text] : undefined,
+      md_text: mdText ? [mdText] : undefined,
+      derived_content: {
+        markdown_key: markdownKey,
+      },
       media_urls: [
         {
           url: storage.urlForKey(fileKey),
@@ -98,7 +103,7 @@ export async function materializeDocument(
   },
 ): Promise<MaterializedDocumentResult> {
   if (!document.original_url) {
-    return { document, cacheHit: false };
+    return { document, cacheHit: false, issues: [] };
   }
 
   if (options.storage) {
@@ -109,10 +114,17 @@ export async function materializeDocument(
   }
 
   const bytes = await options.download(document.original_url);
-  const text = await extractDocumentText(bytes, {
+  const extraction = await extractDocumentMarkdown(bytes, {
     contentType: document.content_type,
     fileName: document.file_name,
   });
+  const mdText = extraction.markdown;
+  const issues = extraction.warnings.map((message) => ({
+    severity: "warning" as const,
+    step: "extract_text" as const,
+    entity_id: document.id,
+    message,
+  }));
 
   let mediaUrls = document.media_urls;
   if (options.storage) {
@@ -123,14 +135,18 @@ export async function materializeDocument(
         source: document.source_info.source,
       },
     });
-    await options.storage.putObject(extractedTextKey(document), new TextEncoder().encode(text), {
-      contentType: "text/plain; charset=utf-8",
-      metadata: {
-        entity_id: document.id,
-        source: document.source_info.source,
-        kind: "extracted_text",
+    await options.storage.putObject(
+      extractedMarkdownKey(document),
+      new TextEncoder().encode(mdText),
+      {
+        contentType: "text/markdown; charset=utf-8",
+        metadata: {
+          entity_id: document.id,
+          source: document.source_info.source,
+          kind: "markdown_text",
+        },
       },
-    });
+    );
     mediaUrls = [
       {
         url: stored.url,
@@ -142,9 +158,15 @@ export async function materializeDocument(
 
   return {
     cacheHit: false,
+    issues,
     document: {
       ...document,
-      text: text ? [text] : undefined,
+      md_text: mdText ? [mdText] : undefined,
+      derived_content: options.storage
+        ? {
+            markdown_key: extractedMarkdownKey(document),
+          }
+        : undefined,
       media_urls: mediaUrls,
     },
   };

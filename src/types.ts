@@ -57,6 +57,10 @@ export interface DocumentMediaLink {
   content_type?: string;
 }
 
+export interface DocumentDerivedContent {
+  markdown_key?: string;
+}
+
 export interface DocumentEntity {
   id: string;
   type: "Document";
@@ -72,8 +76,8 @@ export interface DocumentEntity {
   is_referenced_by?: string;
   creator?: string;
   organization?: string;
-  text?: string[];
   md_text?: string[];
+  derived_content?: DocumentDerivedContent;
   media_urls?: DocumentMediaLink[];
   source_info: SourceInfo;
   raw: unknown;
@@ -178,17 +182,25 @@ export interface AdminRerunResponse {
 }
 
 export interface SearchResult {
+  entityId: string;
   entityType: string;
   entityTypeLabel: string;
   organization: string;
   date: string;
   title: string;
   summary: string;
+  summaryHtml?: string;
   sortDate?: string;
-  fullText: string;
   downloadUrl?: string;
 }
 
 export interface SearchResponse {
   results: SearchResult[];
+}
+
+export interface EntityContentResponse {
+  entityId: string;
+  entityType: string;
+  markdownText?: string;
+  downloadUrl?: string;
 }

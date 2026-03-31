@@ -19,25 +19,59 @@ The current implementation is split into:
 ## Running locally
 
 ```sh
-pnpm i
 docker compose up -d
-pnpm test
+# visit http://0.0.0.0:8787
 ```
 
-For frontend iteration with HMR:
+For frontend iteration with HMR, use one command:
 
 ```sh
-pnpm run dev
+pnpm run dev:hmr
 ```
 
-That starts:
+That does two things:
 
-- the Deno API server on `http://127.0.0.1:8787`
-- the Vite dev server with HMR on `http://127.0.0.1:5173`
+- starts the local infra in Docker: `minio`, `minio-setup`, and `quickwit`
+- starts the local Deno API and Vite HMR frontend on the host
+
+That gives you:
+
+- the Deno API server on `http://127.0.0.1:8788`
+- the Vite dev server with HMR on `http://127.0.0.1:4317`
 
 Vite proxies `/api/*` calls to the Deno server, so you can work on the
 search UI and admin UI with hot reload while reusing the existing backend.
-Open `http://127.0.0.1:5173` while iterating on the frontend.
+Open `http://127.0.0.1:4317` while iterating on the frontend.
+
+Important:
+
+- the local dev API now uses `8788` by default specifically so it can coexist with the `openbesluitvorming` container on `8787`
+- `pnpm run dev:hmr` is the intended development entrypoint
+- `pnpm run dev` now clears stale listeners on its own dev ports before starting, so leftover Vite/Deno processes do not usually require manual cleanup
+
+If you only want the infra:
+
+```sh
+pnpm run dev:infra
+```
+
+To stop the Docker side again:
+
+```sh
+pnpm run dev:down
+```
+
+If you want a different dev port:
+
+```sh
+WOOZI_WEB_PORT=4401 pnpm run dev:web
+```
+
+If you also want a different API port:
+
+```sh
+WOOZI_API_PORT=8799 WOOZI_WEB_PORT=4401 pnpm run dev:hmr
+```
 
 ## Architecture
 
@@ -72,7 +106,7 @@ Responsibilities:
 - poll for changes in a date range or from a source cursor
 - fetch raw payloads and documents
 - store retrieved files in S3-compatible object storage
-- extract plain text from PDFs and office files
+- extract markdown-ready document text from PDFs and office files
 - normalize source-specific structures
 - produce canonical entities
 
@@ -131,7 +165,7 @@ Example object classes:
 - raw source payloads
 - canonical JSON snapshots
 - original files
-- derived text or markdown
+- derived markdown and search text
 
 ### 6. Metadata Store
 
@@ -198,7 +232,7 @@ This folder currently contains:
 - shared frontend/backend TypeScript API types
 - `entity.commit` events for canonical meetings and documents
 - attachment download into S3-compatible object storage
-- plain-text extraction for PDF and Word-style documents
+- markdown extraction for PDF and Word-style documents
 - a local Quickwit setup and projection client
 - a small admin UI for reruns and extraction run inspection
 - live e2e coverage that ingests Haarlem meetings and attached files into Quickwit and the GUI
@@ -208,6 +242,9 @@ This folder currently contains:
 From [`woozi/`](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi):
 
 - `pnpm run dev`
+- `pnpm run dev:infra`
+- `pnpm run dev:hmr`
+- `pnpm run dev:down`
 - `pnpm run dev:web`
 - `pnpm run dev:api`
 - `pnpm run web`
@@ -256,7 +293,7 @@ That command now:
 - extracts public Haarlem meetings from Notubiz
 - downloads attached source files
 - stores the originals in S3-compatible object storage
-- extracts plain text from those files
+- extracts markdown from those files and serves it lazily in the detail view
 - emits `entity.commit` events for `Meeting` and `Document`
 - projects both entity types into Quickwit
 
@@ -274,12 +311,24 @@ pnpm run web
 
 ## Local extractor requirements
 
-The host-side ingest command currently uses local text extraction tools:
+The host-side ingest command currently uses:
 
-- `pdftotext` for PDFs
+- the Rust `unpdf` CLI for PDFs
 - `textutil` for `.doc`, `.docx`, `.rtf`, `.odt`, and HTML-like office documents
 
-On this machine, those are available at:
+In Docker and compose, the `unpdf` CLI is installed in the image automatically.
+On the host, Woozi will try to call `unpdf` from `PATH` or from `WOOZI_UNPDF_BIN`.
 
-- `/opt/homebrew/bin/pdftotext`
-- `/usr/bin/textutil`
+For Apple Silicon macOS, you can install the pinned release like this:
+
+```sh
+curl -fsSL https://github.com/iyulab/unpdf/releases/download/v0.2.4/unpdf-macos-aarch64-v0.2.4.tar.gz \
+  | tar -xz
+chmod +x unpdf
+sudo mv unpdf /usr/local/bin/unpdf
+```
+
+There is still a narrow JavaScript fallback for PDFs when the CLI is missing, but that is only a
+development fallback and not the intended production extractor.
+
+The remaining host dependency is `textutil` for Office-style documents.

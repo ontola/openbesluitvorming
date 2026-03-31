@@ -52,7 +52,7 @@ function buildDocument(): DocumentEntity {
   };
 }
 
-Deno.test("materializeDocument reuses cached file and extracted text from storage", async () => {
+Deno.test("materializeDocument reuses cached file and extracted markdown from storage", async () => {
   const storage = new FakeStorage();
   const document = buildDocument();
   let downloads = 0;
@@ -79,7 +79,7 @@ Deno.test("materializeDocument reuses cached file and extracted text from storag
     "expected cached media url to be reused",
   );
   assert(
-    second.document.text?.[0] === "Dit is de opgeslagen platte tekst.",
-    "expected cached extracted text",
+    second.document.md_text?.[0] === "Dit is de opgeslagen platte tekst.",
+    "expected cached extracted markdown",
   );
 });

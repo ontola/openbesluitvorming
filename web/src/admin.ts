@@ -20,8 +20,8 @@ function statusLabel(status: string): string {
   return labels[status] ?? status;
 }
 
-function titleForRun(run: IngestRunRecord): string {
-  return `${run.source_key} · ${run.date_from} t/m ${run.date_to}`;
+function periodLabel(run: IngestRunRecord): string {
+  return `${run.date_from} t/m ${run.date_to}`;
 }
 
 function runSummary(run: IngestRunRecord): string {
@@ -61,8 +61,11 @@ function renderRuns(
     const issuePreview = previewIssue(run, issuesByRun);
     button.innerHTML = `
       <div class="admin-run__header">
-        <strong>${titleForRun(run)}</strong>
-        <span class="pill pill--soft">${statusLabel(run.status)}</span>
+        <div class="admin-run__meta">
+          <span class="pill">${run.source_key}</span>
+          <span class="pill pill--soft">${statusLabel(run.status)}</span>
+          <span class="admin-run__date">${periodLabel(run)}</span>
+        </div>
       </div>
       <p>${runSummary(run)}</p>
       <small>${run.started_at}</small>
@@ -81,9 +84,11 @@ function renderRunDetail(container: HTMLElement, detail: AdminRunDetailResponse)
   const issues = detail.issues ?? [];
   container.innerHTML = `
     <div class="admin-detail__grid">
+      <div><strong>Run ID</strong><p>${detail.run.id}</p></div>
       <div><strong>Bron</strong><p>${detail.run.source_key}</p></div>
       <div><strong>Status</strong><p>${statusLabel(detail.run.status)}</p></div>
-      <div><strong>Periode</strong><p>${detail.run.date_from} t/m ${detail.run.date_to}</p></div>
+      <div><strong>Periode</strong><p>${periodLabel(detail.run)}</p></div>
+      <div><strong>Gestart</strong><p>${detail.run.started_at}</p></div>
       <div><strong>Vergaderingen</strong><p>${detail.run.meeting_count}</p></div>
       <div><strong>Documenten</strong><p>${detail.run.document_count}</p></div>
       <div><strong>Cache hits</strong><p>${detail.run.cache_hits}</p></div>
@@ -136,21 +141,46 @@ async function bootstrapAdmin(): Promise<void> {
   const detailOverlay = requiredElement<HTMLElement>("#admin-detail-overlay");
   const detailSource = requiredElement<HTMLElement>('[data-role="admin-detail-source"]');
   const detailStatus = requiredElement<HTMLElement>('[data-role="admin-detail-status"]');
-  const detailStarted = requiredElement<HTMLElement>('[data-role="admin-detail-started"]');
-  const detailTitle = requiredElement<HTMLElement>('[data-role="admin-detail-title"]');
+  const detailPeriod = requiredElement<HTMLElement>('[data-role="admin-detail-period"]');
   const detailBody = requiredElement<HTMLElement>('[data-role="admin-detail-body"]');
+  const detailRerun = requiredElement<HTMLButtonElement>('[data-role="admin-detail-rerun"]');
   const closeButtons = document.querySelectorAll<HTMLElement>('[data-role="close-admin-detail"]');
+  let openRun: IngestRunRecord | null = null;
+  let currentRuns: IngestRunRecord[] = [];
+  let pollTimer: number | null = null;
+
+  function hasActiveRuns(runs: IngestRunRecord[]): boolean {
+    return runs.some((run) => run.status === "running");
+  }
+
+  function schedulePolling(): void {
+    if (pollTimer !== null) {
+      return;
+    }
+
+    pollTimer = window.setInterval(() => {
+      void loadRuns();
+    }, 1500);
+  }
+
+  function stopPolling(): void {
+    if (pollTimer !== null) {
+      window.clearInterval(pollTimer);
+      pollTimer = null;
+    }
+  }
 
   function closeDetail(): void {
     detailOverlay.hidden = true;
     document.body.classList.remove("body--locked");
+    openRun = null;
   }
 
   function openDetail(detail: AdminRunDetailResponse): void {
+    openRun = detail.run;
     detailSource.textContent = detail.run.source_key;
     detailStatus.textContent = statusLabel(detail.run.status);
-    detailStarted.textContent = detail.run.started_at;
-    detailTitle.textContent = titleForRun(detail.run);
+    detailPeriod.textContent = periodLabel(detail.run);
     renderRunDetail(detailBody, detail);
     detailOverlay.hidden = false;
     document.body.classList.add("body--locked");
@@ -184,6 +214,7 @@ async function bootstrapAdmin(): Promise<void> {
 
     const payload = await fetchJson<AdminRunsResponse>(`/api/admin/runs?${params.toString()}`);
     const runs = payload.runs ?? [];
+    currentRuns = runs;
     const issuesByRun = new Map<string, IngestRunIssueRecord[]>();
 
     await Promise.all(
@@ -208,6 +239,12 @@ async function bootstrapAdmin(): Promise<void> {
         : await fetchJson<AdminRunDetailResponse>(`/api/admin/runs/${runId}`);
       openDetail(detail);
     });
+
+    if (hasActiveRuns(runs)) {
+      schedulePolling();
+    } else {
+      stopPolling();
+    }
   }
 
   refreshRuns.addEventListener("click", () => {
@@ -222,6 +259,18 @@ async function bootstrapAdmin(): Promise<void> {
 
   rerunForm.addEventListener("submit", async (event: SubmitEvent) => {
     event.preventDefault();
+    if (!rerunSource.value.trim()) {
+      rerunStatus.textContent = "Kies eerst een bron.";
+      return;
+    }
+    if (!rerunDateFrom.value.trim() || !rerunDateTo.value.trim()) {
+      rerunStatus.textContent = "Vul zowel een start- als einddatum in.";
+      return;
+    }
+    if (rerunDateFrom.value > rerunDateTo.value) {
+      rerunStatus.textContent = "De startdatum moet op of voor de einddatum liggen.";
+      return;
+    }
     rerunStatus.textContent = "Rerun gestart...";
 
     try {
@@ -236,10 +285,53 @@ async function bootstrapAdmin(): Promise<void> {
           dateTo: rerunDateTo.value,
         } satisfies AdminRerunRequest),
       });
-      rerunStatus.textContent = `Run ${payload.run.id} afgerond met status ${statusLabel(payload.run.status)}.`;
+      rerunStatus.textContent = `Run ${payload.run.id} gestart.`;
+      currentRuns = [payload.run, ...currentRuns];
+      renderRuns(runsList, currentRuns, new Map(), async (runId) => {
+        const detail = await fetchJson<AdminRunDetailResponse>(`/api/admin/runs/${runId}`);
+        openDetail(detail);
+      });
+      schedulePolling();
       await loadRuns();
     } catch (error) {
       rerunStatus.textContent = error instanceof Error ? error.message : "Rerun mislukt.";
+    }
+  });
+
+  detailRerun.addEventListener("click", async () => {
+    if (!openRun) {
+      return;
+    }
+
+    detailRerun.disabled = true;
+    rerunStatus.textContent = "Rerun gestart...";
+
+    try {
+      const payload = await fetchJson<AdminRerunResponse>("/api/admin/rerun", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          sourceKey: openRun.source_key,
+          dateFrom: openRun.date_from,
+          dateTo: openRun.date_to,
+        } satisfies AdminRerunRequest),
+      });
+
+      rerunStatus.textContent = `Run ${payload.run.id} gestart.`;
+      currentRuns = [payload.run, ...currentRuns];
+      renderRuns(runsList, currentRuns, new Map(), async (runId) => {
+        const detail = await fetchJson<AdminRunDetailResponse>(`/api/admin/runs/${runId}`);
+        openDetail(detail);
+      });
+      openDetail({ run: payload.run, issues: [] });
+      schedulePolling();
+      await loadRuns();
+    } catch (error) {
+      rerunStatus.textContent = error instanceof Error ? error.message : "Rerun mislukt.";
+    } finally {
+      detailRerun.disabled = false;
     }
   });
 

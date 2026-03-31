@@ -179,14 +179,7 @@
             <span class="pill pill--soft" data-role="detail-type"></span>
             <span class="detail-sheet__date" data-role="detail-date"></span>
           </div>
-          <button class="detail-sheet__close" type="button" data-role="close-detail">
-            Sluiten
-          </button>
-        </div>
-
-        <div class="detail-sheet__body">
-          <h2 id="detail-title" data-role="detail-title"></h2>
-          <div class="detail-sheet__actions">
+          <div class="detail-sheet__header-actions">
             <a
               class="primary-button detail-sheet__download"
               data-role="detail-download"
@@ -195,8 +188,15 @@
             >
               Download bronbestand
             </a>
+            <button class="detail-sheet__close" type="button" data-role="close-detail">
+              Sluiten
+            </button>
           </div>
-          <pre class="detail-sheet__text" data-role="detail-text"></pre>
+        </div>
+
+        <div class="detail-sheet__body">
+          <h2 id="detail-title" data-role="detail-title"></h2>
+          <div class="detail-sheet__text prose-detail" data-role="detail-text"></div>
         </div>
       </article>
     </section>
