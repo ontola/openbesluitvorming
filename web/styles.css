@@ -523,7 +523,7 @@ select {
 
 .admin-runs-table {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) repeat(4, 5.25rem) 11rem;
+  grid-template-columns: minmax(0, 1fr) repeat(5, 4.75rem) 11rem;
   gap: 0.75rem;
   margin: 1rem 0 0.55rem;
   padding: 0 0.9rem;
@@ -578,7 +578,7 @@ select {
 
 .admin-run__row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) repeat(4, 5.25rem) 11rem;
+  grid-template-columns: minmax(0, 1fr) repeat(5, 4.75rem) 11rem;
   gap: 0.75rem;
   align-items: center;
 }
@@ -1226,7 +1226,7 @@ select {
   }
 
   .admin-run__row {
-    grid-template-columns: 1fr 3.8rem 3.8rem 3.8rem 4.8rem;
+    grid-template-columns: 1fr 3.6rem 3.6rem 3.6rem 3.8rem 4.8rem;
   }
 
   .admin-run__time {

@@ -111,6 +111,21 @@
       .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label, "nl"));
   }
 
+  function failedDocumentCount(run: IngestRunRecord): number {
+    const issues = issuesByRun.get(run.id) ?? [];
+    const failedDocumentIds = new Set(
+      issues
+        .filter((issue) =>
+          issue.severity === "error" &&
+          Boolean(issue.entity_id) &&
+          issue.entity_id?.startsWith("document:")
+        )
+        .map((issue) => issue.entity_id as string),
+    );
+
+    return failedDocumentIds.size;
+  }
+
   function formatDateInputValue(date: Date): string {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -365,6 +380,7 @@
         <div>Import</div>
         <div>Verg.</div>
         <div>Doc.</div>
+        <div>Fout</div>
         <div>Cache</div>
         <div>Download</div>
         <div>Tijd</div>
@@ -391,6 +407,7 @@
                 </div>
                 <div class="admin-run__metric"><strong>{run.meeting_count}</strong></div>
                 <div class="admin-run__metric"><strong>{run.document_count}</strong></div>
+                <div class="admin-run__metric"><strong>{failedDocumentCount(run)}</strong></div>
                 <div class="admin-run__metric"><strong>{run.cache_hits}</strong></div>
                 <div class="admin-run__metric"><strong>{run.downloaded_count}</strong></div>
                 <div class="admin-run__time">
@@ -469,6 +486,7 @@
             <div><strong>Gestart</strong><p>{openRun.started_at}</p></div>
             <div><strong>Vergaderingen</strong><p>{openRun.meeting_count}</p></div>
             <div><strong>Documenten</strong><p>{openRun.document_count}</p></div>
+            <div><strong>Documentfouten</strong><p>{failedDocumentCount(openRun)}</p></div>
             <div><strong>Cache hits</strong><p>{openRun.cache_hits}</p></div>
             <div><strong>Downloads</strong><p>{openRun.downloaded_count}</p></div>
             <div><strong>Issues</strong><p>{openRun.issue_count}</p></div>

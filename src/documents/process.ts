@@ -116,17 +116,31 @@ export async function materializeDocument(
   }
 
   const bytes = await options.download(document);
-  const extraction = await extractDocumentMarkdown(bytes, {
-    contentType: document.content_type,
-    fileName: document.file_name,
-  });
-  const mdText = extraction.markdown;
-  const issues = extraction.warnings.map((message) => ({
-    severity: "warning" as const,
-    step: "extract_text" as const,
-    entity_id: document.id,
-    message,
-  }));
+  let mdText = "";
+  const issues: ExtractionIssue[] = [];
+
+  try {
+    const extraction = await extractDocumentMarkdown(bytes, {
+      contentType: document.content_type,
+      fileName: document.file_name,
+    });
+    mdText = extraction.markdown;
+    issues.push(
+      ...extraction.warnings.map((message) => ({
+        severity: "warning" as const,
+        step: "extract_text" as const,
+        entity_id: document.id,
+        message,
+      })),
+    );
+  } catch (error) {
+    issues.push({
+      severity: "error",
+      step: "extract_text",
+      entity_id: document.id,
+      message: error instanceof Error ? error.message : "Document extraction failed",
+    });
+  }
 
   let mediaUrls = document.media_urls;
   if (options.storage) {
@@ -137,18 +151,20 @@ export async function materializeDocument(
         source: document.source_info.source,
       },
     });
-    await options.storage.putObject(
-      extractedMarkdownKey(document),
-      new TextEncoder().encode(mdText),
-      {
-        contentType: "text/markdown; charset=utf-8",
-        metadata: {
-          entity_id: document.id,
-          source: document.source_info.source,
-          kind: "markdown_text",
+    if (mdText) {
+      await options.storage.putObject(
+        extractedMarkdownKey(document),
+        new TextEncoder().encode(mdText),
+        {
+          contentType: "text/markdown; charset=utf-8",
+          metadata: {
+            entity_id: document.id,
+            source: document.source_info.source,
+            kind: "markdown_text",
+          },
         },
-      },
-    );
+      );
+    }
     mediaUrls = [
       {
         url: stored.url,
@@ -164,11 +180,12 @@ export async function materializeDocument(
     document: {
       ...document,
       md_text: mdText ? [mdText] : undefined,
-      derived_content: options.storage
-        ? {
-            markdown_key: extractedMarkdownKey(document),
-          }
-        : undefined,
+      derived_content:
+        options.storage && mdText
+          ? {
+              markdown_key: extractedMarkdownKey(document),
+            }
+          : undefined,
       media_urls: mediaUrls,
     },
   };

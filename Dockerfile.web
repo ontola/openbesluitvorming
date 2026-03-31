@@ -15,24 +15,11 @@ FROM denoland/deno:2.7.7
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates tar build-essential pkg-config libssl-dev \
-  && arch="$(dpkg --print-architecture)" \
-  && case "$arch" in \
-    amd64) unpdf_asset="unpdf-linux-x86_64-v0.2.4.tar.gz" ;; \
-    arm64) unpdf_asset="" ;; \
-    *) echo "Unsupported architecture: $arch" >&2; exit 1 ;; \
-  esac \
-  && if [ -n "$unpdf_asset" ]; then \
-       curl -fsSL "https://github.com/iyulab/unpdf/releases/download/v0.2.4/${unpdf_asset}" -o /tmp/unpdf.tar.gz \
-       && tar -xzf /tmp/unpdf.tar.gz -C /usr/local/bin unpdf \
-       && chmod +x /usr/local/bin/unpdf \
-       && rm -f /tmp/unpdf.tar.gz; \
-     else \
-       curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal \
-       && . "$HOME/.cargo/env" \
-       && cargo install --git https://github.com/iyulab/unpdf --tag v0.2.4 unpdf-cli \
-       && cp "$HOME/.cargo/bin/unpdf" /usr/local/bin/unpdf; \
-     fi \
+RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates build-essential pkg-config libssl-dev \
+  && curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal \
+  && . "$HOME/.cargo/env" \
+  && cargo install --locked transmutation --features cli \
+  && cp "$HOME/.cargo/bin/transmutation" /usr/local/bin/transmutation \
   && rm -rf /var/lib/apt/lists/*
 
 COPY deno.json ./

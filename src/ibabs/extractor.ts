@@ -19,7 +19,8 @@ function issueStepForDocumentError(error: unknown): ExtractionIssue["step"] {
   }
 
   if (
-    error.message.includes("unpdf failed") ||
+    error.message.includes("transmutation failed") ||
+    error.message.includes("Rust transmutation CLI not found") ||
     error.message.includes("Office document extraction is not supported yet") ||
     error.message.includes("PDF parsing error")
   ) {

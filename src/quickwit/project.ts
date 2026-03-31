@@ -48,6 +48,44 @@ function projectDocumentContent(payload?: DocumentEntity): string | undefined {
   return content || undefined;
 }
 
+function compactPayload(payload?: WooziEntity): unknown {
+  if (!payload) {
+    return undefined;
+  }
+
+  if (payload.type === "Document") {
+    return {
+      type: payload.type,
+      name: payload.name,
+      classification: payload.classification,
+      original_url: payload.original_url,
+      file_name: payload.file_name,
+      content_type: payload.content_type,
+      date_modified: payload.date_modified,
+      last_discussed_at: payload.last_discussed_at,
+      organization: payload.organization,
+      derived_content: payload.derived_content,
+      media_urls: payload.media_urls,
+    };
+  }
+
+  return {
+    type: payload.type,
+    name: payload.name,
+    classification: payload.classification,
+    status: payload.status,
+    location: payload.location,
+    start_date: payload.start_date,
+    end_date: payload.end_date,
+    last_discussed_at: payload.last_discussed_at,
+    organization: payload.organization,
+    committee: payload.committee,
+    parent: payload.parent,
+    agenda: payload.agenda,
+    attachment: payload.attachment,
+  };
+}
+
 export function projectEntityCommitToQuickwitDocument(
   event: EntityCommitEvent<WooziEntity>,
 ): QuickwitSearchDocument {
@@ -79,6 +117,6 @@ export function projectEntityCommitToQuickwitDocument(
     organization: payload?.organization,
     committee: payload?.type === "Meeting" ? payload.committee : undefined,
     content,
-    payload,
+    payload: compactPayload(payload),
   };
 }

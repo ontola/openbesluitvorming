@@ -3,6 +3,7 @@ import type { EntityCommitEvent, WooziEntity } from "../types.ts";
 
 const DEFAULT_INDEX_ID = "woozi-events";
 const DEFAULT_QUICKWIT_URL = "http://127.0.0.1:7280";
+const MAX_INGEST_PAYLOAD_BYTES = 8_000_000;
 
 type QuickwitSearchResponse = {
   num_hits: number;
@@ -95,37 +96,57 @@ export class QuickwitClient {
 
   async ingestEvents(events: Array<EntityCommitEvent<WooziEntity>>): Promise<void> {
     const documents = events.map(projectEntityCommitToQuickwitDocument);
-    const body = documents.map((document) => JSON.stringify(document)).join("\n");
+    const bodies: string[] = [];
+    let currentLines: string[] = [];
+    let currentBytes = 0;
 
-    let lastError: unknown;
-    for (let attempt = 1; attempt <= 5; attempt += 1) {
-      try {
-        const response = await fetch(
-          `${this.baseUrl}/api/v1/${this.indexId}/ingest?commit=wait_for`,
-          {
-            method: "POST",
-            headers: {
-              "content-type": "application/json",
+    for (const document of documents) {
+      const line = JSON.stringify(document);
+      const lineBytes = new TextEncoder().encode(`${line}\n`).byteLength;
+
+      if (currentLines.length > 0 && currentBytes + lineBytes > MAX_INGEST_PAYLOAD_BYTES) {
+        bodies.push(currentLines.join("\n"));
+        currentLines = [];
+        currentBytes = 0;
+      }
+
+      currentLines.push(line);
+      currentBytes += lineBytes;
+    }
+
+    if (currentLines.length > 0) {
+      bodies.push(currentLines.join("\n"));
+    }
+
+    for (const body of bodies) {
+      for (let attempt = 1; attempt <= 5; attempt += 1) {
+        try {
+          const response = await fetch(
+            `${this.baseUrl}/api/v1/${this.indexId}/ingest?commit=wait_for`,
+            {
+              method: "POST",
+              headers: {
+                "content-type": "application/json",
+              },
+              body,
             },
-            body,
-          },
-        );
+          );
 
-        if (!response.ok) {
-          throw new Error(`Quickwit ingest failed ${response.status}: ${await response.text()}`);
-        }
+          if (!response.ok) {
+            throw new Error(`Quickwit ingest failed ${response.status}: ${await response.text()}`);
+          }
 
-        return;
-      } catch (error) {
-        lastError = error;
-        if (attempt === 5 || !isRetryableIngestError(error)) {
-          throw error;
+          break;
+        } catch (error) {
+          if (attempt === 5 || !isRetryableIngestError(error)) {
+            throw error;
+          }
+          await sleep(500 * attempt);
         }
-        await sleep(500 * attempt);
       }
     }
 
-    throw lastError instanceof Error ? lastError : new Error("Quickwit ingest failed");
+    return;
   }
 
   async search(

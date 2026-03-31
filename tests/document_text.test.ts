@@ -34,7 +34,7 @@ Deno.test("extractDocumentMarkdown decodes html without external tools", async (
   );
 });
 
-Deno.test("extractDocumentMarkdown propagates non-missing unpdf failures", async () => {
+Deno.test("extractDocumentMarkdown propagates non-missing transmutation failures", async () => {
   const tempScript = await Deno.makeTempFile({ suffix: ".sh" });
   await Deno.writeTextFile(
     tempScript,
@@ -42,8 +42,8 @@ Deno.test("extractDocumentMarkdown propagates non-missing unpdf failures", async
   );
   await Deno.chmod(tempScript, 0o755);
 
-  const previous = Deno.env.get("WOOZI_UNPDF_BIN");
-  Deno.env.set("WOOZI_UNPDF_BIN", tempScript);
+  const previous = Deno.env.get("WOOZI_TRANSMUTATION_BIN");
+  Deno.env.set("WOOZI_TRANSMUTATION_BIN", tempScript);
 
   try {
     let thrown: unknown;
@@ -63,48 +63,40 @@ Deno.test("extractDocumentMarkdown propagates non-missing unpdf failures", async
     );
   } finally {
     if (previous === undefined) {
-      Deno.env.delete("WOOZI_UNPDF_BIN");
+      Deno.env.delete("WOOZI_TRANSMUTATION_BIN");
     } else {
-      Deno.env.set("WOOZI_UNPDF_BIN", previous);
+      Deno.env.set("WOOZI_TRANSMUTATION_BIN", previous);
     }
     await Deno.remove(tempScript).catch(() => undefined);
   }
 });
 
-Deno.test("extractDocumentMarkdown strips unpdf update noise from successful CLI output", async () => {
-  const tempScript = await Deno.makeTempFile({ suffix: ".sh" });
-  await Deno.writeTextFile(
-    tempScript,
-    [
-      "#!/bin/sh",
-      "printf 'Update: 0.2.3 → 0.2.4 available!\\n'",
-      "printf \"Run 'unpdf update' to update.\\n\"",
-      "printf '# Titel\\n\\nInhoud van het document.\\n'",
-      "exit 0",
-    ].join("\n"),
-  );
-  await Deno.chmod(tempScript, 0o755);
-
-  const previous = Deno.env.get("WOOZI_UNPDF_BIN");
-  Deno.env.set("WOOZI_UNPDF_BIN", tempScript);
+Deno.test("extractDocumentMarkdown surfaces a clear error when transmutation is missing", async () => {
+  const previous = Deno.env.get("WOOZI_TRANSMUTATION_BIN");
+  Deno.env.set("WOOZI_TRANSMUTATION_BIN", "/tmp/woozi-missing-transmutation-bin");
 
   try {
-    const result = await extractDocumentMarkdown(new TextEncoder().encode("%PDF-1.4 ok"), {
-      contentType: "application/pdf",
-      fileName: "clean.pdf",
-    });
+    let thrown: unknown;
+    try {
+      await extractDocumentMarkdown(new TextEncoder().encode("%PDF-1.4 missing"), {
+        contentType: "application/pdf",
+        fileName: "missing.pdf",
+      });
+    } catch (error) {
+      thrown = error;
+    }
 
+    assert(thrown instanceof Error, "expected missing transmutation binary to throw");
     assert(
-      result.markdown === "# Titel\n\nInhoud van het document.",
-      "CLI update noise should be stripped from successful markdown output",
+      thrown.message.includes("Rust transmutation CLI not found"),
+      "expected a clear missing-transmutation error message",
     );
   } finally {
     if (previous === undefined) {
-      Deno.env.delete("WOOZI_UNPDF_BIN");
+      Deno.env.delete("WOOZI_TRANSMUTATION_BIN");
     } else {
-      Deno.env.set("WOOZI_UNPDF_BIN", previous);
+      Deno.env.set("WOOZI_TRANSMUTATION_BIN", previous);
     }
-    await Deno.remove(tempScript).catch(() => undefined);
   }
 });
 

@@ -1,5 +1,3 @@
-import { extractText, getDocumentProxy } from "npm:unpdf";
-
 export interface DocumentMarkdownExtractionResult {
   markdown: string;
   warnings: string[];
@@ -28,26 +26,6 @@ function fileExtension(fileName?: string): string {
   return fileName.slice(fileName.lastIndexOf(".")).toLowerCase();
 }
 
-function stripUnpdfCliNoise(text: string): string {
-  return text
-    .replaceAll(/\r\n/g, "\n")
-    .split("\n")
-    .filter((line) => {
-      const trimmed = line.trim();
-      if (!trimmed) {
-        return true;
-      }
-      if (/^Update:\s.*available!/.test(trimmed)) {
-        return false;
-      }
-      if (/^Run 'unpdf update' to update\.$/.test(trimmed)) {
-        return false;
-      }
-      return true;
-    })
-    .join("\n");
-}
-
 async function writeTempFile(bytes: Uint8Array, extension: string): Promise<string> {
   const path = await Deno.makeTempFile({ suffix: extension });
   await Deno.writeFile(path, bytes);
@@ -55,12 +33,20 @@ async function writeTempFile(bytes: Uint8Array, extension: string): Promise<stri
 }
 
 async function readCommandOutput(command: string, args: string[]): Promise<string> {
-  const process = new Deno.Command(command, {
-    args,
-    stdout: "piped",
-    stderr: "piped",
-  });
-  const output = await process.output();
+  let output: Deno.CommandOutput;
+  try {
+    const process = new Deno.Command(command, {
+      args,
+      stdout: "piped",
+      stderr: "piped",
+    });
+    output = await process.output();
+  } catch (error) {
+    if (isCommandMissing(error)) {
+      throw new Error(`Rust transmutation CLI not found at '${transmutationBinary()}'.`);
+    }
+    throw error;
+  }
   if (output.code !== 0) {
     const stderr = new TextDecoder().decode(output.stderr);
     throw new Error(`${command} failed: ${stderr.trim()}`);
@@ -70,57 +56,32 @@ async function readCommandOutput(command: string, args: string[]): Promise<strin
 }
 
 async function extractPdf(bytes: Uint8Array): Promise<DocumentMarkdownExtractionResult> {
-  return await extractPdfMarkdown(bytes);
+  return {
+    markdown: await extractPdfMarkdownWithCli(bytes),
+    warnings: [],
+  };
 }
 
-function unpdfBinary(): string {
-  return Deno.env.get("WOOZI_UNPDF_BIN")?.trim() || "unpdf";
+function transmutationBinary(): string {
+  return Deno.env.get("WOOZI_TRANSMUTATION_BIN")?.trim() || "transmutation";
 }
 
 async function extractPdfMarkdownWithCli(bytes: Uint8Array): Promise<string> {
   const tempPath = await writeTempFile(bytes, ".pdf");
+  const outputPath = await Deno.makeTempFile({ suffix: ".md" });
   try {
-    return normalizeWhitespace(
-      stripUnpdfCliNoise(
-        await readCommandOutput(unpdfBinary(), [
-          "markdown",
-          tempPath,
-          "--cleanup",
-          "standard",
-          "--table-mode",
-          "html",
-        ]),
-      ),
-    );
+    await readCommandOutput(transmutationBinary(), [
+      "convert",
+      tempPath,
+      "-o",
+      outputPath,
+      "--format",
+      "markdown",
+    ]);
+    return normalizeWhitespace(await Deno.readTextFile(outputPath));
   } finally {
     await Deno.remove(tempPath).catch(() => undefined);
-  }
-}
-
-async function extractPdfMarkdownWithJsFallback(bytes: Uint8Array): Promise<string> {
-  const pdf = await getDocumentProxy(bytes.slice());
-  const { text } = await extractText(pdf, { mergePages: true });
-  return deriveMarkdownFromText(normalizeWhitespace(text));
-}
-
-async function extractPdfMarkdown(bytes: Uint8Array): Promise<DocumentMarkdownExtractionResult> {
-  try {
-    return {
-      markdown: await extractPdfMarkdownWithCli(bytes),
-      warnings: [],
-    };
-  } catch (error) {
-    if (isCommandMissing(error)) {
-      // The Rust unpdf CLI is the preferred PDF->Markdown path. Keep this fallback so host-side
-      // development and tests still work before the CLI is installed everywhere.
-      return {
-        markdown: await extractPdfMarkdownWithJsFallback(bytes),
-        warnings: [
-          `Rust unpdf CLI not found at '${unpdfBinary()}', falling back to JS PDF extraction.`,
-        ],
-      };
-    }
-    throw error;
+    await Deno.remove(outputPath).catch(() => undefined);
   }
 }
 

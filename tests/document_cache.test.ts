@@ -89,3 +89,45 @@ Deno.test("materializeDocument reuses cached file and extracted markdown from st
     "expected cached extracted markdown",
   );
 });
+
+Deno.test("materializeDocument keeps the stored document when PDF extraction fails", async () => {
+  const storage = new FakeStorage();
+  const document: DocumentEntity = {
+    ...buildDocument(),
+    id: "document:notubiz:gemeente:haarlem:99",
+    file_name: "broken.pdf",
+    content_type: "application/pdf",
+    source_info: {
+      ...buildDocument().source_info,
+      canonical_id: "99",
+    },
+    raw: {
+      id: 99,
+      version: 1,
+      last_modified: "2025-01-16 11:03:37",
+    },
+  };
+
+  const previous = Deno.env.get("WOOZI_TRANSMUTATION_BIN");
+  Deno.env.set("WOOZI_TRANSMUTATION_BIN", "/tmp/woozi-missing-transmutation-bin");
+
+  try {
+    const result = await materializeDocument(document, {
+      storage,
+      download: async () => new TextEncoder().encode("%PDF-1.4 broken"),
+    });
+
+    assert(result.document.media_urls?.[0]?.url, "expected original document to still be stored");
+    assert(!result.document.md_text, "expected no markdown on extraction failure");
+    assert(
+      result.issues.some((issue) => issue.step === "extract_text"),
+      "expected extraction failure to be reported as an extract_text issue",
+    );
+  } finally {
+    if (previous === undefined) {
+      Deno.env.delete("WOOZI_TRANSMUTATION_BIN");
+    } else {
+      Deno.env.set("WOOZI_TRANSMUTATION_BIN", previous);
+    }
+  }
+});

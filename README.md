@@ -40,7 +40,7 @@ That gives you:
 - the Vite dev server with HMR on `http://127.0.0.1:4317`
 
 Vite proxies `/api/*` calls to the Docker backend, so reruns and extraction use
-the same environment as the containerized app, including the installed `unpdf`
+the same environment as the containerized app, including the installed `transmutation`
 binary.
 Open `http://127.0.0.1:4317` while iterating on the frontend.
 
@@ -321,24 +321,20 @@ pnpm run web
 
 The host-side ingest command currently uses:
 
-- the Rust `unpdf` CLI for PDFs
+- the Rust `transmutation` CLI for PDFs
 - direct text decoding for `.txt`, `.md`, `.json`, and HTML-like documents
 - office formats like `.doc`, `.docx`, `.rtf`, and `.odt` are not supported yet and are logged as extraction warnings
 
-In Docker and compose, the `unpdf` CLI is installed in the image automatically.
-On the host, Woozi will try to call `unpdf` from `PATH` or from `WOOZI_UNPDF_BIN`.
+In Docker and compose, the `transmutation` CLI is installed in the image automatically.
+On the host, Woozi will try to call `transmutation` from `PATH` or from `WOOZI_TRANSMUTATION_BIN`.
 
-For Apple Silicon macOS, you can install the pinned release like this:
+For Apple Silicon macOS, you can install it like this:
 
 ```sh
-curl -fsSL https://github.com/iyulab/unpdf/releases/download/v0.2.4/unpdf-macos-aarch64-v0.2.4.tar.gz \
-  | tar -xz
-chmod +x unpdf
-sudo mv unpdf /usr/local/bin/unpdf
+cargo install --locked transmutation
 ```
 
-There is still a narrow JavaScript fallback for PDFs when the CLI is missing, but that is only a
-development fallback and not the intended production extractor.
+If the CLI is missing, PDF extraction fails explicitly and the import records an extraction issue.
 
 There is no remaining host-only Office extractor in the runtime anymore. Unsupported office
 formats are currently skipped with an explicit extraction warning.
