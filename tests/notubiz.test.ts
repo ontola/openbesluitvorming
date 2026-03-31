@@ -60,7 +60,7 @@ Deno.test({
       for (const meeting of extraction.meetings) {
         assert(meeting.type === "Meeting", "meeting type should be Meeting");
         assert(
-          meeting.id.startsWith("meeting:notubiz:haarlem:"),
+          meeting.id.startsWith("meeting:notubiz:gemeente:haarlem:"),
           "meeting id should be namespaced",
         );
         assert(meeting.name.length > 0, "meeting should have a name");
@@ -69,19 +69,23 @@ Deno.test({
         assert(meeting.source_info.source === "haarlem", "meeting source should be haarlem");
         assert(meeting.source_info.supplier === "notubiz", "meeting supplier should be notubiz");
         assert(
-          meeting.organization === "organization:allmanak:haarlem:38688",
-          "meeting organization should be municipality-scoped",
+          meeting.organization === "organization:nl:gemeente:haarlem",
+          "meeting organization should be bestuurslaag-scoped",
         );
         assert(
-          meeting.committee?.startsWith("committee:notubiz:haarlem:") ?? true,
+          meeting.committee?.startsWith("committee:notubiz:gemeente:haarlem:") ?? true,
           "meeting committee should be municipality-scoped",
         );
         assert(
-          meeting.agenda?.every((item) => item.startsWith("agenda_item:notubiz:haarlem:")) ?? true,
+          meeting.agenda?.every((item) =>
+            item.startsWith("agenda_item:notubiz:gemeente:haarlem:"),
+          ) ?? true,
           "meeting agenda ids should be municipality-scoped",
         );
         assert(
-          meeting.attachment?.every((item) => item.startsWith("document:notubiz:haarlem:")) ?? true,
+          meeting.attachment?.every((item) =>
+            item.startsWith("document:notubiz:gemeente:haarlem:"),
+          ) ?? true,
           "meeting attachment ids should be municipality-scoped",
         );
       }
@@ -89,7 +93,7 @@ Deno.test({
       const document = extraction.documents[0];
       assert(document.type === "Document", "document type should be Document");
       assert(
-        document.id.startsWith("document:notubiz:haarlem:"),
+        document.id.startsWith("document:notubiz:gemeente:haarlem:"),
         "document id should be namespaced",
       );
       assert(document.name.length > 0, "document should have a name");
@@ -98,7 +102,7 @@ Deno.test({
         "document should have original_url",
       );
       assert(
-        document.media_urls?.[0]?.url?.includes("/documents/haarlem/"),
+        document.media_urls?.[0]?.url?.includes("/documents/notubiz/gemeente/haarlem/"),
         "document should be stored in object storage",
       );
       assert(
@@ -157,7 +161,7 @@ Deno.test({
 
       const documentEvent = documentEvents[0];
       assert(
-        documentEvent.subject.startsWith("document:notubiz:haarlem:"),
+        documentEvent.subject.startsWith("document:notubiz:gemeente:haarlem:"),
         "expected document subject",
       );
       assert(documentEvent.data.payload?.type === "Document", "expected Document payload");

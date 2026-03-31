@@ -28,9 +28,11 @@ function sanitizedFileName(document: DocumentEntity): string {
 
 function objectKey(document: DocumentEntity): string {
   const version = cacheVersionToken(document);
+  const supplier = document.source_info.supplier;
+  const organizationType = document.source_info.organization_type ?? "onbekend";
   const source = document.source_info.source;
   const canonicalId = document.source_info.canonical_id ?? document.id;
-  return `documents/${source}/${canonicalId}/${version}/${sanitizedFileName(document)}`;
+  return `documents/${supplier}/${organizationType}/${source}/${canonicalId}/${version}/${sanitizedFileName(document)}`;
 }
 
 function extractedMarkdownKey(document: DocumentEntity): string {

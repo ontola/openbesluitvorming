@@ -1,6 +1,7 @@
 export interface SourceInfo {
   supplier: string;
   source: string;
+  organization_type?: string;
   canonical_id?: string;
   canonical_iri?: string;
   source_iri?: string;
@@ -116,6 +117,7 @@ export interface ExtractionIssue {
 export interface NotubizSourceDefinition {
   key: string;
   supplier: "notubiz";
+  organizationType: "gemeente" | "provincie" | "waterschap";
   notubizOrganizationId: number;
   allmanakId: number;
 }

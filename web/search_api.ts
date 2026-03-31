@@ -29,6 +29,11 @@ type SearchSnippet = {
   name?: string[];
 };
 
+type IndexedHit = {
+  hit: SearchHit;
+  snippet?: SearchSnippet;
+};
+
 function escapeTerm(term: string): string {
   return `"${term.replaceAll('"', '\\"')}"`;
 }
@@ -199,6 +204,24 @@ function dedupeLatestHits(hits: SearchHit[]): SearchHit[] {
   return [...byEntityId.values()];
 }
 
+function dedupeLatestIndexedHits(items: IndexedHit[]): IndexedHit[] {
+  const byEntityId = new Map<string, IndexedHit>();
+
+  for (const item of items) {
+    const entityId = item.hit.entity_id;
+    if (!entityId) {
+      continue;
+    }
+
+    const existing = byEntityId.get(entityId);
+    if (!existing || compareRecency(existing.hit.time, item.hit.time) > 0) {
+      byEntityId.set(entityId, item);
+    }
+  }
+
+  return [...byEntityId.values()];
+}
+
 export async function searchMeetings(
   options: {
     query?: string;
@@ -216,21 +239,13 @@ export async function searchMeetings(
     snippetFields: query ? ["content", "name"] : [],
   });
 
-  const dedupedHits = dedupeLatestHits(response.hits as SearchHit[]);
-  const snippetsByEntityId = new Map<string, SearchSnippet>();
+  const indexedHits = (response.hits as SearchHit[]).map((hit, index) => ({
+    hit,
+    snippet: response.snippets?.[index] as SearchSnippet | undefined,
+  }));
+  const dedupedHits = dedupeLatestIndexedHits(indexedHits);
 
-  (response.hits as SearchHit[]).forEach((hit, index) => {
-    if (!hit.entity_id || snippetsByEntityId.has(hit.entity_id)) {
-      return;
-    }
-    const snippet = response.snippets?.[index] as SearchSnippet | undefined;
-    if (snippet) {
-      snippetsByEntityId.set(hit.entity_id, snippet);
-    }
-  });
-
-  const results = dedupedHits.map((document) => {
-    const snippets = document.entity_id ? snippetsByEntityId.get(document.entity_id) : undefined;
+  const results = dedupedHits.map(({ hit: document, snippet: snippets }) => {
     const snippetHtml = sanitizeSnippet(snippets?.content?.[0] ?? snippets?.name?.[0]);
 
     return {

@@ -1,6 +1,7 @@
 import { materializeDocument } from "../documents/process.ts";
 import { NotubizClient } from "./client.ts";
 import { buildEntityCommitEvent } from "../events/entity_commit.ts";
+import { canonicalMeetingId } from "../ids.ts";
 import { normalizeNotubizDocuments, normalizeNotubizMeeting } from "./normalize.ts";
 import { ObjectStorageClient } from "../storage/s3.ts";
 import type {
@@ -79,7 +80,11 @@ function issueStepForDocumentError(error: unknown): ExtractionIssue["step"] {
 }
 
 export class NotubizMeetingExtractor {
-  constructor(private readonly client = new NotubizClient()) {}
+  constructor(
+    private readonly client = new NotubizClient(),
+    private readonly storageProvider: () => Promise<ObjectStorageClient | undefined> = () =>
+      ObjectStorageClient.fromEnvironment(),
+  ) {}
 
   async extractForDateRange(
     source: NotubizSourceDefinition,
@@ -100,7 +105,7 @@ export class NotubizMeetingExtractor {
     let cacheHits = 0;
     let downloadedCount = 0;
     let page = 1;
-    const storage = await ObjectStorageClient.fromEnvironment();
+    const storage = await this.storageProvider();
     const meetingConcurrency = Number(
       Deno.env.get("WOOZI_MEETING_CONCURRENCY") ?? `${DEFAULT_MEETING_CONCURRENCY}`,
     );
@@ -164,7 +169,7 @@ export class NotubizMeetingExtractor {
               await registerIssue({
                 severity: "warning",
                 step: "get_meeting",
-                entity_id: `meeting:notubiz:${source.key}:${meetingId}`,
+                entity_id: canonicalMeetingId(source, meetingId),
                 message: error instanceof Error ? error.message : "Meeting detail not accessible",
               });
               return null;

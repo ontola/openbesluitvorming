@@ -9,20 +9,21 @@ function assert(condition: unknown, message: string): asserts condition {
 
 Deno.test("buildEntityCommitEvent wraps a meeting in a commit envelope", async () => {
   const meeting: MeetingEntity = {
-    id: "meeting:notubiz:haarlem:123",
+    id: "meeting:notubiz:gemeente:haarlem:123",
     type: "Meeting",
     name: "Raadscommissie Financien",
     classification: ["Agenda"],
     start_date: "2025-01-14T19:30:00+01:00",
     end_date: "2025-01-14T21:30:00+01:00",
     last_discussed_at: "2025-01-14T19:30:00+01:00",
-    organization: "organization:allmanak:haarlem:38688",
-    committee: "committee:notubiz:haarlem:999",
-    agenda: ["agenda_item:notubiz:haarlem:1"],
-    attachment: ["document:notubiz:haarlem:2"],
+    organization: "organization:nl:gemeente:haarlem",
+    committee: "committee:notubiz:gemeente:haarlem:999",
+    agenda: ["agenda_item:notubiz:gemeente:haarlem:1"],
+    attachment: ["document:notubiz:gemeente:haarlem:2"],
     source_info: {
       supplier: "notubiz",
       source: "haarlem",
+      organization_type: "gemeente",
       canonical_id: "123",
       canonical_iri: "https://api.notubiz.nl/events/meetings/123",
     },

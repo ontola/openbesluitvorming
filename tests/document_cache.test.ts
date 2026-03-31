@@ -31,7 +31,7 @@ class FakeStorage {
 
 function buildDocument(): DocumentEntity {
   return {
-    id: "document:notubiz:haarlem:42",
+    id: "document:notubiz:gemeente:haarlem:42",
     type: "Document",
     name: "Memo participatie",
     original_url: "https://api.notubiz.nl/document/42/1",
@@ -41,6 +41,7 @@ function buildDocument(): DocumentEntity {
     source_info: {
       supplier: "notubiz",
       source: "haarlem",
+      organization_type: "gemeente",
       canonical_id: "42",
       canonical_iri: "https://api.notubiz.nl/document/42/1",
     },
@@ -77,6 +78,11 @@ Deno.test("materializeDocument reuses cached file and extracted markdown from st
   assert(
     first.document.media_urls?.[0]?.url === second.document.media_urls?.[0]?.url,
     "expected cached media url to be reused",
+  );
+  assert(
+    first.document.media_urls?.[0]?.url ===
+      "http://storage.test/woozi/documents/notubiz/gemeente/haarlem/42/1-2025-01-16T11_03_37/memo.txt",
+    "expected storage key to stay aligned with the scoped identifier tuple",
   );
   assert(
     second.document.md_text?.[0] === "Dit is de opgeslagen platte tekst.",

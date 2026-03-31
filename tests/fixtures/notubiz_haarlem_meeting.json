@@ -1,0 +1,72 @@
+{
+  "id": 123,
+  "inactive": false,
+  "canceled": false,
+  "plannings": [
+    {
+      "start_date": "2025-01-14T19:30:00+01:00",
+      "end_date": "2025-01-14T21:30:00+01:00"
+    }
+  ],
+  "attributes": [
+    {
+      "id": "title",
+      "value": "Raadsvergadering Haarlem"
+    },
+    {
+      "id": "location",
+      "value": "Raadzaal"
+    }
+  ],
+  "gremium": {
+    "id": 999
+  },
+  "documents": [
+    {
+      "id": 42,
+      "title": "Bijlage 1 Memo participatie",
+      "self": "api.notubiz.nl/document/42",
+      "version": 1,
+      "last_modified": "2025-01-16 11:03:37",
+      "types": [
+        {
+          "value": "Bijlage"
+        }
+      ],
+      "versions": [
+        {
+          "file_name": "memo-participatie.pdf",
+          "mime_type": "application/pdf",
+          "file_size": 139780
+        }
+      ]
+    }
+  ],
+  "agenda_items": [
+    {
+      "id": 7,
+      "documents": [
+        {
+          "id": 43,
+          "title": "Besluitvorming",
+          "self": "api.notubiz.nl/document/43",
+          "version": 2,
+          "last_modified": "2025-01-17 08:00:00",
+          "versions": [
+            {
+              "file_name": "besluitvorming.txt",
+              "mime_type": "text/plain",
+              "file_size": 1200
+            }
+          ]
+        }
+      ],
+      "agenda_items": [
+        {
+          "id": 8,
+          "documents": []
+        }
+      ]
+    }
+  ]
+}

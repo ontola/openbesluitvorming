@@ -14,7 +14,7 @@ Deno.test({
   sanitizeResources: false,
   fn: async () => {
     const html = await Deno.readTextFile(new URL("../web/index.html", import.meta.url));
-    const entityId = "document:notubiz:haarlem:15046838";
+    const entityId = "document:notubiz:gemeente:haarlem:15046838";
     const window = new Window({
       url: `http://127.0.0.1:4317/?query=grondprijs&organization=haarlem&view=${encodeURIComponent(entityId)}`,
     });

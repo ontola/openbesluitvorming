@@ -4,28 +4,13 @@ import type {
   NotubizOrganizationAttributes,
   NotubizSourceDefinition,
 } from "../types.ts";
-
-function canonicalId(source: NotubizSourceDefinition, meetingId: number | string): string {
-  return `meeting:notubiz:${source.key}:${meetingId}`;
-}
-
-function canonicalOrganizationId(source: NotubizSourceDefinition): string {
-  return `organization:allmanak:${source.key}:${source.allmanakId}`;
-}
-
-function canonicalCommitteeId(
-  source: NotubizSourceDefinition,
-  committeeId: number | string,
-): string {
-  return `committee:notubiz:${source.key}:${committeeId}`;
-}
-
-function canonicalAgendaItemId(
-  source: NotubizSourceDefinition,
-  agendaItemId: number | string,
-): string {
-  return `agenda_item:notubiz:${source.key}:${agendaItemId}`;
-}
+import {
+  canonicalAgendaItemId,
+  canonicalCommitteeId,
+  canonicalDocumentId,
+  canonicalMeetingId,
+  canonicalOrganizationId,
+} from "../ids.ts";
 
 function collectAgendaIds(source: NotubizSourceDefinition, agendaItems: unknown[]): string[] {
   const result: string[] = [];
@@ -78,10 +63,6 @@ function collectAttachmentIds(
   }
 
   return [...new Set(result)];
-}
-
-function canonicalDocumentId(source: NotubizSourceDefinition, documentId: number | string): string {
-  return `document:notubiz:${source.key}:${documentId}`;
 }
 
 function canonicalDocumentDownloadUrl(documentId: string): string {
@@ -215,7 +196,7 @@ export function normalizeNotubizMeeting(
         : "EventUnconfirmed";
 
   return {
-    id: canonicalId(source, meetingId),
+    id: canonicalMeetingId(source, meetingId),
     type: "Meeting",
     name,
     classification: ["Agenda"],
@@ -234,6 +215,7 @@ export function normalizeNotubizMeeting(
     source_info: {
       supplier: "notubiz",
       source: source.key,
+      organization_type: source.organizationType,
       canonical_id: meetingId,
       canonical_iri: `https://api.notubiz.nl/events/meetings/${meetingId}`,
     },
@@ -293,6 +275,7 @@ export function normalizeNotubizDocuments(
     source_info: {
       supplier: "notubiz",
       source: source.key,
+      organization_type: source.organizationType,
       canonical_id: documentId,
       canonical_iri: canonicalDocumentDownloadUrl(documentId),
       source_iri: meeting.source_info.canonical_iri,
