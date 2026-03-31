@@ -41,12 +41,35 @@
             <span class="sr-only">Bestuurslaag of organisatie</span>
             <select id="organization" name="organization">
               <option value="">Kies een gemeente, provincie of waterschap...</option>
+              <option value="alkmaar">Gemeente Alkmaar</option>
+              <option value="amsterdam">Gemeente Amsterdam</option>
+              <option value="amersfoort">Gemeente Amersfoort</option>
+              <option value="delft">Gemeente Delft</option>
               <option value="haarlem">Gemeente Haarlem</option>
-              <option value="utrecht">Gemeente Utrecht</option>
-              <option value="zuid-holland">Provincie Zuid-Holland</option>
-              <option value="amstel-gooi-vecht">Waterschap Amstel, Gooi en Vecht</option>
+              <option value="leiden">Gemeente Leiden</option>
+              <option value="zaanstad">Gemeente Zaanstad</option>
             </select>
           </label>
+
+          <div class="search-panel__options">
+            <label class="select-field select-field--compact">
+              <span class="sr-only">Type resultaat</span>
+              <select id="entity-type" name="entityType">
+                <option value="">Alles</option>
+                <option value="Document">Documenten</option>
+                <option value="Meeting">Vergaderingen</option>
+              </select>
+            </label>
+
+            <label class="select-field select-field--compact">
+              <span class="sr-only">Sorteren</span>
+              <select id="sort" name="sort">
+                <option value="date_desc">Nieuwste eerst</option>
+                <option value="date_asc">Oudste eerst</option>
+                <option value="title_asc">Titel A-Z</option>
+              </select>
+            </label>
+          </div>
 
           <div class="search-panel__actions">
             <button type="submit" class="primary-button">Doorzoeken</button>
@@ -135,13 +158,47 @@
     <template id="result-template">
       <article class="result-card">
         <div class="result-card__meta">
-          <span class="pill" data-role="org"></span>
+          <div class="result-card__tags">
+            <span class="pill" data-role="org"></span>
+            <span class="pill pill--soft" data-role="type"></span>
+          </div>
           <span class="result-card__date" data-role="date"></span>
         </div>
         <h3 data-role="title"></h3>
         <p data-role="summary"></p>
       </article>
     </template>
+
+    <section class="detail-overlay" id="detail-overlay" hidden>
+      <div class="detail-overlay__backdrop" data-role="close-detail"></div>
+      <article class="detail-sheet" aria-modal="true" aria-labelledby="detail-title" role="dialog">
+        <div class="detail-sheet__header">
+          <div class="detail-sheet__meta">
+            <span class="pill" data-role="detail-org"></span>
+            <span class="pill pill--soft" data-role="detail-type"></span>
+            <span class="detail-sheet__date" data-role="detail-date"></span>
+          </div>
+          <button class="detail-sheet__close" type="button" data-role="close-detail">
+            Sluiten
+          </button>
+        </div>
+
+        <div class="detail-sheet__body">
+          <h2 id="detail-title" data-role="detail-title"></h2>
+          <div class="detail-sheet__actions">
+            <a
+              class="primary-button detail-sheet__download"
+              data-role="detail-download"
+              download
+              hidden
+            >
+              Download bronbestand
+            </a>
+          </div>
+          <pre class="detail-sheet__text" data-role="detail-text"></pre>
+        </div>
+      </article>
+    </section>
 
     <script type="module" src="/app.js"></script>
   </body>

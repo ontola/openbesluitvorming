@@ -13,17 +13,40 @@ function assert(condition: unknown, message: string): asserts condition {
 const composeDir = new URL("../", import.meta.url);
 const quickwitConfigPath = new URL("../quickwit/index-config.json", import.meta.url);
 
-async function runCommand(command: string[], cwd: URL): Promise<void> {
+function useLocalS3(): void {
+  Deno.env.set("S3_STORAGE_BUCKET_NAME", "woozi");
+  Deno.env.set("S3_STORAGE_ENDPOINT", "http://127.0.0.1:9000");
+  Deno.env.set("S3_STORAGE_REGION", "us-east-1");
+  Deno.env.set("S3_ACCESS_KEY", "woozi");
+  Deno.env.set("S3_SECRET_KEY", "woozi-dev-secret");
+}
+
+async function runCommand(
+  command: string[],
+  cwd: URL,
+  env?: Record<string, string>,
+): Promise<void> {
   const process = new Deno.Command(command[0], {
     args: command.slice(1),
     cwd: cwd.pathname,
     stdout: "piped",
     stderr: "piped",
+    env,
   });
   const output = await process.output();
   if (output.code !== 0) {
     throw new Error(`${command.join(" ")} failed:\n${new TextDecoder().decode(output.stderr)}`);
   }
+}
+
+function localComposeS3Env(): Record<string, string> {
+  return {
+    S3_STORAGE_BUCKET_NAME: "woozi",
+    S3_STORAGE_ENDPOINT: "http://minio:9000",
+    S3_STORAGE_REGION: "us-east-1",
+    S3_ACCESS_KEY: "woozi",
+    S3_SECRET_KEY: "woozi-dev-secret",
+  };
 }
 
 async function waitFor(
@@ -49,18 +72,25 @@ Deno.test({
   sanitizeOps: false,
   sanitizeResources: false,
   fn: async () => {
+    useLocalS3();
     const webPort = 8787;
 
     await runCommand(["docker", "compose", "down", "-v"], composeDir).catch(() => undefined);
     await runCommand(
       ["docker", "compose", "--profile", "local-s3", "up", "-d", "minio"],
       composeDir,
+      localComposeS3Env(),
     );
     await runCommand(
       ["docker", "compose", "--profile", "local-s3", "up", "minio-setup"],
       composeDir,
+      localComposeS3Env(),
     );
-    await runCommand(["docker", "compose", "up", "-d", "quickwit"], composeDir);
+    await runCommand(
+      ["docker", "compose", "up", "-d", "quickwit"],
+      composeDir,
+      localComposeS3Env(),
+    );
 
     try {
       const quickwit = new QuickwitClient();
@@ -76,15 +106,21 @@ Deno.test({
       );
 
       assert(events.length > 0, "expected at least one event to ingest into Quickwit");
-      await quickwit.ingestMeetingEvents(events);
-      await quickwit.searchEventually(`entity_type:Meeting AND source_key:${source.key}`);
+      await quickwit.ingestEvents(events);
+      await quickwit.searchEventually(
+        `entity_type:Document AND source_key:${source.key} AND "garantiestelling"`,
+      );
 
-      const importedMeetingName = events[0]?.data.payload?.name;
-      assert(importedMeetingName, "expected imported meeting to have a name");
-      const queryTerm =
-        importedMeetingName.split(/\W+/).find((part) => part.length >= 4) ?? importedMeetingName;
+      const importedDocument = events.find((event) => event.data.entity_type === "Document")?.data
+        .payload;
+      assert(importedDocument?.type === "Document", "expected imported document payload");
+      const queryTerm = "garantiestelling";
 
-      await runCommand(["docker", "compose", "up", "-d", "openbesluitvorming"], composeDir);
+      await runCommand(
+        ["docker", "compose", "up", "-d", "--build", "openbesluitvorming"],
+        composeDir,
+        localComposeS3Env(),
+      );
       await waitFor(async () => {
         try {
           const response = await fetch(`http://127.0.0.1:${webPort}/`);
@@ -129,15 +165,15 @@ Deno.test({
         new window.Event("submit", { bubbles: true, cancelable: true }) as unknown as Event,
       );
 
-      await waitFor(() => resultList.textContent?.includes(importedMeetingName) ?? false);
+      await waitFor(() => resultList.textContent?.includes(importedDocument.name) ?? false);
 
       assert(
         resultList.textContent?.includes("Gemeente Haarlem"),
         "expected rendered GUI results to mention Gemeente Haarlem",
       );
       assert(
-        resultList.textContent?.includes(importedMeetingName),
-        "expected rendered GUI results to mention the imported meeting title",
+        resultList.textContent?.includes(importedDocument.name),
+        "expected rendered GUI results to mention the imported document title",
       );
     } finally {
       await runCommand(["docker", "compose", "down", "-v"], composeDir);

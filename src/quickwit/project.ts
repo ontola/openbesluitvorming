@@ -1,4 +1,4 @@
-import type { EntityCommitEvent, MeetingEntity } from "../types.ts";
+import type { DocumentEntity, EntityCommitEvent, MeetingEntity, WooziEntity } from "../types.ts";
 
 export interface QuickwitSearchDocument {
   time: string;
@@ -18,6 +18,7 @@ export interface QuickwitSearchDocument {
   source_key?: string;
   name?: string;
   classification?: string[];
+  file_name?: string;
   start_date?: string;
   end_date?: string;
   organization?: string;
@@ -26,10 +27,33 @@ export interface QuickwitSearchDocument {
   payload: unknown;
 }
 
+function projectMeetingContent(payload?: MeetingEntity): string | undefined {
+  const content = [payload?.name, ...(payload?.classification ?? []), payload?.location]
+    .filter(Boolean)
+    .join(" ");
+
+  return content || undefined;
+}
+
+function projectDocumentContent(payload?: DocumentEntity): string | undefined {
+  const content = [
+    payload?.name,
+    ...(payload?.classification ?? []),
+    payload?.file_name,
+    ...(payload?.text ?? []),
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  return content || undefined;
+}
+
 export function projectEntityCommitToQuickwitDocument(
-  event: EntityCommitEvent<MeetingEntity>,
+  event: EntityCommitEvent<WooziEntity>,
 ): QuickwitSearchDocument {
   const payload = event.data.payload;
+  const content =
+    payload?.type === "Document" ? projectDocumentContent(payload) : projectMeetingContent(payload);
 
   return {
     time: event.time,
@@ -49,13 +73,12 @@ export function projectEntityCommitToQuickwitDocument(
     source_key: event.data.source.source,
     name: payload?.name,
     classification: payload?.classification,
-    start_date: payload?.start_date,
-    end_date: payload?.end_date,
+    file_name: payload?.type === "Document" ? payload.file_name : undefined,
+    start_date: payload?.type === "Meeting" ? payload.start_date : payload?.last_discussed_at,
+    end_date: payload?.type === "Meeting" ? payload.end_date : undefined,
     organization: payload?.organization,
-    committee: payload?.committee,
-    content: [payload?.name, ...(payload?.classification ?? []), payload?.location]
-      .filter(Boolean)
-      .join(" "),
+    committee: payload?.type === "Meeting" ? payload.committee : undefined,
+    content,
     payload,
   };
 }

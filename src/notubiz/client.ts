@@ -62,6 +62,35 @@ async function fetchJson<T>(url: string): Promise<T> {
   throw lastError instanceof Error ? lastError : new Error(`Request failed for ${url}`);
 }
 
+async function fetchBytes(url: string): Promise<Uint8Array> {
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt += 1) {
+    try {
+      const response = await fetch(url, {
+        headers: {
+          accept: "*/*",
+          "user-agent": "woozi/0.1",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Request failed ${response.status} for ${url}`);
+      }
+
+      return new Uint8Array(await response.arrayBuffer());
+    } catch (error) {
+      lastError = error;
+      if (attempt === MAX_RETRIES || !isRetryableError(error)) {
+        throw error;
+      }
+      await sleep(RETRY_DELAY_MS * attempt);
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error(`Request failed for ${url}`);
+}
+
 export class NotubizClient {
   async getOrganizationAttributes(organizationId: number): Promise<NotubizOrganizationAttributes> {
     type OrganizationsResponse = {
@@ -117,5 +146,10 @@ export class NotubizClient {
 
   async getMeeting(meetingId: number): Promise<unknown> {
     return await fetchJson(buildUrl(`events/meetings/${meetingId}`));
+  }
+
+  async downloadDocument(url: string): Promise<Uint8Array> {
+    const target = url.includes("format=") ? url : `${url}?${DEFAULT_QUERY}`;
+    return await fetchBytes(target);
   }
 }

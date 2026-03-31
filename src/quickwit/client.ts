@@ -1,5 +1,5 @@
 import { projectEntityCommitToQuickwitDocument } from "./project.ts";
-import type { EntityCommitEvent, MeetingEntity } from "../types.ts";
+import type { EntityCommitEvent, WooziEntity } from "../types.ts";
 
 const DEFAULT_INDEX_ID = "woozi-events";
 const DEFAULT_QUICKWIT_URL = "http://127.0.0.1:7280";
@@ -17,6 +17,17 @@ function isRetryableSearchError(error: unknown): boolean {
   return (
     error.message.includes("Quickwit request failed 500") ||
     error.message.includes("No such file or directory")
+  );
+}
+
+function isRetryableIngestError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  return (
+    error.message.includes("index `woozi-events` not found") ||
+    error.message.includes("Quickwit ingest failed 404")
   );
 }
 
@@ -81,21 +92,39 @@ export class QuickwitClient {
     });
   }
 
-  async ingestMeetingEvents(events: Array<EntityCommitEvent<MeetingEntity>>): Promise<void> {
+  async ingestEvents(events: Array<EntityCommitEvent<WooziEntity>>): Promise<void> {
     const documents = events.map(projectEntityCommitToQuickwitDocument);
     const body = documents.map((document) => JSON.stringify(document)).join("\n");
 
-    const response = await fetch(`${this.baseUrl}/api/v1/${this.indexId}/ingest?commit=wait_for`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-      },
-      body,
-    });
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= 5; attempt += 1) {
+      try {
+        const response = await fetch(
+          `${this.baseUrl}/api/v1/${this.indexId}/ingest?commit=wait_for`,
+          {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+            },
+            body,
+          },
+        );
 
-    if (!response.ok) {
-      throw new Error(`Quickwit ingest failed ${response.status}: ${await response.text()}`);
+        if (!response.ok) {
+          throw new Error(`Quickwit ingest failed ${response.status}: ${await response.text()}`);
+        }
+
+        return;
+      } catch (error) {
+        lastError = error;
+        if (attempt === 5 || !isRetryableIngestError(error)) {
+          throw error;
+        }
+        await sleep(500 * attempt);
+      }
     }
+
+    throw lastError instanceof Error ? lastError : new Error("Quickwit ingest failed");
   }
 
   async search(query: string, maxHits = 10): Promise<QuickwitSearchResponse> {

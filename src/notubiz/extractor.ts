@@ -1,7 +1,14 @@
+import { materializeDocument } from "../documents/process.ts";
 import { NotubizClient } from "./client.ts";
 import { buildEntityCommitEvent } from "../events/entity_commit.ts";
-import { normalizeNotubizMeeting } from "./normalize.ts";
-import type { EntityCommitEvent, MeetingEntity, NotubizSourceDefinition } from "../types.ts";
+import { normalizeNotubizDocuments, normalizeNotubizMeeting } from "./normalize.ts";
+import { ObjectStorageClient } from "../storage/s3.ts";
+import type {
+  EntityCommitEvent,
+  ExtractionBundle,
+  NotubizSourceDefinition,
+  WooziEntity,
+} from "../types.ts";
 
 type NotubizEventsResponse = {
   events?: unknown[];
@@ -14,6 +21,16 @@ type NotubizMeetingResponse = {
   meeting?: unknown;
 };
 
+function isSkippableMeetingError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  return (
+    error.message.includes("Request failed 401") || error.message.includes("Request failed 403")
+  );
+}
+
 export class NotubizMeetingExtractor {
   constructor(private readonly client = new NotubizClient()) {}
 
@@ -21,13 +38,15 @@ export class NotubizMeetingExtractor {
     source: NotubizSourceDefinition,
     dateFrom: string,
     dateTo: string,
-  ): Promise<MeetingEntity[]> {
+  ): Promise<ExtractionBundle> {
     const organizationAttributes = await this.client.getOrganizationAttributes(
       source.notubizOrganizationId,
     );
 
-    const meetings: MeetingEntity[] = [];
+    const meetings = [];
+    const documents = [];
     let page = 1;
+    const storage = await ObjectStorageClient.fromEnvironment();
 
     while (true) {
       const eventPage = (await this.client.listEvents(
@@ -54,7 +73,15 @@ export class NotubizMeetingExtractor {
           continue;
         }
 
-        const meetingResponse = (await this.client.getMeeting(meetingId)) as NotubizMeetingResponse;
+        let meetingResponse: NotubizMeetingResponse;
+        try {
+          meetingResponse = (await this.client.getMeeting(meetingId)) as NotubizMeetingResponse;
+        } catch (error) {
+          if (isSkippableMeetingError(error)) {
+            continue;
+          }
+          throw error;
+        }
         if (!meetingResponse.meeting) {
           continue;
         }
@@ -62,6 +89,16 @@ export class NotubizMeetingExtractor {
         meetings.push(
           normalizeNotubizMeeting(source, organizationAttributes, meetingResponse.meeting),
         );
+        const meeting = meetings[meetings.length - 1];
+        const extractedDocuments = normalizeNotubizDocuments(source, meeting);
+        for (const document of extractedDocuments) {
+          documents.push(
+            await materializeDocument(document, {
+              download: (url) => this.client.downloadDocument(url),
+              storage,
+            }),
+          );
+        }
       }
 
       if (!eventPage.pagination?.has_more_pages) {
@@ -71,15 +108,16 @@ export class NotubizMeetingExtractor {
       page += 1;
     }
 
-    return meetings;
+    return { meetings, documents };
   }
 
   async extractCommitEventsForDateRange(
     source: NotubizSourceDefinition,
     dateFrom: string,
     dateTo: string,
-  ): Promise<Array<EntityCommitEvent<MeetingEntity>>> {
-    const meetings = await this.extractForDateRange(source, dateFrom, dateTo);
-    return await Promise.all(meetings.map((meeting) => buildEntityCommitEvent(meeting)));
+  ): Promise<Array<EntityCommitEvent<WooziEntity>>> {
+    const bundle = await this.extractForDateRange(source, dateFrom, dateTo);
+    const entities = [...bundle.meetings, ...bundle.documents];
+    return await Promise.all(entities.map((entity) => buildEntityCommitEvent(entity)));
   }
 }

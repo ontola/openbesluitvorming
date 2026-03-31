@@ -50,6 +50,8 @@ Responsibilities:
 
 - poll for changes in a date range or from a source cursor
 - fetch raw payloads and documents
+- store retrieved files in S3-compatible object storage
+- extract plain text from PDFs and office files
 - normalize source-specific structures
 - produce canonical entities
 
@@ -166,9 +168,11 @@ This folder currently contains:
 
 - minimal entity schemas
 - a first Deno-based Notubiz extractor slice
-- `entity.commit` events for canonical meetings
+- `entity.commit` events for canonical meetings and documents
+- attachment download into S3-compatible object storage
+- plain-text extraction for PDF and Word-style documents
 - a local Quickwit setup and projection client
-- a live e2e that ingests Haarlem Notubiz meetings into Quickwit
+- live e2e coverage that ingests Haarlem meetings and attached files into Quickwit and the GUI
 
 ## Commands
 
@@ -213,8 +217,29 @@ To extract one Haarlem day and ingest the resulting commit events into Quickwit:
 pnpm run ingest:haarlem
 ```
 
+That command now:
+
+- extracts public Haarlem meetings from Notubiz
+- downloads attached source files
+- stores the originals in S3-compatible object storage
+- extracts plain text from those files
+- emits `entity.commit` events for `Meeting` and `Document`
+- projects both entity types into Quickwit
+
 To start the frontend prototype:
 
 ```bash
-docker compose up -d openbesluitvorming
+docker compose up -d --build openbesluitvorming
 ```
+
+## Local extractor requirements
+
+The host-side ingest command currently uses local text extraction tools:
+
+- `pdftotext` for PDFs
+- `textutil` for `.doc`, `.docx`, `.rtf`, `.odt`, and HTML-like office documents
+
+On this machine, those are available at:
+
+- `/opt/homebrew/bin/pdftotext`
+- `/usr/bin/textutil`

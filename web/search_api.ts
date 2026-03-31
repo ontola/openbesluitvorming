@@ -1,18 +1,32 @@
 import { QuickwitClient } from "../src/quickwit/client.ts";
 
 type SearchHit = {
+  entity_type?: string;
   name?: string;
   organization?: string;
   start_date?: string;
   content?: string;
+  file_name?: string;
   source_key?: string;
+  payload?: {
+    original_url?: string;
+    text?: string[];
+    media_urls?: Array<{
+      url?: string;
+    }>;
+  };
 };
 
 export type SearchResult = {
+  entityType: string;
+  entityTypeLabel: string;
   organization: string;
   date: string;
   title: string;
   summary: string;
+  sortDate?: string;
+  fullText: string;
+  downloadUrl?: string;
 };
 
 function escapeTerm(term: string): string {
@@ -48,8 +62,12 @@ function expandDutchGovernanceTerms(query: string): string[] {
   return [...terms];
 }
 
-function buildQuickwitQuery(query: string, organization: string): string {
-  const parts = ["entity_type:Meeting"];
+function buildQuickwitQuery(query: string, organization: string, entityType: string): string {
+  const typeQuery =
+    entityType === "Meeting" || entityType === "Document"
+      ? `entity_type:${entityType}`
+      : "(entity_type:Meeting OR entity_type:Document)";
+  const parts = [typeQuery];
 
   if (organization) {
     parts.push(`source_key:${organization}`);
@@ -65,6 +83,46 @@ function buildQuickwitQuery(query: string, organization: string): string {
   }
 
   return parts.join(" AND ");
+}
+
+function entityTypeLabel(entityType?: string): string {
+  if (entityType === "Document") {
+    return "Document";
+  }
+  if (entityType === "Meeting") {
+    return "Vergadering";
+  }
+  return "Resultaat";
+}
+
+function sortResults(results: SearchResult[], sort: string): SearchResult[] {
+  const items = [...results];
+
+  if (sort === "date_asc") {
+    items.sort((a, b) => (a.sortDate ?? "").localeCompare(b.sortDate ?? ""));
+    return items;
+  }
+
+  if (sort === "title_asc") {
+    items.sort((a, b) => a.title.localeCompare(b.title, "nl"));
+    return items;
+  }
+
+  items.sort((a, b) => (b.sortDate ?? "").localeCompare(a.sortDate ?? ""));
+  return items;
+}
+
+function summarizeContent(content?: string): string {
+  if (!content) {
+    return "Geen samenvatting beschikbaar.";
+  }
+
+  const compact = content.replaceAll(/\s+/g, " ").trim();
+  if (compact.length <= 240) {
+    return compact;
+  }
+
+  return `${compact.slice(0, 237).trimEnd()}...`;
 }
 
 function formatDate(dateValue?: string): string {
@@ -86,7 +144,13 @@ function formatDate(dateValue?: string): string {
 
 function displayOrganization(hit: SearchHit): string {
   const labels: Record<string, string> = {
+    alkmaar: "Gemeente Alkmaar",
+    amsterdam: "Gemeente Amsterdam",
+    amersfoort: "Gemeente Amersfoort",
+    delft: "Gemeente Delft",
     haarlem: "Gemeente Haarlem",
+    leiden: "Gemeente Leiden",
+    zaanstad: "Gemeente Zaanstad",
   };
 
   if (hit.source_key && labels[hit.source_key]) {
@@ -100,21 +164,39 @@ export async function searchMeetings(
   options: {
     query?: string;
     organization?: string;
+    entityType?: string;
+    sort?: string;
   } = {},
 ): Promise<SearchResult[]> {
   const query = options.query?.trim() ?? "";
   const organization = options.organization?.trim() ?? "";
+  const entityType = options.entityType?.trim() ?? "";
+  const sort = options.sort?.trim() ?? "date_desc";
   const quickwit = new QuickwitClient();
-  const response = await quickwit.search(buildQuickwitQuery(query, organization), 12);
+  const response = await quickwit.search(buildQuickwitQuery(query, organization, entityType), 24);
 
-  return response.hits.map((hit) => {
+  const results = response.hits.map((hit) => {
     const document = hit as SearchHit;
 
     return {
       organization: displayOrganization(document),
+      entityType: document.entity_type ?? "Unknown",
+      entityTypeLabel: entityTypeLabel(document.entity_type),
       date: formatDate(document.start_date),
-      title: document.name ?? "Ongetitelde vergadering",
-      summary: document.content ?? "Geen samenvatting beschikbaar.",
+      sortDate: document.start_date,
+      title:
+        document.name ??
+        (document.entity_type === "Document"
+          ? (document.file_name ?? "Ongetiteld document")
+          : "Ongetitelde vergadering"),
+      summary: summarizeContent(document.content),
+      fullText:
+        document.payload?.text?.join("\n\n") ??
+        document.content ??
+        "Geen platte tekst beschikbaar voor dit resultaat.",
+      downloadUrl: document.payload?.media_urls?.[0]?.url ?? document.payload?.original_url,
     };
   });
+
+  return sortResults(results, sort);
 }

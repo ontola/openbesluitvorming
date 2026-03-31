@@ -19,6 +19,8 @@ Deno.serve({ port }, async (request) => {
       const results = await searchMeetings({
         query: url.searchParams.get("query") ?? "",
         organization: url.searchParams.get("organization") ?? "",
+        entityType: url.searchParams.get("entityType") ?? "",
+        sort: url.searchParams.get("sort") ?? "date_desc",
       });
 
       return Response.json({ results });

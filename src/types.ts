@@ -51,7 +51,40 @@ export interface MeetingEntity {
   raw: unknown;
 }
 
-export type WooziEntity = MeetingEntity;
+export interface DocumentMediaLink {
+  url: string;
+  original_url?: string;
+  content_type?: string;
+}
+
+export interface DocumentEntity {
+  id: string;
+  type: "Document";
+  name: string;
+  classification?: string[];
+  original_url?: string;
+  identifier_url?: string;
+  file_name?: string;
+  content_type?: string;
+  size_in_bytes?: number;
+  date_modified?: string;
+  last_discussed_at?: string;
+  is_referenced_by?: string;
+  creator?: string;
+  organization?: string;
+  text?: string[];
+  md_text?: string[];
+  media_urls?: DocumentMediaLink[];
+  source_info: SourceInfo;
+  raw: unknown;
+}
+
+export type WooziEntity = MeetingEntity | DocumentEntity;
+
+export interface ExtractionBundle {
+  meetings: MeetingEntity[];
+  documents: DocumentEntity[];
+}
 
 export interface NotubizSourceDefinition {
   key: string;
