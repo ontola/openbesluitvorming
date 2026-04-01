@@ -49,10 +49,36 @@ async function readCommandOutput(command: string, args: string[]): Promise<strin
   }
   if (output.code !== 0) {
     const stderr = new TextDecoder().decode(output.stderr);
-    throw new Error(`${command} failed: ${stderr.trim()}`);
+    const trimmed = stderr.trim();
+    throw new Error(normalizeCliError(command, trimmed), { cause: trimmed });
   }
 
   return new TextDecoder().decode(output.stdout);
+}
+
+function normalizeCliError(command: string, stderr: string): string {
+  const lines = stderr
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const combined = lines.join(" ");
+
+  if (combined.includes("UnsupportedEncryption")) {
+    return `${command} failed: PDF is encrypted or uses unsupported encryption`;
+  }
+
+  if (combined.includes("Failed to load PDF")) {
+    return `${command} failed: PDF parser could not load this file`;
+  }
+
+  const panicLine = lines.find((line) => line.includes("panicked at"));
+  if (panicLine) {
+    const noteIndex = combined.indexOf("note:");
+    const panicBody = noteIndex >= 0 ? combined.slice(0, noteIndex).trim() : combined;
+    return `${command} failed: ${panicBody}`;
+  }
+
+  return `${command} failed: ${combined}`;
 }
 
 async function extractPdf(bytes: Uint8Array): Promise<DocumentMarkdownExtractionResult> {

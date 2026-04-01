@@ -21,6 +21,22 @@ export interface MaterializedDocumentResult {
   issues: ExtractionIssue[];
 }
 
+function documentIssueContext(document: DocumentEntity): string {
+  const parts = [document.file_name?.trim(), document.original_url?.trim()].filter(
+    (value): value is string => Boolean(value),
+  );
+
+  return parts.length > 0 ? parts.join(" | ") : document.id;
+}
+
+function issueDetailsFromError(error: unknown): string | undefined {
+  if (!(error instanceof Error)) {
+    return undefined;
+  }
+
+  return typeof error.cause === "string" && error.cause.trim() ? error.cause : undefined;
+}
+
 function sanitizedFileName(document: DocumentEntity): string {
   const candidate = document.file_name?.trim() || `${document.id}.bin`;
   return candidate.replaceAll(/[^\w.\-() ]+/g, "_");
@@ -138,7 +154,8 @@ export async function materializeDocument(
       severity: "error",
       step: "extract_text",
       entity_id: document.id,
-      message: error instanceof Error ? error.message : "Document extraction failed",
+      message: `${documentIssueContext(document)}: ${error instanceof Error ? error.message : "Document extraction failed"}`,
+      details: issueDetailsFromError(error),
     });
   }
 

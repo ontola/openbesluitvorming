@@ -6,7 +6,7 @@ import type {
 } from "../src/types.ts";
 import { startIngest } from "../src/ingest.ts";
 import { getRunDetails, listRuns } from "../src/ops/store.ts";
-import { listAdminSourceOptions } from "../src/sources/index.ts";
+import { listAdminSourceOptions, listRunnableSourceRefs } from "../src/sources/index.ts";
 import { getEntityContent, searchMeetings } from "./search_api.ts";
 
 const root = new URL("./", import.meta.url);
@@ -45,7 +45,18 @@ Deno.serve({ port }, async (request) => {
 
   if (url.pathname === "/api/admin/sources") {
     return Response.json<AdminSourcesResponse>({
-      sources: listAdminSourceOptions(),
+      sources: [
+        {
+          key: "__all__",
+          sourceRef: "__all__",
+          label: "Alle ondersteunde bronnen",
+          supplier: "woozi",
+          organizationType: "verzameling",
+          implemented: true,
+          isAggregate: true,
+        },
+        ...listAdminSourceOptions(),
+      ],
     });
   }
 
@@ -98,11 +109,16 @@ Deno.serve({ port }, async (request) => {
           { status: 400 },
         );
       }
-      const run = await startIngest(sourceSelector, payload.dateFrom, payload.dateTo, {
-        ingestToQuickwit: true,
-        trigger: "api",
-      });
-      return Response.json({ run });
+      const sourceRefs = sourceSelector === "__all__" ? listRunnableSourceRefs() : [sourceSelector];
+      const runs = await Promise.all(
+        sourceRefs.map((sourceRef) =>
+          startIngest(sourceRef, payload.dateFrom, payload.dateTo, {
+            ingestToQuickwit: true,
+            trigger: "user",
+          }),
+        ),
+      );
+      return Response.json({ runs });
     } catch (error) {
       return Response.json(
         { error: error instanceof Error ? error.message : "Import mislukt" },

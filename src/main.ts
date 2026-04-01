@@ -14,7 +14,7 @@ if (import.meta.main) {
   try {
     const result = await runIngest(sourceKey, dateFrom, dateTo, {
       ingestToQuickwit: shouldIngestToQuickwit,
-      trigger: "manual",
+      trigger: "user",
     });
 
     console.log(

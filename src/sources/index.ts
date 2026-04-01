@@ -35,6 +35,16 @@ function getImplementedCatalogSources(): SourceCatalogEntry[] {
   return listCatalogSources().filter((source) => source.implemented);
 }
 
+export function listRunnableCatalogSources(): SourceCatalogEntry[] {
+  return getImplementedCatalogSources().filter(
+    (source) => source.supplier === "notubiz" || source.supplier === "ibabs",
+  );
+}
+
+export function listRunnableSourceRefs(): string[] {
+  return listRunnableCatalogSources().map((source) => source.sourceRef);
+}
+
 export function getSource(sourceKeyOrRef: string): SourceDefinition {
   const catalogSource = sourceKeyOrRef.includes(":")
     ? getCatalogSourceByRef(sourceKeyOrRef)
@@ -67,9 +77,7 @@ export function getSource(sourceKeyOrRef: string): SourceDefinition {
 }
 
 export function listSources(): SourceDefinition[] {
-  return getImplementedCatalogSources()
-    .filter((source) => source.supplier === "notubiz" || source.supplier === "ibabs")
-    .map((source) => toRuntimeSourceDefinition(source));
+  return listRunnableCatalogSources().map((source) => toRuntimeSourceDefinition(source));
 }
 
 export function listAdminSourceOptions(): AdminSourceOption[] {

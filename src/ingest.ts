@@ -4,7 +4,7 @@ import { NotubizMeetingExtractor } from "./notubiz/extractor.ts";
 import { updateRun, appendRunIssue, createRun, getRunDetails } from "./ops/store.ts";
 import { QuickwitClient } from "./quickwit/client.ts";
 import { getSource } from "./sources/index.ts";
-import type { IngestRunRecord, SourceDefinition } from "./types.ts";
+import type { IngestRunRecord, IngestRunTrigger, SourceDefinition } from "./types.ts";
 
 function getExtractor(source: SourceDefinition): NotubizMeetingExtractor | IbabsMeetingExtractor {
   if (source.supplier === "notubiz") {
@@ -21,7 +21,7 @@ async function executeIngest(
   dateTo: string,
   options: {
     ingestToQuickwit?: boolean;
-    trigger?: "manual" | "api";
+    trigger?: IngestRunTrigger;
   } = {},
 ): Promise<{
   run: IngestRunRecord;
@@ -110,7 +110,7 @@ export async function runIngest(
   dateTo: string,
   options: {
     ingestToQuickwit?: boolean;
-    trigger?: "manual" | "api";
+    trigger?: IngestRunTrigger;
   } = {},
 ): Promise<{
   run: IngestRunRecord;
@@ -122,7 +122,7 @@ export async function runIngest(
     supplier: source.supplier,
     date_from: dateFrom,
     date_to: dateTo,
-    trigger: options.trigger ?? "manual",
+    trigger: options.trigger ?? "user",
   });
 
   return await executeIngest(run, sourceKey, dateFrom, dateTo, options);
@@ -134,7 +134,7 @@ export async function startIngest(
   dateTo: string,
   options: {
     ingestToQuickwit?: boolean;
-    trigger?: "manual" | "api";
+    trigger?: IngestRunTrigger;
   } = {},
 ): Promise<IngestRunRecord> {
   const source = getSource(sourceKey);
@@ -143,7 +143,7 @@ export async function startIngest(
     supplier: source.supplier,
     date_from: dateFrom,
     date_to: dateTo,
-    trigger: options.trigger ?? "manual",
+    trigger: options.trigger ?? "user",
   });
 
   void executeIngest(run, sourceKey, dateFrom, dateTo, options).catch((error) => {

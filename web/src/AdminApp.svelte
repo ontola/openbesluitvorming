@@ -18,6 +18,7 @@
 
   let allSources: AdminSourceOption[] = [];
   let implementedSources: AdminSourceOption[] = [];
+  let filterSources: AdminSourceOption[] = [];
   let runs: IngestRunRecord[] = [];
   let issuesByRun = new Map<string, IngestRunIssueRecord[]>();
 
@@ -54,6 +55,16 @@
       failed: "status-failed",
     };
     return suffixes[status] ?? "status-unknown";
+  }
+
+  function triggerLabel(trigger: string): string {
+    const labels: Record<string, string> = {
+      user: "Gebruiker",
+      scheduled: "Planner",
+      manual: "Gebruiker",
+      api: "Gebruiker",
+    };
+    return labels[trigger] ?? trigger;
   }
 
   function periodLabel(run: IngestRunRecord): string {
@@ -177,6 +188,7 @@
     const payload = await fetchJson<AdminSourcesResponse>("/api/admin/sources");
     allSources = payload.sources ?? [];
     implementedSources = allSources.filter((source) => source.implemented);
+    filterSources = implementedSources.filter((source) => !source.isAggregate);
   }
 
   async function loadRuns(): Promise<void> {
@@ -229,10 +241,20 @@
       } satisfies AdminRerunRequest),
     });
 
-    importStatus = `Import ${payload.run.id} gestart.`;
-    runs = [payload.run, ...runs];
+    const startedRuns = payload.runs ?? [];
+    if (startedRuns.length === 0) {
+      importStatus = "Er zijn geen imports gestart.";
+      return;
+    }
+
+    importStatus = startedRuns.length === 1
+      ? `Import ${startedRuns[0].id} gestart.`
+      : `${startedRuns.length} imports gestart.`;
+    runs = [...startedRuns, ...runs];
     issuesByRun = new Map(issuesByRun);
-    issuesByRun.set(payload.run.id, []);
+    for (const run of startedRuns) {
+      issuesByRun.set(run.id, []);
+    }
     schedulePolling();
     await loadRuns();
   }
@@ -359,7 +381,7 @@
           <span class="sr-only">Filter bron</span>
           <select bind:value={filterSource} on:change={() => void loadRuns()}>
             <option value="">Alle bronnen</option>
-            {#each implementedSources as source}
+            {#each filterSources as source}
               <option value={source.key}>{source.label}</option>
             {/each}
           </select>
@@ -402,6 +424,9 @@
                     <span class={`pill pill--soft ${statusClassName(run.status)}`}>
                       {statusLabel(run.status)}
                     </span>
+                    {#if run.trigger === "scheduled"}
+                      <span class="pill pill--soft">Planner</span>
+                    {/if}
                     <span class="admin-run__date">{periodLabel(run)}</span>
                   </div>
                 </div>
@@ -481,6 +506,7 @@
           <div class="admin-detail__grid">
             <div><strong>Import-ID</strong><p>{openRun.id}</p></div>
             <div><strong>Bron</strong><p>{openRun.source_key}</p></div>
+            <div><strong>Gestart door</strong><p>{triggerLabel(openRun.trigger)}</p></div>
             <div><strong>Status</strong><p>{statusLabel(openRun.status)}</p></div>
             <div><strong>Periode</strong><p>{periodLabel(openRun)}</p></div>
             <div><strong>Gestart</strong><p>{openRun.started_at}</p></div>
@@ -500,6 +526,12 @@
                   <li>
                     <strong>{issue.step}</strong>
                     {#if issue.entity_id} ({issue.entity_id}){/if}: {issue.message}
+                    {#if issue.details}
+                      <details class="admin-issue-details">
+                        <summary>Volledige fout</summary>
+                        <pre>{issue.details}</pre>
+                      </details>
+                    {/if}
                   </li>
                 {/each}
               </ul>

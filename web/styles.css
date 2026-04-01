@@ -690,6 +690,35 @@ select {
   line-height: 1.6;
 }
 
+.admin-issue-details {
+  margin-top: 0.55rem;
+}
+
+.admin-issue-details summary {
+  cursor: pointer;
+  color: var(--accent-deep);
+  font-weight: 600;
+}
+
+.admin-issue-details pre {
+  margin: 0.55rem 0 0;
+  padding: 0.85rem 1rem;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 0.9rem;
+  background: rgba(23, 50, 92, 0.04);
+  color: var(--muted);
+  font:
+    0.88rem/1.5 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Monaco,
+    Consolas,
+    monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .feature-card h3,
 .result-card h3 {
   margin: 0 0 0.7rem;

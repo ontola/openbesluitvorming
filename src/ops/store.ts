@@ -1,6 +1,6 @@
 import { DatabaseSync } from "node:sqlite";
 import { getConfigValue } from "../config.ts";
-import type { ExtractionIssue, IngestRunRecord } from "../types.ts";
+import type { ExtractionIssue, IngestRunRecord, IngestRunTrigger } from "../types.ts";
 
 let databasePromise: Promise<DatabaseSync> | null = null;
 
@@ -40,9 +40,15 @@ async function getDatabase(): Promise<DatabaseSync> {
           step TEXT NOT NULL,
           entity_id TEXT,
           message TEXT NOT NULL,
+          details TEXT,
           FOREIGN KEY(run_id) REFERENCES ingest_run(id)
         );
       `);
+      try {
+        db.exec("ALTER TABLE ingest_run_issue ADD COLUMN details TEXT");
+      } catch {
+        // Column already exists on initialized databases.
+      }
       return db;
     })();
   }
@@ -53,6 +59,21 @@ async function getDatabase(): Promise<DatabaseSync> {
 export interface RunDetails {
   run: IngestRunRecord;
   issues: ExtractionIssue[];
+}
+
+function normalizeTrigger(trigger: string): IngestRunTrigger {
+  if (trigger === "scheduled" || trigger === "user" || trigger === "manual" || trigger === "api") {
+    return trigger;
+  }
+
+  return "user";
+}
+
+function normalizeRunRecord(record: IngestRunRecord): IngestRunRecord {
+  return {
+    ...record,
+    trigger: normalizeTrigger(record.trigger),
+  };
 }
 
 export async function createRun(
@@ -95,7 +116,7 @@ export async function createRun(
     )`,
   ).run(record);
 
-  return record;
+  return normalizeRunRecord(record);
 }
 
 export async function updateRun(
@@ -133,14 +154,14 @@ export async function updateRun(
     WHERE id=@id`,
   ).run(updated);
 
-  return updated;
+  return normalizeRunRecord(updated);
 }
 
 export async function appendRunIssue(runId: string, issue: ExtractionIssue): Promise<void> {
   const db = await getDatabase();
   db.prepare(
-    `INSERT INTO ingest_run_issue (id, run_id, severity, step, entity_id, message)
-     VALUES (@id, @run_id, @severity, @step, @entity_id, @message)`,
+    `INSERT INTO ingest_run_issue (id, run_id, severity, step, entity_id, message, details)
+     VALUES (@id, @run_id, @severity, @step, @entity_id, @message, @details)`,
   ).run({
     id: crypto.randomUUID(),
     run_id: runId,
@@ -170,9 +191,10 @@ export async function listRuns(
   }
 
   const where = clauses.length > 0 ? `WHERE ${clauses.join(" AND ")}` : "";
-  return db
-    .prepare(
-      `SELECT
+  return (
+    db
+      .prepare(
+        `SELECT
         id, source_key, supplier, date_from, date_to, trigger_mode as trigger, status,
         started_at, finished_at, meeting_count, document_count, cache_hits, downloaded_count,
         issue_count, quickwit_index_id, error_message
@@ -180,8 +202,9 @@ export async function listRuns(
        ${where}
        ORDER BY started_at DESC
        LIMIT @limit`,
-    )
-    .all(params) as IngestRunRecord[];
+      )
+      .all(params) as IngestRunRecord[]
+  ).map(normalizeRunRecord);
 }
 
 export async function getRunDetails(runId: string): Promise<RunDetails | null> {
@@ -204,11 +227,12 @@ export async function getRunDetails(runId: string): Promise<RunDetails | null> {
   const issues = db
     .prepare(
       `SELECT severity, step, entity_id, message
+              , details
        FROM ingest_run_issue
        WHERE run_id = ?
        ORDER BY rowid ASC`,
     )
     .all(runId) as ExtractionIssue[];
 
-  return { run, issues };
+  return { run: normalizeRunRecord(run), issues };
 }

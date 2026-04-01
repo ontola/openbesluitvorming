@@ -112,6 +112,7 @@ export interface ExtractionIssue {
     | "ingest_quickwit";
   entity_id?: string;
   message: string;
+  details?: string;
 }
 
 export type OrganizationType = "gemeente" | "provincie" | "waterschap";
@@ -201,13 +202,15 @@ export interface IbabsMeeting {
   Documents?: IbabsDocument[];
 }
 
+export type IngestRunTrigger = "user" | "scheduled" | "manual" | "api";
+
 export interface IngestRunRecord {
   id: string;
   source_key: string;
   supplier: string;
   date_from: string;
   date_to: string;
-  trigger: "manual" | "api";
+  trigger: IngestRunTrigger;
   status: "running" | "succeeded" | "partial" | "failed";
   started_at: string;
   finished_at?: string;
@@ -227,6 +230,7 @@ export interface IngestRunIssueRecord {
   step: ExtractionIssue["step"];
   entity_id?: string;
   message: string;
+  details?: string;
   created_at: string;
 }
 
@@ -234,9 +238,10 @@ export interface AdminSourceOption {
   key: string;
   sourceRef: string;
   label: string;
-  supplier: Supplier;
-  organizationType: OrganizationType;
+  supplier: string;
+  organizationType: string;
   implemented: boolean;
+  isAggregate?: boolean;
 }
 
 export interface AdminRunsResponse {
@@ -260,7 +265,7 @@ export interface AdminRerunRequest {
 }
 
 export interface AdminRerunResponse {
-  run: IngestRunRecord;
+  runs: IngestRunRecord[];
 }
 
 export interface SearchResult {

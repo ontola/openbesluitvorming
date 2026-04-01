@@ -71,6 +71,43 @@ Deno.test("extractDocumentMarkdown propagates non-missing transmutation failures
   }
 });
 
+Deno.test("extractDocumentMarkdown normalizes unsupported encrypted PDF failures", async () => {
+  const tempScript = await Deno.makeTempFile({ suffix: ".sh" });
+  await Deno.writeTextFile(
+    tempScript,
+    "#!/bin/sh\nprintf 'Error: Engine error (PDF Parser): pdf-extract failed: PdfError(Decryption(UnsupportedEncryption))' 1>&2\nexit 1\n",
+  );
+  await Deno.chmod(tempScript, 0o755);
+
+  const previous = Deno.env.get("WOOZI_TRANSMUTATION_BIN");
+  Deno.env.set("WOOZI_TRANSMUTATION_BIN", tempScript);
+
+  try {
+    let thrown: unknown;
+    try {
+      await extractDocumentMarkdown(new TextEncoder().encode("%PDF-1.4 encrypted"), {
+        contentType: "application/pdf",
+        fileName: "encrypted.pdf",
+      });
+    } catch (error) {
+      thrown = error;
+    }
+
+    assert(thrown instanceof Error, "expected encrypted PDF extraction to throw");
+    assert(
+      thrown.message.includes("PDF is encrypted or uses unsupported encryption"),
+      "expected encrypted PDF failures to be normalized",
+    );
+  } finally {
+    if (previous === undefined) {
+      Deno.env.delete("WOOZI_TRANSMUTATION_BIN");
+    } else {
+      Deno.env.set("WOOZI_TRANSMUTATION_BIN", previous);
+    }
+    await Deno.remove(tempScript).catch(() => undefined);
+  }
+});
+
 Deno.test("extractDocumentMarkdown surfaces a clear error when transmutation is missing", async () => {
   const previous = Deno.env.get("WOOZI_TRANSMUTATION_BIN");
   Deno.env.set("WOOZI_TRANSMUTATION_BIN", "/tmp/woozi-missing-transmutation-bin");
