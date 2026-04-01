@@ -482,7 +482,7 @@
         </div>
         <div class="detail-sheet__header-actions">
           <a class="ghost-button detail-sheet__download" href={searchUrlForRun(openRun)}>
-            Bekijk resultaten
+            Bekijk
           </a>
           <button
             class="primary-button detail-sheet__download"
@@ -492,7 +492,7 @@
               void importOpenRunAgain();
             }}
           >
-            Import uitvoeren
+              Retry
           </button>
           <button class="detail-sheet__close" type="button" on:click={closeDetail}>
             Sluiten

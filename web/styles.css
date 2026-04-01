@@ -264,8 +264,8 @@ select {
 }
 
 .hero--search .search-panel {
-  width: min(100%, 40rem);
-  max-width: 40rem;
+  width: 100%;
+  max-width: none;
   margin: 0 0 0 auto;
   padding: 0;
   border: 0;
@@ -352,6 +352,8 @@ select {
 
 .search-field,
 .select-field {
+  --control-font-size: 1.03rem;
+  --control-padding-inline: 1rem;
   display: flex;
   align-items: center;
   width: 100%;
@@ -378,20 +380,41 @@ select {
 
 .search-field--primary {
   margin-bottom: 0;
+  height: 4rem;
 }
 
 .search-field--picker {
   margin-bottom: 0;
 }
 
+.search-field--compact {
+  --control-font-size: 0.87rem;
+  --control-padding-inline: 0.8rem;
+  height: 2.8rem;
+  padding: 0 0.8rem;
+}
+
+.select-field--compact {
+  --control-font-size: 0.87rem;
+  --control-padding-inline: 0.8rem;
+  height: 2.8rem;
+}
+
+.select-field--compact select {
+  background-position:
+    calc(100% - 1.15rem) calc(50% - 2px),
+    calc(100% - 0.75rem) calc(50% - 2px);
+  background-size: 7px 7px;
+}
+
 .search-panel__options {
   display: grid;
   grid-template-columns:
-    minmax(0, 1.45fr)
-    minmax(0, 0.7fr)
-    minmax(0, 0.82fr)
-    minmax(0, 0.82fr)
-    minmax(0, 0.9fr);
+    minmax(12rem, 1.5fr)
+    minmax(8.5rem, 0.8fr)
+    minmax(8.5rem, 0.85fr)
+    minmax(8.5rem, 0.85fr)
+    minmax(10rem, 1fr);
   gap: 0.65rem;
   margin-top: 0.7rem;
 }
@@ -403,6 +426,7 @@ select {
 .search-field input,
 .select-field select {
   width: 100%;
+  height: 100%;
   border: 0;
   background: transparent;
   outline: 0;
@@ -410,14 +434,12 @@ select {
 }
 
 .search-field input {
-  min-height: 4rem;
-  font-size: 1.15rem;
+  font-size: var(--control-font-size);
 }
 
 .select-field select {
-  min-height: 3.7rem;
-  font-size: 1.03rem;
-  padding: 0 1rem;
+  font-size: var(--control-font-size);
+  padding: 0 var(--control-padding-inline);
   appearance: none;
   background-image:
     linear-gradient(45deg, transparent 50%, #9eb2cd 50%),
@@ -429,19 +451,13 @@ select {
   background-repeat: no-repeat;
 }
 
-.select-field--compact select {
-  min-height: 3.25rem;
-  font-size: 0.96rem;
-}
-
 .select-field--subtle {
   border-color: rgba(41, 88, 153, 0.08);
   background: rgba(255, 255, 255, 0.58);
 }
 
+.search-field--compact input,
 .select-field--subtle select {
-  min-height: 2.95rem;
-  font-size: 0.94rem;
   color: var(--muted);
 }
 
@@ -648,15 +664,15 @@ select {
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  width: 2rem;
-  height: 2rem;
-  margin-left: 0.25rem;
+  width: 1.7rem;
+  height: 1.7rem;
+  margin-left: 0.15rem;
   border: 0;
   border-radius: 999px;
   background: transparent;
   color: var(--accent-deep);
   cursor: pointer;
-  font-size: 1.55rem;
+  font-size: 1.25rem;
   line-height: 1;
 }
 
@@ -861,6 +877,11 @@ select {
 .admin-run__issue-count {
   color: var(--text);
   font-weight: 700;
+}
+
+.admin-detail {
+  padding: 1rem;
+  overflow: auto;
 }
 
 .admin-detail__grid {
@@ -1107,7 +1128,9 @@ select {
 
 .detail-sheet__header {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  padding: 1rem 1rem 0.9rem;
+  justify-content: space-between;
   flex: 0 0 auto;
   gap: 0.9rem;
   padding: 1.1rem 1.25rem 1rem;
@@ -1585,10 +1608,6 @@ select {
   .detail-sheet {
     height: calc(100vh - 1.5rem);
     max-height: calc(100vh - 1.5rem);
-  }
-
-  .detail-sheet__header {
-    padding: 1rem 1rem 0.9rem;
   }
 
   .detail-sheet__header-bar {

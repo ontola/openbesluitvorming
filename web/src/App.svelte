@@ -735,26 +735,28 @@
               bind:value={query}
               name="query"
               type="search"
-              placeholder="Zoeken naar moties, agenda's, toezeggingen of besluiten..."
+              placeholder="Zoeken naar documenten, vergaderingen, agenda's, besluiten..."
               autocomplete="off"
               on:input={onQueryInput}
               on:search={onQuerySearch}
             />
           </label>
-          <button
-            type="button"
-            class="ghost-button ghost-button--subtle search-panel__toggle"
-            aria-expanded={filtersOpen}
-            on:click={() => {
-              filtersOpen = !filtersOpen;
-            }}
-          >
-            <span class="search-panel__toggle-icon" aria-hidden="true">⚙</span>
-            <span class="search-panel__toggle-label">Meer instellingen</span>
-          </button>
+          {#if searched}
+            <button
+              type="button"
+              class="ghost-button ghost-button--subtle search-panel__toggle"
+              aria-expanded={filtersOpen}
+              on:click={() => {
+                filtersOpen = !filtersOpen;
+              }}
+            >
+              <span class="search-panel__toggle-icon" aria-hidden="true">⚙</span>
+              <span class="search-panel__toggle-label">Meer instellingen</span>
+            </button>
+          {/if}
         </div>
 
-        {#if filtersOpen}
+        {#if searched && filtersOpen}
           <div class="search-panel__options">
             <SourcePicker
               options={sources}
