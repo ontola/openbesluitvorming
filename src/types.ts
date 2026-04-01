@@ -251,7 +251,7 @@ export interface IngestRunRecord {
   parent_run_id?: string;
   projection_version?: string;
   derivation_version?: string;
-  status: "running" | "succeeded" | "partial" | "failed";
+  status: "queued" | "running" | "succeeded" | "partial" | "failed";
   started_at: string;
   finished_at?: string;
   meeting_count: number;

@@ -1104,6 +1104,11 @@ select {
   color: var(--muted);
 }
 
+.status-queued {
+  background: rgba(102, 126, 164, 0.14);
+  color: #4b5e7d;
+}
+
 .status-running {
   background: rgba(78, 166, 255, 0.16);
   color: #2559a8;

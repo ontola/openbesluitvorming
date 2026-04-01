@@ -58,6 +58,7 @@ Common app/runtime values:
 - `PORT`
 - `QUICKWIT_URL`
 - `WOOZI_KV_PATH`
+- `INGEST_CONCURRENCY`
 
 ## Docker Runtime
 
@@ -297,6 +298,8 @@ docker run --rm caddy:2 caddy hash-password --plaintext 'your-strong-password'
 - interrupted imports can leave stale run-state unless reconciled on startup
 - startup reconciliation for interrupted runs is now implemented in [src/ops/store.ts](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/src/ops/store.ts)
 - duplicate active imports for the same source/date/execution mode are blocked in [src/ingest.ts](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/src/ingest.ts)
+- background imports are now queued in-process with bounded concurrency from `INGEST_CONCURRENCY`
+- default ingest concurrency is `1`, which is the intended safe production setting for now
 - browser-side fetch helpers now handle empty/non-JSON 500 responses more safely
 
 ## Keep Updated When These Change

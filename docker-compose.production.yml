@@ -3,6 +3,7 @@ services:
     image: caddy:2
     depends_on:
       - openbesluitvorming
+    restart: unless-stopped
     environment:
       DOMAIN: ${DOMAIN}
     ports:
@@ -15,6 +16,7 @@ services:
 
   quickwit:
     image: quickwit/quickwit:0.8.1
+    restart: unless-stopped
     command:
       - run
       - --config
@@ -35,7 +37,9 @@ services:
       dockerfile: Dockerfile.web
     depends_on:
       - quickwit
+    restart: unless-stopped
     environment:
+      DENO_V8_FLAGS: --max-old-space-size=6144
       PORT: 8787
       QUICKWIT_URL: http://quickwit:7280
       WOOZI_KV_PATH: /data/woozi-ops.sqlite3

@@ -12,6 +12,24 @@ import type {
   SourceDefinition,
 } from "./types.ts";
 
+const ingestConcurrency = Math.max(1, Number(Deno.env.get("INGEST_CONCURRENCY") ?? "1"));
+
+type QueuedIngestJob = {
+  run: IngestRunRecord;
+  sourceKey: string;
+  dateFrom: string;
+  dateTo: string;
+  options: {
+    ingestToQuickwit?: boolean;
+    trigger?: IngestRunTrigger;
+    executionMode?: IngestExecutionMode;
+    parentRunId?: string;
+  };
+};
+
+const pendingJobs: QueuedIngestJob[] = [];
+let activeIngestCount = 0;
+
 function getExtractor(source: SourceDefinition): NotubizMeetingExtractor | IbabsMeetingExtractor {
   if (source.supplier === "notubiz") {
     return new NotubizMeetingExtractor();
@@ -120,6 +138,31 @@ async function executeIngest(
   }
 }
 
+async function drainIngestQueue(): Promise<void> {
+  while (activeIngestCount < ingestConcurrency && pendingJobs.length > 0) {
+    const job = pendingJobs.shift();
+    if (!job) {
+      return;
+    }
+
+    activeIngestCount += 1;
+    void (async () => {
+      try {
+        const runningRun = await updateRun(job.run.id, {
+          status: "running",
+          error_message: undefined,
+        });
+        await executeIngest(runningRun, job.sourceKey, job.dateFrom, job.dateTo, job.options);
+      } catch (error) {
+        console.error("Background ingest failed", error);
+      } finally {
+        activeIngestCount -= 1;
+        void drainIngestQueue();
+      }
+    })();
+  }
+}
+
 export async function runIngest(
   sourceKey: string,
   dateFrom: string,
@@ -196,13 +239,19 @@ export async function startIngest(
     trigger: options.trigger ?? "user",
     execution_mode: executionMode,
     parent_run_id: options.parentRunId,
+    status: "queued",
     projection_version: currentProjectionVersion(),
     derivation_version: currentDerivationVersion(),
   });
 
-  void executeIngest(run, sourceKey, dateFrom, dateTo, options).catch((error) => {
-    console.error("Background ingest failed", error);
+  pendingJobs.push({
+    run,
+    sourceKey,
+    dateFrom,
+    dateTo,
+    options,
   });
+  void drainIngestQueue();
 
   return run;
 }

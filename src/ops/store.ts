@@ -179,7 +179,7 @@ export async function createRun(
     | "cache_hits"
     | "downloaded_count"
     | "issue_count"
-  >,
+  > & { status?: IngestRunRecord["status"] },
 ): Promise<IngestRunRecord> {
   const db = await getDatabase();
   const record: IngestRunRecord = {
@@ -193,7 +193,7 @@ export async function createRun(
     parent_run_id: run.parent_run_id,
     projection_version: run.projection_version,
     derivation_version: run.derivation_version,
-    status: "running",
+    status: run.status ?? "running",
     started_at: new Date().toISOString(),
     meeting_count: 0,
     document_count: 0,
@@ -294,7 +294,7 @@ export async function findActiveRun(options: {
          AND date_from = @date_from
          AND date_to = @date_to
          AND execution_mode = @execution_mode
-         AND status = 'running'
+         AND status IN ('queued', 'running')
        ORDER BY started_at DESC
        LIMIT 1`,
     )
@@ -318,7 +318,7 @@ export async function reconcileInterruptedRuns(): Promise<IngestRunRecord[]> {
         started_at, finished_at, meeting_count, document_count, cache_hits, downloaded_count,
         issue_count, quickwit_index_id, error_message
        FROM ingest_run
-       WHERE status = 'running'
+       WHERE status IN ('queued', 'running')
        ORDER BY started_at ASC`,
     )
     .all() as RunRow[];

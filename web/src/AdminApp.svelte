@@ -46,6 +46,7 @@
 
   function statusLabel(status: string): string {
     const labels: Record<string, string> = {
+      queued: "Wacht",
       running: "Draait",
       succeeded: "Geslaagd",
       partial: "Gedeeltelijk",
@@ -56,6 +57,7 @@
 
   function statusClassName(status: string): string {
     const suffixes: Record<string, string> = {
+      queued: "status-queued",
       running: "status-running",
       succeeded: "status-succeeded",
       partial: "status-partial",
@@ -179,7 +181,7 @@
   }
 
   function hasActiveRuns(items: IngestRunRecord[]): boolean {
-    return items.some((run) => run.status === "running");
+    return items.some((run) => run.status === "queued" || run.status === "running");
   }
 
   function schedulePolling(): void {
@@ -452,6 +454,7 @@
           <span class="sr-only">Filter status</span>
           <select bind:value={filterStatus} on:change={() => void loadRuns("replace")}>
             <option value="">Alle statussen</option>
+            <option value="queued">Wacht</option>
             <option value="running">Draait</option>
             <option value="succeeded">Geslaagd</option>
             <option value="partial">Gedeeltelijk</option>
