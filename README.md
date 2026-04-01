@@ -99,6 +99,14 @@ That setup is intended for:
 
 with external S3-compatible object storage from `.env`.
 
+Preferred beta deploy from a clean local Git checkout:
+
+```sh
+pnpm run deploy:beta
+```
+
+This pushes a committed Git ref over SSH to the server and redeploys from a clean Git worktree there, instead of syncing loose files with `rsync`.
+
 Required production env includes:
 
 - `DOMAIN`

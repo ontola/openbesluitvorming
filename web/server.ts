@@ -1,11 +1,12 @@
 import type {
   AdminRerunRequest,
+  AdminRunSummaryResponse,
   AdminSourcesResponse,
   EntityContentResponse,
   SearchResponse,
 } from "../src/types.ts";
 import { startIngest } from "../src/ingest.ts";
-import { getRunDetails, listRuns, reconcileInterruptedRuns } from "../src/ops/store.ts";
+import { getRunDetails, getRunSummary, listRuns, reconcileInterruptedRuns } from "../src/ops/store.ts";
 import { listAdminSourceOptions, listRunnableSourceRefs } from "../src/sources/index.ts";
 import { getEntityContent, searchMeetings } from "./search_api.ts";
 
@@ -92,6 +93,18 @@ Deno.serve({ port }, async (request) => {
     } catch (error) {
       return Response.json(
         { error: error instanceof Error ? error.message : "Runs ophalen mislukt" },
+        { status: 500 },
+      );
+    }
+  }
+
+  if (url.pathname === "/api/admin/summary" && request.method === "GET") {
+    try {
+      const summary = await getRunSummary();
+      return Response.json<AdminRunSummaryResponse>({ summary });
+    } catch (error) {
+      return Response.json(
+        { error: error instanceof Error ? error.message : "Importsamenvatting ophalen mislukt" },
         { status: 500 },
       );
     }

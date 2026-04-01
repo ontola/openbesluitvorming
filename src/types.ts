@@ -289,6 +289,20 @@ export interface AdminRunsResponse {
   hasMore?: boolean;
 }
 
+export interface AdminRunSummary {
+  queuedCount: number;
+  runningCount: number;
+  succeededCount: number;
+  partialCount: number;
+  failedCount: number;
+  currentRun?: IngestRunRecord;
+  oldestQueuedRun?: IngestRunRecord;
+}
+
+export interface AdminRunSummaryResponse {
+  summary: AdminRunSummary;
+}
+
 export interface AdminRunDetailResponse {
   run: IngestRunRecord;
   issues: IngestRunIssueRecord[];

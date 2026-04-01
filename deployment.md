@@ -250,7 +250,24 @@ The expected public endpoint is the Caddy domain, not port `8787` directly.
 
 ## Production Commands
 
-From the server:
+Current preferred deployment flow is Git-over-SSH from the local repo, not `rsync`.
+
+Deploy from the local machine:
+
+```sh
+pnpm run deploy:beta
+```
+
+That script:
+
+- refuses to deploy if the local tree is dirty
+- bootstraps a bare repo at `/opt/woozi.git` on the server if needed
+- pushes the selected Git ref over SSH
+- checks it out into `/opt/woozi-git`
+- reuses the existing `/opt/woozi/.env` on first deploy
+- runs production compose from `/opt/woozi-git` with `COMPOSE_PROJECT_NAME=woozi`
+
+The older direct server command still works for manual recovery:
 
 ```sh
 docker compose -f docker-compose.production.yml up -d --build
@@ -286,11 +303,18 @@ Required env:
 - `ADMIN_PASSWORD_HASH`
 
 That value should be a Caddy password hash, not a plaintext password.
+Because Docker Compose reads `.env`, bcrypt dollar signs must be escaped there as `$$`.
 
 Example generation:
 
 ```sh
 docker run --rm caddy:2 caddy hash-password --plaintext 'your-strong-password'
+```
+
+Example `.env` value:
+
+```env
+ADMIN_PASSWORD_HASH=$$2a$$14$$exampleexampleexampleexampleexampleexampleexampleexample
 ```
 
 ## Known Operational Notes
@@ -300,6 +324,8 @@ docker run --rm caddy:2 caddy hash-password --plaintext 'your-strong-password'
 - duplicate active imports for the same source/date/execution mode are blocked in [src/ingest.ts](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/src/ingest.ts)
 - background imports are now queued in-process with bounded concurrency from `INGEST_CONCURRENCY`
 - default ingest concurrency is `1`, which is the intended safe production setting for now
+- large aggregate imports should therefore mostly appear as many `queued` runs and one `running` run
+- admin now has a queue/status summary backed by `/api/admin/summary`
 - browser-side fetch helpers now handle empty/non-JSON 500 responses more safely
 
 ## Keep Updated When These Change

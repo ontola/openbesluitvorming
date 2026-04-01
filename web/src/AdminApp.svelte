@@ -4,6 +4,8 @@
     AdminRunDetailResponse,
     AdminRerunRequest,
     AdminRerunResponse,
+    AdminRunSummary,
+    AdminRunSummaryResponse,
     AdminSourceOption,
     AdminRunsResponse,
     AdminSourcesResponse,
@@ -21,6 +23,7 @@
   let implementedSources: AdminSourceOption[] = [];
   let filterSources: AdminSourceOption[] = [];
   let runs: IngestRunRecord[] = [];
+  let runSummary: AdminRunSummary | null = null;
   let issuesByRun = new Map<string, IngestRunIssueRecord[]>();
   let runsHasMore = false;
   let runsBusy = false;
@@ -88,6 +91,11 @@
 
   function periodLabel(run: IngestRunRecord): string {
     return `${run.date_from} t/m ${run.date_to}`;
+  }
+
+  function compactRunLabel(run?: IngestRunRecord): string {
+    if (!run) return "Geen";
+    return `${run.source_key} · ${periodLabel(run)}`;
   }
 
   function formatRelativeTime(dateValue?: string): string {
@@ -219,6 +227,11 @@
     filterSources = implementedSources.filter((source) => !source.isAggregate);
   }
 
+  async function loadRunSummary(): Promise<void> {
+    const payload = await fetchJson<AdminRunSummaryResponse>("/api/admin/summary");
+    runSummary = payload.summary;
+  }
+
   async function mergeRunIssues(items: IngestRunRecord[]): Promise<Map<string, IngestRunIssueRecord[]>> {
     const nextIssues = new Map(issuesByRun);
     await Promise.all(
@@ -252,6 +265,7 @@
     }
 
     try {
+      await loadRunSummary();
       const payload = await fetchJson<AdminRunsResponse>(`/api/admin/runs?${params.toString()}`);
       const fetchedRuns = payload.runs ?? [];
       runsHasMore = Boolean(payload.hasMore);
@@ -438,6 +452,41 @@
       <p class="admin-status">{importStatus}</p>
     </section>
 
+    {#if runSummary}
+      <section class="section">
+        <div class="section__heading admin-section-heading">
+          <h2>Importstatus</h2>
+        </div>
+        <div class="admin-summary-grid">
+          <article class="surface-card admin-summary-card">
+            <span class="admin-summary-card__label">In wachtrij</span>
+            <strong class="admin-summary-card__value">{runSummary.queuedCount}</strong>
+            <p>{compactRunLabel(runSummary.oldestQueuedRun)}</p>
+          </article>
+          <article class="surface-card admin-summary-card">
+            <span class="admin-summary-card__label">Actief</span>
+            <strong class="admin-summary-card__value">{runSummary.runningCount}</strong>
+            <p>{compactRunLabel(runSummary.currentRun)}</p>
+          </article>
+          <article class="surface-card admin-summary-card">
+            <span class="admin-summary-card__label">Geslaagd</span>
+            <strong class="admin-summary-card__value">{runSummary.succeededCount}</strong>
+            <p>Voltooide imports zonder issues die het eindresultaat blokkeerden.</p>
+          </article>
+          <article class="surface-card admin-summary-card">
+            <span class="admin-summary-card__label">Met issues</span>
+            <strong class="admin-summary-card__value">{runSummary.partialCount}</strong>
+            <p>Imports die wel klaar zijn, maar met gedeeltelijke fouten.</p>
+          </article>
+          <article class="surface-card admin-summary-card">
+            <span class="admin-summary-card__label">Mislukt</span>
+            <strong class="admin-summary-card__value">{runSummary.failedCount}</strong>
+            <p>Imports die handmatige inspectie of een gerichte retry nodig hebben.</p>
+          </article>
+        </div>
+      </section>
+    {/if}
+
     <section class="section">
       <div class="section__heading admin-section-heading">
         <h2>Recente imports</h2>
@@ -467,7 +516,7 @@
         <div>Import</div>
         <div>Verg.</div>
         <div>Doc.</div>
-        <div>Fout</div>
+        <div>Issues</div>
         <div>Cache</div>
         <div>Download</div>
         <div>Tijd</div>
@@ -497,7 +546,7 @@
                 </div>
                 <div class="admin-run__metric"><strong>{run.meeting_count}</strong></div>
                 <div class="admin-run__metric"><strong>{run.document_count}</strong></div>
-                <div class="admin-run__metric"><strong>{failedDocumentCount(run)}</strong></div>
+                <div class="admin-run__metric"><strong>{run.issue_count}</strong></div>
                 <div class="admin-run__metric"><strong>{run.cache_hits}</strong></div>
                 <div class="admin-run__metric"><strong>{run.downloaded_count}</strong></div>
                 <div class="admin-run__time">

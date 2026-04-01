@@ -1,6 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
 import { getConfigValue } from "../config.ts";
 import type {
+  AdminRunSummary,
   ExtractionIssue,
   IngestExecutionMode,
   IngestRunRecord,
@@ -419,6 +420,79 @@ export async function listRuns(
       )
       .all(params) as IngestRunRecord[]
   ).map(normalizeRunRecord);
+}
+
+export async function getRunSummary(): Promise<AdminRunSummary> {
+  const db = await getDatabase();
+
+  const counts = db
+    .prepare(
+      `SELECT status, COUNT(*) as count
+       FROM ingest_run
+       GROUP BY status`,
+    )
+    .all() as Array<{ status: IngestRunRecord["status"]; count: number }>;
+
+  const summary: AdminRunSummary = {
+    queuedCount: 0,
+    runningCount: 0,
+    succeededCount: 0,
+    partialCount: 0,
+    failedCount: 0,
+  };
+
+  for (const row of counts) {
+    switch (row.status) {
+      case "queued":
+        summary.queuedCount = row.count;
+        break;
+      case "running":
+        summary.runningCount = row.count;
+        break;
+      case "succeeded":
+        summary.succeededCount = row.count;
+        break;
+      case "partial":
+        summary.partialCount = row.count;
+        break;
+      case "failed":
+        summary.failedCount = row.count;
+        break;
+    }
+  }
+
+  const currentRun = db
+    .prepare(
+      `SELECT
+        id, source_key, supplier, date_from, date_to, trigger_mode as trigger,
+        execution_mode, parent_run_id, projection_version, derivation_version, status,
+        started_at, finished_at, meeting_count, document_count, cache_hits, downloaded_count,
+        issue_count, quickwit_index_id, error_message
+       FROM ingest_run
+       WHERE status = 'running'
+       ORDER BY started_at ASC
+       LIMIT 1`,
+    )
+    .get() as RunRow | undefined;
+
+  const oldestQueuedRun = db
+    .prepare(
+      `SELECT
+        id, source_key, supplier, date_from, date_to, trigger_mode as trigger,
+        execution_mode, parent_run_id, projection_version, derivation_version, status,
+        started_at, finished_at, meeting_count, document_count, cache_hits, downloaded_count,
+        issue_count, quickwit_index_id, error_message
+       FROM ingest_run
+       WHERE status = 'queued'
+       ORDER BY started_at ASC
+       LIMIT 1`,
+    )
+    .get() as RunRow | undefined;
+
+  summary.currentRun = currentRun ? normalizeRunRecord(currentRun) : undefined;
+  summary.oldestQueuedRun = oldestQueuedRun ? normalizeRunRecord(oldestQueuedRun) : undefined;
+
+  return summary;
 }
 
 export async function getRunDetails(runId: string): Promise<RunDetails | null> {

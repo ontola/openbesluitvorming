@@ -3,7 +3,7 @@
     path /admin /admin.html /api/admin/*
   }
 
-  basicauth @admin {
+  basic_auth @admin {
     admin {$ADMIN_PASSWORD_HASH}
   }
 
