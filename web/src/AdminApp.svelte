@@ -473,30 +473,32 @@
       role="dialog"
     >
       <div class="detail-sheet__header">
-        <div class="detail-sheet__meta">
-          <span class="pill">{openRun.source_key}</span>
-          <span class={`pill pill--soft ${statusClassName(openRun.status)}`}>
-            {statusLabel(openRun.status)}
-          </span>
-          <span class="detail-sheet__date">{periodLabel(openRun)}</span>
-        </div>
-        <div class="detail-sheet__header-actions">
-          <a class="ghost-button detail-sheet__download" href={searchUrlForRun(openRun)}>
-            Bekijk
-          </a>
-          <button
-            class="primary-button detail-sheet__download"
-            type="button"
-            disabled={detailImportBusy}
-            on:click={() => {
-              void importOpenRunAgain();
-            }}
-          >
+        <div class="detail-sheet__header-bar">
+          <div class="detail-sheet__meta">
+            <span class="pill">{openRun.source_key}</span>
+            <span class={`pill pill--soft ${statusClassName(openRun.status)}`}>
+              {statusLabel(openRun.status)}
+            </span>
+            <span class="detail-sheet__date">{periodLabel(openRun)}</span>
+          </div>
+          <div class="detail-sheet__header-actions">
+            <a class="ghost-button" href={searchUrlForRun(openRun)}>
+              Bekijk
+            </a>
+            <button
+              class="primary-button"
+              type="button"
+              disabled={detailImportBusy}
+              on:click={() => {
+                void importOpenRunAgain();
+              }}
+            >
               Retry
-          </button>
-          <button class="detail-sheet__close" type="button" on:click={closeDetail}>
-            Sluiten
-          </button>
+            </button>
+            <button class="ghost-button" type="button" on:click={closeDetail}>
+              Sluiten
+            </button>
+          </div>
         </div>
       </div>
       <div class="detail-sheet__body">

@@ -52,14 +52,20 @@
   const detailRequests = new Map<string, Promise<EntityContentResponse | null>>();
 
   let queryInputEl: HTMLInputElement | null = null;
+  let primarySearchFieldEl: HTMLLabelElement | null = null;
+  let brandBlockEl: HTMLDivElement | null = null;
   let detailTextEl: HTMLElement | null = null;
   let loadMoreSentinelEl: HTMLDivElement | null = null;
   let debounceTimer: number | undefined;
   let loadMoreObserver: IntersectionObserver | null = null;
   let activeSearchSignature = "";
+  let initialLoadingCardCount = 6;
 
   const PAGE_SIZE = 24;
   const DETAIL_MODE_STORAGE_KEY = "woozi.detailMode";
+  const INITIAL_LOADING_CARD_MIN = 6;
+  const INITIAL_LOADING_CARD_MAX = 12;
+  const INITIAL_LOADING_CARD_HEIGHT = 210;
 
   function routeStateFromUrl(url: URL): SearchRouteState {
     return {
@@ -133,19 +139,74 @@
     }, 0);
   }
 
-  function clearToHome(mode: "push" | "replace" = "push"): void {
-    query = "";
-    organization = "";
-    entityType = "";
-    sort = "date_desc";
-    dateFrom = "";
-    dateTo = "";
-    view = "";
-    filtersOpen = false;
-    searched = false;
-    results = [];
-    closeDetail(false);
-    writeRouteState(mode);
+  function updateInitialLoadingCardCount(): void {
+    const availableHeight = Math.max(window.innerHeight - 220, INITIAL_LOADING_CARD_HEIGHT * INITIAL_LOADING_CARD_MIN);
+    const estimatedCount = Math.ceil(availableHeight / INITIAL_LOADING_CARD_HEIGHT);
+    initialLoadingCardCount = Math.min(
+      INITIAL_LOADING_CARD_MAX,
+      Math.max(INITIAL_LOADING_CARD_MIN, estimatedCount),
+    );
+  }
+
+  async function animateModeChange(apply: () => void): Promise<void> {
+    const animatedElements = [brandBlockEl, primarySearchFieldEl].filter((element) => element !== null);
+    const firstRects = animatedElements.map((element) => element.getBoundingClientRect());
+
+    apply();
+    await tick();
+
+    animatedElements.forEach((element, index) => {
+      const first = firstRects[index];
+      const last = element.getBoundingClientRect();
+      const deltaX = first.left - last.left;
+      const deltaY = first.top - last.top;
+      const scaleX = first.width > 0 && last.width > 0 ? first.width / last.width : 1;
+      const scaleY = first.height > 0 && last.height > 0 ? first.height / last.height : 1;
+
+      if (
+        Math.abs(deltaX) < 0.5 &&
+        Math.abs(deltaY) < 0.5 &&
+        Math.abs(scaleX - 1) < 0.01 &&
+        Math.abs(scaleY - 1) < 0.01
+      ) {
+        return;
+      }
+
+      element.animate(
+        [
+          {
+            transformOrigin: "top left",
+            transform: `translate(${deltaX}px, ${deltaY}px) scale(${scaleX}, ${scaleY})`,
+          },
+          {
+            transformOrigin: "top left",
+            transform: "translate(0, 0) scale(1, 1)",
+          },
+        ],
+        {
+          /** Should be the same as the motion-slow value in the CSS custom properties */
+          duration: 500,
+          easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+        },
+      );
+    });
+  }
+
+  async function clearToHome(mode: "push" | "replace" = "push"): Promise<void> {
+    await animateModeChange(() => {
+      query = "";
+      organization = "";
+      entityType = "";
+      sort = "date_desc";
+      dateFrom = "";
+      dateTo = "";
+      view = "";
+      filtersOpen = false;
+      searched = false;
+      results = [];
+      closeDetail(false);
+      writeRouteState(mode);
+    });
     focusQuery();
   }
 
@@ -558,12 +619,16 @@
     scheduleSearch();
   }
 
-  function onQuerySearch(): void {
+  async function onQuerySearch(): Promise<void> {
     if (!searched && !hasActiveSearchFilters()) {
       return;
     }
 
-    searched = true;
+    if (!searched) {
+      await animateModeChange(() => {
+        searched = true;
+      });
+    }
     void runSearch("replace");
   }
 
@@ -643,9 +708,11 @@
 
   onMount(async () => {
     preferredDetailMode = loadPreferredDetailMode();
+    updateInitialLoadingCardCount();
     await loadSources();
     await syncFromUrl(true);
     document.addEventListener("keydown", handleEscape);
+    window.addEventListener("resize", updateInitialLoadingCardCount);
     loadMoreObserver = new IntersectionObserver((entries) => {
       if (entries.some((entry) => entry.isIntersecting)) {
         void loadMoreResults();
@@ -662,6 +729,7 @@
       debounceTimer = undefined;
     }
     document.removeEventListener("keydown", handleEscape);
+    window.removeEventListener("resize", updateInitialLoadingCardCount);
     loadMoreObserver?.disconnect();
     loadMoreObserver = null;
   });
@@ -677,6 +745,7 @@
     void syncDetailText();
   }
 
+  $: initialResultsLoading = searched && loading && results.length === 0;
   $: resultsTitle = !searched
     ? "Zoek op organisatie of onderwerp"
     : loading
@@ -701,12 +770,14 @@
     <div class="hero__frame">
       <div class="hero__masthead">
         <p class="hero__admin-link"><a href="/admin.html">Admin</a></p>
-        <div class="hero__brand-block">
+        <div bind:this={brandBlockEl} class="hero__brand-block">
           <h1 class="brand">
             <a
               class="brand__link"
               href="/"
-              on:click|preventDefault={() => clearToHome()}
+              on:click|preventDefault={() => {
+                void clearToHome();
+              }}
             >
               <span class="brand__dark">Open</span><span class="brand__light">Besluitvorming</span>
             </a>
@@ -729,7 +800,7 @@
         }}
       >
         <div class="search-panel__query-row">
-          <label class="search-field search-field--primary">
+          <label bind:this={primarySearchFieldEl} class="search-field search-field--primary">
             <input
               bind:this={queryInputEl}
               bind:value={query}
@@ -738,7 +809,9 @@
               placeholder="Zoeken naar documenten, vergaderingen, agenda's, besluiten..."
               autocomplete="off"
               on:input={onQueryInput}
-              on:search={onQuerySearch}
+              on:search={() => {
+                void onQuerySearch();
+              }}
             />
           </label>
           {#if searched}
@@ -809,7 +882,26 @@
         </div>
 
         <div class:result-list--loading={loading} class="result-list" aria-busy={loading}>
-          {#if results.length === 0 && !loading}
+          {#if initialResultsLoading}
+            {#each Array.from({ length: initialLoadingCardCount }) as _, index}
+              <article
+                class="surface-card result-card result-card--skeleton"
+                aria-hidden="true"
+                style={`animation-delay:${index * 70}ms`}
+              >
+                <div class="result-card__meta">
+                  <div class="result-card__tags">
+                    <span class="pill pill--skeleton"></span>
+                    <span class="pill pill--soft pill--skeleton"></span>
+                  </div>
+                  <span class="result-card__date result-card__line result-card__line--date"></span>
+                </div>
+                <span class="result-card__line result-card__line--title"></span>
+                <span class="result-card__line result-card__line--body"></span>
+                <span class="result-card__line result-card__line--body result-card__line--short"></span>
+              </article>
+            {/each}
+          {:else if results.length === 0 && !loading}
             <div class="result-state">Geen resultaten gevonden voor deze zoekopdracht.</div>
           {:else}
             {#each results as item, index}
@@ -981,23 +1073,23 @@
             </div>
             {#if detailContent?.downloadUrl || detailItem.downloadUrl}
               <a
-                class="primary-button detail-sheet__download"
+                class="primary-button button-inline"
                 href={detailContent?.downloadUrl ?? detailItem.downloadUrl}
                 aria-label="Download"
                 download
               >
-                <span class="detail-sheet__action-icon" aria-hidden="true">↓</span>
-                <span class="detail-sheet__action-label">Download</span>
+                <span class="button-inline__icon" aria-hidden="true">↓</span>
+                <span class="button-inline__label">Download</span>
               </a>
             {/if}
             <button
-              class="detail-sheet__close"
+              class="ghost-button button-inline"
               type="button"
               aria-label="Sluiten"
               on:click={() => closeDetail()}
             >
-              <span class="detail-sheet__action-icon" aria-hidden="true">×</span>
-              <span class="detail-sheet__action-label">Sluiten</span>
+              <span class="button-inline__icon" aria-hidden="true">×</span>
+              <span class="button-inline__label">Sluiten</span>
             </button>
           </div>
         </div>

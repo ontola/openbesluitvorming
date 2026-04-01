@@ -11,6 +11,9 @@
   --accent-deep: #2559a8;
   --shadow: 0 18px 50px rgba(31, 62, 116, 0.12);
   --font-sans: "Avenir Next", "Segoe UI", "Helvetica Neue", "Trebuchet MS", sans-serif;
+  /** For hover interactions */
+  --motion-fast: 180ms;
+  --motion-slow: 500ms;
 }
 
 * {
@@ -55,11 +58,11 @@ select {
   padding: 2rem 1.5rem 0;
   min-height: min(82vh, 56rem);
   transition:
-    padding 260ms ease,
-    min-height 260ms ease,
-    background-color 260ms ease,
-    box-shadow 260ms ease,
-    backdrop-filter 260ms ease;
+    padding var(--motion-slow) ease,
+    min-height var(--motion-slow) ease,
+    background-color var(--motion-slow) ease,
+    box-shadow var(--motion-slow) ease,
+    backdrop-filter var(--motion-slow) ease;
 }
 
 .hero--search {
@@ -114,8 +117,8 @@ select {
   min-height: calc(min(82vh, 56rem) - 2rem);
   margin: 0 auto;
   transition:
-    min-height 260ms ease,
-    gap 260ms ease;
+    min-height var(--motion-slow) ease,
+    gap var(--motion-slow) ease;
 }
 
 .hero--search .hero__frame {
@@ -156,9 +159,9 @@ select {
   margin: 0 0 0.75rem;
   text-align: center;
   transition:
-    opacity 220ms ease,
-    transform 220ms ease,
-    margin 220ms ease;
+    opacity var(--motion-slow) ease,
+    transform var(--motion-slow) ease,
+    margin var(--motion-slow) ease;
 }
 
 .hero--search .hero__admin-link {
@@ -181,9 +184,9 @@ select {
   letter-spacing: -0.04em;
   transform-origin: left top;
   transition:
-    font-size 260ms ease,
-    letter-spacing 260ms ease,
-    text-align 260ms ease;
+    font-size var(--motion-slow) ease,
+    letter-spacing var(--motion-slow) ease,
+    text-align var(--motion-slow) ease;
 }
 
 .hero--search .brand {
@@ -197,9 +200,9 @@ select {
   color: inherit;
   text-decoration: none;
   transition:
-    transform 180ms ease,
-    text-shadow 180ms ease,
-    filter 180ms ease;
+    transform var(--motion-fast) ease,
+    text-shadow var(--motion-fast) ease,
+    filter var(--motion-fast) ease;
 }
 
 .brand__link:hover,
@@ -228,10 +231,10 @@ select {
   line-height: 1.7;
   color: var(--muted);
   transition:
-    opacity 220ms ease,
-    transform 220ms ease,
-    max-height 220ms ease,
-    margin 220ms ease;
+    opacity var(--motion-slow) ease,
+    transform var(--motion-slow) ease,
+    max-height var(--motion-slow) ease,
+    margin var(--motion-slow) ease;
 }
 
 .hero--search .hero__intro {
@@ -254,13 +257,13 @@ select {
   backdrop-filter: blur(14px);
   z-index: 3;
   transition:
-    width 260ms ease,
-    max-width 260ms ease,
-    margin 260ms ease,
-    padding 220ms ease,
-    border-radius 220ms ease,
-    box-shadow 220ms ease,
-    background 220ms ease;
+    width var(--motion-slow) ease,
+    max-width var(--motion-slow) ease,
+    margin var(--motion-slow) ease,
+    padding var(--motion-slow) ease,
+    border-radius var(--motion-slow) ease,
+    box-shadow var(--motion-slow) ease,
+    background var(--motion-slow) ease;
 }
 
 .hero--search .search-panel {
@@ -334,7 +337,9 @@ select {
 
 .search-results__heading h2 {
   margin: 0;
-  font-size: clamp(1.6rem, 3vw, 2.3rem);
+  font-size: 1rem;
+  color: var(--muted);
+  font-weight: normal;
   line-height: 1.05;
   letter-spacing: -0.04em;
 }
@@ -361,9 +366,9 @@ select {
   border-radius: 1rem;
   background: rgba(255, 255, 255, 0.88);
   transition:
-    transform 180ms ease,
-    border-color 180ms ease,
-    box-shadow 180ms ease;
+    transform var(--motion-fast) ease,
+    border-color var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease;
 }
 
 .search-field:focus-within,
@@ -462,19 +467,17 @@ select {
 }
 
 .primary-button,
-.ghost-button,
-.detail-sheet__close {
+.ghost-button {
   border-radius: 999px;
   cursor: pointer;
   transition:
-    transform 180ms ease,
-    box-shadow 180ms ease,
-    border-color 180ms ease;
+    transform var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease,
+    border-color var(--motion-fast) ease;
 }
 
 .primary-button:hover,
-.ghost-button:hover,
-.detail-sheet__close:hover {
+.ghost-button:hover {
   transform: translateY(-1px);
 }
 
@@ -512,10 +515,10 @@ select {
   list-style: none;
   color: var(--muted);
   transition:
-    opacity 220ms ease,
-    transform 220ms ease,
-    max-height 220ms ease,
-    margin 220ms ease;
+    opacity var(--motion-slow) ease,
+    transform var(--motion-slow) ease,
+    max-height var(--motion-slow) ease,
+    margin var(--motion-slow) ease;
 }
 
 .hero--search .hero__meta {
@@ -768,9 +771,9 @@ select {
   color: inherit;
   cursor: pointer;
   transition:
-    transform 180ms ease,
-    box-shadow 180ms ease,
-    border-color 180ms ease;
+    transform var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease,
+    border-color var(--motion-fast) ease;
 }
 
 .admin-run,
@@ -975,6 +978,55 @@ select {
   opacity: 0.58;
 }
 
+.result-card--skeleton {
+  pointer-events: none;
+  opacity: 1;
+}
+
+.pill--skeleton,
+.result-card__line {
+  display: block;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    rgba(37, 89, 168, 0.08) 0%,
+    rgba(78, 166, 255, 0.14) 50%,
+    rgba(37, 89, 168, 0.08) 100%
+  );
+  background-size: 200% 100%;
+  animation: result-skeleton-shimmer 1.2s ease-in-out infinite;
+}
+
+.pill--skeleton {
+  min-width: 7rem;
+  color: transparent;
+}
+
+.result-card__line {
+  height: 0.95rem;
+}
+
+.result-card__line--date {
+  width: 7rem;
+  height: 0.85rem;
+}
+
+.result-card__line--title {
+  width: 62%;
+  height: 1.4rem;
+  margin-bottom: 1rem;
+  border-radius: 0.7rem;
+}
+
+.result-card__line--body {
+  width: 100%;
+  margin-top: 0.75rem;
+}
+
+.result-card__line--short {
+  width: 78%;
+}
+
 .result-list__sentinel {
   min-height: 2rem;
   padding: 0.5rem 0;
@@ -1128,7 +1180,7 @@ select {
 
 .detail-sheet__header {
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   padding: 1rem 1rem 0.9rem;
   justify-content: space-between;
   flex: 0 0 auto;
@@ -1195,15 +1247,15 @@ select {
   font-size: 0.95rem;
 }
 
-.detail-sheet__close {
-  border: 1px solid var(--line);
-  background: white;
-  color: var(--accent-deep);
-  min-height: 2.8rem;
-  padding: 0 1rem;
+.button-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-decoration: none;
+  box-shadow: none;
 }
 
-.detail-sheet__action-icon {
+.button-inline__icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1211,7 +1263,7 @@ select {
   line-height: 1;
 }
 
-.detail-sheet__action-label {
+.button-inline__label {
   display: inline;
 }
 
@@ -1225,14 +1277,6 @@ select {
 
 .detail-sheet--reader .detail-sheet__body {
   min-height: 0;
-}
-
-.detail-sheet__download {
-  display: inline-flex;
-  align-items: center;
-  text-decoration: none;
-  min-height: 2.8rem;
-  box-shadow: none;
 }
 
 .detail-sheet__view-switch {
@@ -1255,9 +1299,9 @@ select {
   color: var(--muted);
   cursor: pointer;
   transition:
-    background-color 180ms ease,
-    color 180ms ease,
-    box-shadow 180ms ease;
+    background-color var(--motion-fast) ease,
+    color var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease;
 }
 
 .detail-sheet__view-toggle[aria-pressed="true"] {
@@ -1374,6 +1418,16 @@ select {
   100% {
     background: rgba(78, 166, 255, 0.24);
     box-shadow: 0 0 0 rgba(78, 166, 255, 0);
+  }
+}
+
+@keyframes result-skeleton-shimmer {
+  from {
+    background-position: 100% 50%;
+  }
+
+  to {
+    background-position: 0% 50%;
   }
 }
 
@@ -1636,19 +1690,19 @@ select {
     flex: 1 1 0;
   }
 
-  .detail-sheet__download,
-  .detail-sheet__close {
+  .detail-sheet__header-actions > .primary-button,
+  .detail-sheet__header-actions > .ghost-button {
     min-height: 2.5rem;
     padding: 0 0.85rem;
     flex: 0 0 auto;
   }
 
-  .detail-sheet__close {
+  .detail-sheet__header-actions > .ghost-button {
     min-width: 2.5rem;
     justify-content: center;
   }
 
-  .detail-sheet__action-label {
+  .button-inline__label {
     font-size: 0.95rem;
   }
 
