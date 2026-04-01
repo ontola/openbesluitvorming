@@ -1469,26 +1469,51 @@ select {
   position: absolute;
   inset: 0.9rem;
   overflow: hidden;
+  opacity: 1;
+  line-height: 1;
+  text-size-adjust: none;
+  transform-origin: 0 0;
   user-select: text;
   pointer-events: auto;
+  z-index: 1;
+  --min-font-size: 1;
+  --text-scale-factor: calc(var(--total-scale-factor, 1) * var(--min-font-size));
+  --min-font-size-inv: calc(1 / var(--min-font-size));
 }
 
-.pdf-document__text-item {
+.pdf-document__text-layer :is(span, br) {
   position: absolute;
-  display: block;
-  white-space: pre;
-  line-height: 1;
   color: transparent;
-  pointer-events: auto;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0 0;
 }
 
-.pdf-document__text-item::selection,
-.pdf-document__text-item *::selection {
+.pdf-document__text-layer > :not(.markedContent),
+.pdf-document__text-layer .markedContent span:not(.markedContent) {
+  z-index: 1;
+  --font-height: 0;
+  font-size: calc(var(--text-scale-factor) * var(--font-height));
+  --scale-x: 1;
+  --rotate: 0deg;
+  transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv));
+}
+
+.pdf-document__text-layer .markedContent {
+  display: contents;
+}
+
+.pdf-document__text-layer span[role="img"] {
+  user-select: none;
+  cursor: default;
+}
+
+.pdf-document__text-layer ::selection {
   background: rgba(78, 166, 255, 0.32);
   color: transparent;
 }
 
-.pdf-document__text-item mark {
+.pdf-document__text-layer mark {
   padding: 0.04em 0.1em;
   border-radius: 0.2rem;
   background: rgba(255, 215, 97, 0.72);
@@ -1496,13 +1521,6 @@ select {
   box-shadow:
     0 0 0 1px rgba(255, 215, 97, 0.18),
     0 0 0.7rem rgba(255, 215, 97, 0.24);
-}
-
-.pdf-document__text-item--match mark {
-  background: rgba(255, 215, 97, 0.9);
-  box-shadow:
-    0 0 0 1px rgba(255, 215, 97, 0.24),
-    0 0 1rem rgba(255, 215, 97, 0.36);
 }
 
 @keyframes pdf-page-match-bloom {

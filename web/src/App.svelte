@@ -20,6 +20,7 @@
     dateFrom: string;
     dateTo: string;
     view: string;
+    page: string;
   };
 
   function routeHasSearchIntent(state: SearchRouteState): boolean {
@@ -62,6 +63,7 @@
   let detailContent: EntityContentResponse | null = null;
   let detailMode: "text" | "pdf" = "text";
   let preferredDetailMode: "text" | "pdf" = "text";
+  let detailPage = "";
 
   const detailCache = new Map<string, EntityContentResponse | null>();
   const detailRequests = new Map<string, Promise<EntityContentResponse | null>>();
@@ -91,6 +93,7 @@
       dateFrom: url.searchParams.get("dateFrom") ?? "",
       dateTo: url.searchParams.get("dateTo") ?? "",
       view: url.searchParams.get("view") ?? "",
+      page: url.searchParams.get("page") ?? "",
     };
   }
 
@@ -103,6 +106,7 @@
     if (state.dateFrom) params.set("dateFrom", state.dateFrom);
     if (state.dateTo) params.set("dateTo", state.dateTo);
     if (state.view) params.set("view", state.view);
+    if (state.view && state.page) params.set("page", state.page);
     return params;
   }
 
@@ -115,6 +119,7 @@
       dateFrom: dateFrom.trim(),
       dateTo: dateTo.trim(),
       view,
+      page: view ? detailPage.trim() : "",
     };
   }
 
@@ -338,6 +343,7 @@
     detailItem = null;
     detailContent = null;
     detailMode = "text";
+    detailPage = "";
     document.body.classList.remove("body--locked");
     if (updateUrl && view) {
       view = "";
@@ -376,6 +382,11 @@
       block: "center",
       behavior: "smooth",
     });
+  }
+
+  function parsePageNumber(value: string): number | null {
+    const parsed = Number.parseInt(value, 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
   }
 
   async function loadDetailContent(entityId: string): Promise<EntityContentResponse | null> {
@@ -472,12 +483,13 @@
     }
   }
 
-  async function openDetail(item: SearchResult, updateUrl = true): Promise<void> {
+  async function openDetail(item: SearchResult, updateUrl = true, pageOverride: number | null = null): Promise<void> {
     detailItem = item;
     detailLoading = true;
     detailOpen = true;
     detailContent = null;
     detailMode = "text";
+    detailPage = `${pageOverride ?? item.matchedPage ?? 1}`;
     document.body.classList.add("body--locked");
     scrollResultCardIntoView(item.entityId);
 
@@ -577,7 +589,7 @@
       if (view) {
         const selected = results.find((item) => item.entityId === view);
         if (selected) {
-          await openDetail(selected, false);
+          await openDetail(selected, false, parsePageNumber(detailPage));
         } else {
           closeDetail(false);
         }
@@ -690,7 +702,22 @@
     dateFrom = state.dateFrom;
     dateTo = state.dateTo;
     view = state.view;
+    detailPage = state.page;
     filtersOpen = hasAdvancedSearchFilters();
+  }
+
+  function handlePdfPageChange(event: CustomEvent<{ page: number }>): void {
+    if (!detailOpen || !detailItem || detailMode !== "pdf") {
+      return;
+    }
+
+    const nextPage = `${event.detail.page}`;
+    if (detailPage === nextPage) {
+      return;
+    }
+
+    detailPage = nextPage;
+    writeRouteState("replace");
   }
 
   async function syncFromUrl(replace = false): Promise<void> {
@@ -1160,8 +1187,9 @@
           <div class="detail-sheet__pdf">
             {#key detailItem.entityId}
               <PdfDocumentView
-                initialPage={detailItem.matchedPage ?? null}
+                initialPage={parsePageNumber(detailPage) ?? detailItem.matchedPage ?? null}
                 matchPreview={detailItem.summary}
+                on:pagechange={handlePdfPageChange}
                 query={query}
                 url={entityPdfProxyUrl(detailItem.entityId)}
               />

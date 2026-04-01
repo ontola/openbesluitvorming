@@ -1,7 +1,8 @@
 <script lang="ts">
-  import { onDestroy, tick } from "svelte";
-  import { getDocument, GlobalWorkerOptions } from "pdfjs-dist";
+  import { createEventDispatcher, onDestroy, tick } from "svelte";
+  import { getDocument, GlobalWorkerOptions, TextLayer } from "pdfjs-dist";
   import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+  import jbig2WasmUrl from "pdfjs-dist/wasm/jbig2.wasm?url";
 
   GlobalWorkerOptions.workerSrc = workerUrl;
 
@@ -10,24 +11,18 @@
     dataUrl: string;
     width: number;
     height: number;
-    textItems: PdfTextItem[];
-  };
-
-  type PdfTextItem = {
-    left: number;
-    top: number;
-    width: number;
-    height: number;
-    fontSize: number;
-    text: string;
-    html: string;
-    hasMatch: boolean;
+    scale: number;
+    viewport: unknown;
+    textContent: unknown;
   };
 
   export let url = "";
   export let initialPage: number | null = null;
   export let query = "";
   export let matchPreview = "";
+
+  const dispatch = createEventDispatcher<{ pagechange: { page: number } }>();
+  const wasmUrl = jbig2WasmUrl.slice(0, jbig2WasmUrl.lastIndexOf("/") + 1);
 
   let containerEl: HTMLDivElement | null = null;
   let resizeObserver: ResizeObserver | null = null;
@@ -41,13 +36,15 @@
   let pdfDocument: Awaited<ReturnType<typeof getDocument>>["promise"] extends Promise<infer T> ? T : never | null =
     null;
   let lastScrollSignature = "";
-  let loadingPrevious = false;
-  let loadingNext = false;
   let scrollCheckTimer: number | undefined;
+  let activePage = 0;
+  let windowPages: number[] = [];
+  let pageCache = new Map<number, PdfPageView>();
+  let applyingWindow = false;
 
   const MIN_PAGE_WIDTH = 320;
-  const SMALL_DOCUMENT_PAGE_LIMIT = 12;
-  const PAGE_BATCH_SIZE = 5;
+  const PAGE_WINDOW_RADIUS = 2;
+  const textLayerTasks = new Map<number, { cancel: () => void }>();
 
   function escapeHtml(value: string): string {
     return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
@@ -83,6 +80,25 @@
     return { html, hasMatch };
   }
 
+  function applyHighlightsToTextLayer(container: HTMLElement): void {
+    const spans = container.querySelectorAll<HTMLElement>('span:not([role="img"])');
+    for (const span of spans) {
+      const rawText = span.dataset.rawText ?? span.textContent ?? "";
+      span.dataset.rawText = rawText;
+      if (!rawText.trim()) {
+        span.textContent = rawText;
+        continue;
+      }
+
+      const highlighted = highlightText(rawText);
+      if (highlighted.hasMatch) {
+        span.innerHTML = highlighted.html;
+      } else {
+        span.textContent = rawText;
+      }
+    }
+  }
+
   function targetPageNumber(): number {
     const value = initialPage ?? 1;
     return Math.max(1, Math.min(pageCount || value, value));
@@ -96,13 +112,11 @@
     return pages.map((page) => page.number).sort((left, right) => left - right);
   }
 
-  function hasPreviousPages(): boolean {
-    return visiblePageNumbers()[0] > 1;
-  }
-
-  function hasNextPages(): boolean {
-    const visible = visiblePageNumbers();
-    return visible.length > 0 && visible[visible.length - 1] < pageCount;
+  function pageWindow(centerPage: number): number[] {
+    const boundedCenter = Math.max(1, Math.min(pageCount || centerPage, centerPage));
+    const start = Math.max(1, boundedCenter - PAGE_WINDOW_RADIUS);
+    const end = Math.min(pageCount, boundedCenter + PAGE_WINDOW_RADIUS);
+    return Array.from({ length: end - start + 1 }, (_, index) => start + index);
   }
 
   async function renderSinglePage(pageNumber: number): Promise<PdfPageView> {
@@ -133,40 +147,15 @@
     }).promise;
 
     const textContent = await page.getTextContent();
-    const textItems = textContent.items
-      .filter((item): item is {
-        str: string;
-        transform: number[];
-        width: number;
-        height: number;
-      } => "str" in item && Array.isArray(item.transform))
-      .map((item) => {
-        const tx = item.transform[4] * scale;
-        const ty = item.transform[5] * scale;
-        const width = Math.max(item.width * scale, 1);
-        const height = Math.max(item.height * scale, 1);
-        const fontSize = Math.max(Math.abs(item.transform[0] || item.transform[3] || item.height) * scale, 8);
-        const highlighted = highlightText(item.str);
-
-        return {
-          left: tx,
-          top: scaledViewport.height - ty - height,
-          width,
-          height,
-          fontSize,
-          text: item.str,
-          html: highlighted.html,
-          hasMatch: highlighted.hasMatch,
-        };
-      })
-      .filter((item) => item.text.trim().length > 0);
 
     const renderedPage = {
       number: pageNumber,
       dataUrl: canvas.toDataURL("image/png"),
       width: scaledViewport.width,
       height: scaledViewport.height,
-      textItems,
+      scale: scaledViewport.scale,
+      viewport: scaledViewport,
+      textContent,
     };
 
     page.cleanup();
@@ -177,21 +166,6 @@
     const uniqueNumbers = [...new Set(pageNumbers)].sort((left, right) => left - right);
     const rendered = await Promise.all(uniqueNumbers.map((pageNumber) => renderSinglePage(pageNumber)));
     return rendered.sort((left, right) => left.number - right.number);
-  }
-
-  function initialPageWindow(): number[] {
-    if (pageCount <= SMALL_DOCUMENT_PAGE_LIMIT) {
-      return Array.from({ length: pageCount }, (_, index) => index + 1);
-    }
-
-    const center = targetPageNumber();
-    const start = Math.max(1, center - 1);
-    const end = Math.min(pageCount, center + 1);
-    const pages = [];
-    for (let pageNumber = start; pageNumber <= end; pageNumber += 1) {
-      pages.push(pageNumber);
-    }
-    return pages;
   }
 
   async function scheduleRender(delay = 0): Promise<void> {
@@ -226,10 +200,13 @@
     error = "";
     pages = [];
     pageCount = 0;
+    activePage = 0;
+    windowPages = [];
+    pageCache = new Map();
     lastScrollSignature = "";
 
     try {
-      const loadingTask = getDocument(url);
+      const loadingTask = getDocument({ url, wasmUrl });
       const pdf = await loadingTask.promise;
       if (token !== renderToken) {
         await pdf.destroy();
@@ -238,7 +215,8 @@
 
       pdfDocument = pdf;
       pageCount = pdf.numPages;
-      pages = await renderPageSet(initialPageWindow());
+      activePage = targetPageNumber();
+      await applyPageWindow(activePage);
     } catch (cause) {
       if (token === renderToken) {
         console.error(cause);
@@ -251,24 +229,55 @@
     }
   }
 
+  async function applyPageWindow(centerPage: number, preservePageNumber?: number): Promise<void> {
+    if (!pdfDocument || centerPage < 1 || centerPage > pageCount || applyingWindow) {
+      return;
+    }
+
+    applyingWindow = true;
+    const nextWindow = pageWindow(centerPage);
+    const preserveNumber = preservePageNumber ?? centerPage;
+    const preserveSelector = `.pdf-document__page[data-page-number="${preserveNumber}"]`;
+    const preserveEl = containerEl?.querySelector<HTMLElement>(preserveSelector) ?? null;
+    const previousTop = preserveEl ? preserveEl.getBoundingClientRect().top : null;
+
+    try {
+      const missing = nextWindow.filter((pageNumber) => !pageCache.has(pageNumber));
+      if (missing.length > 0) {
+        const rendered = await renderPageSet(missing);
+        for (const page of rendered) {
+          pageCache.set(page.number, page);
+        }
+      }
+
+      windowPages = nextWindow;
+      pages = nextWindow
+        .map((pageNumber) => pageCache.get(pageNumber))
+        .filter((page): page is PdfPageView => Boolean(page));
+
+      await tick();
+
+      if (previousTop !== null) {
+        const nextPreserveEl = containerEl?.querySelector<HTMLElement>(preserveSelector) ?? null;
+        if (nextPreserveEl && containerEl) {
+          const nextTop = nextPreserveEl.getBoundingClientRect().top;
+          containerEl.scrollTop += nextTop - previousTop;
+        }
+      }
+    } finally {
+      applyingWindow = false;
+    }
+  }
+
   async function ensurePageVisible(pageNumber: number): Promise<void> {
     if (!pdfDocument || pageNumber < 1 || pageNumber > pageCount) {
       return;
     }
 
-    if (!visiblePageNumbers().includes(pageNumber)) {
-      const nextPages = await renderPageSet([pageNumber - 1, pageNumber, pageNumber + 1].filter((value) =>
-        value >= 1 && value <= pageCount
-      ));
-      pages = [...pages, ...nextPages]
-        .sort((left, right) => left.number - right.number)
-        .filter((page, index, list) => index === list.findIndex((item) => item.number === page.number));
-    }
-
+    activePage = pageNumber;
+    await applyPageWindow(pageNumber, pageNumber);
     await tick();
-    const pageEl = containerEl?.querySelector<HTMLElement>(
-      `.pdf-document__page[data-page-number="${pageNumber}"]`,
-    );
+    const pageEl = containerEl?.querySelector<HTMLElement>(`.pdf-document__page[data-page-number="${pageNumber}"]`);
     if (!pageEl) {
       return;
     }
@@ -279,70 +288,50 @@
     });
   }
 
-  async function loadPreviousPages(): Promise<void> {
-    if (!pdfDocument || loadingPrevious) {
-      return;
+  function mostVisiblePageNumber(): number | null {
+    if (!containerEl || pages.length === 0) {
+      return null;
     }
-    loadingPrevious = true;
 
-    try {
-      const first = visiblePageNumbers()[0] ?? 1;
-      const start = Math.max(1, first - PAGE_BATCH_SIZE);
-      const additions = Array.from({ length: first - start }, (_, index) => start + index);
-      if (additions.length === 0) {
-        return;
+    const containerRect = containerEl.getBoundingClientRect();
+    const viewportCenter = containerRect.top + containerRect.height / 2;
+    let bestPage: number | null = null;
+    let bestDistance = Number.POSITIVE_INFINITY;
+
+    for (const page of pages) {
+      const pageEl = containerEl.querySelector<HTMLElement>(`.pdf-document__page[data-page-number="${page.number}"]`);
+      if (!pageEl) {
+        continue;
       }
 
-      const anchorTop = containerEl?.scrollHeight ?? 0;
-      const rendered = await renderPageSet(additions);
-      pages = [...rendered, ...pages];
-      await tick();
-      if (containerEl) {
-        const growth = containerEl.scrollHeight - anchorTop;
-        containerEl.scrollTop += growth;
+      const rect = pageEl.getBoundingClientRect();
+      const pageCenter = rect.top + rect.height / 2;
+      const distance = Math.abs(pageCenter - viewportCenter);
+
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestPage = page.number;
       }
-    } finally {
-      loadingPrevious = false;
     }
+
+    return bestPage;
   }
 
-  async function loadNextPages(): Promise<void> {
-    if (!pdfDocument || loadingNext) {
-      return;
-    }
-    loadingNext = true;
-
-    try {
-      const last = visiblePageNumbers().at(-1) ?? 0;
-      const end = Math.min(pageCount, last + PAGE_BATCH_SIZE);
-      const additions = Array.from({ length: end - last }, (_, index) => last + index + 1);
-      if (additions.length === 0) {
-        return;
-      }
-
-      const rendered = await renderPageSet(additions);
-      pages = [...pages, ...rendered];
-    } finally {
-      loadingNext = false;
-    }
-  }
-
-  function checkScrollPrefetch(): void {
-    if (!containerEl || loading) {
+  async function checkScrollPrefetch(): Promise<void> {
+    if (!containerEl || loading || applyingWindow) {
       return;
     }
 
-    const threshold = Math.max(320, containerEl.clientHeight * 0.8);
-    const distanceFromTop = containerEl.scrollTop;
-    const distanceFromBottom =
-      containerEl.scrollHeight - containerEl.clientHeight - containerEl.scrollTop;
-
-    if (distanceFromTop < threshold && hasPreviousPages()) {
-      void loadPreviousPages();
+    const nextVisiblePage = mostVisiblePageNumber();
+    if (!nextVisiblePage || nextVisiblePage === activePage) {
+      return;
     }
 
-    if (distanceFromBottom < threshold && hasNextPages()) {
-      void loadNextPages();
+    activePage = nextVisiblePage;
+    dispatch("pagechange", { page: nextVisiblePage });
+    const desiredWindow = pageWindow(nextVisiblePage);
+    if (desiredWindow.join(",") !== windowPages.join(",")) {
+      await applyPageWindow(nextVisiblePage, nextVisiblePage);
     }
   }
 
@@ -353,8 +342,58 @@
 
     scrollCheckTimer = window.setTimeout(() => {
       scrollCheckTimer = undefined;
-      checkScrollPrefetch();
+      void checkScrollPrefetch();
     }, 20);
+  }
+
+  function mountTextLayer(node: HTMLDivElement, page: PdfPageView): { update: (page: PdfPageView) => void; destroy: () => void } {
+    let destroyed = false;
+    let currentTask: { cancel: () => void } | null = null;
+
+    async function renderLayer(nextPage: PdfPageView): Promise<void> {
+      currentTask?.cancel();
+      node.replaceChildren();
+      node.classList.add("textLayer");
+      node.style.setProperty("--scale-factor", `${nextPage.scale}`);
+      node.style.setProperty("--user-unit", "1");
+      node.style.setProperty("--total-scale-factor", `${nextPage.scale}`);
+
+      const textLayer = new TextLayer({
+        textContentSource: nextPage.textContent as never,
+        container: node,
+        viewport: nextPage.viewport as never,
+      });
+
+      currentTask = {
+        cancel: () => textLayer.cancel(),
+      };
+      textLayerTasks.set(nextPage.number, currentTask);
+
+      try {
+        await textLayer.render();
+        if (destroyed) {
+          return;
+        }
+        applyHighlightsToTextLayer(node);
+      } catch (cause) {
+        if (!destroyed) {
+          console.error(cause);
+        }
+      }
+    }
+
+    void renderLayer(page);
+
+    return {
+      update(nextPage) {
+        void renderLayer(nextPage);
+      },
+      destroy() {
+        destroyed = true;
+        currentTask?.cancel();
+        textLayerTasks.delete(page.number);
+      },
+    };
   }
 
   $: if (containerEl && url) {
@@ -367,18 +406,35 @@
     pdfDocument = null;
     loading = false;
     error = "";
+    activePage = 0;
+    windowPages = [];
+    pageCache = new Map();
   }
 
   $: {
     const signature = `${url}::${initialPage ?? 1}`;
     if (pdfDocument && pageCount > 0 && signature !== lastScrollSignature) {
       lastScrollSignature = signature;
-      void ensurePageVisible(targetPageNumber());
+      const targetPage = targetPageNumber();
+      if (targetPage !== activePage || !visiblePageNumbers().includes(targetPage)) {
+        void ensurePageVisible(targetPage);
+      }
     }
   }
 
   $: if (pages.length > 0) {
     void tick().then(() => checkScrollPrefetch());
+  }
+
+  $: if (pages.length >= 0) {
+    void tick().then(() => {
+      for (const page of pages) {
+        const layer = containerEl?.querySelector<HTMLDivElement>(`.pdf-document__text-layer[data-page-number="${page.number}"]`);
+        if (layer) {
+          applyHighlightsToTextLayer(layer);
+        }
+      }
+    });
   }
 
   $: if (containerEl && !resizeObserver) {
@@ -399,6 +455,10 @@
     if (scrollCheckTimer) {
       window.clearTimeout(scrollCheckTimer);
     }
+    for (const task of textLayerTasks.values()) {
+      task.cancel();
+    }
+    textLayerTasks.clear();
     resizeObserver?.disconnect();
     resizeObserver = null;
     await pdfDocument?.destroy();
@@ -419,34 +479,12 @@
     </p>
   {:else}
     <div class="pdf-document__pages">
-      {#if initialPage}
-        <p class="pdf-document__location">PDF geopend rond pagina {initialPage}</p>
-      {/if}
-
-      {#if hasPreviousPages()}
-        <div class="pdf-document__pager">
-          <button class="ghost-button" type="button" on:click={loadPreviousPages}>
-            Laad eerdere pagina's
-          </button>
-        </div>
-      {/if}
-
       {#each pages as page}
         <figure
           class:pdf-document__page--match={page.number === initialPage}
           class="pdf-document__page"
           data-page-number={page.number}
         >
-          {#if page.number === initialPage}
-            <figcaption class="pdf-document__match-badge">
-              <strong>Zoekmatch op pagina {page.number}</strong>
-              {#if matchPreview}
-                <span>{matchPreview}</span>
-              {:else}
-                <span>PDF opent direct bij de best passende pagina voor "{query}".</span>
-              {/if}
-            </figcaption>
-          {/if}
           <img
             alt={`PDF pagina ${page.number}`}
             class="pdf-document__image"
@@ -455,25 +493,14 @@
             src={page.dataUrl}
             width={page.width}
           />
-          <div class="pdf-document__text-layer" aria-label={`Tekstlaag pagina ${page.number}`}>
-            {#each page.textItems as item}
-              <span
-                class:pdf-document__text-item--match={item.hasMatch}
-                class="pdf-document__text-item"
-                style={`left:${item.left}px;top:${item.top}px;width:${item.width}px;height:${item.height}px;font-size:${item.fontSize}px;`}
-              >
-                {@html item.html}
-              </span>
-            {/each}
-          </div>
+          <div
+            use:mountTextLayer={page}
+            class="pdf-document__text-layer"
+            data-page-number={page.number}
+            aria-label={`Tekstlaag pagina ${page.number}`}
+          ></div>
         </figure>
       {/each}
-
-      {#if hasNextPages()}
-        <div class="pdf-document__pager">
-          <span>Meer pagina's worden automatisch geladen tijdens scrollen.</span>
-        </div>
-      {/if}
     </div>
   {/if}
 </div>
