@@ -33,12 +33,12 @@ Deno.test("normalizeNotubizMeeting and normalizeNotubizDocuments produce determi
     "committee id should use the canonical scoped grammar",
   );
   assert(
-    JSON.stringify(meeting.agenda) ===
-      JSON.stringify([
-        "agenda_item:notubiz:gemeente:haarlem:7",
-        "agenda_item:notubiz:gemeente:haarlem:8",
-      ]),
-    "agenda ids should stay deterministic across nested agenda items",
+    meeting.agenda?.[0]?.id === "agenda_item:notubiz:gemeente:haarlem:7",
+    "top-level agenda item id should stay deterministic",
+  );
+  assert(
+    meeting.agenda?.[0]?.agenda_items?.[0]?.id === "agenda_item:notubiz:gemeente:haarlem:8",
+    "nested agenda item ids should stay deterministic",
   );
   assert(
     JSON.stringify(meeting.attachment) ===

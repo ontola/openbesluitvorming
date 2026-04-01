@@ -1,5 +1,7 @@
 import type {
   DocumentEntity,
+  MeetingAgendaDocumentLink,
+  MeetingAgendaItem,
   MeetingEntity,
   NotubizOrganizationAttributes,
   NotubizSourceDefinition,
@@ -11,26 +13,6 @@ import {
   canonicalMeetingId,
   canonicalOrganizationId,
 } from "../ids.ts";
-
-function collectAgendaIds(source: NotubizSourceDefinition, agendaItems: unknown[]): string[] {
-  const result: string[] = [];
-
-  function walk(items: unknown[]) {
-    for (const item of items) {
-      if (!item || typeof item !== "object") continue;
-      const record = item as Record<string, unknown>;
-      const id = record.id;
-      if (typeof id === "number" || typeof id === "string") {
-        result.push(canonicalAgendaItemId(source, id));
-      }
-      const children = Array.isArray(record.agenda_items) ? record.agenda_items : [];
-      walk(children);
-    }
-  }
-
-  walk(agendaItems);
-  return result;
-}
 
 function collectAttachmentIds(
   source: NotubizSourceDefinition,
@@ -67,6 +49,87 @@ function collectAttachmentIds(
 
 function canonicalDocumentDownloadUrl(documentId: string): string {
   return `https://api.notubiz.nl/document/${documentId}/1`;
+}
+
+function agendaAttributeValue(typeData: Record<string, unknown> | undefined, id: number): string | undefined {
+  const attributes = Array.isArray(typeData?.attributes) ? typeData.attributes : [];
+  for (const attribute of attributes) {
+    if (!attribute || typeof attribute !== "object") {
+      continue;
+    }
+    const record = attribute as Record<string, unknown>;
+    if (record.id === id && typeof record.value === "string" && record.value.trim()) {
+      return record.value;
+    }
+  }
+  return undefined;
+}
+
+function normalizeAgendaDocumentLink(
+  source: NotubizSourceDefinition,
+  document: Record<string, unknown>,
+): MeetingAgendaDocumentLink | undefined {
+  const id = document.id;
+  if (typeof id !== "number" && typeof id !== "string") {
+    return undefined;
+  }
+
+  const documentId = String(id);
+  return {
+    id: canonicalDocumentId(source, documentId),
+    name:
+      typeof document.title === "string" && document.title.trim().length > 0
+        ? document.title
+        : (normalizeFileName(document) ?? `Document ${documentId}`),
+    file_name: normalizeFileName(document),
+    content_type: normalizeContentType(document),
+    original_url: canonicalDocumentDownloadUrl(documentId),
+  };
+}
+
+export function normalizeNotubizAgendaItems(
+  source: NotubizSourceDefinition,
+  agendaItems: unknown[],
+  parentId?: string,
+): MeetingAgendaItem[] {
+  return agendaItems
+    .filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object"))
+    .flatMap((record) => {
+      const id = record.id;
+      if (typeof id !== "number" && typeof id !== "string") {
+        return [];
+      }
+
+      const typeData =
+        record.type_data && typeof record.type_data === "object"
+          ? (record.type_data as Record<string, unknown>)
+          : undefined;
+      const agendaId = canonicalAgendaItemId(source, id);
+      const documents = (Array.isArray(record.documents) ? record.documents : [])
+        .filter((document): document is Record<string, unknown> => Boolean(document && typeof document === "object"))
+        .map((document) => normalizeAgendaDocumentLink(source, document))
+        .filter((document): document is MeetingAgendaDocumentLink => Boolean(document));
+      const children = normalizeNotubizAgendaItems(
+        source,
+        Array.isArray(record.agenda_items) ? record.agenda_items : [],
+        agendaId,
+      );
+
+      return [{
+        id: agendaId,
+        parent: parentId,
+        title: agendaAttributeValue(typeData, 1),
+        description: agendaAttributeValue(typeData, 3),
+        number: typeof typeData?.title_prefix === "string" ? typeData.title_prefix : undefined,
+        order: typeof record.order === "number" ? record.order : undefined,
+        classification: typeof record.type === "string" ? record.type : undefined,
+        is_heading: typeData?.heading === true,
+        start_date: normalizeDateTime(record.start_date),
+        end_date: normalizeDateTime(record.end_date),
+        documents: documents.length > 0 ? documents : undefined,
+        agenda_items: children.length > 0 ? children : undefined,
+      }];
+    });
 }
 
 function collectAgendaDocuments(agendaItems: unknown[]): Record<string, unknown>[] {
@@ -210,7 +273,7 @@ export function normalizeNotubizMeeting(
       typeof gremiumId === "number" || typeof gremiumId === "string"
         ? canonicalCommitteeId(source, gremiumId)
         : undefined,
-    agenda: collectAgendaIds(source, Array.isArray(record.agenda_items) ? record.agenda_items : []),
+    agenda: normalizeNotubizAgendaItems(source, Array.isArray(record.agenda_items) ? record.agenda_items : []),
     attachment: collectAttachmentIds(source, record),
     source_info: {
       supplier: "notubiz",

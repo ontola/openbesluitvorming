@@ -48,7 +48,10 @@
       "$ref": "common.schema.json#/$defs/entityRef"
     },
     "agenda": {
-      "$ref": "common.schema.json#/$defs/entityRefArray"
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/agendaItem"
+      }
     },
     "attachment": {
       "$ref": "common.schema.json#/$defs/entityRefArray"
@@ -57,5 +60,78 @@
       "$ref": "common.schema.json#/$defs/sourceInfo"
     }
   },
-  "required": ["id", "type", "name", "start_date"]
+  "required": ["id", "type", "name", "start_date"],
+  "$defs": {
+    "agendaDocumentLink": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "id": {
+          "$ref": "common.schema.json#/$defs/entityRef"
+        },
+        "name": {
+          "type": "string"
+        },
+        "file_name": {
+          "type": "string"
+        },
+        "content_type": {
+          "type": "string"
+        },
+        "original_url": {
+          "type": "string"
+        }
+      },
+      "required": ["id", "name"]
+    },
+    "agendaItem": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "id": {
+          "$ref": "common.schema.json#/$defs/entityRef"
+        },
+        "parent": {
+          "$ref": "common.schema.json#/$defs/entityRef"
+        },
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "number": {
+          "type": "string"
+        },
+        "order": {
+          "type": "number"
+        },
+        "classification": {
+          "type": "string"
+        },
+        "is_heading": {
+          "type": "boolean"
+        },
+        "start_date": {
+          "$ref": "common.schema.json#/$defs/dateTime"
+        },
+        "end_date": {
+          "$ref": "common.schema.json#/$defs/dateTime"
+        },
+        "documents": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/agendaDocumentLink"
+          }
+        },
+        "agenda_items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/agendaItem"
+          }
+        }
+      },
+      "required": ["id"]
+    }
+  }
 }

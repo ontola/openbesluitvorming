@@ -18,7 +18,10 @@ Deno.test("buildEntityCommitEvent wraps a meeting in a commit envelope", async (
     last_discussed_at: "2025-01-14T19:30:00+01:00",
     organization: "organization:nl:gemeente:haarlem",
     committee: "committee:notubiz:gemeente:haarlem:999",
-    agenda: ["agenda_item:notubiz:gemeente:haarlem:1"],
+    agenda: [{
+      id: "agenda_item:notubiz:gemeente:haarlem:1",
+      title: "Ingekomen stukken",
+    }],
     attachment: ["document:notubiz:gemeente:haarlem:2"],
     source_info: {
       supplier: "notubiz",

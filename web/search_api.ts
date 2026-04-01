@@ -1,7 +1,9 @@
-import type { EntityContentResponse, SearchResponse, SearchResult } from "../src/types.ts";
+import type { EntityContentResponse, MeetingAgendaItem, SearchResponse, SearchResult } from "../src/types.ts";
+import { NotubizClient } from "../src/notubiz/client.ts";
+import { normalizeNotubizAgendaItems } from "../src/notubiz/normalize.ts";
 import { currentProjectionVersion } from "../src/pipeline/versioning.ts";
 import { QuickwitClient } from "../src/quickwit/client.ts";
-import { listSources } from "../src/sources/index.ts";
+import { getSource, listSources } from "../src/sources/index.ts";
 import { ObjectStorageClient } from "../src/storage/s3.ts";
 
 type SearchHit = {
@@ -30,6 +32,7 @@ type SearchHit = {
       page_count?: number;
     };
     md_text?: string[];
+    agenda?: MeetingAgendaItem[];
   };
 };
 
@@ -260,6 +263,14 @@ function dedupeLatestHits(hits: SearchHit[]): SearchHit[] {
   return [...byEntityId.values()];
 }
 
+function hasStructuredAgenda(agenda: MeetingAgendaItem[] | undefined): boolean {
+  if (!Array.isArray(agenda) || agenda.length === 0) {
+    return false;
+  }
+
+  return agenda.some((item) => typeof item === "object" && item !== null && Boolean(item.title || item.documents?.length));
+}
+
 function dedupeLatestIndexedHits(items: IndexedHit[]): IndexedHit[] {
   const byEntityId = new Map<string, IndexedHit>();
 
@@ -434,12 +445,49 @@ export async function getEntityContent(entityId: string): Promise<EntityContentR
     markdownText = await storage.getObjectText(markdownKey);
   }
 
+  let agenda = hit.payload?.agenda;
+  if (
+    hit.entity_type === "Meeting" &&
+    !hasStructuredAgenda(agenda) &&
+    hit.source_key
+  ) {
+    const source = getSource(hit.source_key);
+    if (source.supplier === "notubiz") {
+      const meetingId = entityId.split(":").at(-1);
+      if (meetingId) {
+        const client = new NotubizClient();
+        const meetingResponse = await client.getMeeting(Number(meetingId));
+        const rawMeeting =
+          meetingResponse && typeof meetingResponse === "object"
+            ? (meetingResponse as { meeting?: unknown }).meeting
+            : undefined;
+        if (rawMeeting && typeof rawMeeting === "object") {
+          const record = rawMeeting as Record<string, unknown>;
+          agenda = normalizeNotubizAgendaItems(
+            source,
+            Array.isArray(record.agenda_items) ? record.agenda_items : [],
+          );
+        }
+      }
+    }
+  }
+
   return {
     entityId: hit.entity_id ?? entityId,
     entityType: hit.entity_type ?? "Unknown",
+    entityTypeLabel: entityTypeLabel(hit.entity_type),
+    title:
+      hit.name ??
+      (hit.entity_type === "Document"
+        ? (hit.file_name ?? "Ongetiteld document")
+        : "Ongetitelde vergadering"),
+    organization: displayOrganization(hit),
+    date: formatDate(hit.start_date),
+    sortDate: hit.start_date,
     markdownText,
     downloadUrl,
     contentType,
     pdfUrl,
+    agenda,
   };
 }

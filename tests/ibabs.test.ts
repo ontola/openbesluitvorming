@@ -120,8 +120,12 @@ Deno.test("normalizeIbabsMeeting and normalizeIbabsDocuments use the canonical W
     "committee id should use the canonical Woozi grammar",
   );
   assert(
-    meeting.agenda?.[0] === "agenda_item:ibabs:gemeente:amstelveen:agenda-7",
+    meeting.agenda?.[0]?.id === "agenda_item:ibabs:gemeente:amstelveen:agenda-7",
     "agenda item ids should use the canonical Woozi grammar",
+  );
+  assert(
+    meeting.agenda?.[0]?.documents?.[0]?.id === "document:ibabs:gemeente:amstelveen:doc-43",
+    "agenda items should retain linked document refs",
   );
   assert(documents.length === 2, "expected direct and agenda documents");
   assert(

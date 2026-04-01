@@ -78,7 +78,7 @@ Deno.test({
         );
         assert(
           meeting.agenda?.every((item) =>
-            item.startsWith("agenda_item:notubiz:gemeente:haarlem:"),
+            item.id.startsWith("agenda_item:notubiz:gemeente:haarlem:"),
           ) ?? true,
           "meeting agenda ids should be municipality-scoped",
         );

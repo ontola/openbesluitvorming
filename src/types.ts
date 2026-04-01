@@ -46,10 +46,33 @@ export interface MeetingEntity {
   organization?: string;
   committee?: string;
   parent?: string;
-  agenda?: string[];
+  agenda?: MeetingAgendaItem[];
   attachment?: string[];
   source_info: SourceInfo;
   raw: unknown;
+}
+
+export interface MeetingAgendaDocumentLink {
+  id: string;
+  name: string;
+  file_name?: string;
+  content_type?: string;
+  original_url?: string;
+}
+
+export interface MeetingAgendaItem {
+  id: string;
+  parent?: string;
+  title?: string;
+  description?: string;
+  number?: string;
+  order?: number;
+  classification?: string;
+  is_heading?: boolean;
+  start_date?: string;
+  end_date?: string;
+  documents?: MeetingAgendaDocumentLink[];
+  agenda_items?: MeetingAgendaItem[];
 }
 
 export interface DocumentMediaLink {
@@ -312,8 +335,14 @@ export interface SearchResponse {
 export interface EntityContentResponse {
   entityId: string;
   entityType: string;
+  entityTypeLabel?: string;
+  title?: string;
+  organization?: string;
+  date?: string;
+  sortDate?: string;
   markdownText?: string;
   downloadUrl?: string;
   contentType?: string;
   pdfUrl?: string;
+  agenda?: MeetingAgendaItem[];
 }

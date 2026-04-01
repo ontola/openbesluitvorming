@@ -31,8 +31,37 @@ export interface QuickwitSearchDocument {
   payload: unknown;
 }
 
+function flattenAgendaContent(items?: MeetingEntity["agenda"]): string[] {
+  if (!items?.length) {
+    return [];
+  }
+
+  const content: string[] = [];
+  for (const item of items) {
+    if (item.number) {
+      content.push(item.number);
+    }
+    if (item.title) {
+      content.push(item.title);
+    }
+    if (item.description) {
+      content.push(item.description);
+    }
+    for (const document of item.documents ?? []) {
+      content.push(document.name);
+    }
+    content.push(...flattenAgendaContent(item.agenda_items));
+  }
+  return content;
+}
+
 function projectMeetingContent(payload?: MeetingEntity): string | undefined {
-  const content = [payload?.name, ...(payload?.classification ?? []), payload?.location]
+  const content = [
+    payload?.name,
+    ...(payload?.classification ?? []),
+    payload?.location,
+    ...flattenAgendaContent(payload?.agenda),
+  ]
     .filter(Boolean)
     .join(" ");
 

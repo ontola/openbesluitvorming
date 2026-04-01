@@ -10,6 +10,7 @@
     SearchResult,
   } from "../../src/types.ts";
   import PdfDocumentView from "./PdfDocumentView.svelte";
+  import MeetingAgendaTree from "./MeetingAgendaTree.svelte";
   import SourcePicker from "./SourcePicker.svelte";
 
   type SearchRouteState = {
@@ -283,7 +284,17 @@
     )].sort((left, right) => right.length - left.length);
   }
 
+  function clearHighlightedText(root: HTMLElement): void {
+    for (const mark of root.querySelectorAll("mark")) {
+      const parent = mark.parentNode;
+      if (!parent) continue;
+      parent.replaceChild(document.createTextNode(mark.textContent ?? ""), mark);
+      parent.normalize();
+    }
+  }
+
   function highlightElementText(root: HTMLElement, value: string): void {
+    clearHighlightedText(root);
     const terms = getHighlightTerms(value);
     if (terms.length === 0) return;
 
@@ -469,6 +480,9 @@
   async function syncDetailText(): Promise<void> {
     if (detailMode !== "text" || !detailTextEl) return;
     await tick();
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => resolve());
+    });
     if (!detailTextEl) return;
     highlightElementText(detailTextEl, query);
     const firstMatch = detailTextEl.querySelector<HTMLElement>("mark");
@@ -476,7 +490,14 @@
       detailTextEl.classList.remove("detail-sheet__text--highlighting");
       void detailTextEl.offsetWidth;
       detailTextEl.classList.add("detail-sheet__text--highlighting");
-      firstMatch.scrollIntoView({ block: "center", behavior: "smooth" });
+      const containerRect = detailTextEl.getBoundingClientRect();
+      const matchRect = firstMatch.getBoundingClientRect();
+      const targetTop = detailTextEl.scrollTop + (matchRect.top - containerRect.top)
+        - (detailTextEl.clientHeight / 2) + (matchRect.height / 2);
+      detailTextEl.scrollTo({
+        top: Math.max(0, targetTop),
+        behavior: "smooth",
+      });
     } else {
       detailTextEl.classList.remove("detail-sheet__text--highlighting");
       detailTextEl.scrollTop = 0;
@@ -515,6 +536,35 @@
     if (detailMode === "text") {
       await syncDetailText();
     }
+  }
+
+  async function openDetailById(entityId: string, updateUrl = true): Promise<void> {
+    const existing = results.find((item) => item.entityId === entityId);
+    if (existing) {
+      await openDetail(existing, updateUrl);
+      return;
+    }
+
+    const content = await loadDetailContent(entityId);
+    if (!content) {
+      return;
+    }
+
+    await openDetail({
+      entityId: content.entityId,
+      entityType: content.entityType,
+      entityTypeLabel: content.entityTypeLabel ?? (content.entityType === "Meeting" ? "Vergadering" : "Document"),
+      organization: content.organization ?? "Onbekende organisatie",
+      date: content.date ?? "Datum onbekend",
+      title: content.title ?? "Ongetiteld",
+      summary: "",
+      sortDate: content.sortDate,
+      downloadUrl: content.downloadUrl,
+    }, updateUrl);
+  }
+
+  function handleAgendaDocumentOpen(event: CustomEvent<{ entityId: string }>): void {
+    void openDetailById(event.detail.entityId);
   }
 
   async function navigateDetail(direction: -1 | 1): Promise<void> {
@@ -1168,21 +1218,39 @@
 
       <div class="detail-sheet__body">
         {#if detailMode === "text"}
-          <div bind:this={detailTextEl} class="detail-sheet__text prose-detail">
-            {#if detailLoading}
-              <div class="detail-sheet__loading" aria-hidden="true">
-                <span class="detail-sheet__loading-line detail-sheet__loading-line--title"></span>
-                <span class="detail-sheet__loading-line"></span>
-                <span class="detail-sheet__loading-line"></span>
-                <span class="detail-sheet__loading-line detail-sheet__loading-line--short"></span>
-                <span class="detail-sheet__loading-line"></span>
-                <span class="detail-sheet__loading-line"></span>
-                <span class="detail-sheet__loading-line detail-sheet__loading-line--medium"></span>
+          {#if detailItem.entityType === "Meeting"}
+            <div class="detail-sheet__meeting">
+              <div class="detail-sheet__meeting-intro">
+                <p class="detail-sheet__meeting-label">Agenda</p>
+                {#if detailContent?.agenda?.length}
+                  <p class="detail-sheet__meeting-copy">
+                    Bekijk agendapunten en gekoppelde documenten van deze vergadering.
+                  </p>
+                {/if}
               </div>
-            {:else}
-              {@html detailMarkdownHtml}
-            {/if}
-          </div>
+              {#if detailContent?.agenda?.length}
+                <MeetingAgendaTree items={detailContent.agenda} on:opendocument={handleAgendaDocumentOpen} />
+              {:else}
+                <p class="detail-sheet__meeting-empty">Geen agenda beschikbaar.</p>
+              {/if}
+            </div>
+          {:else}
+            <div bind:this={detailTextEl} class="detail-sheet__text prose-detail">
+              {#if detailLoading}
+                <div class="detail-sheet__loading" aria-hidden="true">
+                  <span class="detail-sheet__loading-line detail-sheet__loading-line--title"></span>
+                  <span class="detail-sheet__loading-line"></span>
+                  <span class="detail-sheet__loading-line"></span>
+                  <span class="detail-sheet__loading-line detail-sheet__loading-line--short"></span>
+                  <span class="detail-sheet__loading-line"></span>
+                  <span class="detail-sheet__loading-line"></span>
+                  <span class="detail-sheet__loading-line detail-sheet__loading-line--medium"></span>
+                </div>
+              {:else}
+                {@html detailMarkdownHtml}
+              {/if}
+            </div>
+          {/if}
         {:else}
           <div class="detail-sheet__pdf">
             {#key detailItem.entityId}

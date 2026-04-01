@@ -10,6 +10,8 @@ import type {
   IbabsMeeting,
   IbabsMeetingItem,
   IbabsSourceDefinition,
+  MeetingAgendaDocumentLink,
+  MeetingAgendaItem,
   MeetingEntity,
 } from "../types.ts";
 
@@ -47,10 +49,27 @@ function meetingTypeName(
   return byTypeId ?? meeting.Meetingtype ?? `Vergadering ${meeting.MeetingDate ?? meeting.Id}`;
 }
 
-function collectAgendaIds(source: IbabsSourceDefinition, meeting: IbabsMeeting): string[] {
-  return (meeting.MeetingItems ?? []).map((item: IbabsMeetingItem) =>
-    canonicalAgendaItemId(source, item.Id),
-  );
+function toAgendaDocumentLinks(
+  source: IbabsSourceDefinition,
+  item: IbabsMeetingItem,
+): MeetingAgendaDocumentLink[] | undefined {
+  const documents = (item.Documents ?? []).map((document) => ({
+    id: canonicalDocumentId(source, document.Id),
+    name: documentName(document),
+    file_name: document.FileName,
+    original_url: document.PublicDownloadURL,
+  }));
+  return documents.length > 0 ? documents : undefined;
+}
+
+function collectAgendaItems(source: IbabsSourceDefinition, meeting: IbabsMeeting): MeetingAgendaItem[] {
+  return (meeting.MeetingItems ?? []).map((item: IbabsMeetingItem, index) => ({
+    id: canonicalAgendaItemId(source, item.Id),
+    title: item.Title,
+    description: item.Explanation,
+    order: index + 1,
+    documents: toAgendaDocumentLinks(source, item),
+  }));
 }
 
 function collectAttachmentIds(source: IbabsSourceDefinition, meeting: IbabsMeeting): string[] {
@@ -102,7 +121,7 @@ export function normalizeIbabsMeeting(
       meeting.MeetingtypeId && looksLikeCommittee(meetingType)
         ? canonicalCommitteeId(source, meeting.MeetingtypeId)
         : undefined,
-    agenda: collectAgendaIds(source, meeting),
+    agenda: collectAgendaItems(source, meeting),
     attachment: collectAttachmentIds(source, meeting),
     source_info: {
       supplier: source.supplier,

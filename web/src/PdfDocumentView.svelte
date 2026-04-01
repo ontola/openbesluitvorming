@@ -33,6 +33,7 @@
   let error = "";
   let pages: PdfPageView[] = [];
   let pageCount = 0;
+  let loadedUrl = "";
   let pdfDocument: Awaited<ReturnType<typeof getDocument>>["promise"] extends Promise<infer T> ? T : never | null =
     null;
   let lastScrollSignature = "";
@@ -43,7 +44,8 @@
   let applyingWindow = false;
 
   const MIN_PAGE_WIDTH = 320;
-  const PAGE_WINDOW_RADIUS = 2;
+  const PAGE_WINDOW_BEHIND = 2;
+  const PAGE_WINDOW_AHEAD = 5;
   const textLayerTasks = new Map<number, { cancel: () => void }>();
 
   function escapeHtml(value: string): string {
@@ -114,8 +116,8 @@
 
   function pageWindow(centerPage: number): number[] {
     const boundedCenter = Math.max(1, Math.min(pageCount || centerPage, centerPage));
-    const start = Math.max(1, boundedCenter - PAGE_WINDOW_RADIUS);
-    const end = Math.min(pageCount, boundedCenter + PAGE_WINDOW_RADIUS);
+    const start = Math.max(1, boundedCenter - PAGE_WINDOW_BEHIND);
+    const end = Math.min(pageCount, boundedCenter + PAGE_WINDOW_AHEAD);
     return Array.from({ length: end - start + 1 }, (_, index) => start + index);
   }
 
@@ -194,6 +196,10 @@
       return;
     }
 
+    if (pdfDocument && loadedUrl === url && pageCount > 0 && Math.abs(nextWidth - renderWidth) < 1) {
+      return;
+    }
+
     renderWidth = nextWidth;
     const token = ++renderToken;
     loading = true;
@@ -214,9 +220,12 @@
       }
 
       pdfDocument = pdf;
+      loadedUrl = url;
       pageCount = pdf.numPages;
-      activePage = targetPageNumber();
-      await applyPageWindow(activePage);
+      const targetPage = targetPageNumber();
+      activePage = 0;
+      await applyPageWindow(targetPage);
+      await ensurePageVisible(targetPage, "auto");
     } catch (cause) {
       if (token === renderToken) {
         console.error(cause);
@@ -269,7 +278,7 @@
     }
   }
 
-  async function ensurePageVisible(pageNumber: number): Promise<void> {
+  async function ensurePageVisible(pageNumber: number, behavior: ScrollBehavior = "smooth"): Promise<void> {
     if (!pdfDocument || pageNumber < 1 || pageNumber > pageCount) {
       return;
     }
@@ -284,7 +293,7 @@
 
     pageEl.scrollIntoView({
       block: "center",
-      behavior: "smooth",
+      behavior,
     });
   }
 
@@ -403,6 +412,7 @@
   $: if (!url) {
     pages = [];
     pageCount = 0;
+    loadedUrl = "";
     pdfDocument = null;
     loading = false;
     error = "";
@@ -420,10 +430,6 @@
         void ensurePageVisible(targetPage);
       }
     }
-  }
-
-  $: if (pages.length > 0) {
-    void tick().then(() => checkScrollPrefetch());
   }
 
   $: if (pages.length >= 0) {
@@ -479,7 +485,7 @@
     </p>
   {:else}
     <div class="pdf-document__pages">
-      {#each pages as page}
+      {#each pages as page (page.number)}
         <figure
           class:pdf-document__page--match={page.number === initialPage}
           class="pdf-document__page"
