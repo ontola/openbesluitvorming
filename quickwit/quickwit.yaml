@@ -1,12 +1,12 @@
 version: 0.7
-cluster_id: woozi-local
-node_id: quickwit-local
+cluster_id: ${QUICKWIT_CLUSTER_ID}
+node_id: ${QUICKWIT_NODE_ID}
 listen_address: 0.0.0.0
 rest:
   listen_port: 7280
 data_dir: /quickwit/qwdata
-metastore_uri: s3://${S3_STORAGE_BUCKET_NAME}/indexes#polling_interval=30s
-default_index_root_uri: s3://${S3_STORAGE_BUCKET_NAME}/indexes
+metastore_uri: s3://${S3_STORAGE_BUCKET_NAME}/${QUICKWIT_INDEX_ROOT_PREFIX}#polling_interval=30s
+default_index_root_uri: s3://${S3_STORAGE_BUCKET_NAME}/${QUICKWIT_INDEX_ROOT_PREFIX}
 storage:
   s3:
     endpoint: ${S3_STORAGE_ENDPOINT}

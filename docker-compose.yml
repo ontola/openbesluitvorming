@@ -42,6 +42,9 @@ services:
       S3_STORAGE_BUCKET_NAME: ${S3_STORAGE_BUCKET_NAME:-woozi}
       S3_STORAGE_ENDPOINT: ${S3_STORAGE_ENDPOINT:-http://minio:9000}
       S3_STORAGE_REGION: ${S3_STORAGE_REGION:-us-east-1}
+      QUICKWIT_CLUSTER_ID: ${QUICKWIT_CLUSTER_ID:-woozi-dev}
+      QUICKWIT_NODE_ID: ${QUICKWIT_NODE_ID:-quickwit-dev}
+      QUICKWIT_INDEX_ROOT_PREFIX: ${QUICKWIT_INDEX_ROOT_PREFIX:-indexes-dev}
     ports:
       - "7280:7280"
     volumes:
@@ -57,6 +60,7 @@ services:
     environment:
       PORT: 8787
       QUICKWIT_URL: http://quickwit:7280
+      QUICKWIT_INDEX_ID: ${QUICKWIT_INDEX_ID:-woozi-events-dev}
       WOOZI_KV_PATH: /data/woozi-ops.sqlite3
       AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY:-woozi}
       AWS_SECRET_ACCESS_KEY: ${S3_SECRET_KEY:-woozi-dev-secret}

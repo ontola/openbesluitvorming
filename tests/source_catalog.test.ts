@@ -3,7 +3,7 @@ import {
   listCatalogSources,
   listImplementedCatalogSources,
 } from "../src/sources/catalog.ts";
-import { listAggregateRunnableSourceRefs } from "../src/sources/index.ts";
+import { listAggregateAdminSourceOptions, listAggregateRunnableSourceRefs } from "../src/sources/index.ts";
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) {
@@ -46,8 +46,8 @@ Deno.test("implemented catalog sources are limited to Woozi-supported suppliers 
   );
 });
 
-Deno.test("aggregate runnable sources include all implemented notubiz sources", () => {
-  const refs = listAggregateRunnableSourceRefs();
+Deno.test("aggregate runnable sources include all implemented sources for a supplier", () => {
+  const refs = listAggregateRunnableSourceRefs("notubiz");
   const implementedNotubizRefs = listImplementedCatalogSources()
     .filter((source) => source.supplier === "notubiz")
     .map((source) => source.sourceRef);
@@ -60,5 +60,17 @@ Deno.test("aggregate runnable sources include all implemented notubiz sources", 
   assert(
     JSON.stringify(refs) === JSON.stringify(implementedNotubizRefs),
     "aggregate import should not silently drop implemented notubiz sources",
+  );
+});
+
+Deno.test("admin source options expose supplier aggregate choices", () => {
+  const options = listAggregateAdminSourceOptions();
+  const refs = options.map((option) => option.sourceRef);
+
+  assert(refs.includes("__supplier__:notubiz"), "expected aggregate notubiz option");
+  assert(refs.includes("__supplier__:ibabs"), "expected aggregate ibabs option");
+  assert(
+    options.every((option) => option.isAggregate),
+    "aggregate source options should be marked as aggregate",
   );
 });

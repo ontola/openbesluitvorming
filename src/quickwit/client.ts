@@ -28,7 +28,7 @@ function isRetryableIngestError(error: unknown): boolean {
   }
 
   return (
-    error.message.includes("index `woozi-events` not found") ||
+    error.message.includes("index `") && error.message.includes("` not found") ||
     error.message.includes("Quickwit ingest failed 404")
   );
 }
@@ -39,6 +39,10 @@ async function sleep(ms: number): Promise<void> {
 
 function getBaseUrl(): string {
   return Deno.env.get("QUICKWIT_URL") ?? DEFAULT_QUICKWIT_URL;
+}
+
+function getIndexId(): string {
+  return Deno.env.get("QUICKWIT_INDEX_ID") ?? DEFAULT_INDEX_ID;
 }
 
 async function fetchJson<T>(input: string, init?: RequestInit): Promise<T> {
@@ -53,7 +57,7 @@ async function fetchJson<T>(input: string, init?: RequestInit): Promise<T> {
 export class QuickwitClient {
   constructor(
     private readonly baseUrl = getBaseUrl(),
-    private readonly indexId = DEFAULT_INDEX_ID,
+    private readonly indexId = getIndexId(),
   ) {}
 
   async waitUntilReady(timeoutMs = 20000): Promise<void> {
@@ -73,7 +77,9 @@ export class QuickwitClient {
   }
 
   async ensureIndex(configPath: string): Promise<void> {
-    const configText = await Deno.readTextFile(configPath);
+    const config = JSON.parse(await Deno.readTextFile(configPath)) as Record<string, unknown>;
+    config.index_id = this.indexId;
+    const configText = JSON.stringify(config);
     const list = await fetchJson<
       Array<{ index_id?: string; index_config?: { index_id?: string } }>
     >(`${this.baseUrl}/api/v1/indexes`);

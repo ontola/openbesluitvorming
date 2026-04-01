@@ -8,6 +8,7 @@ import type {
 import { resumeQueuedIngests, startIngest } from "../src/ingest.ts";
 import { getRunDetails, getRunSummary, listRuns, reconcileInterruptedRuns } from "../src/ops/store.ts";
 import { listAdminSourceOptions, listAggregateRunnableSourceRefs } from "../src/sources/index.ts";
+import type { Supplier } from "../src/types.ts";
 import { getEntityContent, searchMeetings } from "./search_api.ts";
 
 const root = new URL("./", import.meta.url);
@@ -60,15 +61,6 @@ Deno.serve({ port }, async (request) => {
   if (url.pathname === "/api/admin/sources") {
     return Response.json<AdminSourcesResponse>({
       sources: [
-        {
-          key: "__all__",
-          sourceRef: "__all__",
-          label: "Alle ondersteunde bronnen",
-          supplier: "woozi",
-          organizationType: "verzameling",
-          implemented: true,
-          isAggregate: true,
-        },
         ...listAdminSourceOptions(),
       ],
     });
@@ -142,14 +134,14 @@ Deno.serve({ port }, async (request) => {
         );
       }
       const executionMode = payload.executionMode ?? "full";
-      if (payload.sourceRef?.trim() === "__all__" && executionMode !== "full") {
+      if (sourceSelector.startsWith("__supplier__:") && executionMode !== "full") {
         return Response.json(
-          { error: "Deze uitvoermodus is nog niet beschikbaar voor alle bronnen tegelijk." },
+          { error: "Deze uitvoermodus is nog niet beschikbaar voor alle bronnen van een leverancier tegelijk." },
           { status: 400 },
         );
       }
-      const sourceRefs = sourceSelector === "__all__"
-        ? listAggregateRunnableSourceRefs()
+      const sourceRefs = sourceSelector.startsWith("__supplier__:")
+        ? listAggregateRunnableSourceRefs(sourceSelector.replace("__supplier__:", "") as Supplier)
         : [sourceSelector];
       const runs = await Promise.all(
         sourceRefs.map((sourceRef) =>

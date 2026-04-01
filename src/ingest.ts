@@ -114,7 +114,7 @@ async function executeIngest(
       await quickwit.waitUntilReady();
       await quickwit.ensureIndex(configPath.pathname);
       await quickwit.ingestEvents(events);
-      quickwitIndexId = "woozi-events";
+      quickwitIndexId = Deno.env.get("QUICKWIT_INDEX_ID") ?? "woozi-events";
     }
 
     const status = extraction.issues.length > 0 ? "partial" : "succeeded";

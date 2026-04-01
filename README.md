@@ -116,6 +116,10 @@ Required production env includes:
 - `S3_STORAGE_BUCKET_NAME`
 - `S3_STORAGE_ENDPOINT`
 - `S3_STORAGE_REGION`
+- `QUICKWIT_INDEX_ID`
+- `QUICKWIT_CLUSTER_ID`
+- `QUICKWIT_NODE_ID`
+- `QUICKWIT_INDEX_ROOT_PREFIX`
 
 Run it with:
 
@@ -124,6 +128,24 @@ docker compose -f docker-compose.production.yml up -d --build
 ```
 
 Point your domain to the server first so Caddy can obtain Let's Encrypt certificates.
+
+Quickwit defaults are intentionally different between local and production so both environments do not accidentally share the same S3-backed metastore and index:
+
+- local/dev defaults:
+  - `QUICKWIT_CLUSTER_ID=woozi-dev`
+  - `QUICKWIT_NODE_ID=quickwit-dev`
+  - `QUICKWIT_INDEX_ROOT_PREFIX=indexes-dev`
+  - `QUICKWIT_INDEX_ID=woozi-events-dev`
+- production defaults:
+  - `QUICKWIT_CLUSTER_ID=woozi-prod`
+  - `QUICKWIT_NODE_ID=quickwit-prod`
+  - `QUICKWIT_INDEX_ROOT_PREFIX=indexes-prod`
+  - `QUICKWIT_INDEX_ID=woozi-events-prod`
+
+Important:
+
+- if production previously used `indexes` + `woozi-events`, switching to `indexes-prod` + `woozi-events-prod` creates a fresh search projection
+- after that change, production search needs a reindex/reimport before results appear again
 
 ## Architecture
 

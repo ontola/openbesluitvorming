@@ -57,6 +57,10 @@ Common app/runtime values:
 
 - `PORT`
 - `QUICKWIT_URL`
+- `QUICKWIT_INDEX_ID`
+- `QUICKWIT_CLUSTER_ID`
+- `QUICKWIT_NODE_ID`
+- `QUICKWIT_INDEX_ROOT_PREFIX`
 - `WOOZI_KV_PATH`
 - `INGEST_CONCURRENCY`
 
@@ -91,6 +95,49 @@ So this stack is not "just Node" and it is not "just the app container":
 - `openbesluitvorming` serves search/admin/document APIs
 - `quickwit` handles indexing/search
 - S3-compatible object storage holds document artifacts and Quickwit index data
+
+### Quickwit Environment Split
+
+Local and production must not share the same Quickwit metastore/index root in S3.
+
+The repo now separates them by default:
+
+- local/dev:
+  - `QUICKWIT_CLUSTER_ID=woozi-dev`
+  - `QUICKWIT_NODE_ID=quickwit-dev`
+  - `QUICKWIT_INDEX_ROOT_PREFIX=indexes-dev`
+  - `QUICKWIT_INDEX_ID=woozi-events-dev`
+- production:
+  - `QUICKWIT_CLUSTER_ID=woozi-prod`
+  - `QUICKWIT_NODE_ID=quickwit-prod`
+  - `QUICKWIT_INDEX_ROOT_PREFIX=indexes-prod`
+  - `QUICKWIT_INDEX_ID=woozi-events-prod`
+
+This prevents a local Quickwit instance from writing into the same S3-backed metastore and index as production.
+
+### Production Migration Warning
+
+If production previously used:
+
+- S3 prefix `indexes`
+- index id `woozi-events`
+
+then switching production to:
+
+- S3 prefix `indexes-prod`
+- index id `woozi-events-prod`
+
+creates a fresh Quickwit projection namespace.
+
+That is usually the right long-term move, but it means production search will be empty until Quickwit is rebuilt for the new location/index id.
+
+Treat this as a projection migration:
+
+1. deploy the new env/config
+2. recreate or ensure the new index
+3. reindex/reimport into the new projection
+
+Do not assume old search data under `indexes/woozi-events` will automatically appear under `indexes-prod/woozi-events-prod`.
 
 ## Hetzner Cloud
 
