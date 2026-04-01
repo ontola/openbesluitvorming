@@ -283,6 +283,9 @@ export interface SearchResult {
 
 export interface SearchResponse {
   results: SearchResult[];
+  totalCount?: number;
+  totalIsApproximate?: boolean;
+  hasMore?: boolean;
 }
 
 export interface EntityContentResponse {

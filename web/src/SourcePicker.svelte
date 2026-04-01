@@ -16,6 +16,7 @@
 
   let query = "";
   let open = false;
+  let inputEl: HTMLInputElement | null = null;
 
   $: selected = options.find((source) => valueSelector(source) === value) ?? null;
   $: if (selected && query !== selected.label) {
@@ -56,13 +57,20 @@
     dispatch("change", { value: "", source: null });
     open = true;
   }
+
+  function clearSelection(): void {
+    choose(null);
+    query = "";
+    inputEl?.focus();
+  }
 </script>
 
 <div class:source-picker--open={open} class="source-picker search-panel__source-picker">
-  <label class="search-field search-field--subtle search-field--compact">
+  <label class="search-field search-field--subtle search-field--compact search-field--picker">
     <span class="sr-only">Bestuurslaag of organisatie</span>
     <input
-      type="search"
+      bind:this={inputEl}
+      type="text"
       autocomplete="off"
       {placeholder}
       bind:value={query}
@@ -79,6 +87,17 @@
         }, 120);
       }}
     />
+    {#if query || value}
+      <button
+        type="button"
+        class="source-picker__clear"
+        aria-label="Wissen"
+        on:mousedown|preventDefault
+        on:click={clearSelection}
+      >
+        ×
+      </button>
+    {/if}
   </label>
 
   {#if open}

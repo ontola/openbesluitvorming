@@ -1,4 +1,4 @@
-import type { EntityContentResponse, SearchResult } from "../src/types.ts";
+import type { EntityContentResponse, SearchResponse, SearchResult } from "../src/types.ts";
 import { QuickwitClient } from "../src/quickwit/client.ts";
 import { listSources } from "../src/sources/index.ts";
 import { ObjectStorageClient } from "../src/storage/s3.ts";
@@ -275,18 +275,27 @@ export async function searchMeetings(
     sort?: string;
     dateFrom?: string;
     dateTo?: string;
+    offset?: number;
+    limit?: number;
   } = {},
-): Promise<SearchResult[]> {
+): Promise<SearchResponse> {
   const query = options.query?.trim() ?? "";
   const organization = options.organization?.trim() ?? "";
   const entityType = options.entityType?.trim() ?? "";
   const sort = options.sort?.trim() ?? "date_desc";
   const dateFrom = options.dateFrom?.trim() ?? "";
   const dateTo = options.dateTo?.trim() ?? "";
+  const offset = Math.max(0, options.offset ?? 0);
+  const limit = Math.max(1, Math.min(options.limit ?? 24, 100));
   const quickwit = new QuickwitClient();
-  const response = await quickwit.search(buildQuickwitQuery(query, organization, entityType), 96, {
-    snippetFields: query ? ["content", "name"] : [],
-  });
+  const maxHits = Math.min(Math.max((offset + limit) * 4, 96), 400);
+  const response = await quickwit.search(
+    buildQuickwitQuery(query, organization, entityType),
+    maxHits,
+    {
+      snippetFields: query ? ["content", "name"] : [],
+    },
+  );
 
   const indexedHits = (response.hits as SearchHit[]).map((hit, index) => ({
     hit,
@@ -317,7 +326,17 @@ export async function searchMeetings(
     };
   });
 
-  return sortResults(filterResultsByDateRange(results, { dateFrom, dateTo }), sort).slice(0, 24);
+  const filteredResults = filterResultsByDateRange(results, { dateFrom, dateTo });
+
+  const sortedResults = sortResults(filteredResults, sort);
+  const pagedResults = sortedResults.slice(offset, offset + limit);
+
+  return {
+    results: pagedResults,
+    totalCount: response.num_hits,
+    totalIsApproximate: true,
+    hasMore: sortedResults.length > offset + limit || response.num_hits > offset + limit,
+  };
 }
 
 export async function getEntityContent(entityId: string): Promise<EntityContentResponse | null> {

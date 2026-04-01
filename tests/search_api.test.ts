@@ -15,7 +15,7 @@ Deno.test("searchMeetings dedupes to the latest hit and keeps the newest snippet
       throw new Error(`Unexpected URL ${url}`);
     }
 
-    const body = JSON.parse(String(init?.body ?? "{}"));
+    const body = JSON.parse(String((init as { body?: string } | undefined)?.body ?? "{}"));
     assert(body.max_hits === 96, "search should over-fetch before deduping");
 
     return new Response(
@@ -66,9 +66,12 @@ Deno.test("searchMeetings dedupes to the latest hit and keeps the newest snippet
   };
 
   try {
-    const results = await searchMeetings({ query: "raad", organization: "haarlem" });
+    const response = await searchMeetings({ query: "raad", organization: "haarlem" });
+    const results = response.results;
 
     assert(results.length === 2, "duplicate entity ids should collapse to one result");
+    assert(response.totalCount === 3, "quickwit total should be forwarded for UI estimates");
+    assert(response.totalIsApproximate === true, "forwarded total should be marked approximate");
     assert(
       results[0].entityId === "document:notubiz:gemeente:haarlem:42",
       "newest document hit should be kept after dedupe",
@@ -81,6 +84,50 @@ Deno.test("searchMeetings dedupes to the latest hit and keeps the newest snippet
       results[0].downloadUrl === "https://example.test/original.pdf",
       "deduped result should keep the newest payload metadata",
     );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+Deno.test("searchMeetings supports offset paging and signals more results approximately", async () => {
+  const originalFetch = globalThis.fetch;
+
+  globalThis.fetch = async (_input, init) => {
+    const body = JSON.parse(String((init as { body?: string } | undefined)?.body ?? "{}"));
+    assert(body.max_hits === 192, "search should increase over-fetch for deeper pages");
+
+    const hits = Array.from({ length: 30 }, (_, index) => ({
+      time: `2026-03-31T${String(index).padStart(2, "0")}:00:00Z`,
+      entity_id: `meeting:notubiz:gemeente:haarlem:${index}`,
+      entity_type: "Meeting",
+      name: `Vergadering ${index}`,
+      start_date: `2025-01-${String((index % 28) + 1).padStart(2, "0")}T17:00:00Z`,
+      source_key: "haarlem",
+      content: `Agenda ${index}`,
+    }));
+
+    return new Response(
+      JSON.stringify({
+        num_hits: 30,
+        hits,
+      }),
+      {
+        headers: { "content-type": "application/json" },
+      },
+    );
+  };
+
+  try {
+    const response = await searchMeetings({
+      query: "vergadering",
+      organization: "haarlem",
+      offset: 24,
+      limit: 24,
+    });
+
+    assert(response.results.length === 6, "second page should contain remaining results");
+    assert(response.hasMore === false, "paging should stop when the fetched page is exhausted");
+    assert(response.totalCount === 30, "total count should be forwarded");
   } finally {
     globalThis.fetch = originalFetch;
   }

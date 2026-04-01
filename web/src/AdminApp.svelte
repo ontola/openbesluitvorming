@@ -377,15 +377,13 @@
         <h2>Recente imports</h2>
       </div>
       <div class="admin-form admin-form--filters">
-        <label class="select-field select-field--compact">
-          <span class="sr-only">Filter bron</span>
-          <select bind:value={filterSource} on:change={() => void loadRuns()}>
-            <option value="">Alle bronnen</option>
-            {#each filterSources as source}
-              <option value={source.key}>{source.label}</option>
-            {/each}
-          </select>
-        </label>
+        <SourcePicker
+          options={filterSources}
+          bind:value={filterSource}
+          placeholder="Alle bronnen"
+          valueSelector={(source) => source.key}
+          on:change={() => void loadRuns()}
+        />
         <label class="select-field select-field--compact">
           <span class="sr-only">Filter status</span>
           <select bind:value={filterStatus} on:change={() => void loadRuns()}>

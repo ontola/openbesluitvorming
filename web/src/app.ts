@@ -862,10 +862,12 @@ export async function bootstrapSearchApp({
 if (typeof document !== "undefined") {
   bootstrapSearchApp({ document }).catch((error) => {
     const resultList = document.querySelector<HTMLElement>("#result-list");
+    const resultsStatus = document.querySelector<HTMLElement>("#results-status");
     if (resultList) {
       renderState(
         document,
         resultList,
+        resultsStatus ?? document.createElement("div"),
         error instanceof Error ? error.message : "De zoekmachine reageert niet.",
       );
     }

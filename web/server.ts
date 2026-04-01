@@ -136,9 +136,11 @@ Deno.serve({ port }, async (request) => {
         sort: url.searchParams.get("sort") ?? "date_desc",
         dateFrom: url.searchParams.get("dateFrom") ?? "",
         dateTo: url.searchParams.get("dateTo") ?? "",
+        offset: Number(url.searchParams.get("offset") ?? "0"),
+        limit: Number(url.searchParams.get("limit") ?? "24"),
       });
 
-      return Response.json<SearchResponse>({ results });
+      return Response.json<SearchResponse>(results);
     } catch (error) {
       return Response.json(
         {

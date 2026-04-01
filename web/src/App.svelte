@@ -30,7 +30,11 @@
 
   let sources: AdminSourceOption[] = [];
   let results: SearchResult[] = [];
+  let totalCount: number | null = null;
+  let totalIsApproximate = false;
+  let hasMore = false;
   let loading = false;
+  let loadingMore = false;
   let searched = false;
   let filtersOpen = false;
   let searchRequestId = 0;
@@ -41,12 +45,20 @@
   let detailContent: EntityContentResponse | null = null;
   let detailMode: "text" | "pdf" = "text";
   let detailPdfFailed = false;
+  let preferredDetailMode: "text" | "pdf" = "text";
 
   const detailCache = new Map<string, EntityContentResponse | null>();
+  const detailRequests = new Map<string, Promise<EntityContentResponse | null>>();
 
   let queryInputEl: HTMLInputElement | null = null;
   let detailTextEl: HTMLElement | null = null;
+  let loadMoreSentinelEl: HTMLDivElement | null = null;
   let debounceTimer: number | undefined;
+  let loadMoreObserver: IntersectionObserver | null = null;
+  let activeSearchSignature = "";
+
+  const PAGE_SIZE = 24;
+  const DETAIL_MODE_STORAGE_KEY = "woozi.detailMode";
 
   function routeStateFromUrl(url: URL): SearchRouteState {
     return {
@@ -157,6 +169,24 @@
     return url.includes("#") ? `${url}&${hash}` : `${url}#${hash}`;
   }
 
+  function loadPreferredDetailMode(): "text" | "pdf" {
+    try {
+      const stored = window.localStorage.getItem(DETAIL_MODE_STORAGE_KEY);
+      return stored === "pdf" ? "pdf" : "text";
+    } catch {
+      return "text";
+    }
+  }
+
+  function persistPreferredDetailMode(mode: "text" | "pdf"): void {
+    preferredDetailMode = mode;
+    try {
+      window.localStorage.setItem(DETAIL_MODE_STORAGE_KEY, mode);
+    } catch {
+      // Ignore storage failures; the in-memory preference still works for this session.
+    }
+  }
+
   function escapeRegex(value: string): string {
     return value.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
@@ -239,24 +269,95 @@
     }
   }
 
+  function scrollResultCardIntoView(entityId: string): void {
+    const card = document.querySelector<HTMLElement>(
+      `.result-card[data-result-id="${CSS.escape(entityId)}"]`,
+    );
+    if (!card) {
+      return;
+    }
+
+    card.scrollIntoView({
+      block: "center",
+      behavior: "smooth",
+    });
+  }
+
   async function loadDetailContent(entityId: string): Promise<EntityContentResponse | null> {
     if (detailCache.has(entityId)) {
       return detailCache.get(entityId) ?? null;
     }
 
-    const response = await fetch(`/api/entities/${encodeURIComponent(entityId)}`);
-    if (response.status === 404) {
-      detailCache.set(entityId, null);
-      return null;
+    const inFlight = detailRequests.get(entityId);
+    if (inFlight) {
+      return await inFlight;
     }
 
-    if (!response.ok) {
-      throw new Error("Documentdetail kon niet worden geladen.");
+    const request = (async () => {
+      const response = await fetch(`/api/entities/${encodeURIComponent(entityId)}`);
+      if (response.status === 404) {
+        detailCache.set(entityId, null);
+        return null;
+      }
+
+      if (!response.ok) {
+        throw new Error("Documentdetail kon niet worden geladen.");
+      }
+
+      const payload = (await response.json()) as EntityContentResponse;
+      detailCache.set(entityId, payload);
+      return payload;
+    })();
+
+    detailRequests.set(entityId, request);
+
+    try {
+      return await request;
+    } finally {
+      detailRequests.delete(entityId);
+    }
+  }
+
+  async function prefetchDetailContent(entityId: string): Promise<void> {
+    if (detailCache.has(entityId) || detailRequests.has(entityId)) {
+      return;
     }
 
-    const payload = (await response.json()) as EntityContentResponse;
-    detailCache.set(entityId, payload);
-    return payload;
+    try {
+      await loadDetailContent(entityId);
+    } catch {
+      // Ignore prefetch failures; explicit opens should surface real errors.
+    }
+  }
+
+  function prefetchAdjacentDetails(entityId: string): void {
+    const currentIndex = results.findIndex((item) => item.entityId === entityId);
+    if (currentIndex < 0) {
+      return;
+    }
+
+    const previousItem = results[currentIndex - 1];
+    const nextItem = results[currentIndex + 1];
+
+    if (previousItem) {
+      void prefetchDetailContent(previousItem.entityId);
+    }
+
+    if (nextItem) {
+      void prefetchDetailContent(nextItem.entityId);
+      return;
+    }
+
+    if (hasMore && !loadingMore) {
+      const currentLength = results.length;
+      void (async () => {
+        await loadMoreResults();
+        const appendedNextItem = results[currentLength];
+        if (appendedNextItem) {
+          await prefetchDetailContent(appendedNextItem.entityId);
+        }
+      })();
+    }
   }
 
   async function syncDetailText(): Promise<void> {
@@ -280,6 +381,7 @@
     detailMode = "text";
     detailPdfFailed = false;
     document.body.classList.add("body--locked");
+    scrollResultCardIntoView(item.entityId);
 
     if (updateUrl && view !== item.entityId) {
       view = item.entityId;
@@ -292,11 +394,57 @@
     detailContent = content;
     detailLoading = false;
     const hasPdf = Boolean(content?.pdfUrl);
-    detailMode = !content?.markdownText?.trim() && hasPdf ? "pdf" : "text";
+    detailMode = !content?.markdownText?.trim() && hasPdf
+      ? "pdf"
+      : preferredDetailMode === "pdf" && hasPdf
+        ? "pdf"
+        : "text";
+
+    prefetchAdjacentDetails(item.entityId);
 
     if (detailMode === "text") {
       await syncDetailText();
     }
+  }
+
+  async function navigateDetail(direction: -1 | 1): Promise<void> {
+    if (!detailItem) {
+      return;
+    }
+
+    const currentIndex = results.findIndex((item) => item.entityId === detailItem?.entityId);
+    if (currentIndex < 0) {
+      return;
+    }
+
+    const targetIndex = currentIndex + direction;
+    if (targetIndex >= 0 && targetIndex < results.length) {
+      await openDetail(results[targetIndex]);
+      return;
+    }
+
+    if (direction > 0 && hasMore && !loadingMore) {
+      const previousLength = results.length;
+      await loadMoreResults();
+      if (results.length > previousLength) {
+        const nextItem = results[previousLength];
+        if (nextItem) {
+          await openDetail(nextItem);
+        }
+      }
+    }
+  }
+
+  function currentSearchSignature(): string {
+    const { query, organization, entityType, sort, dateFrom, dateTo } = currentRouteState();
+    return JSON.stringify({ query, organization, entityType, sort, dateFrom, dateTo });
+  }
+
+  async function fetchSearchPage(offset: number): Promise<SearchResponse> {
+    const params = routeStateToSearchParams({ ...currentRouteState(), view: "" });
+    params.set("offset", `${offset}`);
+    params.set("limit", `${PAGE_SIZE}`);
+    return await fetchJson<SearchResponse>(`/api/search?${params.toString()}`);
   }
 
   async function runSearch(mode: "push" | "replace" = "push"): Promise<void> {
@@ -305,20 +453,29 @@
 
     if (!hasFilters) {
       results = [];
+      totalCount = null;
+      totalIsApproximate = false;
+      hasMore = false;
+      activeSearchSignature = "";
       closeDetail(false);
       if (mode) writeRouteState(mode);
       return;
     }
 
     loading = true;
+    loadingMore = false;
     if (mode) writeRouteState(mode);
     const requestId = ++searchRequestId;
+    const signature = currentSearchSignature();
+    activeSearchSignature = signature;
 
     try {
-      const params = routeStateToSearchParams({ ...currentRouteState(), view: "" });
-      const payload = await fetchJson<SearchResponse>(`/api/search?${params.toString()}`);
+      const payload = await fetchSearchPage(0);
       if (requestId !== searchRequestId) return;
       results = payload.results ?? [];
+      totalCount = payload.totalCount ?? null;
+      totalIsApproximate = payload.totalIsApproximate ?? false;
+      hasMore = payload.hasMore ?? false;
 
       if (view) {
         const selected = results.find((item) => item.entityId === view);
@@ -333,10 +490,45 @@
     } catch {
       if (requestId === searchRequestId) {
         results = [];
+        totalCount = null;
+        totalIsApproximate = false;
+        hasMore = false;
       }
     } finally {
       if (requestId === searchRequestId) {
         loading = false;
+      }
+    }
+  }
+
+  async function loadMoreResults(): Promise<void> {
+    if (!searched || loading || loadingMore || !hasMore) {
+      return;
+    }
+
+    const signature = currentSearchSignature();
+    if (signature !== activeSearchSignature) {
+      return;
+    }
+
+    loadingMore = true;
+    const requestId = searchRequestId;
+
+    try {
+      const payload = await fetchSearchPage(results.length);
+      if (requestId !== searchRequestId || signature !== activeSearchSignature) {
+        return;
+      }
+
+      const nextResults = payload.results ?? [];
+      const seen = new Set(results.map((item) => item.entityId));
+      results = [...results, ...nextResults.filter((item) => !seen.has(item.entityId))];
+      totalCount = payload.totalCount ?? totalCount;
+      totalIsApproximate = payload.totalIsApproximate ?? totalIsApproximate;
+      hasMore = payload.hasMore ?? false;
+    } finally {
+      if (requestId === searchRequestId) {
+        loadingMore = false;
       }
     }
   }
@@ -400,6 +592,10 @@
     if (!hasActiveSearchFilters() && !view) {
       searched = false;
       results = [];
+      totalCount = null;
+      totalIsApproximate = false;
+      hasMore = false;
+      activeSearchSignature = "";
       closeDetail(false);
       focusQuery();
       return;
@@ -413,15 +609,37 @@
   }
 
   function handleEscape(event: KeyboardEvent): void {
-    if (event.key === "Escape" && detailOpen) {
+    if (!detailOpen) {
+      return;
+    }
+
+    if (event.key === "Escape") {
       closeDetail();
+      return;
+    }
+
+    if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+      event.preventDefault();
+      void navigateDetail(-1);
+      return;
+    }
+
+    if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+      event.preventDefault();
+      void navigateDetail(1);
     }
   }
 
   onMount(async () => {
+    preferredDetailMode = loadPreferredDetailMode();
     await loadSources();
     await syncFromUrl(true);
     document.addEventListener("keydown", handleEscape);
+    loadMoreObserver = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        void loadMoreResults();
+      }
+    }, { rootMargin: "320px 0px" });
     if (!hasActiveSearchFilters() && !view) {
       focusQuery();
     }
@@ -433,7 +651,16 @@
       debounceTimer = undefined;
     }
     document.removeEventListener("keydown", handleEscape);
+    loadMoreObserver?.disconnect();
+    loadMoreObserver = null;
   });
+
+  $: {
+    loadMoreObserver?.disconnect();
+    if (loadMoreObserver && loadMoreSentinelEl && searched && hasMore) {
+      loadMoreObserver.observe(loadMoreSentinelEl);
+    }
+  }
 
   $: if (detailOpen && detailMode === "text" && detailContent) {
     void syncDetailText();
@@ -443,8 +670,13 @@
     ? "Zoek op organisatie of onderwerp"
     : loading
       ? "Zoeken..."
-      : `Resultaten (${results.length})`;
+      : totalIsApproximate && totalCount !== null
+        ? `Resultaten (~${totalCount})`
+        : `Resultaten (${totalCount ?? results.length})`;
   $: selectedSource = sources.find((source) => source.key === organization) ?? null;
+  $: detailIndex = detailItem ? results.findIndex((item) => item.entityId === detailItem.entityId) : -1;
+  $: hasPreviousDetail = detailIndex > 0;
+  $: hasNextDetail = detailIndex >= 0 && (detailIndex < results.length - 1 || hasMore);
   $: detailMarkdownHtml = renderMarkdown(detailContent?.markdownText);
   $: detailPdfUrl = detailContent?.pdfUrl ? pdfViewerUrl(detailContent.pdfUrl) : "";
 </script>
@@ -565,6 +797,7 @@
               <button
                 type="button"
                 class="surface-card surface-card--lift result-card"
+                data-result-id={item.entityId}
                 style={`animation-delay:${index * 70}ms`}
                 on:click={() => void openDetail(item)}
                 on:keydown={(event) => {
@@ -589,6 +822,12 @@
                 {/if}
               </button>
             {/each}
+
+            {#if hasMore}
+              <div bind:this={loadMoreSentinelEl} class="result-list__sentinel" aria-hidden="true">
+                {#if loadingMore}Meer resultaten laden...{/if}
+              </div>
+            {/if}
           {/if}
         </div>
       </section>
@@ -669,35 +908,60 @@
             <span class="pill">{detailItem.organization}</span>
             <span class="pill pill--soft">{detailItem.entityTypeLabel}</span>
             <span class="detail-sheet__date">{detailItem.date}</span>
-
-            {#if detailContent?.pdfUrl}
-              <div class="detail-sheet__view-switch">
-                <button
-                  type="button"
-                  class="detail-sheet__view-toggle"
-                  aria-pressed={detailMode === "text"}
-                  on:click={async () => {
-                    detailMode = "text";
-                    await syncDetailText();
-                  }}
-                >
-                  Tekst
-                </button>
-                <button
-                  type="button"
-                  class="detail-sheet__view-toggle"
-                  aria-pressed={detailMode === "pdf"}
-                  on:click={() => {
-                    detailMode = "pdf";
-                  }}
-                >
-                  PDF
-                </button>
-              </div>
-            {/if}
           </div>
 
           <div class="detail-sheet__header-actions">
+              {#if detailContent?.pdfUrl}
+                <div class="detail-sheet__view-switch">
+                  <button
+                    type="button"
+                    class="detail-sheet__view-toggle"
+                    aria-pressed={detailMode === "text"}
+                    on:click={async () => {
+                      persistPreferredDetailMode("text");
+                      detailMode = "text";
+                      await syncDetailText();
+                    }}
+                  >
+                    Tekst
+                  </button>
+                  <button
+                    type="button"
+                    class="detail-sheet__view-toggle"
+                    aria-pressed={detailMode === "pdf"}
+                    on:click={() => {
+                      persistPreferredDetailMode("pdf");
+                      detailMode = "pdf";
+                    }}
+                  >
+                    PDF
+                  </button>
+                </div>
+              {/if}
+            <div class="detail-sheet__nav">
+              <button
+                type="button"
+                class="ghost-button detail-sheet__nav-button"
+                aria-label="Vorige resultaat"
+                disabled={!hasPreviousDetail}
+                on:click={() => {
+                  void navigateDetail(-1);
+                }}
+              >
+                ←
+              </button>
+              <button
+                type="button"
+                class="ghost-button detail-sheet__nav-button"
+                aria-label="Volgende resultaat"
+                disabled={!hasNextDetail}
+                on:click={() => {
+                  void navigateDetail(1);
+                }}
+              >
+                →
+              </button>
+            </div>
             {#if detailContent?.downloadUrl || detailItem.downloadUrl}
               <a
                 class="primary-button detail-sheet__download"
