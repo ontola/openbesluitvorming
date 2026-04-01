@@ -1,4 +1,5 @@
 :root {
+  color-scheme: light;
   --bg: #f6f8fb;
   --bg-strong: #ffffff;
   --document-surface: #ffffff;
@@ -2086,6 +2087,250 @@ select {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --bg: #050608;
+    --bg-strong: #0d1015;
+    --document-surface: #12161c;
+    --document-surface-muted: rgba(10, 12, 16, 0.92);
+    --line: rgba(114, 163, 232, 0.16);
+    --line-strong: rgba(114, 163, 232, 0.28);
+    --text: #ecf4ff;
+    --muted: #a5b6d1;
+    --accent: #72b7ff;
+    --accent-deep: #9bcbff;
+    --shadow: 0 24px 58px rgba(0, 0, 0, 0.44);
+  }
+
+  html {
+    background:
+      radial-gradient(circle at top left, rgba(114, 183, 255, 0.08), transparent 30%),
+      radial-gradient(circle at top right, rgba(51, 123, 221, 0.08), transparent 24%),
+      linear-gradient(180deg, rgba(7, 8, 10, 0.96), rgba(5, 6, 8, 1)), var(--bg);
+  }
+
+  body {
+    background: transparent;
+  }
+
+  .page-shell--search::before {
+    background: linear-gradient(180deg, rgba(5, 6, 8, 0.78), rgba(5, 6, 8, 0) 24rem), transparent;
+  }
+
+  .hero--search {
+    background: rgba(5, 6, 8, 0.86);
+    box-shadow: 0 16px 32px rgba(0, 0, 0, 0.34);
+  }
+
+  .hero__glow--left {
+    background: radial-gradient(circle, rgba(114, 183, 255, 0.18), transparent 68%);
+  }
+
+  .hero__glow--right {
+    background: radial-gradient(circle, rgba(66, 122, 220, 0.22), transparent 66%);
+  }
+
+  .brand__dark {
+    color: color-mix(in srgb, var(--text) 92%, var(--accent-deep) 8%);
+  }
+
+  .brand__light {
+    color: var(--accent);
+  }
+
+  .search-panel {
+    border-color: rgba(114, 163, 232, 0.18);
+    background: rgba(14, 16, 20, 0.82);
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
+  }
+
+  .search-field,
+  .select-field {
+    border-color: rgba(114, 163, 232, 0.18);
+    background: rgba(18, 21, 27, 0.94);
+  }
+
+  .search-field input,
+  .select-field select {
+    color: var(--text);
+  }
+
+  .search-field input::placeholder {
+    color: color-mix(in srgb, var(--muted) 80%, transparent);
+  }
+
+  .select-field select {
+    background-image:
+      linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+      linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  }
+
+  .select-field--subtle {
+    background: rgba(18, 21, 27, 0.78);
+  }
+
+  .ghost-button {
+    background: rgba(18, 21, 27, 0.86);
+    color: var(--text);
+    border-color: rgba(114, 163, 232, 0.18);
+  }
+
+  .ghost-button--subtle {
+    background: rgba(18, 21, 27, 0.62);
+  }
+
+  .source-picker__results,
+  .admin-source-results {
+    background: rgba(11, 13, 17, 0.98);
+    border-color: rgba(114, 163, 232, 0.18);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.34);
+  }
+
+  .source-picker__option:hover,
+  .source-picker__option:focus-visible,
+  .admin-source-option:hover,
+  .admin-source-option:focus-visible {
+    background: rgba(114, 183, 255, 0.12);
+  }
+
+  .surface-card {
+    background: rgba(14, 16, 20, 0.9);
+    box-shadow: 0 18px 36px rgba(0, 0, 0, 0.28);
+  }
+
+  .surface-card--lift:hover,
+  .surface-card--lift:focus-visible,
+  .admin-run:hover,
+  .admin-run:focus-visible {
+    box-shadow: 0 22px 44px rgba(0, 0, 0, 0.34);
+  }
+
+  .pill--soft {
+    background: rgba(114, 183, 255, 0.1);
+    color: var(--muted);
+  }
+
+  .status-queued {
+    background: rgba(123, 144, 180, 0.18);
+    color: #c0d0ea;
+  }
+
+  .status-running {
+    background: rgba(114, 183, 255, 0.18);
+    color: #b6d8ff;
+  }
+
+  .status-succeeded {
+    background: rgba(46, 177, 111, 0.18);
+    color: #96e7b8;
+  }
+
+  .status-partial {
+    background: rgba(234, 174, 69, 0.22);
+    color: #ffd48d;
+  }
+
+  .status-failed {
+    background: rgba(214, 71, 82, 0.18);
+    color: #ffb0b8;
+  }
+
+  .detail-overlay__backdrop {
+    background: rgba(2, 7, 16, 0.74);
+  }
+
+  .detail-sheet {
+    background: rgba(8, 10, 14, 0.97);
+    border-color: rgba(114, 163, 232, 0.18);
+    box-shadow: 0 26px 58px rgba(0, 0, 0, 0.42);
+  }
+
+  .detail-sheet__view-switch {
+    background: rgba(18, 21, 27, 0.92);
+  }
+
+  .detail-sheet__view-toggle[aria-pressed="true"] {
+    background: rgba(114, 183, 255, 0.14);
+    color: var(--accent-deep);
+  }
+
+  .detail-sheet__meeting-empty {
+    background: rgba(18, 21, 27, 0.74);
+    border-color: rgba(114, 163, 232, 0.2);
+  }
+
+  .meeting-agenda__card {
+    background: rgba(14, 16, 20, 0.9);
+  }
+
+  .meeting-agenda__number {
+    background: rgba(114, 183, 255, 0.12);
+    color: var(--accent-deep);
+  }
+
+  .meeting-agenda__document-main,
+  .meeting-agenda__document-toggle,
+  .meeting-agenda__document-download {
+    background: rgba(18, 21, 27, 0.86);
+    color: var(--text);
+    border-color: rgba(114, 163, 232, 0.16);
+  }
+
+  .meeting-agenda__document-main:hover,
+  .meeting-agenda__document-toggle:hover,
+  .meeting-agenda__document-toggle[aria-expanded="true"],
+  .meeting-agenda__document-download:hover {
+    background: rgba(27, 31, 39, 0.96);
+  }
+
+  .meeting-agenda__document-preview {
+    background: rgba(10, 12, 16, 0.82);
+    border-color: rgba(114, 163, 232, 0.16);
+  }
+
+  .pdf-document__page {
+    background: rgba(14, 16, 20, 0.92);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.28);
+  }
+
+  .pdf-document__page--match {
+    box-shadow:
+      0 0 0 0.35rem rgba(114, 183, 255, 0.14),
+      0 20px 40px rgba(0, 0, 0, 0.28);
+  }
+
+  .detail-sheet__loading-line {
+    background: linear-gradient(
+      90deg,
+      rgba(114, 183, 255, 0.08),
+      rgba(114, 183, 255, 0.2),
+      rgba(114, 183, 255, 0.08)
+    );
+  }
+
+  .detail-sheet__text mark,
+  .pdf-document__text-layer mark {
+    background: rgba(114, 183, 255, 0.28);
+  }
+
+  .prose-detail pre,
+  .admin-issue-details pre {
+    background: rgba(10, 12, 16, 0.94);
+    border-color: rgba(114, 163, 232, 0.18);
+  }
+
+  .prose-detail th,
+  .prose-detail td {
+    border-color: rgba(114, 163, 232, 0.18);
+  }
+
+  .prose-detail blockquote {
+    border-left-color: rgba(114, 183, 255, 0.42);
+    background: rgba(18, 21, 27, 0.48);
+  }
 }
 
 @keyframes rise {
