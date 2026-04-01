@@ -1,6 +1,7 @@
 <script lang="ts">
   import { marked } from "marked";
   import { onDestroy, onMount, tick } from "svelte";
+  import { fade } from "svelte/transition";
   import type {
     AdminSourceOption,
     AdminSourcesResponse,
@@ -367,8 +368,12 @@
     highlightElementText(detailTextEl, query);
     const firstMatch = detailTextEl.querySelector<HTMLElement>("mark");
     if (firstMatch) {
+      detailTextEl.classList.remove("detail-sheet__text--highlighting");
+      void detailTextEl.offsetWidth;
+      detailTextEl.classList.add("detail-sheet__text--highlighting");
       firstMatch.scrollIntoView({ block: "center", behavior: "smooth" });
     } else {
+      detailTextEl.classList.remove("detail-sheet__text--highlighting");
       detailTextEl.scrollTop = 0;
     }
   }
@@ -449,11 +454,10 @@
 
   async function runSearch(mode: "push" | "replace" = "push"): Promise<void> {
     const hasFilters = hasActiveSearchFilters();
-    searched = hasFilters;
 
     if (!hasFilters) {
       results = [];
-      totalCount = null;
+      totalCount = 0;
       totalIsApproximate = false;
       hasMore = false;
       activeSearchSignature = "";
@@ -542,22 +546,24 @@
   }
 
   function onQueryInput(): void {
+    if (!searched) {
+      return;
+    }
+
     if (!query.trim()) {
-      if (!organization && !entityType && !dateFrom && !dateTo) {
-        clearToHome("replace");
-        return;
-      }
       void runSearch("replace");
       return;
     }
+
     scheduleSearch();
   }
 
   function onQuerySearch(): void {
-    if (!query.trim() && !organization && !entityType && !dateFrom && !dateTo) {
-      clearToHome("replace");
+    if (!searched && !hasActiveSearchFilters()) {
       return;
     }
+
+    searched = true;
     void runSearch("replace");
   }
 
@@ -566,6 +572,11 @@
       window.clearTimeout(debounceTimer);
       debounceTimer = undefined;
     }
+
+    if (!searched) {
+      return;
+    }
+
     void runSearch();
   }
 
@@ -618,13 +629,13 @@
       return;
     }
 
-    if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+    if (event.key === "ArrowLeft") {
       event.preventDefault();
       void navigateDetail(-1);
       return;
     }
 
-    if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+    if (event.key === "ArrowRight") {
       event.preventDefault();
       void navigateDetail(1);
     }
@@ -683,110 +694,116 @@
 
 <svelte:window on:popstate={handlePopstate} />
 
-<div class="page-shell">
-  <header class="hero">
+<div class:page-shell--search={searched} class="page-shell">
+  <header class:hero--search={searched} class="hero">
     <div class="hero__glow hero__glow--left"></div>
     <div class="hero__glow hero__glow--right"></div>
-    <p class="hero__admin-link"><a href="/admin.html">Admin</a></p>
-    <h1 class="brand">
-      <a
-        class="brand__link"
-        href="/"
-        on:click|preventDefault={() => clearToHome()}
-      >
-        <span class="brand__dark">Open</span><span class="brand__light">Besluitvorming</span>
-      </a>
-    </h1>
-    <p class="hero__intro">
-      Vind vergaderingen, documenten en besluiten van Nederlandse overheden in een rustige,
-      snelle zoekomgeving.
-    </p>
-    <ul class="hero__meta">
-      <li><strong>5.153.921</strong> vergaderstukken</li>
-      <li><strong>330+</strong> organisaties</li>
-    </ul>
-
-    <form
-      class="search-panel"
-      on:submit|preventDefault={() => {
-        void runSearch();
-      }}
-    >
-      <div class="search-panel__query-row">
-        <label class="search-field search-field--primary">
-          <input
-            bind:this={queryInputEl}
-            bind:value={query}
-            name="query"
-            type="search"
-            placeholder="Zoeken naar moties, agenda's, toezeggingen of besluiten..."
-            autocomplete="off"
-            on:input={onQueryInput}
-            on:search={onQuerySearch}
-          />
-        </label>
-        <button type="submit" class="primary-button search-panel__submit">Doorzoeken</button>
-      </div>
-
-      <div class="search-panel__actions">
-        <button
-          type="button"
-          class="ghost-button ghost-button--subtle search-panel__toggle"
-          aria-expanded={filtersOpen}
-          on:click={() => {
-            filtersOpen = !filtersOpen;
-          }}
-        >
-          {filtersOpen ? "Filters verbergen" : "Filters tonen"}
-        </button>
-      </div>
-
-      {#if filtersOpen}
-        <div class="search-panel__options">
-          <SourcePicker
-            options={sources}
-            bind:value={organization}
-            placeholder="Alle organisaties"
-            valueSelector={(source) => source.key}
-            on:change={onSourceChange}
-          />
-
-          <label class="select-field select-field--subtle select-field--compact">
-            <span class="sr-only">Type resultaat</span>
-            <select bind:value={entityType} name="entityType" on:change={onFilterChange}>
-              <option value="">Alles</option>
-              <option value="Document">Documenten</option>
-              <option value="Meeting">Vergaderingen</option>
-            </select>
-          </label>
-
-          <label class="search-field search-field--subtle search-field--compact">
-            <span class="sr-only">Van datum</span>
-            <input bind:value={dateFrom} name="dateFrom" type="date" on:change={onFilterChange} />
-          </label>
-
-          <label class="search-field search-field--subtle search-field--compact">
-            <span class="sr-only">Tot datum</span>
-            <input bind:value={dateTo} name="dateTo" type="date" on:change={onFilterChange} />
-          </label>
+    <div class="hero__frame">
+      <div class="hero__masthead">
+        <p class="hero__admin-link"><a href="/admin.html">Admin</a></p>
+        <div class="hero__brand-block">
+          <h1 class="brand">
+            <a
+              class="brand__link"
+              href="/"
+              on:click|preventDefault={() => clearToHome()}
+            >
+              <span class="brand__dark">Open</span><span class="brand__light">Besluitvorming</span>
+            </a>
+          </h1>
+          <p class="hero__intro">
+            Vind vergaderingen, documenten en besluiten van Nederlandse overheden in een rustige,
+            snelle zoekomgeving.
+          </p>
+          <ul class="hero__meta">
+            <li><strong>5.153.921</strong> vergaderstukken</li>
+            <li><strong>330+</strong> organisaties</li>
+          </ul>
         </div>
-      {/if}
-    </form>
+      </div>
 
-    {#if searched}
-      <section class="search-results search-results--hero" aria-live="polite">
+      <form
+        class="search-panel"
+        on:submit|preventDefault={() => {
+          void runSearch();
+        }}
+      >
+        <div class="search-panel__query-row">
+          <label class="search-field search-field--primary">
+            <input
+              bind:this={queryInputEl}
+              bind:value={query}
+              name="query"
+              type="search"
+              placeholder="Zoeken naar moties, agenda's, toezeggingen of besluiten..."
+              autocomplete="off"
+              on:input={onQueryInput}
+              on:search={onQuerySearch}
+            />
+          </label>
+          <button
+            type="button"
+            class="ghost-button ghost-button--subtle search-panel__toggle"
+            aria-expanded={filtersOpen}
+            on:click={() => {
+              filtersOpen = !filtersOpen;
+            }}
+          >
+            <span class="search-panel__toggle-icon" aria-hidden="true">⚙</span>
+            <span class="search-panel__toggle-label">Meer instellingen</span>
+          </button>
+        </div>
+
+        {#if filtersOpen}
+          <div class="search-panel__options">
+            <SourcePicker
+              options={sources}
+              bind:value={organization}
+              placeholder="Alle organisaties"
+              valueSelector={(source) => source.key}
+              on:change={onSourceChange}
+            />
+
+            <label class="select-field select-field--subtle select-field--compact">
+              <span class="sr-only">Type resultaat</span>
+              <select bind:value={entityType} name="entityType" on:change={onFilterChange}>
+                <option value="">Alles</option>
+                <option value="Document">Documenten</option>
+                <option value="Meeting">Vergaderingen</option>
+              </select>
+            </label>
+
+            <label class="search-field search-field--subtle search-field--compact">
+              <span class="sr-only">Van datum</span>
+              <input bind:value={dateFrom} name="dateFrom" type="date" on:change={onFilterChange} />
+            </label>
+
+            <label class="search-field search-field--subtle search-field--compact">
+              <span class="sr-only">Tot datum</span>
+              <input bind:value={dateTo} name="dateTo" type="date" on:change={onFilterChange} />
+            </label>
+
+            <label class="select-field select-field--subtle select-field--compact">
+              <span class="sr-only">Sorteren</span>
+              <select bind:value={sort} name="sort" on:change={() => void runSearch("replace")}>
+                <option value="date_desc">Nieuwste eerst</option>
+                <option value="date_asc">Oudste eerst</option>
+                <option value="title_asc">Titel A-Z</option>
+              </select>
+            </label>
+          </div>
+        {/if}
+      </form>
+    </div>
+  </header>
+
+  {#if searched}
+    <main class="content content--search" transition:fade={{ duration: 180 }}>
+      <section class="search-results" aria-live="polite">
         <div class="search-results__heading">
           <div class="search-results__title-group">
             <h2 class="search-results__title">{resultsTitle}</h2>
           </div>
-          <label class="select-field select-field--compact search-results__sort">
-            <span class="sr-only">Sorteren</span>
-            <select bind:value={sort} name="sort" on:change={() => void runSearch("replace")}>
-              <option value="date_desc">Nieuwste eerst</option>
-              <option value="date_asc">Oudste eerst</option>
-              <option value="title_asc">Titel A-Z</option>
-            </select>
-          </label>
         </div>
 
         <div class:result-list--loading={loading} class="result-list" aria-busy={loading}>
@@ -831,11 +848,9 @@
           {/if}
         </div>
       </section>
-    {/if}
-  </header>
-
-  {#if !searched}
-    <main class="content">
+    </main>
+  {:else}
+    <main class="content content--home" transition:fade={{ duration: 220 }}>
       <section class="section section--intro">
         <div class="section__heading">
           <p class="section__label">Waarom dit bestaat</p>
