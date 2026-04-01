@@ -163,6 +163,39 @@ Deno.test("searchMeetings groups page hits back to one document result with matc
   }
 });
 
+Deno.test("searchMeetings avoids phrase queries for multi-word input", async () => {
+  const originalFetch = globalThis.fetch;
+
+  globalThis.fetch = async (_input, init) => {
+    const body = JSON.parse(String((init as { body?: string } | undefined)?.body ?? "{}"));
+    const query = String(body.query ?? "");
+    assert(
+      query.includes('"test" AND "query"'),
+      "multi-word queries should be split into token clauses",
+    );
+    assert(
+      !query.includes('"test query"'),
+      "multi-word queries should not be sent as a phrase query",
+    );
+
+    return new Response(
+      JSON.stringify({
+        num_hits: 0,
+        hits: [],
+      }),
+      {
+        headers: { "content-type": "application/json" },
+      },
+    );
+  };
+
+  try {
+    await searchMeetings({ query: "test query" });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 Deno.test("searchMeetings supports offset paging and signals more results approximately", async () => {
   const originalFetch = globalThis.fetch;
 

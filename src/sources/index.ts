@@ -45,6 +45,12 @@ export function listRunnableSourceRefs(): string[] {
   return listRunnableCatalogSources().map((source) => source.sourceRef);
 }
 
+export function listAggregateRunnableSourceRefs(): string[] {
+  return listRunnableCatalogSources()
+    .filter((source) => source.supplier === "notubiz")
+    .map((source) => source.sourceRef);
+}
+
 export function getSource(sourceKeyOrRef: string): SourceDefinition {
   const catalogSource = sourceKeyOrRef.includes(":")
     ? getCatalogSourceByRef(sourceKeyOrRef)

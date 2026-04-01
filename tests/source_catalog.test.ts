@@ -3,6 +3,7 @@ import {
   listCatalogSources,
   listImplementedCatalogSources,
 } from "../src/sources/catalog.ts";
+import { listAggregateRunnableSourceRefs } from "../src/sources/index.ts";
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) {
@@ -42,5 +43,22 @@ Deno.test("implemented catalog sources are limited to Woozi-supported suppliers 
   assert(
     suppliers.size === 2 && suppliers.has("notubiz") && suppliers.has("ibabs"),
     "only notubiz and ibabs should be marked implemented for now",
+  );
+});
+
+Deno.test("aggregate runnable sources include all implemented notubiz sources", () => {
+  const refs = listAggregateRunnableSourceRefs();
+  const implementedNotubizRefs = listImplementedCatalogSources()
+    .filter((source) => source.supplier === "notubiz")
+    .map((source) => source.sourceRef);
+
+  assert(refs.length > 0, "aggregate import should still have runnable sources");
+  assert(
+    refs.every((ref) => ref.startsWith("notubiz:")),
+    "aggregate import should currently exclude ibabs sources",
+  );
+  assert(
+    JSON.stringify(refs) === JSON.stringify(implementedNotubizRefs),
+    "aggregate import should not silently drop implemented notubiz sources",
   );
 });

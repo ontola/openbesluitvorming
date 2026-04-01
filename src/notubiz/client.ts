@@ -116,6 +116,28 @@ function fallbackDocumentUrl(document: unknown): string | undefined {
 }
 
 export class NotubizClient {
+  private mapOrganizationAttributes(
+    organization: {
+      settings?: {
+        folder?: {
+          fields?: {
+            field?: Array<{
+              "@attributes": { id: string };
+              label: string;
+            }>;
+          };
+        };
+      };
+    },
+  ): NotubizOrganizationAttributes {
+    const fields = organization.settings?.folder?.fields?.field ?? [];
+    const attributes: Record<string, string> = {};
+    for (const field of fields) {
+      attributes[field["@attributes"].id] = field.label;
+    }
+    return { attributes };
+  }
+
   async getOrganizationAttributes(organizationId: number): Promise<NotubizOrganizationAttributes> {
     type OrganizationsResponse = {
       organisations: {
@@ -134,22 +156,41 @@ export class NotubizClient {
         }>;
       };
     };
+    type OrganizationResponse = {
+      organisation: {
+        settings?: {
+          folder?: {
+            fields?: {
+              field?: Array<{
+                "@attributes": { id: string };
+                label: string;
+              }>;
+            };
+          };
+        };
+      };
+    };
 
     const data = await fetchJson<OrganizationsResponse>(buildUrl("organisations"));
     const org = data.organisations.organisation.find(
       (item) => Number(item["@attributes"].id) === organizationId,
     );
 
-    if (!org) {
-      throw new Error(`Organization ${organizationId} not found in /organisations`);
+    if (org) {
+      return this.mapOrganizationAttributes(org);
     }
 
-    const fields = org.settings?.folder?.fields?.field ?? [];
-    const attributes: Record<string, string> = {};
-    for (const field of fields) {
-      attributes[field["@attributes"].id] = field.label;
+    try {
+      const direct = await fetchJson<OrganizationResponse>(
+        buildUrl(`organisations/${organizationId}`),
+      );
+      return this.mapOrganizationAttributes(direct.organisation);
+    } catch {
+      // Some live Notubiz organisations are queryable via their event endpoints while omitted
+      // from the global organisations listing and without folder field metadata. Keep ingesting
+      // those organisations and fall back to generic meeting titles instead of aborting entirely.
+      return { attributes: {} };
     }
-    return { attributes };
   }
 
   async listEvents(

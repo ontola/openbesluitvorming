@@ -5,9 +5,9 @@ import type {
   EntityContentResponse,
   SearchResponse,
 } from "../src/types.ts";
-import { startIngest } from "../src/ingest.ts";
+import { resumeQueuedIngests, startIngest } from "../src/ingest.ts";
 import { getRunDetails, getRunSummary, listRuns, reconcileInterruptedRuns } from "../src/ops/store.ts";
-import { listAdminSourceOptions, listRunnableSourceRefs } from "../src/sources/index.ts";
+import { listAdminSourceOptions, listAggregateRunnableSourceRefs } from "../src/sources/index.ts";
 import { getEntityContent, searchMeetings } from "./search_api.ts";
 
 const root = new URL("./", import.meta.url);
@@ -18,6 +18,12 @@ const reconciledRuns = await reconcileInterruptedRuns();
 if (reconciledRuns.length > 0) {
   console.warn(
     `Reconciled ${reconciledRuns.length} interrupted import${reconciledRuns.length === 1 ? "" : "s"} on startup.`,
+  );
+}
+const resumedRuns = await resumeQueuedIngests();
+if (resumedRuns.length > 0) {
+  console.warn(
+    `Resumed ${resumedRuns.length} queued import${resumedRuns.length === 1 ? "" : "s"} on startup.`,
   );
 }
 
@@ -142,7 +148,9 @@ Deno.serve({ port }, async (request) => {
           { status: 400 },
         );
       }
-      const sourceRefs = sourceSelector === "__all__" ? listRunnableSourceRefs() : [sourceSelector];
+      const sourceRefs = sourceSelector === "__all__"
+        ? listAggregateRunnableSourceRefs()
+        : [sourceSelector];
       const runs = await Promise.all(
         sourceRefs.map((sourceRef) =>
           startIngest(sourceRef, payload.dateFrom, payload.dateTo, {

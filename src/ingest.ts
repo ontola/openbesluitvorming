@@ -1,7 +1,14 @@
 import { buildEntityCommitEvent } from "./events/entity_commit.ts";
 import { IbabsMeetingExtractor } from "./ibabs/extractor.ts";
 import { NotubizMeetingExtractor } from "./notubiz/extractor.ts";
-import { updateRun, appendRunIssue, createRun, findActiveRun, getRunDetails } from "./ops/store.ts";
+import {
+  appendRunIssue,
+  createRun,
+  findActiveRun,
+  getRunIssueCount,
+  listQueuedRuns,
+  updateRun,
+} from "./ops/store.ts";
 import { QuickwitClient } from "./quickwit/client.ts";
 import { currentDerivationVersion, currentProjectionVersion } from "./pipeline/versioning.ts";
 import { getSource } from "./sources/index.ts";
@@ -29,6 +36,13 @@ type QueuedIngestJob = {
 
 const pendingJobs: QueuedIngestJob[] = [];
 let activeIngestCount = 0;
+
+function enqueueJob(job: QueuedIngestJob): void {
+  if (pendingJobs.some((candidate) => candidate.run.id === job.run.id)) {
+    return;
+  }
+  pendingJobs.push(job);
+}
 
 function getExtractor(source: SourceDefinition): NotubizMeetingExtractor | IbabsMeetingExtractor {
   if (source.supplier === "notubiz") {
@@ -127,12 +141,12 @@ async function executeIngest(
       step: "ingest_quickwit",
       message,
     });
-    const details = await getRunDetails(run.id);
+    const issueCount = await getRunIssueCount(run.id);
     const updated = await updateRun(run.id, {
       status: "failed",
       finished_at: new Date().toISOString(),
       error_message: message,
-      issue_count: details?.issues.length ?? 1,
+      issue_count: issueCount || 1,
     });
     throw new Error(`Run ${updated.id} failed: ${message}`);
   }
@@ -244,7 +258,7 @@ export async function startIngest(
     derivation_version: currentDerivationVersion(),
   });
 
-  pendingJobs.push({
+  enqueueJob({
     run,
     sourceKey,
     dateFrom,
@@ -254,4 +268,24 @@ export async function startIngest(
   void drainIngestQueue();
 
   return run;
+}
+
+export async function resumeQueuedIngests(): Promise<IngestRunRecord[]> {
+  const runs = await listQueuedRuns();
+  for (const run of runs) {
+    enqueueJob({
+      run,
+      sourceKey: run.source_key,
+      dateFrom: run.date_from,
+      dateTo: run.date_to,
+      options: {
+        ingestToQuickwit: true,
+        trigger: run.trigger,
+        executionMode: run.execution_mode,
+        parentRunId: run.parent_run_id,
+      },
+    });
+  }
+  void drainIngestQueue();
+  return runs;
 }

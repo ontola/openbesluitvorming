@@ -326,6 +326,8 @@ ADMIN_PASSWORD_HASH=$$2a$$14$$exampleexampleexampleexampleexampleexampleexamplee
 - default ingest concurrency is `1`, which is the intended safe production setting for now
 - large aggregate imports should therefore mostly appear as many `queued` runs and one `running` run
 - admin now has a queue/status summary backed by `/api/admin/summary`
+- startup now reconciles only previously `running` imports as interrupted and resumes `queued` imports
+- aggregate `__all__` imports are currently restricted to verified Notubiz sources and exclude known stale Notubiz org mappings
 - browser-side fetch helpers now handle empty/non-JSON 500 responses more safely
 
 ## Keep Updated When These Change

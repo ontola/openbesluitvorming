@@ -93,6 +93,14 @@ export interface RunDetails {
 
 type RunRow = IngestRunRecord;
 
+export async function getRunIssueCount(runId: string): Promise<number> {
+  const db = await getDatabase();
+  const row = db.prepare("SELECT COUNT(*) as count FROM ingest_run_issue WHERE run_id = ?").get(runId) as
+    | { count?: number }
+    | undefined;
+  return row?.count ?? 0;
+}
+
 function normalizeTrigger(trigger: string): IngestRunTrigger {
   if (trigger === "scheduled" || trigger === "user" || trigger === "manual" || trigger === "api") {
     return trigger;
@@ -319,7 +327,7 @@ export async function reconcileInterruptedRuns(): Promise<IngestRunRecord[]> {
         started_at, finished_at, meeting_count, document_count, cache_hits, downloaded_count,
         issue_count, quickwit_index_id, error_message
        FROM ingest_run
-       WHERE status IN ('queued', 'running')
+       WHERE status = 'running'
        ORDER BY started_at ASC`,
     )
     .all() as RunRow[];
@@ -334,7 +342,12 @@ export async function reconcileInterruptedRuns(): Promise<IngestRunRecord[]> {
     `UPDATE ingest_run SET
       status = 'failed',
       finished_at = @finished_at,
-      error_message = COALESCE(error_message, @error_message)
+      error_message = COALESCE(error_message, @error_message),
+      issue_count = (
+        SELECT COUNT(*)
+        FROM ingest_run_issue
+        WHERE run_id = @id
+      ) + 1
     WHERE id = @id`,
   );
   const insertIssueStatement = db.prepare(
@@ -375,9 +388,26 @@ export async function reconcileInterruptedRuns(): Promise<IngestRunRecord[]> {
       ...run,
       status: "failed",
       finished_at: finishedAt,
+      issue_count: run.issue_count + 1,
       error_message: run.error_message ?? message,
     })
   );
+}
+
+export async function listQueuedRuns(): Promise<IngestRunRecord[]> {
+  const db = await getDatabase();
+  return (
+    db.prepare(
+      `SELECT
+        id, source_key, supplier, date_from, date_to, trigger_mode as trigger,
+        execution_mode, parent_run_id, projection_version, derivation_version, status,
+        started_at, finished_at, meeting_count, document_count, cache_hits, downloaded_count,
+        issue_count, quickwit_index_id, error_message
+       FROM ingest_run
+       WHERE status = 'queued'
+       ORDER BY started_at ASC`,
+    ).all() as IngestRunRecord[]
+  ).map(normalizeRunRecord);
 }
 
 export async function listRuns(

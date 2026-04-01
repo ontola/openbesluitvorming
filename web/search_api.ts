@@ -69,6 +69,17 @@ function escapeTerm(term: string): string {
   return `"${term.replaceAll('"', '\\"')}"`;
 }
 
+function buildSearchClause(text: string): string {
+  const tokens = text.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) {
+    return "";
+  }
+  if (tokens.length === 1) {
+    return escapeTerm(tokens[0]);
+  }
+  return `(${tokens.map(escapeTerm).join(" AND ")})`;
+}
+
 function expandDutchGovernanceTerms(query: string): string[] {
   const normalized = query.trim().toLowerCase();
   if (!normalized) {
@@ -118,9 +129,9 @@ function buildQuickwitQuery(query: string, organization: string, entityType: str
   if (query) {
     const expandedTerms = expandDutchGovernanceTerms(query);
     if (expandedTerms.length === 1) {
-      parts.push(escapeTerm(expandedTerms[0]));
+      parts.push(buildSearchClause(expandedTerms[0]));
     } else {
-      parts.push(`(${expandedTerms.map(escapeTerm).join(" OR ")})`);
+      parts.push(`(${expandedTerms.map(buildSearchClause).filter(Boolean).join(" OR ")})`);
     }
   }
 

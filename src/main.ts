@@ -1,4 +1,4 @@
-import { runIngest } from "./ingest.ts";
+import { resumeQueuedIngests, runIngest } from "./ingest.ts";
 import { reconcileInterruptedRuns } from "./ops/store.ts";
 
 if (import.meta.main) {
@@ -6,6 +6,12 @@ if (import.meta.main) {
   if (reconciledRuns.length > 0) {
     console.warn(
       `Reconciled ${reconciledRuns.length} interrupted import${reconciledRuns.length === 1 ? "" : "s"} on startup.`,
+    );
+  }
+  const resumedRuns = await resumeQueuedIngests();
+  if (resumedRuns.length > 0) {
+    console.warn(
+      `Resumed ${resumedRuns.length} queued import${resumedRuns.length === 1 ? "" : "s"} on startup.`,
     );
   }
 
