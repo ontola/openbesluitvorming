@@ -258,6 +258,7 @@ docker compose -f docker-compose.production.yml up -d --build
 Required `.env` values for that production compose file:
 
 - `DOMAIN`
+- `ADMIN_PASSWORD_HASH`
 - `S3_ACCESS_KEY`
 - `S3_SECRET_KEY`
 - `S3_STORAGE_BUCKET_NAME`
@@ -269,6 +270,27 @@ First DNS step:
 - point the domain `A` record at the server IP
 - DNS for this setup is managed in Netlify
 - wait for DNS to resolve before bringing up Caddy for the first time
+
+## Admin Protection
+
+The current recommended protection for the admin UI is:
+
+- Caddy HTTP Basic Auth
+- only on `/admin`, `/admin.html`, and `/api/admin/*`
+
+Public search/document routes remain open.
+
+Required env:
+
+- `ADMIN_PASSWORD_HASH`
+
+That value should be a Caddy password hash, not a plaintext password.
+
+Example generation:
+
+```sh
+docker run --rm caddy:2 caddy hash-password --plaintext 'your-strong-password'
+```
 
 ## Known Operational Notes
 

@@ -3,6 +3,8 @@ services:
     image: caddy:2
     depends_on:
       - openbesluitvorming
+    environment:
+      DOMAIN: ${DOMAIN}
     ports:
       - "80:80"
       - "443:443"

@@ -1,4 +1,12 @@
 {$DOMAIN} {
+  @admin {
+    path /admin /admin.html /api/admin/*
+  }
+
+  basicauth @admin {
+    admin {$ADMIN_PASSWORD_HASH}
+  }
+
   encode gzip zstd
 
   reverse_proxy openbesluitvorming:8787

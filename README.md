@@ -102,6 +102,7 @@ with external S3-compatible object storage from `.env`.
 Required production env includes:
 
 - `DOMAIN`
+- `ADMIN_PASSWORD_HASH`
 - `S3_ACCESS_KEY`
 - `S3_SECRET_KEY`
 - `S3_STORAGE_BUCKET_NAME`
