@@ -1,4 +1,5 @@
 import type { DocumentEntity, EntityCommitEvent, MeetingEntity, WooziEntity } from "../types.ts";
+import { currentProjectionVersion } from "../pipeline/versioning.ts";
 
 export interface QuickwitSearchDocument {
   time: string;
@@ -24,6 +25,9 @@ export interface QuickwitSearchDocument {
   organization?: string;
   committee?: string;
   content?: string;
+  parent_entity_id?: string;
+  page_number?: number;
+  projection_version: string;
   payload: unknown;
 }
 
@@ -36,11 +40,12 @@ function projectMeetingContent(payload?: MeetingEntity): string | undefined {
 }
 
 function projectDocumentContent(payload?: DocumentEntity): string | undefined {
+  const hasPageChunks = Boolean(payload?.page_chunks && payload.page_chunks.length > 0);
   const content = [
     payload?.name,
     ...(payload?.classification ?? []),
     payload?.file_name,
-    ...(payload?.md_text ?? []),
+    ...(hasPageChunks ? [] : (payload?.md_text ?? [])),
   ]
     .filter(Boolean)
     .join(" ");
@@ -66,6 +71,7 @@ function compactPayload(payload?: WooziEntity): unknown {
       organization: payload.organization,
       derived_content: payload.derived_content,
       media_urls: payload.media_urls,
+      md_text: payload.md_text,
     };
   }
 
@@ -86,14 +92,49 @@ function compactPayload(payload?: WooziEntity): unknown {
   };
 }
 
-export function projectEntityCommitToQuickwitDocument(
+function projectDocumentPageDocuments(
   event: EntityCommitEvent<WooziEntity>,
-): QuickwitSearchDocument {
+  payload: DocumentEntity,
+): QuickwitSearchDocument[] {
+  const projectionVersion = currentProjectionVersion();
+  return (payload.page_chunks ?? []).map((page) => ({
+    time: event.time,
+    event_id: `${event.id}#page=${page.page_number}`,
+    event_type: event.type,
+    source: event.source,
+    subject: `${event.subject}#page=${page.page_number}`,
+    entity_id: `${event.data.entity_id}#page=${page.page_number}`,
+    entity_type: "DocumentPage",
+    commit_id: event.data.commit_id,
+    op: event.data.op,
+    mode: event.data.mode,
+    schema_name: event.data.schema_name,
+    schema_version: event.data.schema_version,
+    content_hash: event.data.content_hash,
+    supplier: event.data.source.supplier,
+    source_key: event.data.source.source,
+    name: payload.name,
+    classification: payload.classification,
+    file_name: payload.file_name,
+    start_date: payload.last_discussed_at,
+    organization: payload.organization,
+    content: page.markdown,
+    parent_entity_id: event.data.entity_id,
+    page_number: page.page_number,
+    projection_version: projectionVersion,
+    payload: compactPayload(payload),
+  }));
+}
+
+export function projectEntityCommitToQuickwitDocuments(
+  event: EntityCommitEvent<WooziEntity>,
+): QuickwitSearchDocument[] {
   const payload = event.data.payload;
+  const projectionVersion = currentProjectionVersion();
   const content =
     payload?.type === "Document" ? projectDocumentContent(payload) : projectMeetingContent(payload);
 
-  return {
+  const primaryDocument: QuickwitSearchDocument = {
     time: event.time,
     event_id: event.id,
     event_type: event.type,
@@ -117,6 +158,13 @@ export function projectEntityCommitToQuickwitDocument(
     organization: payload?.organization,
     committee: payload?.type === "Meeting" ? payload.committee : undefined,
     content,
+    projection_version: projectionVersion,
     payload: compactPayload(payload),
   };
+
+  if (payload?.type === "Document" && payload.page_chunks?.length) {
+    return [primaryDocument, ...projectDocumentPageDocuments(event, payload)];
+  }
+
+  return [primaryDocument];
 }

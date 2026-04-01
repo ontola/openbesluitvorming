@@ -1,6 +1,11 @@
 import { DatabaseSync } from "node:sqlite";
 import { getConfigValue } from "../config.ts";
-import type { ExtractionIssue, IngestRunRecord, IngestRunTrigger } from "../types.ts";
+import type {
+  ExtractionIssue,
+  IngestExecutionMode,
+  IngestRunRecord,
+  IngestRunTrigger,
+} from "../types.ts";
 
 let databasePromise: Promise<DatabaseSync> | null = null;
 
@@ -22,6 +27,10 @@ async function getDatabase(): Promise<DatabaseSync> {
           date_from TEXT NOT NULL,
           date_to TEXT NOT NULL,
           trigger_mode TEXT NOT NULL,
+          execution_mode TEXT NOT NULL DEFAULT 'full',
+          parent_run_id TEXT,
+          projection_version TEXT,
+          derivation_version TEXT,
           status TEXT NOT NULL,
           started_at TEXT NOT NULL,
           finished_at TEXT,
@@ -49,6 +58,26 @@ async function getDatabase(): Promise<DatabaseSync> {
       } catch {
         // Column already exists on initialized databases.
       }
+      try {
+        db.exec("ALTER TABLE ingest_run ADD COLUMN execution_mode TEXT NOT NULL DEFAULT 'full'");
+      } catch {
+        // Column already exists on initialized databases.
+      }
+      try {
+        db.exec("ALTER TABLE ingest_run ADD COLUMN parent_run_id TEXT");
+      } catch {
+        // Column already exists on initialized databases.
+      }
+      try {
+        db.exec("ALTER TABLE ingest_run ADD COLUMN projection_version TEXT");
+      } catch {
+        // Column already exists on initialized databases.
+      }
+      try {
+        db.exec("ALTER TABLE ingest_run ADD COLUMN derivation_version TEXT");
+      } catch {
+        // Column already exists on initialized databases.
+      }
       return db;
     })();
   }
@@ -69,10 +98,71 @@ function normalizeTrigger(trigger: string): IngestRunTrigger {
   return "user";
 }
 
+function normalizeExecutionMode(mode: string): IngestExecutionMode {
+  if (
+    mode === "full" ||
+    mode === "rederive_cached" ||
+    mode === "reindex_only" ||
+    mode === "retry_failed_documents"
+  ) {
+    return mode;
+  }
+
+  return "full";
+}
+
 function normalizeRunRecord(record: IngestRunRecord): IngestRunRecord {
   return {
     ...record,
     trigger: normalizeTrigger(record.trigger),
+    execution_mode: normalizeExecutionMode(record.execution_mode),
+  };
+}
+
+function sqliteCreateRunParams(record: IngestRunRecord): Record<string, string | number | null> {
+  return {
+    id: record.id,
+    source_key: record.source_key,
+    supplier: record.supplier,
+    date_from: record.date_from,
+    date_to: record.date_to,
+    trigger: record.trigger,
+    status: record.status,
+    started_at: record.started_at,
+    execution_mode: record.execution_mode,
+    parent_run_id: record.parent_run_id ?? null,
+    projection_version: record.projection_version ?? null,
+    derivation_version: record.derivation_version ?? null,
+    meeting_count: record.meeting_count,
+    document_count: record.document_count,
+    cache_hits: record.cache_hits,
+    downloaded_count: record.downloaded_count,
+    issue_count: record.issue_count,
+  };
+}
+
+function sqliteUpdateRunParams(record: IngestRunRecord): Record<string, string | number | null> {
+  return {
+    id: record.id,
+    source_key: record.source_key,
+    supplier: record.supplier,
+    date_from: record.date_from,
+    date_to: record.date_to,
+    trigger: record.trigger,
+    execution_mode: record.execution_mode,
+    parent_run_id: record.parent_run_id ?? null,
+    projection_version: record.projection_version ?? null,
+    derivation_version: record.derivation_version ?? null,
+    status: record.status,
+    started_at: record.started_at,
+    finished_at: record.finished_at ?? null,
+    meeting_count: record.meeting_count,
+    document_count: record.document_count,
+    cache_hits: record.cache_hits,
+    downloaded_count: record.downloaded_count,
+    issue_count: record.issue_count,
+    quickwit_index_id: record.quickwit_index_id ?? null,
+    error_message: record.error_message ?? null,
   };
 }
 
@@ -97,6 +187,10 @@ export async function createRun(
     date_from: run.date_from,
     date_to: run.date_to,
     trigger: run.trigger,
+    execution_mode: run.execution_mode,
+    parent_run_id: run.parent_run_id,
+    projection_version: run.projection_version,
+    derivation_version: run.derivation_version,
     status: "running",
     started_at: new Date().toISOString(),
     meeting_count: 0,
@@ -109,12 +203,14 @@ export async function createRun(
   db.prepare(
     `INSERT INTO ingest_run (
       id, source_key, supplier, date_from, date_to, trigger_mode, status, started_at,
+      execution_mode, parent_run_id, projection_version, derivation_version,
       meeting_count, document_count, cache_hits, downloaded_count, issue_count
     ) VALUES (
       @id, @source_key, @supplier, @date_from, @date_to, @trigger, @status, @started_at,
+      @execution_mode, @parent_run_id, @projection_version, @derivation_version,
       @meeting_count, @document_count, @cache_hits, @downloaded_count, @issue_count
     )`,
-  ).run(record);
+  ).run(sqliteCreateRunParams(record));
 
   return normalizeRunRecord(record);
 }
@@ -141,6 +237,10 @@ export async function updateRun(
       date_from=@date_from,
       date_to=@date_to,
       trigger_mode=@trigger,
+      execution_mode=@execution_mode,
+      parent_run_id=@parent_run_id,
+      projection_version=@projection_version,
+      derivation_version=@derivation_version,
       status=@status,
       started_at=@started_at,
       finished_at=@finished_at,
@@ -152,7 +252,7 @@ export async function updateRun(
       quickwit_index_id=@quickwit_index_id,
       error_message=@error_message
     WHERE id=@id`,
-  ).run(updated);
+  ).run(sqliteUpdateRunParams(updated));
 
   return normalizeRunRecord(updated);
 }
@@ -165,7 +265,11 @@ export async function appendRunIssue(runId: string, issue: ExtractionIssue): Pro
   ).run({
     id: crypto.randomUUID(),
     run_id: runId,
-    ...issue,
+    severity: issue.severity,
+    step: issue.step,
+    entity_id: issue.entity_id ?? null,
+    message: issue.message,
+    details: issue.details ?? null,
   });
 }
 
@@ -195,7 +299,8 @@ export async function listRuns(
     db
       .prepare(
         `SELECT
-        id, source_key, supplier, date_from, date_to, trigger_mode as trigger, status,
+        id, source_key, supplier, date_from, date_to, trigger_mode as trigger,
+        execution_mode, parent_run_id, projection_version, derivation_version, status,
         started_at, finished_at, meeting_count, document_count, cache_hits, downloaded_count,
         issue_count, quickwit_index_id, error_message
        FROM ingest_run
@@ -212,7 +317,8 @@ export async function getRunDetails(runId: string): Promise<RunDetails | null> {
   const run = db
     .prepare(
       `SELECT
-        id, source_key, supplier, date_from, date_to, trigger_mode as trigger, status,
+        id, source_key, supplier, date_from, date_to, trigger_mode as trigger,
+        execution_mode, parent_run_id, projection_version, derivation_version, status,
         started_at, finished_at, meeting_count, document_count, cache_hits, downloaded_count,
         issue_count, quickwit_index_id, error_message
        FROM ingest_run

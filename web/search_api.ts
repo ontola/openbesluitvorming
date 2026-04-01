@@ -1,4 +1,5 @@
 import type { EntityContentResponse, SearchResponse, SearchResult } from "../src/types.ts";
+import { currentProjectionVersion } from "../src/pipeline/versioning.ts";
 import { QuickwitClient } from "../src/quickwit/client.ts";
 import { listSources } from "../src/sources/index.ts";
 import { ObjectStorageClient } from "../src/storage/s3.ts";
@@ -7,6 +8,9 @@ type SearchHit = {
   time?: string;
   entity_id?: string;
   entity_type?: string;
+  parent_entity_id?: string;
+  page_number?: number;
+  projection_version?: string;
   name?: string;
   organization?: string;
   start_date?: string;
@@ -23,6 +27,7 @@ type SearchHit = {
     }>;
     derived_content?: {
       markdown_key?: string;
+      page_count?: number;
     };
     md_text?: string[];
   };
@@ -92,10 +97,16 @@ function expandDutchGovernanceTerms(query: string): string[] {
 
 function buildQuickwitQuery(query: string, organization: string, entityType: string): string {
   const typeQuery =
-    entityType === "Meeting" || entityType === "Document"
-      ? `entity_type:${entityType}`
-      : "(entity_type:Meeting OR entity_type:Document)";
-  const parts = [typeQuery];
+    entityType === "Meeting"
+      ? "entity_type:Meeting"
+      : entityType === "Document"
+        ? query
+          ? "(entity_type:Document OR entity_type:DocumentPage)"
+          : "entity_type:Document"
+        : query
+          ? "(entity_type:Meeting OR entity_type:Document OR entity_type:DocumentPage)"
+          : "(entity_type:Meeting OR entity_type:Document)";
+  const parts = [`projection_version:${escapeTerm(currentProjectionVersion())}`, typeQuery];
 
   if (organization) {
     parts.push(`source_key:${organization}`);
@@ -267,6 +278,56 @@ function dedupeLatestIndexedHits(items: IndexedHit[]): IndexedHit[] {
   return [...byEntityId.values()];
 }
 
+function searchResultEntityId(hit: SearchHit): string {
+  return hit.entity_type === "DocumentPage"
+    ? (hit.parent_entity_id ?? hit.entity_id ?? "")
+    : (hit.entity_id ?? "");
+}
+
+function searchResultEntityType(hit: SearchHit): string {
+  return hit.entity_type === "DocumentPage" ? "Document" : (hit.entity_type ?? "Unknown");
+}
+
+function preferIndexedHit(existing: IndexedHit | undefined, candidate: IndexedHit): boolean {
+  if (!existing) {
+    return true;
+  }
+
+  const recency = compareRecency(existing.hit.time, candidate.hit.time);
+  if (recency !== 0) {
+    return recency > 0;
+  }
+
+  const existingHasSnippet = Boolean(existing.snippet?.content?.[0] ?? existing.snippet?.name?.[0]);
+  const candidateHasSnippet = Boolean(
+    candidate.snippet?.content?.[0] ?? candidate.snippet?.name?.[0],
+  );
+  if (existingHasSnippet !== candidateHasSnippet) {
+    return candidateHasSnippet;
+  }
+
+  const existingPage = existing.hit.page_number ?? Number.MAX_SAFE_INTEGER;
+  const candidatePage = candidate.hit.page_number ?? Number.MAX_SAFE_INTEGER;
+  return candidatePage < existingPage;
+}
+
+function groupIndexedHits(items: IndexedHit[]): IndexedHit[] {
+  const grouped = new Map<string, IndexedHit>();
+
+  for (const item of items) {
+    const key = searchResultEntityId(item.hit);
+    if (!key) {
+      continue;
+    }
+
+    if (preferIndexedHit(grouped.get(key), item)) {
+      grouped.set(key, item);
+    }
+  }
+
+  return [...grouped.values()];
+}
+
 export async function searchMeetings(
   options: {
     query?: string;
@@ -301,21 +362,22 @@ export async function searchMeetings(
     hit,
     snippet: response.snippets?.[index] as SearchSnippet | undefined,
   }));
-  const dedupedHits = dedupeLatestIndexedHits(indexedHits);
+  const dedupedHits = groupIndexedHits(dedupeLatestIndexedHits(indexedHits));
 
   const results = dedupedHits.map(({ hit: document, snippet: snippets }) => {
     const snippetHtml = sanitizeSnippet(snippets?.content?.[0] ?? snippets?.name?.[0]);
+    const normalizedEntityType = searchResultEntityType(document);
 
     return {
-      entityId: document.entity_id ?? "",
+      entityId: searchResultEntityId(document),
       organization: displayOrganization(document),
-      entityType: document.entity_type ?? "Unknown",
-      entityTypeLabel: entityTypeLabel(document.entity_type),
+      entityType: normalizedEntityType,
+      entityTypeLabel: entityTypeLabel(normalizedEntityType),
       date: formatDate(document.start_date),
       sortDate: document.start_date,
       title:
         document.name ??
-        (document.entity_type === "Document"
+        (normalizedEntityType === "Document"
           ? (document.file_name ?? "Ongetiteld document")
           : "Ongetitelde vergadering"),
       summary: snippetHtml
@@ -323,6 +385,8 @@ export async function searchMeetings(
         : summarizeContent(document.content),
       summaryHtml: snippetHtml,
       downloadUrl: document.payload?.media_urls?.[0]?.url ?? document.payload?.original_url,
+      matchedPage: document.entity_type === "DocumentPage" ? document.page_number : undefined,
+      pageCount: document.payload?.derived_content?.page_count,
     };
   });
 
@@ -341,7 +405,10 @@ export async function searchMeetings(
 
 export async function getEntityContent(entityId: string): Promise<EntityContentResponse | null> {
   const quickwit = new QuickwitClient();
-  const response = await quickwit.search(`entity_id:${escapeTerm(entityId)}`, 8);
+  const response = await quickwit.search(
+    `projection_version:${escapeTerm(currentProjectionVersion())} AND entity_id:${escapeTerm(entityId)}`,
+    8,
+  );
   const hit = dedupeLatestHits(response.hits as SearchHit[])[0];
 
   if (!hit) {

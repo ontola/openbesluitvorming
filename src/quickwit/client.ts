@@ -1,4 +1,4 @@
-import { projectEntityCommitToQuickwitDocument } from "./project.ts";
+import { projectEntityCommitToQuickwitDocuments } from "./project.ts";
 import type { EntityCommitEvent, WooziEntity } from "../types.ts";
 
 const DEFAULT_INDEX_ID = "woozi-events";
@@ -95,7 +95,7 @@ export class QuickwitClient {
   }
 
   async ingestEvents(events: Array<EntityCommitEvent<WooziEntity>>): Promise<void> {
-    const documents = events.map(projectEntityCommitToQuickwitDocument);
+    const documents = events.flatMap(projectEntityCommitToQuickwitDocuments);
     const bodies: string[] = [];
     let currentLines: string[] = [];
     let currentBytes = 0;

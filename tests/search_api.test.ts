@@ -89,6 +89,80 @@ Deno.test("searchMeetings dedupes to the latest hit and keeps the newest snippet
   }
 });
 
+Deno.test("searchMeetings groups page hits back to one document result with matched page", async () => {
+  const originalFetch = globalThis.fetch;
+
+  globalThis.fetch = async (_input, init) => {
+    const body = JSON.parse(String((init as { body?: string } | undefined)?.body ?? "{}"));
+    assert(
+      String(body.query).includes("DocumentPage"),
+      "document queries with text should include page chunk records",
+    );
+
+    return new Response(
+      JSON.stringify({
+        num_hits: 2,
+        hits: [
+          {
+            time: "2026-03-31T11:00:00Z",
+            entity_id: "document:notubiz:gemeente:haarlem:42#page=84",
+            parent_entity_id: "document:notubiz:gemeente:haarlem:42",
+            page_number: 84,
+            entity_type: "DocumentPage",
+            name: "Grondprijsbrief 2025",
+            start_date: "2025-01-14T17:00:00Z",
+            source_key: "haarlem",
+            content: "Pagina 84 inhoud",
+            payload: {
+              original_url: "https://example.test/original.pdf",
+            },
+          },
+          {
+            time: "2026-03-31T11:00:00Z",
+            entity_id: "document:notubiz:gemeente:haarlem:42#page=85",
+            parent_entity_id: "document:notubiz:gemeente:haarlem:42",
+            page_number: 85,
+            entity_type: "DocumentPage",
+            name: "Grondprijsbrief 2025",
+            start_date: "2025-01-14T17:00:00Z",
+            source_key: "haarlem",
+            content: "Pagina 85 inhoud",
+          },
+        ],
+        snippets: [
+          { content: ["beste <b>raad</b> snippet"] },
+          { content: ["zwakkere <b>raad</b> snippet"] },
+        ],
+      }),
+      {
+        headers: { "content-type": "application/json" },
+      },
+    );
+  };
+
+  try {
+    const response = await searchMeetings({ query: "raad", entityType: "Document" });
+    assert(
+      response.results.length === 1,
+      "page hits for the same document should group to one result",
+    );
+    assert(
+      response.results[0].entityId === "document:notubiz:gemeente:haarlem:42",
+      "grouped result should point at the parent document id",
+    );
+    assert(
+      response.results[0].matchedPage === 84,
+      "best matching page should be preserved for viewer navigation",
+    );
+    assert(
+      response.results[0].summaryHtml?.includes("beste <b>raad</b> snippet"),
+      "grouped result should keep the best snippet from the chosen page hit",
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 Deno.test("searchMeetings supports offset paging and signals more results approximately", async () => {
   const originalFetch = globalThis.fetch;
 

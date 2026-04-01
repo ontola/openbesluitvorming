@@ -3,8 +3,14 @@ import { IbabsMeetingExtractor } from "./ibabs/extractor.ts";
 import { NotubizMeetingExtractor } from "./notubiz/extractor.ts";
 import { updateRun, appendRunIssue, createRun, getRunDetails } from "./ops/store.ts";
 import { QuickwitClient } from "./quickwit/client.ts";
+import { currentDerivationVersion, currentProjectionVersion } from "./pipeline/versioning.ts";
 import { getSource } from "./sources/index.ts";
-import type { IngestRunRecord, IngestRunTrigger, SourceDefinition } from "./types.ts";
+import type {
+  IngestExecutionMode,
+  IngestRunRecord,
+  IngestRunTrigger,
+  SourceDefinition,
+} from "./types.ts";
 
 function getExtractor(source: SourceDefinition): NotubizMeetingExtractor | IbabsMeetingExtractor {
   if (source.supplier === "notubiz") {
@@ -22,16 +28,26 @@ async function executeIngest(
   options: {
     ingestToQuickwit?: boolean;
     trigger?: IngestRunTrigger;
+    executionMode?: IngestExecutionMode;
+    parentRunId?: string;
   } = {},
 ): Promise<{
   run: IngestRunRecord;
   quickwit_index_id?: string;
 }> {
+  if (
+    options.executionMode === "reindex_only" ||
+    options.executionMode === "retry_failed_documents"
+  ) {
+    throw new Error(`Execution mode "${options.executionMode}" is not implemented yet.`);
+  }
+
   try {
     const source = getSource(sourceKey);
     const extractor = getExtractor(source);
     let currentRun = run;
     const extraction = await extractor.extractForDateRange(source, dateFrom, dateTo, {
+      executionMode: options.executionMode,
       onProgress: async (stats) => {
         currentRun = await updateRun(run.id, {
           meeting_count: stats.meeting_count,
@@ -111,6 +127,8 @@ export async function runIngest(
   options: {
     ingestToQuickwit?: boolean;
     trigger?: IngestRunTrigger;
+    executionMode?: IngestExecutionMode;
+    parentRunId?: string;
   } = {},
 ): Promise<{
   run: IngestRunRecord;
@@ -123,6 +141,10 @@ export async function runIngest(
     date_from: dateFrom,
     date_to: dateTo,
     trigger: options.trigger ?? "user",
+    execution_mode: options.executionMode ?? "full",
+    parent_run_id: options.parentRunId,
+    projection_version: currentProjectionVersion(),
+    derivation_version: currentDerivationVersion(),
   });
 
   return await executeIngest(run, sourceKey, dateFrom, dateTo, options);
@@ -135,6 +157,8 @@ export async function startIngest(
   options: {
     ingestToQuickwit?: boolean;
     trigger?: IngestRunTrigger;
+    executionMode?: IngestExecutionMode;
+    parentRunId?: string;
   } = {},
 ): Promise<IngestRunRecord> {
   const source = getSource(sourceKey);
@@ -144,6 +168,10 @@ export async function startIngest(
     date_from: dateFrom,
     date_to: dateTo,
     trigger: options.trigger ?? "user",
+    execution_mode: options.executionMode ?? "full",
+    parent_run_id: options.parentRunId,
+    projection_version: currentProjectionVersion(),
+    derivation_version: currentDerivationVersion(),
   });
 
   void executeIngest(run, sourceKey, dateFrom, dateTo, options).catch((error) => {

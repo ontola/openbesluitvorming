@@ -16,6 +16,19 @@ function trimTrailingSlash(value: string): string {
   return value.endsWith("/") ? value.slice(0, -1) : value;
 }
 
+function describeStorageError(action: string, key: string, error: unknown): Error {
+  if (error instanceof Error) {
+    const name = error.name?.trim() || "Error";
+    const message = error.message?.trim();
+    const summary = message && message !== name ? `${name}: ${message}` : name;
+    return new Error(`S3 ${action} failed for ${key}: ${summary}`, {
+      cause: message && message !== name ? `${name}: ${message}` : name,
+    });
+  }
+
+  return new Error(`S3 ${action} failed for ${key}: ${String(error)}`);
+}
+
 export interface StoredObject {
   bucket: string;
   key: string;
@@ -59,15 +72,19 @@ export class ObjectStorageClient {
       metadata?: Record<string, string>;
     } = {},
   ): Promise<StoredObject> {
-    await this.client.send(
-      new PutObjectCommand({
-        Bucket: this.bucket,
-        Key: key,
-        Body: body,
-        ContentType: options.contentType,
-        Metadata: options.metadata,
-      }),
-    );
+    try {
+      await this.client.send(
+        new PutObjectCommand({
+          Bucket: this.bucket,
+          Key: key,
+          Body: body,
+          ContentType: options.contentType,
+          Metadata: options.metadata,
+        }),
+      );
+    } catch (error) {
+      throw describeStorageError("write", key, error);
+    }
 
     return {
       bucket: this.bucket,
@@ -95,18 +112,38 @@ export class ObjectStorageClient {
   }
 
   async getObjectText(key: string): Promise<string> {
-    const response = await this.client.send(
-      new GetObjectCommand({
-        Bucket: this.bucket,
-        Key: key,
-      }),
-    );
-
-    const bytes = await response.Body?.transformToByteArray();
+    const bytes = await this.getObjectBytes(key);
     if (!bytes) {
       return "";
     }
 
     return new TextDecoder().decode(bytes);
+  }
+
+  async getObjectBytes(key: string): Promise<Uint8Array | null> {
+    let response;
+    try {
+      response = await this.client.send(
+        new GetObjectCommand({
+          Bucket: this.bucket,
+          Key: key,
+        }),
+      );
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        (error.name === "NoSuchKey" || error.name === "NotFound" || error.name === "NoSuchBucket")
+      ) {
+        return null;
+      }
+      throw describeStorageError("read", key, error);
+    }
+
+    const bytes = await response.Body?.transformToByteArray();
+    if (!bytes) {
+      return null;
+    }
+
+    return bytes;
   }
 }

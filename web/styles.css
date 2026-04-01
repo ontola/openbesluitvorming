@@ -1231,6 +1231,17 @@ select {
   flex: 0 0 auto;
 }
 
+.detail-sheet__header-actions > .select-field {
+  min-height: 3rem;
+  flex: 0 0 auto;
+  width: max-content;
+}
+
+.detail-sheet__header-actions > .select-field select {
+  min-height: 100%;
+  padding-right: 2.4rem;
+}
+
 .detail-sheet__nav {
   display: inline-flex;
   align-items: center;
@@ -1359,6 +1370,7 @@ select {
   min-height: 100%;
   padding: 1rem;
   background: var(--document-surface-muted);
+  overflow: auto;
 }
 
 .pdf-document__loading {
@@ -1382,6 +1394,25 @@ select {
 .pdf-document__pages {
   display: grid;
   gap: 1.1rem;
+}
+
+.pdf-document__location {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.pdf-document__pager {
+  display: flex;
+  justify-content: center;
+  color: var(--muted);
+  font-size: 0.88rem;
+  text-align: center;
+}
+
+.pdf-document__pager .ghost-button {
+  min-height: 2.6rem;
+  padding-inline: 1rem;
 }
 
 .pdf-document__page {
@@ -1409,9 +1440,10 @@ select {
   display: grid;
   gap: 0.3rem;
   margin: 0 0 0.8rem;
-  padding: 0.75rem 0.85rem;
+  padding: 0.85rem 0.95rem;
   border-radius: 0.85rem;
-  background: rgba(78, 166, 255, 0.12);
+  border: 1px solid rgba(78, 166, 255, 0.2);
+  background: linear-gradient(180deg, rgba(78, 166, 255, 0.14), rgba(78, 166, 255, 0.08));
   color: var(--accent-deep);
   font-size: 0.84rem;
   line-height: 1.45;
@@ -1431,6 +1463,46 @@ select {
   height: auto;
   border-radius: 0.55rem;
   background: white;
+}
+
+.pdf-document__text-layer {
+  position: absolute;
+  inset: 0.9rem;
+  overflow: hidden;
+  user-select: text;
+  pointer-events: auto;
+}
+
+.pdf-document__text-item {
+  position: absolute;
+  display: block;
+  white-space: pre;
+  line-height: 1;
+  color: transparent;
+  pointer-events: auto;
+}
+
+.pdf-document__text-item::selection,
+.pdf-document__text-item *::selection {
+  background: rgba(78, 166, 255, 0.32);
+  color: transparent;
+}
+
+.pdf-document__text-item mark {
+  padding: 0.04em 0.1em;
+  border-radius: 0.2rem;
+  background: rgba(255, 215, 97, 0.72);
+  color: transparent;
+  box-shadow:
+    0 0 0 1px rgba(255, 215, 97, 0.18),
+    0 0 0.7rem rgba(255, 215, 97, 0.24);
+}
+
+.pdf-document__text-item--match mark {
+  background: rgba(255, 215, 97, 0.9);
+  box-shadow:
+    0 0 0 1px rgba(255, 215, 97, 0.24),
+    0 0 1rem rgba(255, 215, 97, 0.36);
 }
 
 @keyframes pdf-page-match-bloom {
@@ -1840,10 +1912,15 @@ select {
   }
 
   .detail-sheet__header-actions > .primary-button,
-  .detail-sheet__header-actions > .ghost-button {
+  .detail-sheet__header-actions > .ghost-button,
+  .detail-sheet__header-actions > .select-field {
     min-height: 2.5rem;
-    padding: 0 0.85rem;
     flex: 0 0 auto;
+  }
+
+  .detail-sheet__header-actions > .primary-button,
+  .detail-sheet__header-actions > .ghost-button {
+    padding: 0 0.85rem;
   }
 
   .detail-sheet__header-actions > .ghost-button {

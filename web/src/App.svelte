@@ -791,6 +791,9 @@
   $: hasPreviousDetail = detailIndex > 0;
   $: hasNextDetail = detailIndex >= 0 && (detailIndex < results.length - 1 || hasMore);
   $: detailMarkdownHtml = renderMarkdown(detailContent?.markdownText);
+  $: if (detailOpen && detailMode === "text" && detailContent && detailMarkdownHtml) {
+    void syncDetailText();
+  }
 </script>
 
 <svelte:window on:popstate={handlePopstate} />
@@ -954,6 +957,9 @@
                   <div class="result-card__tags">
                     <span class="pill">{item.organization}</span>
                     <span class="pill pill--soft">{item.entityTypeLabel}</span>
+                    {#if item.pageCount && item.entityType === "Document"}
+                      <span class="pill pill--soft">{item.pageCount} pagina's</span>
+                    {/if}
                   </div>
                   <span class="result-card__date">{item.date}</span>
                 </div>
@@ -1153,7 +1159,12 @@
         {:else}
           <div class="detail-sheet__pdf">
             {#key detailItem.entityId}
-              <PdfDocumentView query={query} url={entityPdfProxyUrl(detailItem.entityId)} />
+              <PdfDocumentView
+                initialPage={detailItem.matchedPage ?? null}
+                matchPreview={detailItem.summary}
+                query={query}
+                url={entityPdfProxyUrl(detailItem.entityId)}
+              />
             {/key}
           </div>
         {/if}

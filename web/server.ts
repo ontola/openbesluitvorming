@@ -109,12 +109,21 @@ Deno.serve({ port }, async (request) => {
           { status: 400 },
         );
       }
+      const executionMode = payload.executionMode ?? "full";
+      if (payload.sourceRef?.trim() === "__all__" && executionMode !== "full") {
+        return Response.json(
+          { error: "Deze uitvoermodus is nog niet beschikbaar voor alle bronnen tegelijk." },
+          { status: 400 },
+        );
+      }
       const sourceRefs = sourceSelector === "__all__" ? listRunnableSourceRefs() : [sourceSelector];
       const runs = await Promise.all(
         sourceRefs.map((sourceRef) =>
           startIngest(sourceRef, payload.dateFrom, payload.dateTo, {
             ingestToQuickwit: true,
             trigger: "user",
+            executionMode,
+            parentRunId: payload.parentRunId,
           }),
         ),
       );

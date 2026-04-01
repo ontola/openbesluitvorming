@@ -27,6 +27,10 @@ class FakeStorage {
     const bytes = this.objects.get(key);
     return bytes ? new TextDecoder().decode(bytes) : "";
   }
+
+  async getObjectBytes(key: string): Promise<Uint8Array | null> {
+    return this.objects.get(key) ?? null;
+  }
 }
 
 function buildDocument(): DocumentEntity {

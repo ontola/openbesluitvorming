@@ -12,6 +12,7 @@ import type {
   MeetingEntity,
   NotubizSourceDefinition,
   WooziEntity,
+  IngestExecutionMode,
 } from "../types.ts";
 
 type NotubizEventsResponse = {
@@ -94,6 +95,7 @@ export class NotubizMeetingExtractor {
     options: {
       onProgress?: (stats: ExtractionBundle["stats"]) => Promise<void> | void;
       onIssue?: (issue: ExtractionIssue, stats: ExtractionBundle["stats"]) => Promise<void> | void;
+      executionMode?: IngestExecutionMode;
     } = {},
   ): Promise<ExtractionBundle> {
     const organizationAttributes = await this.client.getOrganizationAttributes(
@@ -192,6 +194,7 @@ export class NotubizMeetingExtractor {
           const materialized = await materializeDocument(document, {
             download: (documentEntity) => this.client.downloadDocument(documentEntity),
             storage,
+            executionMode: options.executionMode,
           });
           for (const issue of materialized.issues) {
             await registerIssue(issue);

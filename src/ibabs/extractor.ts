@@ -6,6 +6,7 @@ import type {
   ExtractionBundle,
   ExtractionIssue,
   IbabsSourceDefinition,
+  IngestExecutionMode,
   MeetingEntity,
   WooziEntity,
 } from "../types.ts";
@@ -44,6 +45,7 @@ export class IbabsMeetingExtractor {
     options: {
       onProgress?: (stats: ExtractionBundle["stats"]) => Promise<void> | void;
       onIssue?: (issue: ExtractionIssue, stats: ExtractionBundle["stats"]) => Promise<void> | void;
+      executionMode?: IngestExecutionMode;
     } = {},
   ): Promise<ExtractionBundle> {
     const meetingTypes = await this.client.getMeetingTypes(source);
@@ -91,6 +93,7 @@ export class IbabsMeetingExtractor {
         const materialized = await materializeDocument(document, {
           download: (documentEntity) => this.client.downloadDocument(documentEntity),
           storage,
+          executionMode: options.executionMode,
         });
         for (const issue of materialized.issues) {
           await registerIssue(issue);

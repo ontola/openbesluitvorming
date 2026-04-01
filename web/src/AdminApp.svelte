@@ -7,6 +7,7 @@
     AdminSourceOption,
     AdminRunsResponse,
     AdminSourcesResponse,
+    IngestExecutionMode,
     IngestRunIssueRecord,
     IngestRunRecord,
   } from "../../src/types.ts";
@@ -34,6 +35,7 @@
   let openRun: IngestRunRecord | null = null;
   let openIssues: IngestRunIssueRecord[] = [];
   let detailImportBusy = false;
+  let retryExecutionMode: IngestExecutionMode = "full";
 
   let pollTimer: number | null = null;
 
@@ -65,6 +67,16 @@
       api: "Gebruiker",
     };
     return labels[trigger] ?? trigger;
+  }
+
+  function executionModeLabel(mode: IngestExecutionMode): string {
+    const labels: Record<IngestExecutionMode, string> = {
+      full: "Volledige import",
+      rederive_cached: "Herleid uit cache",
+      reindex_only: "Alleen herindexeren",
+      retry_failed_documents: "Alleen mislukte documenten",
+    };
+    return labels[mode] ?? mode;
   }
 
   function periodLabel(run: IngestRunRecord): string {
@@ -180,6 +192,7 @@
   function openDetail(detail: AdminRunDetailResponse): void {
     openRun = detail.run;
     openIssues = detail.issues ?? [];
+    retryExecutionMode = "full";
     detailOpen = true;
     document.body.classList.add("body--locked");
   }
@@ -230,7 +243,15 @@
     }
   }
 
-  async function startImport(sourceRef: string, dateFrom: string, dateTo: string): Promise<void> {
+  async function startImport(
+    sourceRef: string,
+    dateFrom: string,
+    dateTo: string,
+    options: {
+      executionMode?: IngestExecutionMode;
+      parentRunId?: string;
+    } = {},
+  ): Promise<void> {
     const payload = await fetchJson<AdminRerunResponse>("/api/admin/rerun", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -238,6 +259,8 @@
         sourceRef,
         dateFrom,
         dateTo,
+        executionMode: options.executionMode,
+        parentRunId: options.parentRunId,
       } satisfies AdminRerunRequest),
     });
 
@@ -296,7 +319,10 @@
     try {
       const source = allSources.find((item) => item.key === openRun?.source_key);
       const sourceRef = source?.sourceRef ?? openRun.source_key;
-      await startImport(sourceRef, openRun.date_from, openRun.date_to);
+      await startImport(sourceRef, openRun.date_from, openRun.date_to, {
+        executionMode: retryExecutionMode,
+        parentRunId: openRun.id,
+      });
       const run = runs.find((item) => item.source_key === openRun?.source_key && item.date_from === openRun?.date_from && item.date_to === openRun?.date_to && item.status === "running") ?? runs[0];
       if (run) {
         openRun = run;
@@ -485,6 +511,13 @@
             <a class="ghost-button" href={searchUrlForRun(openRun)}>
               Bekijk
             </a>
+            <label class="select-field select-field--compact">
+              <span class="sr-only">Retry-modus</span>
+              <select bind:value={retryExecutionMode}>
+                <option value="full">Volledige import</option>
+                <option value="rederive_cached">Herleid uit cache</option>
+              </select>
+            </label>
             <button
               class="primary-button"
               type="button"
@@ -493,7 +526,7 @@
                 void importOpenRunAgain();
               }}
             >
-              Retry
+              Opnieuw
             </button>
             <button class="ghost-button" type="button" on:click={closeDetail}>
               Sluiten
@@ -507,9 +540,12 @@
             <div><strong>Import-ID</strong><p>{openRun.id}</p></div>
             <div><strong>Bron</strong><p>{openRun.source_key}</p></div>
             <div><strong>Gestart door</strong><p>{triggerLabel(openRun.trigger)}</p></div>
+            <div><strong>Uitvoering</strong><p>{executionModeLabel(openRun.execution_mode)}</p></div>
             <div><strong>Status</strong><p>{statusLabel(openRun.status)}</p></div>
             <div><strong>Periode</strong><p>{periodLabel(openRun)}</p></div>
             <div><strong>Gestart</strong><p>{openRun.started_at}</p></div>
+            <div><strong>Projectie</strong><p>{openRun.projection_version ?? "onbekend"}</p></div>
+            <div><strong>Afleiding</strong><p>{openRun.derivation_version ?? "onbekend"}</p></div>
             <div><strong>Vergaderingen</strong><p>{openRun.meeting_count}</p></div>
             <div><strong>Documenten</strong><p>{openRun.document_count}</p></div>
             <div><strong>Documentfouten</strong><p>{failedDocumentCount(openRun)}</p></div>

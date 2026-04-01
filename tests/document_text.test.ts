@@ -6,32 +6,242 @@ function assert(condition: unknown, message: string): asserts condition {
   }
 }
 
-Deno.test("extractDocumentMarkdown warns explicitly for unsupported office formats", async () => {
-  const result = await extractDocumentMarkdown(new TextEncoder().encode("dummy"), {
-    contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    fileName: "nota.docx",
-  });
-
-  assert(result.markdown === "", "unsupported office documents should not invent markdown");
-  assert(
-    result.warnings[0]?.includes("Office document extraction is not supported yet"),
-    "unsupported office documents should emit a clear warning",
+Deno.test("extractDocumentMarkdown uses transmutation for supported office formats", async () => {
+  const tempScript = await Deno.makeTempFile({ suffix: ".sh" });
+  await Deno.writeTextFile(
+    tempScript,
+    [
+      "#!/bin/sh",
+      'input=""',
+      'output=""',
+      'if [ "$1" = "convert" ]; then',
+      "  shift",
+      "fi",
+      'while [ "$#" -gt 0 ]; do',
+      '  if [ -z "$input" ] && [ "${1#-}" = "$1" ]; then',
+      '    input="$1"',
+      "    shift",
+      "    continue",
+      "  fi",
+      '  if [ "$1" = "--output" ] || [ "$1" = "-o" ]; then',
+      '    output="$2"',
+      "    shift 2",
+      "    continue",
+      "  fi",
+      "  shift",
+      "done",
+      'if [ -z "$input" ] || [ -z "$output" ]; then',
+      "  printf 'expected input file and --output' 1>&2",
+      "  exit 1",
+      "fi",
+      "printf '# DOCX\\n\\nOmgezet via transmutation' > \"$output\"",
+    ].join("\n"),
   );
+  await Deno.chmod(tempScript, 0o755);
+
+  const previous = Deno.env.get("WOOZI_TRANSMUTATION_BIN");
+  Deno.env.set("WOOZI_TRANSMUTATION_BIN", tempScript);
+
+  try {
+    const result = await extractDocumentMarkdown(new TextEncoder().encode("dummy"), {
+      contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      fileName: "nota.docx",
+    });
+
+    assert(
+      result.markdown.includes("Omgezet via transmutation"),
+      "supported office documents should be converted through transmutation",
+    );
+    assert(result.warnings.length === 0, "supported office documents should not warn");
+  } finally {
+    if (previous === undefined) {
+      Deno.env.delete("WOOZI_TRANSMUTATION_BIN");
+    } else {
+      Deno.env.set("WOOZI_TRANSMUTATION_BIN", previous);
+    }
+    await Deno.remove(tempScript).catch(() => undefined);
+  }
 });
 
-Deno.test("extractDocumentMarkdown decodes html without external tools", async () => {
-  const result = await extractDocumentMarkdown(
-    new TextEncoder().encode("<h1>Agenda</h1><p>Besluitvorming</p>"),
-    {
-      contentType: "text/html",
-      fileName: "agenda.html",
-    },
-  );
+Deno.test("extractDocumentMarkdown leaves unknown binary formats alone", async () => {
+  const result = await extractDocumentMarkdown(new Uint8Array([1, 2, 3, 4]), {
+    contentType: "application/octet-stream",
+    fileName: "blob.bin",
+  });
 
-  assert(
-    result.markdown.includes("<h1>Agenda</h1><p>Besluitvorming</p>"),
-    "html documents should be decoded directly instead of shelling out",
+  assert(result.markdown === "", "unknown binary files should not invent markdown");
+  assert(result.warnings.length === 0, "unknown binary files should not emit fake warnings");
+});
+
+Deno.test("extractDocumentMarkdown returns per-page markdown chunks for PDFs", async () => {
+  const tempScript = await Deno.makeTempFile({ suffix: ".sh" });
+  await Deno.writeTextFile(
+    tempScript,
+    [
+      "#!/bin/sh",
+      'outdir=""',
+      'if [ "$1" = "convert" ]; then',
+      "  shift",
+      "fi",
+      'while [ "$#" -gt 0 ]; do',
+      '  if [ "$1" = "--output-dir" ] || [ "$1" = "-d" ]; then',
+      '    outdir="$2"',
+      "    shift 2",
+      "    continue",
+      "  fi",
+      "  shift",
+      "done",
+      'if [ -z "$outdir" ]; then',
+      "  printf 'expected --output-dir for split pages' 1>&2",
+      "  exit 1",
+      "fi",
+      'mkdir -p "$outdir"',
+      "printf '## Pagina 1\\n\\nEerste pagina' > \"$outdir/page-001.md\"",
+      "printf '## Pagina 2\\n\\nTweede pagina' > \"$outdir/page-002.md\"",
+    ].join("\n"),
   );
+  await Deno.chmod(tempScript, 0o755);
+
+  const previous = Deno.env.get("WOOZI_TRANSMUTATION_BIN");
+  Deno.env.set("WOOZI_TRANSMUTATION_BIN", tempScript);
+
+  try {
+    const result = await extractDocumentMarkdown(new TextEncoder().encode("%PDF-1.4 pages"), {
+      contentType: "application/pdf",
+      fileName: "pages.pdf",
+    });
+
+    assert(result.markdown.includes("## Pagina 1"), "expected combined markdown from page chunks");
+    assert(
+      result.markdown.includes("## Pagina 2"),
+      "expected later page markdown in combined output",
+    );
+    assert(result.pageChunks?.length === 2, "expected one chunk per emitted page");
+    assert(
+      result.pageChunks?.[1]?.page_number === 2,
+      "expected page numbers to be parsed from file names",
+    );
+  } finally {
+    if (previous === undefined) {
+      Deno.env.delete("WOOZI_TRANSMUTATION_BIN");
+    } else {
+      Deno.env.set("WOOZI_TRANSMUTATION_BIN", previous);
+    }
+    await Deno.remove(tempScript).catch(() => undefined);
+  }
+});
+
+Deno.test("extractDocumentMarkdown falls back to input-directory markdown output for single-page PDFs", async () => {
+  const tempScript = await Deno.makeTempFile({ suffix: ".sh" });
+  await Deno.writeTextFile(
+    tempScript,
+    [
+      "#!/bin/sh",
+      'input=""',
+      'outdir=""',
+      'if [ "$1" = "convert" ]; then',
+      "  shift",
+      "fi",
+      'while [ "$#" -gt 0 ]; do',
+      '  if [ -z "$input" ] && [ "${1#-}" = "$1" ]; then',
+      '    input="$1"',
+      "    shift",
+      "    continue",
+      "  fi",
+      '  if [ "$1" = "--output-dir" ] || [ "$1" = "-d" ]; then',
+      '    outdir="$2"',
+      "    shift 2",
+      "    continue",
+      "  fi",
+      "  shift",
+      "done",
+      'if [ -z "$input" ] || [ -z "$outdir" ]; then',
+      "  printf 'expected input file and --output-dir' 1>&2",
+      "  exit 1",
+      "fi",
+      'input_dir=$(dirname "$input")',
+      'input_base=$(basename "$input" .pdf)',
+      "printf '# Enkel\\n\\nPagina tekst' > \"$input_dir/$input_base.md\"",
+    ].join("\n"),
+  );
+  await Deno.chmod(tempScript, 0o755);
+
+  const previous = Deno.env.get("WOOZI_TRANSMUTATION_BIN");
+  Deno.env.set("WOOZI_TRANSMUTATION_BIN", tempScript);
+
+  try {
+    const result = await extractDocumentMarkdown(new TextEncoder().encode("%PDF-1.4 one page"), {
+      contentType: "application/pdf",
+      fileName: "single.pdf",
+    });
+
+    assert(result.pageChunks?.length === 1, "expected one chunk from input-directory markdown");
+    assert(result.pageChunks?.[0]?.page_number === 1, "expected single-page fallback to be page 1");
+    assert(
+      result.markdown.includes("Pagina tekst"),
+      "expected fallback markdown file content to be returned",
+    );
+  } finally {
+    if (previous === undefined) {
+      Deno.env.delete("WOOZI_TRANSMUTATION_BIN");
+    } else {
+      Deno.env.set("WOOZI_TRANSMUTATION_BIN", previous);
+    }
+    await Deno.remove(tempScript).catch(() => undefined);
+  }
+});
+
+Deno.test("extractDocumentMarkdown uses transmutation for supported html formats", async () => {
+  const tempScript = await Deno.makeTempFile({ suffix: ".sh" });
+  await Deno.writeTextFile(
+    tempScript,
+    [
+      "#!/bin/sh",
+      'output=""',
+      'if [ "$1" = "convert" ]; then',
+      "  shift",
+      "fi",
+      'while [ "$#" -gt 0 ]; do',
+      '  if [ "$1" = "--output" ] || [ "$1" = "-o" ]; then',
+      '    output="$2"',
+      "    shift 2",
+      "    continue",
+      "  fi",
+      "  shift",
+      "done",
+      'if [ -z "$output" ]; then',
+      "  printf 'expected --output' 1>&2",
+      "  exit 1",
+      "fi",
+      "printf '# HTML\\n\\nOmgezet uit HTML' > \"$output\"",
+    ].join("\n"),
+  );
+  await Deno.chmod(tempScript, 0o755);
+
+  const previous = Deno.env.get("WOOZI_TRANSMUTATION_BIN");
+  Deno.env.set("WOOZI_TRANSMUTATION_BIN", tempScript);
+
+  try {
+    const result = await extractDocumentMarkdown(
+      new TextEncoder().encode("<h1>Agenda</h1><p>Besluitvorming</p>"),
+      {
+        contentType: "text/html",
+        fileName: "agenda.html",
+      },
+    );
+
+    assert(
+      result.markdown.includes("Omgezet uit HTML"),
+      "html documents should go through transmutation when supported",
+    );
+  } finally {
+    if (previous === undefined) {
+      Deno.env.delete("WOOZI_TRANSMUTATION_BIN");
+    } else {
+      Deno.env.set("WOOZI_TRANSMUTATION_BIN", previous);
+    }
+    await Deno.remove(tempScript).catch(() => undefined);
+  }
 });
 
 Deno.test("extractDocumentMarkdown propagates non-missing transmutation failures", async () => {

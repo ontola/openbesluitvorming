@@ -58,8 +58,15 @@ export interface DocumentMediaLink {
   content_type?: string;
 }
 
+export interface DocumentPageChunk {
+  page_number: number;
+  markdown: string;
+}
+
 export interface DocumentDerivedContent {
   markdown_key?: string;
+  page_chunks_key?: string;
+  page_count?: number;
 }
 
 export interface DocumentEntity {
@@ -78,6 +85,7 @@ export interface DocumentEntity {
   creator?: string;
   organization?: string;
   md_text?: string[];
+  page_chunks?: DocumentPageChunk[];
   derived_content?: DocumentDerivedContent;
   media_urls?: DocumentMediaLink[];
   source_info: SourceInfo;
@@ -203,6 +211,11 @@ export interface IbabsMeeting {
 }
 
 export type IngestRunTrigger = "user" | "scheduled" | "manual" | "api";
+export type IngestExecutionMode =
+  | "full"
+  | "rederive_cached"
+  | "reindex_only"
+  | "retry_failed_documents";
 
 export interface IngestRunRecord {
   id: string;
@@ -211,6 +224,10 @@ export interface IngestRunRecord {
   date_from: string;
   date_to: string;
   trigger: IngestRunTrigger;
+  execution_mode: IngestExecutionMode;
+  parent_run_id?: string;
+  projection_version?: string;
+  derivation_version?: string;
   status: "running" | "succeeded" | "partial" | "failed";
   started_at: string;
   finished_at?: string;
@@ -262,6 +279,8 @@ export interface AdminRerunRequest {
   sourceRef?: string;
   dateFrom: string;
   dateTo: string;
+  executionMode?: IngestExecutionMode;
+  parentRunId?: string;
 }
 
 export interface AdminRerunResponse {
@@ -279,6 +298,8 @@ export interface SearchResult {
   summaryHtml?: string;
   sortDate?: string;
   downloadUrl?: string;
+  matchedPage?: number;
+  pageCount?: number;
 }
 
 export interface SearchResponse {

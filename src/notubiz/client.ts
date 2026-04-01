@@ -22,15 +22,30 @@ function isRetryableError(error: unknown): boolean {
     return false;
   }
 
-  const message = error.message.toLowerCase();
+  const message = `${error.name} ${error.message}`.toLowerCase();
   return (
     message.includes("error reading a body from connection") ||
     message.includes("connection reset") ||
     message.includes("broken pipe") ||
     message.includes("timed out") ||
     message.includes("dns error") ||
-    message.includes("client error")
+    message.includes("client error") ||
+    message.includes("unknownerror") ||
+    message.includes("failed to fetch")
   );
+}
+
+function describeTransportError(url: string, error: unknown): Error {
+  if (error instanceof Error) {
+    const name = error.name?.trim() || "Error";
+    const message = error.message?.trim();
+    const summary = message && message !== name ? `${name}: ${message}` : name;
+    return new Error(`Request transport failed for ${url}: ${summary}`, {
+      cause: message && message !== name ? `${name}: ${message}` : name,
+    });
+  }
+
+  return new Error(`Request transport failed for ${url}: ${String(error)}`);
 }
 
 async function fetchJson<T>(url: string): Promise<T> {
@@ -53,13 +68,13 @@ async function fetchJson<T>(url: string): Promise<T> {
     } catch (error) {
       lastError = error;
       if (attempt === MAX_RETRIES || !isRetryableError(error)) {
-        throw error;
+        throw describeTransportError(url, error);
       }
       await sleep(RETRY_DELAY_MS * attempt);
     }
   }
 
-  throw lastError instanceof Error ? lastError : new Error(`Request failed for ${url}`);
+  throw describeTransportError(url, lastError);
 }
 
 async function fetchBytes(url: string): Promise<Uint8Array> {
@@ -82,13 +97,13 @@ async function fetchBytes(url: string): Promise<Uint8Array> {
     } catch (error) {
       lastError = error;
       if (attempt === MAX_RETRIES || !isRetryableError(error)) {
-        throw error;
+        throw describeTransportError(url, error);
       }
       await sleep(RETRY_DELAY_MS * attempt);
     }
   }
 
-  throw lastError instanceof Error ? lastError : new Error(`Request failed for ${url}`);
+  throw describeTransportError(url, lastError);
 }
 
 function fallbackDocumentUrl(document: unknown): string | undefined {

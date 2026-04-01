@@ -1,7 +1,24 @@
+import type { DocumentPageChunk } from "../types.ts";
+
 export interface DocumentMarkdownExtractionResult {
   markdown: string;
   warnings: string[];
+  pageChunks?: DocumentPageChunk[];
 }
+
+const TRANSMUTATION_MARKDOWN_EXTENSIONS = new Set([
+  ".pdf",
+  ".docx",
+  ".pptx",
+  ".xlsx",
+  ".html",
+  ".htm",
+  ".xml",
+  ".txt",
+  ".md",
+  ".rtf",
+  ".odt",
+]);
 
 function isCommandMissing(error: unknown): boolean {
   return (
@@ -26,12 +43,6 @@ function fileExtension(fileName?: string): string {
   return fileName.slice(fileName.lastIndexOf(".")).toLowerCase();
 }
 
-async function writeTempFile(bytes: Uint8Array, extension: string): Promise<string> {
-  const path = await Deno.makeTempFile({ suffix: extension });
-  await Deno.writeFile(path, bytes);
-  return path;
-}
-
 async function readCommandOutput(command: string, args: string[]): Promise<string> {
   let output: Deno.CommandOutput;
   try {
@@ -54,6 +65,10 @@ async function readCommandOutput(command: string, args: string[]): Promise<strin
   }
 
   return new TextDecoder().decode(output.stdout);
+}
+
+async function removePath(path: string): Promise<void> {
+  await Deno.remove(path, { recursive: true }).catch(() => undefined);
 }
 
 function normalizeCliError(command: string, stderr: string): string {
@@ -82,32 +97,140 @@ function normalizeCliError(command: string, stderr: string): string {
 }
 
 async function extractPdf(bytes: Uint8Array): Promise<DocumentMarkdownExtractionResult> {
-  return {
-    markdown: await extractPdfMarkdownWithCli(bytes),
-    warnings: [],
-  };
+  try {
+    const pageChunks = await extractPdfMarkdownPagesWithCli(bytes);
+
+    return {
+      markdown: normalizeWhitespace(pageChunks.map((page) => page.markdown).join("\n\n")),
+      pageChunks,
+      warnings: [],
+    };
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message.includes("no per-page markdown files were produced")
+    ) {
+      const fallback = await extractMarkdownWithCli(bytes, ".pdf");
+      return {
+        markdown: fallback.markdown,
+        warnings: [
+          ...fallback.warnings,
+          "Per-page PDF extraction failed; using whole-document markdown fallback.",
+        ],
+      };
+    }
+
+    throw error;
+  }
+}
+
+async function extractMarkdownWithCli(
+  bytes: Uint8Array,
+  extension: string,
+): Promise<DocumentMarkdownExtractionResult> {
+  const workDir = await Deno.makeTempDir();
+  const normalizedExtension = extension || ".bin";
+  const inputPath = `${workDir}/document${normalizedExtension}`;
+  const outputPath = `${workDir}/document.md`;
+  await Deno.writeFile(inputPath, bytes);
+
+  try {
+    await readCommandOutput(transmutationBinary(), [
+      "convert",
+      inputPath,
+      "--output",
+      outputPath,
+      "--format",
+      "markdown",
+    ]);
+
+    const markdown = normalizeWhitespace(await Deno.readTextFile(outputPath));
+    return {
+      markdown,
+      warnings: [],
+    };
+  } finally {
+    await removePath(workDir);
+  }
 }
 
 function transmutationBinary(): string {
   return Deno.env.get("WOOZI_TRANSMUTATION_BIN")?.trim() || "transmutation";
 }
 
-async function extractPdfMarkdownWithCli(bytes: Uint8Array): Promise<string> {
-  const tempPath = await writeTempFile(bytes, ".pdf");
-  const outputPath = await Deno.makeTempFile({ suffix: ".md" });
+function parsePageNumber(path: string, fallbackPageNumber: number): number {
+  const baseName = path.split("/").at(-1) ?? path;
+  const zeroBasedSuffix = baseName.match(/_(\d+)\.md$/i);
+  if (zeroBasedSuffix) {
+    const parsed = Number(zeroBasedSuffix[1]);
+    if (Number.isFinite(parsed) && parsed >= 0) {
+      return parsed + 1;
+    }
+  }
+
+  const matches = [...baseName.matchAll(/(\d+)/g)];
+  const lastMatch = matches.at(-1)?.[1];
+  const parsed = lastMatch ? Number(lastMatch) : NaN;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallbackPageNumber;
+}
+
+async function collectMarkdownFiles(path: string): Promise<string[]> {
+  const files: string[] = [];
+
+  for await (const entry of Deno.readDir(path)) {
+    const childPath = `${path}/${entry.name}`;
+    if (entry.isDirectory) {
+      files.push(...(await collectMarkdownFiles(childPath)));
+      continue;
+    }
+
+    if (entry.isFile && childPath.toLowerCase().endsWith(".md")) {
+      files.push(childPath);
+    }
+  }
+
+  return files.sort((left, right) =>
+    left.localeCompare(right, undefined, {
+      numeric: true,
+      sensitivity: "base",
+    }),
+  );
+}
+
+async function extractPdfMarkdownPagesWithCli(bytes: Uint8Array): Promise<DocumentPageChunk[]> {
+  const workDir = await Deno.makeTempDir();
+  const tempPath = `${workDir}/document.pdf`;
+  await Deno.writeFile(tempPath, bytes);
+  const outputDir = `${workDir}/pages`;
+  await Deno.mkdir(outputDir, { recursive: true });
   try {
     await readCommandOutput(transmutationBinary(), [
       "convert",
       tempPath,
-      "-o",
-      outputPath,
+      "--output-dir",
+      outputDir,
       "--format",
       "markdown",
+      "--split-pages",
     ]);
-    return normalizeWhitespace(await Deno.readTextFile(outputPath));
+
+    const markdownFilesInOutputDir = await collectMarkdownFiles(outputDir);
+    const markdownFiles =
+      markdownFilesInOutputDir.length > 0
+        ? markdownFilesInOutputDir
+        : (await collectMarkdownFiles(workDir)).filter((path) => !path.startsWith(`${outputDir}/`));
+    if (markdownFiles.length === 0) {
+      throw new Error("transmutation failed: no per-page markdown files were produced");
+    }
+
+    return await Promise.all(
+      markdownFiles.map(async (path, index) => ({
+        page_number: parsePageNumber(path, index + 1),
+        markdown: normalizeWhitespace(await Deno.readTextFile(path)),
+      })),
+    );
   } finally {
-    await Deno.remove(tempPath).catch(() => undefined);
-    await Deno.remove(outputPath).catch(() => undefined);
+    await removePath(workDir);
   }
 }
 
@@ -161,25 +284,26 @@ export async function extractDocumentMarkdown(
 
   if (contentType.includes("pdf") || extension === ".pdf") {
     return await extractPdf(bytes);
-  } else if (
+  }
+
+  const looksLikeTransmutationDocument =
+    TRANSMUTATION_MARKDOWN_EXTENSIONS.has(extension) ||
     contentType.includes("word") ||
     contentType.includes("officedocument") ||
+    contentType.includes("presentation") ||
+    contentType.includes("spreadsheet") ||
+    contentType.includes("excel") ||
+    contentType.includes("powerpoint") ||
     contentType.includes("rtf") ||
-    extension === ".doc" ||
-    extension === ".docx" ||
-    extension === ".rtf" ||
-    extension === ".odt" ||
-    extension === ".html" ||
-    extension === ".htm"
-  ) {
-    if (extension === ".html" || extension === ".htm" || contentType.includes("html")) {
-      text = normalizeWhitespace(new TextDecoder().decode(bytes));
-    } else {
-      warnings.push(
-        `Office document extraction is not supported yet for ${extension || contentType || "this file type"}.`,
-      );
-    }
-  } else if (
+    contentType.includes("opendocument") ||
+    contentType.includes("html") ||
+    contentType.includes("xml");
+
+  if (looksLikeTransmutationDocument) {
+    return await extractMarkdownWithCli(bytes, extension);
+  }
+
+  if (
     contentType.startsWith("text/") ||
     contentType.includes("json") ||
     extension === ".txt" ||

@@ -1,5 +1,6 @@
 import type { DocumentEntity, ExtractionIssue } from "../types.ts";
 import { extractDocumentMarkdown } from "./text.ts";
+import type { IngestExecutionMode } from "../types.ts";
 
 interface CachedStorage {
   hasObject(key: string): Promise<boolean>;
@@ -12,8 +13,16 @@ interface CachedStorage {
     },
   ): Promise<{ url: string }>;
   getObjectText(key: string): Promise<string>;
+  getObjectBytes(key: string): Promise<Uint8Array | null>;
   urlForKey(key: string): string;
 }
+
+type StoredPageChunks = {
+  pages: Array<{
+    page_number: number;
+    markdown: string;
+  }>;
+};
 
 export interface MaterializedDocumentResult {
   document: DocumentEntity;
@@ -55,6 +64,10 @@ function extractedMarkdownKey(document: DocumentEntity): string {
   return `${objectKey(document)}.md`;
 }
 
+function extractedPageChunksKey(document: DocumentEntity): string {
+  return `${objectKey(document)}.pages.json`;
+}
+
 function sanitizeToken(value: string): string {
   return value.replaceAll(/[^a-zA-Z0-9._-]+/g, "_");
 }
@@ -83,24 +96,126 @@ async function readCachedDocument(
 ): Promise<MaterializedDocumentResult | null> {
   const fileKey = objectKey(document);
   const markdownKey = extractedMarkdownKey(document);
+  const pageChunksKey = extractedPageChunksKey(document);
   // We only reuse cache when both the stored source file and the derived markdown sidecar exist
   // for the same supplier-specific version token.
   const hasFile = await storage.hasObject(fileKey);
   const hasMarkdown = await storage.hasObject(markdownKey);
+  const hasPageChunks = await storage.hasObject(pageChunksKey);
 
   if (!hasFile || !hasMarkdown) {
     return null;
   }
 
   const mdText = await storage.getObjectText(markdownKey);
+  const pageChunksText = hasPageChunks ? await storage.getObjectText(pageChunksKey) : "";
+  const pageChunks = pageChunksText
+    ? ((JSON.parse(pageChunksText) as StoredPageChunks).pages ?? [])
+    : [];
   return {
     cacheHit: true,
     issues: [],
     document: {
       ...document,
       md_text: mdText ? [mdText] : undefined,
+      page_chunks: pageChunks,
       derived_content: {
         markdown_key: markdownKey,
+        page_chunks_key: hasPageChunks ? pageChunksKey : undefined,
+        page_count: pageChunks.length > 0 ? pageChunks.length : undefined,
+      },
+      media_urls: [
+        {
+          url: storage.urlForKey(fileKey),
+          original_url: document.original_url,
+          content_type: document.content_type,
+        },
+      ],
+    },
+  };
+}
+
+async function rederiveFromStoredFile(
+  document: DocumentEntity,
+  storage: CachedStorage,
+): Promise<MaterializedDocumentResult | null> {
+  const fileKey = objectKey(document);
+  let storedBytes: Uint8Array | null;
+  try {
+    storedBytes = await storage.getObjectBytes(fileKey);
+  } catch {
+    return null;
+  }
+  if (!storedBytes) {
+    return null;
+  }
+
+  let mdText = "";
+  let pageChunks = document.page_chunks ?? [];
+  const issues: ExtractionIssue[] = [];
+
+  try {
+    const extraction = await extractDocumentMarkdown(storedBytes, {
+      contentType: document.content_type,
+      fileName: document.file_name,
+    });
+    mdText = extraction.markdown;
+    pageChunks = extraction.pageChunks ?? [];
+    issues.push(
+      ...extraction.warnings.map((message) => ({
+        severity: "warning" as const,
+        step: "extract_text" as const,
+        entity_id: document.id,
+        message,
+      })),
+    );
+  } catch (error) {
+    issues.push({
+      severity: "error",
+      step: "extract_text",
+      entity_id: document.id,
+      message: `${documentIssueContext(document)}: ${error instanceof Error ? error.message : "Document extraction failed"}`,
+      details: issueDetailsFromError(error),
+    });
+  }
+
+  if (mdText) {
+    await storage.putObject(extractedMarkdownKey(document), new TextEncoder().encode(mdText), {
+      contentType: "text/markdown; charset=utf-8",
+      metadata: {
+        entity_id: document.id,
+        source: document.source_info.source,
+        kind: "markdown_text",
+      },
+    });
+  }
+
+  if (pageChunks.length > 0) {
+    await storage.putObject(
+      extractedPageChunksKey(document),
+      new TextEncoder().encode(JSON.stringify({ pages: pageChunks })),
+      {
+        contentType: "application/json; charset=utf-8",
+        metadata: {
+          entity_id: document.id,
+          source: document.source_info.source,
+          kind: "pdf_page_chunks",
+        },
+      },
+    );
+  }
+
+  return {
+    cacheHit: true,
+    issues,
+    document: {
+      ...document,
+      md_text: mdText ? [mdText] : undefined,
+      page_chunks: pageChunks.length > 0 ? pageChunks : undefined,
+      derived_content: {
+        markdown_key: mdText ? extractedMarkdownKey(document) : undefined,
+        page_chunks_key: pageChunks.length > 0 ? extractedPageChunksKey(document) : undefined,
+        page_count: pageChunks.length > 0 ? pageChunks.length : undefined,
       },
       media_urls: [
         {
@@ -118,6 +233,7 @@ export async function materializeDocument(
   options: {
     download: (document: DocumentEntity) => Promise<Uint8Array>;
     storage?: CachedStorage;
+    executionMode?: IngestExecutionMode;
   },
 ): Promise<MaterializedDocumentResult> {
   if (!document.original_url) {
@@ -125,14 +241,32 @@ export async function materializeDocument(
   }
 
   if (options.storage) {
-    const cached = await readCachedDocument(document, options.storage);
-    if (cached) {
-      return cached;
+    if (options.executionMode === "rederive_cached") {
+      const rederived = await rederiveFromStoredFile(document, options.storage);
+      if (rederived) {
+        return rederived;
+      }
+    } else {
+      const cached = await readCachedDocument(document, options.storage);
+      if (cached) {
+        return cached;
+      }
+
+      const canBackfillPageChunks =
+        document.content_type?.toLowerCase().includes("pdf") ||
+        document.file_name?.toLowerCase().endsWith(".pdf");
+      if (canBackfillPageChunks) {
+        const rederived = await rederiveFromStoredFile(document, options.storage);
+        if (rederived) {
+          return rederived;
+        }
+      }
     }
   }
 
   const bytes = await options.download(document);
   let mdText = "";
+  let pageChunks = document.page_chunks ?? [];
   const issues: ExtractionIssue[] = [];
 
   try {
@@ -141,6 +275,7 @@ export async function materializeDocument(
       fileName: document.file_name,
     });
     mdText = extraction.markdown;
+    pageChunks = extraction.pageChunks ?? [];
     issues.push(
       ...extraction.warnings.map((message) => ({
         severity: "warning" as const,
@@ -182,6 +317,20 @@ export async function materializeDocument(
         },
       );
     }
+    if (pageChunks.length > 0) {
+      await options.storage.putObject(
+        extractedPageChunksKey(document),
+        new TextEncoder().encode(JSON.stringify({ pages: pageChunks })),
+        {
+          contentType: "application/json; charset=utf-8",
+          metadata: {
+            entity_id: document.id,
+            source: document.source_info.source,
+            kind: "pdf_page_chunks",
+          },
+        },
+      );
+    }
     mediaUrls = [
       {
         url: stored.url,
@@ -197,10 +346,13 @@ export async function materializeDocument(
     document: {
       ...document,
       md_text: mdText ? [mdText] : undefined,
+      page_chunks: pageChunks.length > 0 ? pageChunks : undefined,
       derived_content:
-        options.storage && mdText
+        options.storage && (mdText || pageChunks.length > 0)
           ? {
-              markdown_key: extractedMarkdownKey(document),
+              markdown_key: mdText ? extractedMarkdownKey(document) : undefined,
+              page_chunks_key: pageChunks.length > 0 ? extractedPageChunksKey(document) : undefined,
+              page_count: pageChunks.length > 0 ? pageChunks.length : undefined,
             }
           : undefined,
       media_urls: mediaUrls,
