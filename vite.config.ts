@@ -3,7 +3,7 @@ import { defineConfig } from "vite";
 
 const apiTarget =
   process.env.WOOZI_API_TARGET ??
-  `http://127.0.0.1:${Number(process.env.WOOZI_API_PORT ?? "8788")}`;
+  `http://127.0.0.1:${Number(process.env.WOOZI_API_PORT ?? "8787")}`;
 
 export default defineConfig({
   plugins: [svelte()],

@@ -286,6 +286,7 @@ export interface AdminSourceOption {
 
 export interface AdminRunsResponse {
   runs: IngestRunRecord[];
+  hasMore?: boolean;
 }
 
 export interface AdminRunDetailResponse {

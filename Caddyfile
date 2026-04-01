@@ -1,0 +1,5 @@
+{$DOMAIN} {
+  encode gzip zstd
+
+  reverse_proxy openbesluitvorming:8787
+}

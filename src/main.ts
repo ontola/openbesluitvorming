@@ -1,6 +1,14 @@
 import { runIngest } from "./ingest.ts";
+import { reconcileInterruptedRuns } from "./ops/store.ts";
 
 if (import.meta.main) {
+  const reconciledRuns = await reconcileInterruptedRuns();
+  if (reconciledRuns.length > 0) {
+    console.warn(
+      `Reconciled ${reconciledRuns.length} interrupted import${reconciledRuns.length === 1 ? "" : "s"} on startup.`,
+    );
+  }
+
   const args = [...Deno.args];
   const shouldIngestToQuickwit = args.includes("--quickwit");
   const positionalArgs = args.filter((arg) => arg !== "--quickwit");

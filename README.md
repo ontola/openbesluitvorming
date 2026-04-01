@@ -31,7 +31,7 @@ pnpm run dev
 
 That does two things:
 
-- starts the full Docker backend: `minio`, `minio-setup`, `quickwit`, and `openbesluitvorming`
+- starts the Docker backend services needed for app development: `quickwit` and `openbesluitvorming`
 - starts the Vite HMR frontend on the host
 
 That gives you:
@@ -44,12 +44,15 @@ the same environment as the containerized app, including the installed `transmut
 binary.
 Open `http://127.0.0.1:4317` while iterating on the frontend.
 
+Object storage is taken from your environment configuration. If your `.env` points
+to external S3-compatible storage such as Hetzner, `pnpm run dev` uses that directly
+and does not start local MinIO.
+
 Important:
 
 - `pnpm run dev` is the intended development entrypoint
-- `pnpm run dev:hmr` is an explicit alias for the same Docker-backed flow
-- `pnpm run dev:local` is still available if you explicitly want the host Deno API on `8788`
-- `pnpm run dev` and `pnpm run dev:local` clear stale listeners on their own dev ports before starting, so leftover Vite/Deno processes do not usually require manual cleanup
+- `pnpm run dev` starts Docker-backed services and the API, then runs Vite with HMR
+- `pnpm run dev` clears stale listeners on the HMR port before starting, so leftover Vite processes do not usually require manual cleanup
 
 If you only want the infra:
 
@@ -57,10 +60,10 @@ If you only want the infra:
 pnpm run dev:infra
 ```
 
-If you explicitly want the host API instead of the Docker backend:
+Run:
 
 ```sh
-pnpm run dev:local
+pnpm run dev
 ```
 
 To stop the Docker side again:
@@ -78,8 +81,40 @@ WOOZI_WEB_PORT=4401 pnpm run dev:web
 If you want a different HMR web port:
 
 ```sh
-WOOZI_WEB_PORT=4401 pnpm run dev:hmr
+WOOZI_WEB_PORT=4401 pnpm run dev
 ```
+
+## Production with Caddy
+
+The repo includes a production-oriented compose file and Caddy config:
+
+- [docker-compose.production.yml](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/docker-compose.production.yml)
+- [Caddyfile](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/Caddyfile)
+
+That setup is intended for:
+
+- `openbesluitvorming`
+- `quickwit`
+- `caddy`
+
+with external S3-compatible object storage from `.env`.
+
+Required production env includes:
+
+- `DOMAIN`
+- `S3_ACCESS_KEY`
+- `S3_SECRET_KEY`
+- `S3_STORAGE_BUCKET_NAME`
+- `S3_STORAGE_ENDPOINT`
+- `S3_STORAGE_REGION`
+
+Run it with:
+
+```sh
+docker compose -f docker-compose.production.yml up -d --build
+```
+
+Point your domain to the server first so Caddy can obtain Let's Encrypt certificates.
 
 ## Architecture
 
@@ -251,10 +286,9 @@ From [`woozi/`](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi):
 
 - `pnpm run dev`
 - `pnpm run dev:infra`
-- `pnpm run dev:hmr`
+- `pnpm run dev:docker`
 - `pnpm run dev:down`
 - `pnpm run dev:web`
-- `pnpm run dev:api`
 - `pnpm run web`
 - `pnpm run serve:web`
 - `pnpm run build:web`

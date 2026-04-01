@@ -51,7 +51,11 @@
         throw new Error("Documenttekst kon niet worden geladen.");
       }
 
-      const payload = (await response.json()) as EntityContentResponse;
+      const body = await response.text();
+      if (!body) {
+        throw new Error("Lege API-respons ontvangen.");
+      }
+      const payload = JSON.parse(body) as EntityContentResponse;
       documentMarkdown = {
         ...documentMarkdown,
         [entityId]: payload.markdownText?.trim() ? payload.markdownText : null,

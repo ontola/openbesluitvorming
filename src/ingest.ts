@@ -1,7 +1,7 @@
 import { buildEntityCommitEvent } from "./events/entity_commit.ts";
 import { IbabsMeetingExtractor } from "./ibabs/extractor.ts";
 import { NotubizMeetingExtractor } from "./notubiz/extractor.ts";
-import { updateRun, appendRunIssue, createRun, getRunDetails } from "./ops/store.ts";
+import { updateRun, appendRunIssue, createRun, findActiveRun, getRunDetails } from "./ops/store.ts";
 import { QuickwitClient } from "./quickwit/client.ts";
 import { currentDerivationVersion, currentProjectionVersion } from "./pipeline/versioning.ts";
 import { getSource } from "./sources/index.ts";
@@ -135,13 +135,26 @@ export async function runIngest(
   quickwit_index_id?: string;
 }> {
   const source = getSource(sourceKey);
+  const executionMode = options.executionMode ?? "full";
+  const activeRun = await findActiveRun({
+    sourceKey: source.key,
+    dateFrom,
+    dateTo,
+    executionMode,
+  });
+  if (activeRun) {
+    throw new Error(
+      `Er draait al een import voor ${source.key} (${dateFrom} t/m ${dateTo}) met run ${activeRun.id}.`,
+    );
+  }
+
   const run = await createRun({
     source_key: source.key,
     supplier: source.supplier,
     date_from: dateFrom,
     date_to: dateTo,
     trigger: options.trigger ?? "user",
-    execution_mode: options.executionMode ?? "full",
+    execution_mode: executionMode,
     parent_run_id: options.parentRunId,
     projection_version: currentProjectionVersion(),
     derivation_version: currentDerivationVersion(),
@@ -162,13 +175,26 @@ export async function startIngest(
   } = {},
 ): Promise<IngestRunRecord> {
   const source = getSource(sourceKey);
+  const executionMode = options.executionMode ?? "full";
+  const activeRun = await findActiveRun({
+    sourceKey: source.key,
+    dateFrom,
+    dateTo,
+    executionMode,
+  });
+  if (activeRun) {
+    throw new Error(
+      `Er draait al een import voor ${source.key} (${dateFrom} t/m ${dateTo}) met run ${activeRun.id}.`,
+    );
+  }
+
   const run = await createRun({
     source_key: source.key,
     supplier: source.supplier,
     date_from: dateFrom,
     date_to: dateTo,
     trigger: options.trigger ?? "user",
-    execution_mode: options.executionMode ?? "full",
+    execution_mode: executionMode,
     parent_run_id: options.parentRunId,
     projection_version: currentProjectionVersion(),
     derivation_version: currentDerivationVersion(),

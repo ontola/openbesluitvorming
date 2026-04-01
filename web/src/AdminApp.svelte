@@ -22,6 +22,11 @@
   let filterSources: AdminSourceOption[] = [];
   let runs: IngestRunRecord[] = [];
   let issuesByRun = new Map<string, IngestRunIssueRecord[]>();
+  let runsHasMore = false;
+  let runsBusy = false;
+  let loadingOlderRuns = false;
+
+  const RUNS_PAGE_SIZE = 50;
 
   let filterSource = "";
   let filterStatus = "";
@@ -158,9 +163,17 @@
 
   async function fetchJson<TPayload>(url: string, options?: RequestInit): Promise<TPayload> {
     const response = await fetch(url, options);
-    const payload = (await response.json()) as TPayload & { error?: string };
+    const body = await response.text();
+    const payload = body ? JSON.parse(body) as TPayload & { error?: string } : null;
     if (!response.ok) {
-      throw new Error(payload.error ?? "Verzoek mislukt");
+      throw new Error(
+        payload && typeof payload === "object" && "error" in payload && payload.error
+          ? String(payload.error)
+          : `Verzoek mislukt (${response.status})`,
+      );
+    }
+    if (payload === null) {
+      throw new Error("Lege API-respons ontvangen.");
     }
     return payload;
   }
@@ -204,17 +217,10 @@
     filterSources = implementedSources.filter((source) => !source.isAggregate);
   }
 
-  async function loadRuns(): Promise<void> {
-    const params = new URLSearchParams();
-    if (filterSource) params.set("source", filterSource);
-    if (filterStatus) params.set("status", filterStatus);
-
-    const payload = await fetchJson<AdminRunsResponse>(`/api/admin/runs?${params.toString()}`);
-    runs = payload.runs ?? [];
-
-    const nextIssues = new Map<string, IngestRunIssueRecord[]>();
+  async function mergeRunIssues(items: IngestRunRecord[]): Promise<Map<string, IngestRunIssueRecord[]>> {
+    const nextIssues = new Map(issuesByRun);
     await Promise.all(
-      runs.map(async (run) => {
+      items.map(async (run) => {
         if (run.issue_count <= 0) {
           nextIssues.set(run.id, []);
           return;
@@ -224,22 +230,50 @@
         nextIssues.set(run.id, detail.issues ?? []);
       }),
     );
-    issuesByRun = nextIssues;
+    return nextIssues;
+  }
 
-    if (openRun) {
-      const current = runs.find((run) => run.id === openRun?.id);
-      if (current) {
-        openRun = current;
-        openIssues = issuesByRun.get(current.id) ?? [];
-      } else {
-        closeDetail();
-      }
+  async function loadRuns(mode: "replace" | "append" = "replace"): Promise<void> {
+    if (mode === "append") {
+      if (loadingOlderRuns || !runsHasMore) return;
+      loadingOlderRuns = true;
+    } else {
+      runsBusy = true;
     }
 
-    if (hasActiveRuns(runs)) {
-      schedulePolling();
-    } else {
-      stopPolling();
+    const params = new URLSearchParams();
+    if (filterSource) params.set("source", filterSource);
+    if (filterStatus) params.set("status", filterStatus);
+    params.set("limit", `${RUNS_PAGE_SIZE}`);
+    if (mode === "append") {
+      params.set("offset", `${runs.length}`);
+    }
+
+    try {
+      const payload = await fetchJson<AdminRunsResponse>(`/api/admin/runs?${params.toString()}`);
+      const fetchedRuns = payload.runs ?? [];
+      runsHasMore = Boolean(payload.hasMore);
+      runs = mode === "append" ? [...runs, ...fetchedRuns] : fetchedRuns;
+      issuesByRun = await mergeRunIssues(runs);
+
+      if (openRun) {
+        const current = runs.find((run) => run.id === openRun?.id);
+        if (current) {
+          openRun = current;
+          openIssues = issuesByRun.get(current.id) ?? [];
+        } else {
+          closeDetail();
+        }
+      }
+
+      if (hasActiveRuns(runs)) {
+        schedulePolling();
+      } else {
+        stopPolling();
+      }
+    } finally {
+      runsBusy = false;
+      loadingOlderRuns = false;
     }
   }
 
@@ -251,7 +285,7 @@
       executionMode?: IngestExecutionMode;
       parentRunId?: string;
     } = {},
-  ): Promise<void> {
+  ): Promise<IngestRunRecord[]> {
     const payload = await fetchJson<AdminRerunResponse>("/api/admin/rerun", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -267,7 +301,7 @@
     const startedRuns = payload.runs ?? [];
     if (startedRuns.length === 0) {
       importStatus = "Er zijn geen imports gestart.";
-      return;
+      return [];
     }
 
     importStatus = startedRuns.length === 1
@@ -280,6 +314,7 @@
     }
     schedulePolling();
     await loadRuns();
+    return startedRuns;
   }
 
   async function submitImport(): Promise<void> {
@@ -319,11 +354,14 @@
     try {
       const source = allSources.find((item) => item.key === openRun?.source_key);
       const sourceRef = source?.sourceRef ?? openRun.source_key;
-      await startImport(sourceRef, openRun.date_from, openRun.date_to, {
+      const startedRuns = await startImport(sourceRef, openRun.date_from, openRun.date_to, {
         executionMode: retryExecutionMode,
         parentRunId: openRun.id,
       });
-      const run = runs.find((item) => item.source_key === openRun?.source_key && item.date_from === openRun?.date_from && item.date_to === openRun?.date_to && item.status === "running") ?? runs[0];
+      const startedRunId = startedRuns[0]?.id;
+      const run = startedRunId
+        ? runs.find((item) => item.id === startedRunId) ?? startedRuns[0]
+        : null;
       if (run) {
         openRun = run;
         openIssues = issuesByRun.get(run.id) ?? [];
@@ -408,11 +446,11 @@
           bind:value={filterSource}
           placeholder="Alle bronnen"
           valueSelector={(source) => source.key}
-          on:change={() => void loadRuns()}
+          on:change={() => void loadRuns("replace")}
         />
         <label class="select-field select-field--compact">
           <span class="sr-only">Filter status</span>
-          <select bind:value={filterStatus} on:change={() => void loadRuns()}>
+          <select bind:value={filterStatus} on:change={() => void loadRuns("replace")}>
             <option value="">Alle statussen</option>
             <option value="running">Draait</option>
             <option value="succeeded">Geslaagd</option>
@@ -420,7 +458,7 @@
             <option value="failed">Mislukt</option>
           </select>
         </label>
-        <button type="button" class="ghost-button" on:click={() => void loadRuns()}>Verversen</button>
+        <button type="button" class="ghost-button" on:click={() => void loadRuns("replace")}>Verversen</button>
       </div>
       <div class="admin-runs-table" aria-hidden="true">
         <div>Import</div>
@@ -432,7 +470,7 @@
         <div>Tijd</div>
       </div>
       <div class="admin-runs">
-        {#if runs.length === 0}
+        {#if runs.length === 0 && !runsBusy}
           <div class="result-state">Nog geen imports gevonden.</div>
         {:else}
           {#each runs as run}
@@ -478,6 +516,16 @@
               {/if}
             </button>
           {/each}
+          {#if runsHasMore}
+            <button
+              type="button"
+              class="ghost-button admin-runs__load-more"
+              disabled={loadingOlderRuns}
+              on:click={() => void loadRuns("append")}
+            >
+              {loadingOlderRuns ? "Oudere imports laden..." : "Laad oudere imports"}
+            </button>
+          {/if}
         {/if}
       </div>
     </section>

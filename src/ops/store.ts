@@ -90,6 +90,8 @@ export interface RunDetails {
   issues: ExtractionIssue[];
 }
 
+type RunRow = IngestRunRecord;
+
 function normalizeTrigger(trigger: string): IngestRunTrigger {
   if (trigger === "scheduled" || trigger === "user" || trigger === "manual" || trigger === "api") {
     return trigger;
@@ -273,17 +275,123 @@ export async function appendRunIssue(runId: string, issue: ExtractionIssue): Pro
   });
 }
 
+export async function findActiveRun(options: {
+  sourceKey: string;
+  dateFrom: string;
+  dateTo: string;
+  executionMode: IngestExecutionMode;
+}): Promise<IngestRunRecord | null> {
+  const db = await getDatabase();
+  const run = db
+    .prepare(
+      `SELECT
+        id, source_key, supplier, date_from, date_to, trigger_mode as trigger,
+        execution_mode, parent_run_id, projection_version, derivation_version, status,
+        started_at, finished_at, meeting_count, document_count, cache_hits, downloaded_count,
+        issue_count, quickwit_index_id, error_message
+       FROM ingest_run
+       WHERE source_key = @source_key
+         AND date_from = @date_from
+         AND date_to = @date_to
+         AND execution_mode = @execution_mode
+         AND status = 'running'
+       ORDER BY started_at DESC
+       LIMIT 1`,
+    )
+    .get({
+      source_key: options.sourceKey,
+      date_from: options.dateFrom,
+      date_to: options.dateTo,
+      execution_mode: options.executionMode,
+    }) as RunRow | undefined;
+
+  return run ? normalizeRunRecord(run) : null;
+}
+
+export async function reconcileInterruptedRuns(): Promise<IngestRunRecord[]> {
+  const db = await getDatabase();
+  const interruptedRuns = db
+    .prepare(
+      `SELECT
+        id, source_key, supplier, date_from, date_to, trigger_mode as trigger,
+        execution_mode, parent_run_id, projection_version, derivation_version, status,
+        started_at, finished_at, meeting_count, document_count, cache_hits, downloaded_count,
+        issue_count, quickwit_index_id, error_message
+       FROM ingest_run
+       WHERE status = 'running'
+       ORDER BY started_at ASC`,
+    )
+    .all() as RunRow[];
+
+  if (interruptedRuns.length === 0) {
+    return [];
+  }
+
+  const finishedAt = new Date().toISOString();
+  const message = "Process terminated before completion.";
+  const updateStatement = db.prepare(
+    `UPDATE ingest_run SET
+      status = 'failed',
+      finished_at = @finished_at,
+      error_message = COALESCE(error_message, @error_message)
+    WHERE id = @id`,
+  );
+  const insertIssueStatement = db.prepare(
+    `INSERT INTO ingest_run_issue (id, run_id, severity, step, entity_id, message, details)
+     VALUES (@id, @run_id, @severity, @step, @entity_id, @message, @details)`,
+  );
+
+  try {
+    db.exec("BEGIN");
+    for (const run of interruptedRuns) {
+      updateStatement.run({
+        id: run.id,
+        finished_at: finishedAt,
+        error_message: message,
+      });
+      insertIssueStatement.run({
+        id: crypto.randomUUID(),
+        run_id: run.id,
+        severity: "error",
+        step: "ingest_quickwit",
+        entity_id: null,
+        message,
+        details: "Automatically reconciled on startup after the previous process exited unexpectedly.",
+      });
+    }
+    db.exec("COMMIT");
+  } catch (error) {
+    try {
+      db.exec("ROLLBACK");
+    } catch {
+      // Ignore rollback failures; surface the original reconciliation error.
+    }
+    throw error;
+  }
+
+  return interruptedRuns.map((run) =>
+    normalizeRunRecord({
+      ...run,
+      status: "failed",
+      finished_at: finishedAt,
+      error_message: run.error_message ?? message,
+    })
+  );
+}
+
 export async function listRuns(
   options: {
     sourceKey?: string;
     status?: string;
     limit?: number;
+    offset?: number;
   } = {},
 ): Promise<IngestRunRecord[]> {
   const db = await getDatabase();
   const limit = options.limit ?? 50;
+  const offset = Math.max(0, options.offset ?? 0);
   const clauses: string[] = [];
-  const params: Record<string, string | number> = { limit };
+  const params: Record<string, string | number> = { limit, offset };
 
   if (options.sourceKey) {
     clauses.push("source_key = @source_key");
@@ -306,7 +414,8 @@ export async function listRuns(
        FROM ingest_run
        ${where}
        ORDER BY started_at DESC
-       LIMIT @limit`,
+       LIMIT @limit
+       OFFSET @offset`,
       )
       .all(params) as IngestRunRecord[]
   ).map(normalizeRunRecord);
@@ -324,7 +433,7 @@ export async function getRunDetails(runId: string): Promise<RunDetails | null> {
        FROM ingest_run
        WHERE id = ?`,
     )
-    .get(runId) as IngestRunRecord | undefined;
+    .get(runId) as RunRow | undefined;
 
   if (!run) {
     return null;

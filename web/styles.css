@@ -755,6 +755,11 @@ select {
   gap: 0.8rem;
 }
 
+.admin-runs__load-more {
+  justify-self: center;
+  margin-top: 0.35rem;
+}
+
 .admin-runs-table {
   display: grid;
   grid-template-columns: minmax(0, 1fr) repeat(5, 4.75rem) 11rem;

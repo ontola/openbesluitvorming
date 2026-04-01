@@ -335,10 +335,21 @@
 
   async function fetchJson<T>(url: string): Promise<T> {
     const response = await fetch(url);
-    const payload = (await response.json()) as T & { error?: string };
+    const body = await response.text();
+    const payload = body ? JSON.parse(body) as T & { error?: string } : null;
+
     if (!response.ok) {
-      throw new Error(payload.error ?? "Verzoek mislukt");
+      throw new Error(
+        payload && typeof payload === "object" && "error" in payload && payload.error
+          ? String(payload.error)
+          : `Verzoek mislukt (${response.status})`,
+      );
     }
+
+    if (payload === null) {
+      throw new Error("Lege API-respons ontvangen.");
+    }
+
     return payload;
   }
 

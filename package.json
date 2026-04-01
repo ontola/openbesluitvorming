@@ -5,16 +5,13 @@
   "scripts": {
     "web": "pnpm run build:web && deno run -A web/server.ts",
     "serve:web": "deno run -A web/server.ts",
-    "dev:cleanup": "sh -c 'for port in ${WOOZI_WEB_PORT:-4317} ${WOOZI_API_PORT:-8788}; do pids=$(lsof -ti tcp:$port -sTCP:LISTEN 2>/dev/null || true); if [ -n \"$pids\" ]; then kill $pids; sleep 1; fi; done'",
-    "dev:cleanup:web": "sh -c 'pids=$(lsof -ti tcp:${WOOZI_WEB_PORT:-4317} -sTCP:LISTEN 2>/dev/null || true); if [ -n \"$pids\" ]; then kill $pids; sleep 1; fi'",
-    "dev:api": "PORT=${WOOZI_API_PORT:-8788} pnpm run serve:web",
+    "_dev:cleanup": "sh -c 'for port in ${WOOZI_WEB_PORT:-4317} ${WOOZI_API_PORT:-8787}; do pids=$(lsof -ti tcp:$port -sTCP:LISTEN 2>/dev/null || true); if [ -n \"$pids\" ]; then kill $pids; sleep 1; fi; done'",
+    "_dev:cleanup:web": "sh -c 'pids=$(lsof -ti tcp:${WOOZI_WEB_PORT:-4317} -sTCP:LISTEN 2>/dev/null || true); if [ -n \"$pids\" ]; then kill $pids; sleep 1; fi'",
+    "dev": "pnpm run dev:docker",
+    "dev:infra": "docker compose up -d quickwit",
+    "dev:docker": "pnpm run dev:docker-api && pnpm run _dev:cleanup:web && WOOZI_API_TARGET=http://127.0.0.1:${WOOZI_API_PORT:-8787} pnpm run dev:web",
+    "dev:docker-api": "docker compose up -d --build quickwit openbesluitvorming",
     "dev:web": "vite",
-    "dev": "pnpm run dev:hmr",
-    "dev:local": "pnpm run dev:cleanup && concurrently -k -n api,web -c blue,green \"pnpm run dev:api\" \"pnpm run dev:web\"",
-    "dev:infra": "docker compose --profile local-s3 up -d minio minio-setup quickwit",
-    "dev:hmr": "pnpm run dev:docker-api && pnpm run dev:cleanup:web && WOOZI_API_TARGET=http://127.0.0.1:8787 pnpm run dev:web",
-    "dev:docker-api": "docker compose --profile local-s3 up -d --build minio minio-setup quickwit openbesluitvorming",
-    "dev:hmr:docker": "pnpm run dev:docker-api && WOOZI_API_TARGET=http://127.0.0.1:8787 pnpm run dev:web",
     "dev:down": "docker compose down",
     "build:web": "vite build",
     "test": "deno test -A",
@@ -27,6 +24,9 @@
     "format": "oxfmt --write src tests web/src/*.ts web/*.html web/*.css vite.config.ts tsconfig.json",
     "check-format": "oxfmt --check src tests web/src/*.ts web/*.html web/*.css vite.config.ts tsconfig.json"
   },
+  "dependencies": {
+    "pdfjs-dist": "^5.6.205"
+  },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^7.0.0",
     "concurrently": "^9.2.1",
@@ -38,8 +38,5 @@
     "svelte": "^5.55.1",
     "typescript": "^5.9.3",
     "vite": "^7.1.10"
-  },
-  "dependencies": {
-    "pdfjs-dist": "^5.6.205"
   }
 }

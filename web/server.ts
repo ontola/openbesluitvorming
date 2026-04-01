@@ -5,13 +5,20 @@ import type {
   SearchResponse,
 } from "../src/types.ts";
 import { startIngest } from "../src/ingest.ts";
-import { getRunDetails, listRuns } from "../src/ops/store.ts";
+import { getRunDetails, listRuns, reconcileInterruptedRuns } from "../src/ops/store.ts";
 import { listAdminSourceOptions, listRunnableSourceRefs } from "../src/sources/index.ts";
 import { getEntityContent, searchMeetings } from "./search_api.ts";
 
 const root = new URL("./", import.meta.url);
 const distRoot = new URL("./dist/", import.meta.url);
 const port = Number(Deno.env.get("PORT") ?? "8787");
+
+const reconciledRuns = await reconcileInterruptedRuns();
+if (reconciledRuns.length > 0) {
+  console.warn(
+    `Reconciled ${reconciledRuns.length} interrupted import${reconciledRuns.length === 1 ? "" : "s"} on startup.`,
+  );
+}
 
 function contentType(pathname) {
   if (pathname.endsWith(".css")) return "text/css; charset=utf-8";
@@ -70,12 +77,18 @@ Deno.serve({ port }, async (request) => {
 
   if (url.pathname === "/api/admin/runs" && request.method === "GET") {
     try {
+      const limit = Number(url.searchParams.get("limit") ?? "50");
+      const offset = Number(url.searchParams.get("offset") ?? "0");
       const runs = await listRuns({
         sourceKey: url.searchParams.get("source") ?? undefined,
         status: url.searchParams.get("status") ?? undefined,
-        limit: Number(url.searchParams.get("limit") ?? "50"),
+        limit: limit + 1,
+        offset,
       });
-      return Response.json({ runs });
+      return Response.json({
+        runs: runs.slice(0, limit),
+        hasMore: runs.length > limit,
+      });
     } catch (error) {
       return Response.json(
         { error: error instanceof Error ? error.message : "Runs ophalen mislukt" },
