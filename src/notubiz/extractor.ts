@@ -95,6 +95,7 @@ export class NotubizMeetingExtractor {
     options: {
       onProgress?: (stats: ExtractionBundle["stats"]) => Promise<void> | void;
       onIssue?: (issue: ExtractionIssue, stats: ExtractionBundle["stats"]) => Promise<void> | void;
+      onEntity?: (entity: MeetingEntity | DocumentEntity) => Promise<void> | void;
       executionMode?: IngestExecutionMode;
     } = {},
   ): Promise<ExtractionBundle> {
@@ -166,6 +167,7 @@ export class NotubizMeetingExtractor {
             );
             meetings.push(meeting);
             await options.onProgress?.(currentStats());
+            await options.onEntity?.(meeting);
             return meeting;
           } catch (error) {
             if (isSkippableMeetingError(error)) {
@@ -206,6 +208,7 @@ export class NotubizMeetingExtractor {
             downloadedCount += 1;
           }
           await options.onProgress?.(currentStats());
+          await options.onEntity?.(materialized.document);
         } catch (error) {
           await registerIssue({
             severity: "error",

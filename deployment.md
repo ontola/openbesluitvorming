@@ -63,6 +63,9 @@ Common app/runtime values:
 - `QUICKWIT_INDEX_ROOT_PREFIX`
 - `WOOZI_KV_PATH`
 - `INGEST_CONCURRENCY`
+- `INGEST_MEMORY_PER_JOB_MB`
+- `INGEST_MIN_FREE_MEMORY_MB`
+- `QUICKWIT_BATCH_SIZE`
 
 ## Docker Runtime
 
@@ -79,6 +82,37 @@ The backend entrypoint is:
 ```sh
 deno run -A web/server.ts
 ```
+
+## Import Concurrency
+
+Imports are queued in-process and use a memory-aware concurrency limit.
+
+Relevant env:
+
+- `INGEST_CONCURRENCY`
+  hard upper bound for parallel imports
+- `INGEST_MEMORY_PER_JOB_MB`
+  estimated memory budget per active import
+- `INGEST_MIN_FREE_MEMORY_MB`
+  reserve memory that should stay free before another import starts
+
+Current intended production behavior:
+
+- allow more than one import when the server has enough free memory
+- avoid the earlier unbounded fan-out that caused OOM crashes
+
+Example safe starting point on the current `cpx32` server:
+
+- `INGEST_CONCURRENCY=4`
+- `INGEST_MEMORY_PER_JOB_MB=1400`
+- `INGEST_MIN_FREE_MEMORY_MB=1024`
+
+Quickwit projection writes are now streamed during extraction in small batches instead of one big end-of-run push.
+
+Relevant env:
+
+- `QUICKWIT_BATCH_SIZE`
+  number of entity commit events to buffer before ingesting to Quickwit
 
 ## Quickwit
 

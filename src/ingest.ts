@@ -12,14 +12,26 @@ import {
 import { QuickwitClient } from "./quickwit/client.ts";
 import { currentDerivationVersion, currentProjectionVersion } from "./pipeline/versioning.ts";
 import { getSource } from "./sources/index.ts";
+import { computeAllowedIngestConcurrency } from "./ingest_scheduler.ts";
 import type {
+  EntityCommitEvent,
   IngestExecutionMode,
   IngestRunRecord,
   IngestRunTrigger,
   SourceDefinition,
+  WooziEntity,
 } from "./types.ts";
 
-const ingestConcurrency = Math.max(1, Number(Deno.env.get("INGEST_CONCURRENCY") ?? "1"));
+const ingestConcurrencyCap = Math.max(1, Number(Deno.env.get("INGEST_CONCURRENCY") ?? "4"));
+const ingestMemoryPerJobMb = Math.max(
+  256,
+  Number(Deno.env.get("INGEST_MEMORY_PER_JOB_MB") ?? "1400"),
+);
+const ingestMinFreeMemoryMb = Math.max(
+  256,
+  Number(Deno.env.get("INGEST_MIN_FREE_MEMORY_MB") ?? "1024"),
+);
+const quickwitBatchSize = Math.max(1, Number(Deno.env.get("QUICKWIT_BATCH_SIZE") ?? "64"));
 
 type QueuedIngestJob = {
   run: IngestRunRecord;
@@ -36,6 +48,20 @@ type QueuedIngestJob = {
 
 const pendingJobs: QueuedIngestJob[] = [];
 let activeIngestCount = 0;
+
+function getAllowedIngestConcurrency(): number {
+  try {
+    const memory = Deno.systemMemoryInfo();
+    return computeAllowedIngestConcurrency({
+      configuredConcurrency: ingestConcurrencyCap,
+      availableMemoryBytes: memory.available,
+      memoryPerJobMb: ingestMemoryPerJobMb,
+      minFreeMemoryMb: ingestMinFreeMemoryMb,
+    });
+  } catch {
+    return ingestConcurrencyCap;
+  }
+}
 
 function enqueueJob(job: QueuedIngestJob): void {
   if (pendingJobs.some((candidate) => candidate.run.id === job.run.id)) {
@@ -78,6 +104,26 @@ async function executeIngest(
     const source = getSource(sourceKey);
     const extractor = getExtractor(source);
     let currentRun = run;
+    let quickwit: QuickwitClient | null = null;
+    let quickwitIndexId: string | undefined;
+    const pendingEvents: Array<EntityCommitEvent<WooziEntity>> = [];
+
+    const flushQuickwitBatch = async (): Promise<void> => {
+      if (!quickwit || pendingEvents.length === 0) {
+        return;
+      }
+      const batch = pendingEvents.splice(0, pendingEvents.length);
+      await quickwit.ingestEvents(batch);
+    };
+
+    if (options.ingestToQuickwit) {
+      quickwit = new QuickwitClient();
+      const configPath = new URL("../quickwit/index-config.json", import.meta.url);
+      await quickwit.waitUntilReady();
+      await quickwit.ensureIndex(configPath.pathname);
+      quickwitIndexId = Deno.env.get("QUICKWIT_INDEX_ID") ?? "woozi-events";
+    }
+
     const extraction = await extractor.extractForDateRange(source, dateFrom, dateTo, {
       executionMode: options.executionMode,
       onProgress: async (stats) => {
@@ -99,23 +145,17 @@ async function executeIngest(
           issue_count: stats.issue_count,
         });
       },
+      onEntity: async (entity) => {
+        if (!quickwit) {
+          return;
+        }
+        pendingEvents.push(await buildEntityCommitEvent(entity));
+        if (pendingEvents.length >= quickwitBatchSize) {
+          await flushQuickwitBatch();
+        }
+      },
     });
-
-    const events = await Promise.all(
-      [...extraction.meetings, ...extraction.documents].map((entity) =>
-        buildEntityCommitEvent(entity),
-      ),
-    );
-
-    let quickwitIndexId: string | undefined;
-    if (options.ingestToQuickwit) {
-      const quickwit = new QuickwitClient();
-      const configPath = new URL("../quickwit/index-config.json", import.meta.url);
-      await quickwit.waitUntilReady();
-      await quickwit.ensureIndex(configPath.pathname);
-      await quickwit.ingestEvents(events);
-      quickwitIndexId = Deno.env.get("QUICKWIT_INDEX_ID") ?? "woozi-events";
-    }
+    await flushQuickwitBatch();
 
     const status = extraction.issues.length > 0 ? "partial" : "succeeded";
     const updated = await updateRun(run.id, {
@@ -153,7 +193,12 @@ async function executeIngest(
 }
 
 async function drainIngestQueue(): Promise<void> {
-  while (activeIngestCount < ingestConcurrency && pendingJobs.length > 0) {
+  while (pendingJobs.length > 0) {
+    const allowedConcurrency = getAllowedIngestConcurrency();
+    if (activeIngestCount >= allowedConcurrency) {
+      return;
+    }
+
     const job = pendingJobs.shift();
     if (!job) {
       return;

@@ -47,6 +47,7 @@ services:
       PORT: 8787
       QUICKWIT_URL: http://quickwit:7280
       QUICKWIT_INDEX_ID: ${QUICKWIT_INDEX_ID:-woozi-events-prod}
+      QUICKWIT_BATCH_SIZE: ${QUICKWIT_BATCH_SIZE:-64}
       WOOZI_KV_PATH: /data/woozi-ops.sqlite3
       AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY}
       AWS_SECRET_ACCESS_KEY: ${S3_SECRET_KEY}

@@ -45,6 +45,7 @@ export class IbabsMeetingExtractor {
     options: {
       onProgress?: (stats: ExtractionBundle["stats"]) => Promise<void> | void;
       onIssue?: (issue: ExtractionIssue, stats: ExtractionBundle["stats"]) => Promise<void> | void;
+      onEntity?: (entity: MeetingEntity | DocumentEntity) => Promise<void> | void;
       executionMode?: IngestExecutionMode;
     } = {},
   ): Promise<ExtractionBundle> {
@@ -82,6 +83,7 @@ export class IbabsMeetingExtractor {
       const meeting = normalizeIbabsMeeting(source, rawMeeting, meetingTypeMap);
       meetings.push(meeting);
       await options.onProgress?.(currentStats());
+      await options.onEntity?.(meeting);
 
       for (const document of normalizeIbabsDocuments(source, meeting)) {
         documentsById.set(document.id, document);
@@ -105,6 +107,7 @@ export class IbabsMeetingExtractor {
           downloadedCount += 1;
         }
         await options.onProgress?.(currentStats());
+        await options.onEntity?.(materialized.document);
       } catch (error) {
         await registerIssue({
           severity: "error",
