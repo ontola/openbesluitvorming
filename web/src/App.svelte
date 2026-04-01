@@ -1,7 +1,7 @@
 <script lang="ts">
   import { marked } from "marked";
   import { onDestroy, onMount, tick } from "svelte";
-  import { fade } from "svelte/transition";
+  import { fade, scale } from "svelte/transition";
   import type {
     AdminSourceOption,
     AdminSourcesResponse,
@@ -9,6 +9,7 @@
     SearchResponse,
     SearchResult,
   } from "../../src/types.ts";
+  import PdfDocumentView from "./PdfDocumentView.svelte";
   import SourcePicker from "./SourcePicker.svelte";
 
   type SearchRouteState = {
@@ -20,6 +21,21 @@
     dateTo: string;
     view: string;
   };
+
+  function routeHasSearchIntent(state: SearchRouteState): boolean {
+    return Boolean(
+      state.query.trim() ||
+        state.organization.trim() ||
+        state.entityType.trim() ||
+        state.dateFrom.trim() ||
+        state.dateTo.trim() ||
+        state.view.trim(),
+    );
+  }
+
+  const initialRouteState = typeof window === "undefined"
+    ? null
+    : routeStateFromUrl(new URL(window.location.href));
 
   let query = "";
   let organization = "";
@@ -36,7 +52,7 @@
   let hasMore = false;
   let loading = false;
   let loadingMore = false;
-  let searched = false;
+  let searched = initialRouteState ? routeHasSearchIntent(initialRouteState) : false;
   let filtersOpen = false;
   let searchRequestId = 0;
 
@@ -45,7 +61,6 @@
   let detailItem: SearchResult | null = null;
   let detailContent: EntityContentResponse | null = null;
   let detailMode: "text" | "pdf" = "text";
-  let detailPdfFailed = false;
   let preferredDetailMode: "text" | "pdf" = "text";
 
   const detailCache = new Map<string, EntityContentResponse | null>();
@@ -210,6 +225,10 @@
     focusQuery();
   }
 
+  function entityPdfProxyUrl(entityId: string): string {
+    return `/api/entities/${encodeURIComponent(entityId)}/pdf`;
+  }
+
   function sanitizeMarkdownSource(markdown: string): string {
     return markdown.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
   }
@@ -224,11 +243,6 @@
       breaks: true,
       gfm: true,
     }) as string;
-  }
-
-  function pdfViewerUrl(url: string): string {
-    const hash = "toolbar=0&navpanes=0&view=FitH";
-    return url.includes("#") ? `${url}&${hash}` : `${url}#${hash}`;
   }
 
   function loadPreferredDetailMode(): "text" | "pdf" {
@@ -318,16 +332,35 @@
   }
 
   function closeDetail(updateUrl = true): void {
+    const closingEntityId = detailItem?.entityId ?? "";
     detailOpen = false;
     detailLoading = false;
     detailItem = null;
     detailContent = null;
     detailMode = "text";
-    detailPdfFailed = false;
     document.body.classList.remove("body--locked");
     if (updateUrl && view) {
       view = "";
       writeRouteState();
+    }
+
+    if (closingEntityId) {
+      window.setTimeout(() => {
+        const card = document.querySelector<HTMLElement>(
+          `.result-card[data-result-id="${CSS.escape(closingEntityId)}"]`,
+        );
+        if (!card) {
+          return;
+        }
+
+        scrollResultCardIntoView(closingEntityId);
+        card.classList.remove("result-card--returning");
+        void card.offsetWidth;
+        card.classList.add("result-card--returning");
+        window.setTimeout(() => {
+          card.classList.remove("result-card--returning");
+        }, 1200);
+      }, 40);
     }
   }
 
@@ -445,7 +478,6 @@
     detailOpen = true;
     detailContent = null;
     detailMode = "text";
-    detailPdfFailed = false;
     document.body.classList.add("body--locked");
     scrollResultCardIntoView(item.entityId);
 
@@ -677,6 +709,7 @@
       return;
     }
 
+    searched = true;
     await runSearch(replace ? "replace" : "push");
   }
 
@@ -758,7 +791,6 @@
   $: hasPreviousDetail = detailIndex > 0;
   $: hasNextDetail = detailIndex >= 0 && (detailIndex < results.length - 1 || hasMore);
   $: detailMarkdownHtml = renderMarkdown(detailContent?.markdownText);
-  $: detailPdfUrl = detailContent?.pdfUrl ? pdfViewerUrl(detailContent.pdfUrl) : "";
 </script>
 
 <svelte:window on:popstate={handlePopstate} />
@@ -998,7 +1030,7 @@
 </div>
 
 {#if detailOpen && detailItem}
-  <section class="detail-overlay">
+  <section class="detail-overlay" transition:fade={{ duration: 160 }}>
     <button
       type="button"
       class="detail-overlay__backdrop"
@@ -1010,6 +1042,8 @@
       aria-modal="true"
       aria-labelledby="detail-title"
       role="dialog"
+      in:scale={{ duration: 200, start: 0.97 }}
+      out:scale={{ duration: 160, start: 0.985 }}
     >
       <div class="detail-sheet__header">
         <div class="detail-sheet__header-bar">
@@ -1073,23 +1107,23 @@
             </div>
             {#if detailContent?.downloadUrl || detailItem.downloadUrl}
               <a
-                class="primary-button button-inline"
+                class="primary-button button-with-icon"
                 href={detailContent?.downloadUrl ?? detailItem.downloadUrl}
                 aria-label="Download"
                 download
               >
-                <span class="button-inline__icon" aria-hidden="true">↓</span>
-                <span class="button-inline__label">Download</span>
+                <span class="button-icon" aria-hidden="true">↓</span>
+                <span class="button-label">Download</span>
               </a>
             {/if}
             <button
-              class="ghost-button button-inline"
+              class="ghost-button button-with-icon"
               type="button"
               aria-label="Sluiten"
               on:click={() => closeDetail()}
             >
-              <span class="button-inline__icon" aria-hidden="true">×</span>
-              <span class="button-inline__label">Sluiten</span>
+              <span class="button-icon" aria-hidden="true">×</span>
+              <span class="button-label">Sluiten</span>
             </button>
           </div>
         </div>
@@ -1118,20 +1152,9 @@
           </div>
         {:else}
           <div class="detail-sheet__pdf">
-            <iframe
-              class="detail-sheet__pdf-frame"
-              title="PDF-weergave"
-              src={detailPdfUrl}
-              on:error={() => {
-                detailPdfFailed = true;
-              }}
-            ></iframe>
-            {#if detailPdfFailed}
-              <p class="detail-sheet__pdf-fallback">
-                De ingebouwde PDF-weergave kon niet worden geladen.
-                <a href={detailContent?.pdfUrl} target="_blank" rel="noopener">Open PDF in nieuw tabblad</a>
-              </p>
-            {/if}
+            {#key detailItem.entityId}
+              <PdfDocumentView query={query} url={entityPdfProxyUrl(detailItem.entityId)} />
+            {/key}
           </div>
         {/if}
       </div>

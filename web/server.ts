@@ -151,6 +151,71 @@ Deno.serve({ port }, async (request) => {
     }
   }
 
+  if (
+    url.pathname.startsWith("/api/entities/") &&
+    url.pathname.endsWith("/pdf") &&
+    request.method === "GET"
+  ) {
+    const entityId = decodeURIComponent(
+      url.pathname.slice("/api/entities/".length, -"/pdf".length),
+    );
+
+    try {
+      const content = await getEntityContent(entityId);
+      if (!content?.pdfUrl) {
+        return Response.json({ error: "PDF niet gevonden" }, { status: 404 });
+      }
+
+      const upstreamHeaders = new Headers();
+      const range = request.headers.get("range");
+      if (range) {
+        upstreamHeaders.set("range", range);
+      }
+
+      const upstream = await fetch(content.pdfUrl, {
+        headers: upstreamHeaders,
+        redirect: "follow",
+      });
+
+      if (!upstream.ok && upstream.status !== 206) {
+        return Response.json(
+          { error: `PDF ophalen mislukt (${upstream.status})` },
+          { status: 502 },
+        );
+      }
+
+      const headers = new Headers();
+      const contentType = upstream.headers.get("content-type") ?? "application/pdf";
+      headers.set("content-type", contentType);
+
+      const contentLength = upstream.headers.get("content-length");
+      if (contentLength) {
+        headers.set("content-length", contentLength);
+      }
+
+      const contentRange = upstream.headers.get("content-range");
+      if (contentRange) {
+        headers.set("content-range", contentRange);
+      }
+
+      const acceptRanges = upstream.headers.get("accept-ranges");
+      headers.set("accept-ranges", acceptRanges ?? "bytes");
+      headers.set("cache-control", "private, max-age=60");
+
+      return new Response(upstream.body, {
+        status: upstream.status,
+        headers,
+      });
+    } catch (error) {
+      return Response.json(
+        {
+          error: error instanceof Error ? error.message : "PDF ophalen mislukt",
+        },
+        { status: 500 },
+      );
+    }
+  }
+
   if (url.pathname.startsWith("/api/entities/") && request.method === "GET") {
     const entityId = decodeURIComponent(url.pathname.replace("/api/entities/", ""));
 

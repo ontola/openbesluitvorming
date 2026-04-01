@@ -38,5 +38,8 @@
     "svelte": "^5.55.1",
     "typescript": "^5.9.3",
     "vite": "^7.1.10"
+  },
+  "dependencies": {
+    "pdfjs-dist": "^5.6.205"
   }
 }
