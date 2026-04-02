@@ -58,6 +58,7 @@ async function fetchJson<T>(input: string, init?: RequestInit): Promise<T> {
 type QuickwitSearchRequest = {
   query: string;
   max_hits?: number;
+  start_offset?: number;
   snippet_fields?: string;
   aggs?: Record<string, unknown>;
 };

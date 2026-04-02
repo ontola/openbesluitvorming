@@ -20,6 +20,7 @@
     "test:e2e": "deno test -A tests/notubiz.test.ts",
     "test:quickwit": "deno test -A tests/quickwit.test.ts",
     "test:gui": "deno test -A tests/gui_e2e.test.ts",
+    "export:opub": "deno run -A src/integrations/opub/export.ts",
     "extract:haarlem": "deno run -A src/main.ts haarlem 2025-01-14 2025-01-15",
     "ingest:haarlem": "deno run -A src/main.ts --quickwit haarlem 2025-01-14 2025-01-15",
     "lint": "oxlint src tests web/src/*.ts vite.config.ts",
