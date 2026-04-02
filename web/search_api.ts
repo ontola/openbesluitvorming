@@ -1,4 +1,12 @@
-import type { EntityContentResponse, MeetingAgendaItem, SearchResponse, SearchResult } from "../src/types.ts";
+import type {
+  AdminCoverageCell,
+  AdminCoverageResponse,
+  AdminCoverageRow,
+  EntityContentResponse,
+  MeetingAgendaItem,
+  SearchResponse,
+  SearchResult,
+} from "../src/types.ts";
 import { NotubizClient } from "../src/notubiz/client.ts";
 import { normalizeNotubizAgendaItems } from "../src/notubiz/normalize.ts";
 import { currentProjectionVersion } from "../src/pipeline/versioning.ts";
@@ -44,6 +52,17 @@ type SearchSnippet = {
 type IndexedHit = {
   hit: SearchHit;
   snippet?: SearchSnippet;
+};
+
+type CoverageBucket = {
+  key?: string;
+  doc_count?: number;
+  by_month?: {
+    buckets?: Array<{
+      key?: string;
+      doc_count?: number;
+    }>;
+  };
 };
 
 function looksLikePdf(options: { contentType?: string; fileName?: string; url?: string }): boolean {
@@ -373,6 +392,94 @@ function searchSamplingOptions(query: string, offset: number, limit: number): {
   return {
     maxHits: Math.min(Math.max(offset + limit, 24), 96),
     snippetFields: [],
+  };
+}
+
+function monthKey(month: Date): string {
+  const year = month.getUTCFullYear();
+  const value = String(month.getUTCMonth() + 1).padStart(2, "0");
+  return `${year}-${value}`;
+}
+
+function coverageMonthLabels(monthCount: number): string[] {
+  const now = new Date();
+  const currentMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const months: string[] = [];
+  for (let offset = monthCount - 1; offset >= 0; offset -= 1) {
+    const month = new Date(currentMonth);
+    month.setUTCMonth(month.getUTCMonth() - offset);
+    months.push(monthKey(month));
+  }
+  return months;
+}
+
+export async function getDocumentCoverage(monthCount = 12): Promise<AdminCoverageResponse> {
+  const months = coverageMonthLabels(Math.max(3, Math.min(monthCount, 24)));
+  const municipalitySources = listSources().filter((source) => source.organizationType === "gemeente");
+  const quickwit = new QuickwitClient();
+  const response = await quickwit.searchRequest({
+    query: `projection_version:${escapeTerm(currentProjectionVersion())} AND entity_type:Document`,
+    max_hits: 0,
+    aggs: {
+      by_source: {
+        terms: {
+          field: "source_key",
+          size: 400,
+        },
+        aggs: {
+          by_month: {
+            terms: {
+              field: "document_month",
+              size: Math.max(months.length, 24),
+            },
+          },
+        },
+      },
+    },
+  });
+
+  const sourceBuckets = ((response.aggregations?.by_source as { buckets?: CoverageBucket[] })?.buckets ??
+    []) as CoverageBucket[];
+  const bySource = new Map(sourceBuckets.map((bucket) => [bucket.key ?? "", bucket]));
+  let maxDocumentCount = 0;
+
+  const rows: AdminCoverageRow[] = municipalitySources
+    .map((source) => {
+      const sourceBucket = bySource.get(source.key);
+      const byMonth = new Map(
+        ((sourceBucket?.by_month?.buckets ?? []).map((bucket) => [
+          String(bucket.key ?? ""),
+          Number(bucket.doc_count ?? 0),
+        ])),
+      );
+      const monthCells: AdminCoverageCell[] = months.map((month) => ({
+        month,
+        documentCount: byMonth.get(month) ?? 0,
+        meetingCount: 0,
+        issueCount: 0,
+      }));
+      const totalDocumentCount = monthCells.reduce((sum, cell) => sum + cell.documentCount, 0);
+      const coveredMonthCount = monthCells.filter((cell) => cell.documentCount > 0).length;
+      maxDocumentCount = Math.max(
+        maxDocumentCount,
+        ...monthCells.map((cell) => cell.documentCount),
+      );
+
+      return {
+        sourceKey: source.key,
+        label: source.label ?? source.key,
+        supplier: source.supplier,
+        months: monthCells,
+        totalDocumentCount,
+        coveredMonthCount,
+      };
+    })
+    .sort((left, right) => left.label.localeCompare(right.label, "nl"));
+
+  return {
+    months,
+    rows,
+    maxDocumentCount,
   };
 }
 

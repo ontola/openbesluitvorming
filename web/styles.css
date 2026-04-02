@@ -637,6 +637,19 @@ select {
   color: var(--muted);
 }
 
+.admin-section-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.admin-coverage__controls {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
 .admin-form {
   display: grid;
   gap: 0.75rem;
@@ -797,6 +810,257 @@ select {
   margin: 0;
   color: var(--muted);
   font-size: 0.92rem;
+}
+
+.admin-coverage {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.admin-coverage__legend {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.7rem;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.admin-coverage__legend-scale {
+  display: inline-grid;
+  grid-template-columns: repeat(4, 1.1rem);
+  gap: 0.3rem;
+}
+
+.admin-coverage__legend-scale span {
+  height: 0.8rem;
+  border-radius: 999px;
+  border: 1px solid rgba(41, 88, 153, 0.12);
+  background: linear-gradient(180deg, rgba(78, 166, 255, 0.12), rgba(41, 88, 153, 0.18));
+}
+
+.admin-coverage__legend-scale span:nth-child(1) {
+  opacity: 0.35;
+}
+.admin-coverage__legend-scale span:nth-child(2) {
+  opacity: 0.55;
+}
+.admin-coverage__legend-scale span:nth-child(3) {
+  opacity: 0.75;
+}
+.admin-coverage__legend-scale span:nth-child(4) {
+  opacity: 1;
+}
+
+.admin-coverage__table {
+  display: grid;
+  grid-template-columns: minmax(15rem, 18rem) repeat(12, minmax(4.4rem, 1fr));
+  gap: 0.45rem;
+  overflow: auto;
+  align-items: stretch;
+}
+
+.admin-coverage__months {
+  display: grid;
+  grid-template-columns: minmax(14rem, 16rem) repeat(
+      var(--coverage-column-count, 12),
+      minmax(2rem, 1fr)
+    );
+  gap: 0.4rem;
+  align-items: end;
+}
+
+.admin-coverage__months-spacer {
+  min-height: 1px;
+}
+
+.admin-coverage__month {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  text-align: center;
+}
+
+.admin-coverage__rows {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.admin-coverage__row {
+  display: grid;
+  grid-template-columns: minmax(14rem, 16rem) minmax(0, 1fr);
+  gap: 1rem;
+  align-items: center;
+  padding: 0.8rem 1rem;
+}
+
+.admin-coverage__row-meta {
+  display: grid;
+  gap: 0.12rem;
+}
+
+.admin-coverage__row-meta strong {
+  font-size: 1rem;
+}
+
+.admin-coverage__row-meta span {
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.admin-coverage__sparkline {
+  display: grid;
+  grid-template-columns: repeat(var(--coverage-column-count, 12), minmax(2rem, 1fr));
+  gap: 0.35rem;
+  align-items: stretch;
+}
+
+.admin-coverage__bar {
+  min-height: 3rem;
+  border: 1px solid rgba(41, 88, 153, 0.12);
+  border-radius: 0.95rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.admin-coverage__bar--empty {
+  border-style: dashed;
+  background: linear-gradient(135deg, rgba(41, 88, 153, 0.04), rgba(41, 88, 153, 0.015));
+}
+
+.admin-coverage__bar--filled {
+  background: linear-gradient(
+    180deg,
+    rgba(78, 166, 255, calc(0.08 + var(--coverage-intensity) * 0.22)),
+    rgba(41, 88, 153, calc(0.1 + var(--coverage-intensity) * 0.32))
+  );
+}
+
+.admin-coverage__header,
+.admin-coverage__label,
+.admin-coverage__cell {
+  min-height: 3.15rem;
+}
+
+.admin-coverage__header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.2rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  text-align: center;
+}
+
+.admin-coverage__header--sticky {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  justify-content: flex-start;
+  background: linear-gradient(90deg, rgba(244, 249, 255, 1), rgba(244, 249, 255, 0.9));
+}
+
+.admin-coverage__label {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  display: grid;
+  gap: 0.12rem;
+  align-content: center;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.96), rgba(247, 251, 255, 0.9));
+  box-shadow: 0 10px 22px rgba(35, 71, 128, 0.05);
+}
+
+.admin-coverage__label strong {
+  font-size: 0.95rem;
+}
+
+.admin-coverage__label span {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.admin-coverage__cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(41, 88, 153, 0.12);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--text);
+  font-size: 0.88rem;
+  font-weight: 700;
+  transition:
+    transform var(--motion-fast) ease,
+    border-color var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease;
+}
+
+.admin-coverage__cell:not(:disabled) {
+  cursor: pointer;
+}
+
+.admin-coverage__cell:hover:not(:disabled),
+.admin-coverage__cell:focus-visible:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: rgba(78, 166, 255, 0.36);
+  box-shadow: 0 10px 18px rgba(35, 71, 128, 0.1);
+  outline: none;
+}
+
+.admin-coverage__cell--empty {
+  border-style: dashed;
+  background: linear-gradient(135deg, rgba(41, 88, 153, 0.04), rgba(41, 88, 153, 0.015));
+}
+
+.admin-coverage__cell--succeeded,
+.admin-coverage__cell--partial,
+.admin-coverage__cell--failed,
+.admin-coverage__cell--running,
+.admin-coverage__cell--queued {
+  background: linear-gradient(
+    180deg,
+    rgba(78, 166, 255, calc(0.08 + var(--coverage-intensity) * 0.22)),
+    rgba(41, 88, 153, calc(0.1 + var(--coverage-intensity) * 0.32))
+  );
+}
+
+.admin-coverage__cell--partial {
+  border-color: rgba(186, 140, 28, 0.34);
+  background: linear-gradient(
+    180deg,
+    rgba(243, 192, 64, calc(0.08 + var(--coverage-intensity) * 0.22)),
+    rgba(186, 140, 28, calc(0.1 + var(--coverage-intensity) * 0.28))
+  );
+}
+
+.admin-coverage__cell--failed {
+  border-color: rgba(194, 72, 72, 0.32);
+  background: linear-gradient(
+    180deg,
+    rgba(238, 121, 121, calc(0.08 + var(--coverage-intensity) * 0.2)),
+    rgba(194, 72, 72, calc(0.1 + var(--coverage-intensity) * 0.24))
+  );
+}
+
+.admin-coverage__cell--queued {
+  background: linear-gradient(
+    180deg,
+    rgba(139, 160, 208, calc(0.08 + var(--coverage-intensity) * 0.16)),
+    rgba(94, 117, 173, calc(0.09 + var(--coverage-intensity) * 0.2))
+  );
 }
 
 .admin-runs {
@@ -2230,6 +2494,33 @@ select {
     box-shadow: 0 18px 36px rgba(0, 0, 0, 0.28);
   }
 
+  .admin-coverage__header--sticky {
+    background: linear-gradient(90deg, rgba(9, 11, 15, 0.98), rgba(9, 11, 15, 0.9));
+  }
+
+  .admin-coverage__bar {
+    border-color: rgba(114, 163, 232, 0.16);
+  }
+
+  .admin-coverage__bar--empty {
+    background: linear-gradient(135deg, rgba(114, 163, 232, 0.06), rgba(114, 163, 232, 0.02));
+  }
+
+  .admin-coverage__label {
+    background: linear-gradient(90deg, rgba(14, 16, 20, 0.98), rgba(14, 16, 20, 0.9));
+    border-color: rgba(114, 163, 232, 0.16);
+    box-shadow: 0 14px 26px rgba(0, 0, 0, 0.22);
+  }
+
+  .admin-coverage__cell {
+    border-color: rgba(114, 163, 232, 0.16);
+    background: rgba(16, 19, 24, 0.88);
+  }
+
+  .admin-coverage__cell--empty {
+    background: linear-gradient(135deg, rgba(114, 163, 232, 0.06), rgba(114, 163, 232, 0.02));
+  }
+
   .surface-card--lift:hover,
   .surface-card--lift:focus-visible,
   .admin-run:hover,
@@ -2466,6 +2757,29 @@ select {
     grid-template-columns: 1fr;
   }
 
+  .admin-section-heading {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .admin-coverage__controls {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .admin-coverage__months {
+    grid-template-columns: minmax(9rem, 11rem) repeat(
+        var(--coverage-column-count, 12),
+        minmax(1.8rem, 1fr)
+      );
+  }
+
+  .admin-coverage__row {
+    grid-template-columns: 1fr;
+    gap: 0.7rem;
+  }
+
   .admin-runs-table {
     display: none;
   }
@@ -2484,6 +2798,20 @@ select {
   .hero__meta {
     flex-direction: column;
     align-items: center;
+  }
+
+  .admin-coverage__legend {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .admin-coverage__month {
+    font-size: 0.68rem;
+  }
+
+  .admin-coverage__bar {
+    min-height: 2.5rem;
+    font-size: 0.72rem;
   }
 
   .hero {

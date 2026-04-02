@@ -303,6 +303,31 @@ export interface AdminRunSummaryResponse {
   summary: AdminRunSummary;
 }
 
+export interface AdminCoverageCell {
+  month: string;
+  status?: IngestRunRecord["status"];
+  documentCount: number;
+  meetingCount: number;
+  issueCount: number;
+  startedAt?: string;
+  runId?: string;
+}
+
+export interface AdminCoverageRow {
+  sourceKey: string;
+  label: string;
+  supplier: string;
+  months: AdminCoverageCell[];
+  totalDocumentCount: number;
+  coveredMonthCount: number;
+}
+
+export interface AdminCoverageResponse {
+  months: string[];
+  rows: AdminCoverageRow[];
+  maxDocumentCount: number;
+}
+
 export interface AdminRunDetailResponse {
   run: IngestRunRecord;
   issues: IngestRunIssueRecord[];
