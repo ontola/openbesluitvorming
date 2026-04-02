@@ -349,7 +349,18 @@
   async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
     const response = await fetch(url, init);
     const body = await response.text();
-    const payload = body ? JSON.parse(body) as T & { error?: string } : null;
+    let payload: (T & { error?: string }) | null = null;
+
+    if (body) {
+      try {
+        payload = JSON.parse(body) as T & { error?: string };
+      } catch {
+        if (!response.ok) {
+          throw new Error(body.trim() || `Verzoek mislukt (${response.status})`);
+        }
+        throw new Error("Ongeldige API-respons ontvangen.");
+      }
+    }
 
     if (!response.ok) {
       throw new Error(
@@ -637,6 +648,7 @@
     if (!hasFilters) {
       searchAbortController?.abort();
       searchAbortController = null;
+      searched = false;
       results = [];
       totalCount = 0;
       totalIsApproximate = false;
