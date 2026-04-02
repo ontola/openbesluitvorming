@@ -26,6 +26,14 @@ export default defineConfig({
         target: apiTarget,
         changeOrigin: true,
       },
+      "/API.md": {
+        target: apiTarget,
+        changeOrigin: true,
+      },
+      "/schemas": {
+        target: apiTarget,
+        changeOrigin: true,
+      },
     },
   },
 });

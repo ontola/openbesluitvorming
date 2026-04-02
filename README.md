@@ -16,6 +16,10 @@ The current implementation is split into:
 - a Vite + TypeScript frontend for the public UI and admin UI
 - shared TypeScript contracts in [`src/types.ts`](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/src/types.ts)
 
+## Use the API
+
+See [API.md](./API.md)
+
 ## Running locally
 
 ```sh
@@ -121,13 +125,18 @@ Required production env includes:
 - `QUICKWIT_NODE_ID`
 - `QUICKWIT_INDEX_ROOT_PREFIX`
 
-Run it with:
+The server should run production with:
 
 ```sh
-docker compose -f docker-compose.production.yml up -d --build
+docker compose -f docker-compose.production.yml up -d
 ```
 
 Point your domain to the server first so Caddy can obtain Let's Encrypt certificates.
+
+Important:
+
+- the GHCR package must be public, or the server must be logged in to GHCR
+- code deploys should update container images, not rsync source files
 
 Quickwit defaults are intentionally different between local and production so both environments do not accidentally share the same S3-backed metastore and index:
 
