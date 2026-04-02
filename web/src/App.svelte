@@ -937,60 +937,7 @@
               }}
             />
           </label>
-          {#if searched}
-            <button
-              type="button"
-              class="ghost-button ghost-button--subtle search-panel__toggle"
-              aria-expanded={filtersOpen}
-              on:click={() => {
-                filtersOpen = !filtersOpen;
-              }}
-            >
-              <span class="search-panel__toggle-icon" aria-hidden="true">⚙</span>
-              <span class="search-panel__toggle-label">Meer instellingen</span>
-            </button>
-          {/if}
         </div>
-
-        {#if searched && filtersOpen}
-          <div class="search-panel__options">
-            <SourcePicker
-              options={sources}
-              bind:value={organization}
-              placeholder="Alle organisaties"
-              valueSelector={(source) => source.key}
-              on:change={onSourceChange}
-            />
-
-            <label class="select-field select-field--subtle select-field--compact">
-              <span class="sr-only">Type resultaat</span>
-              <select bind:value={entityType} name="entityType" on:change={onFilterChange}>
-                <option value="">Alles</option>
-                <option value="Document">Documenten</option>
-                <option value="Meeting">Vergaderingen</option>
-              </select>
-            </label>
-
-            <label class="search-field search-field--subtle search-field--compact">
-              <span class="sr-only">Van datum</span>
-              <input bind:value={dateFrom} name="dateFrom" type="date" on:change={onFilterChange} />
-            </label>
-
-            <label class="search-field search-field--subtle search-field--compact">
-              <span class="sr-only">Tot datum</span>
-              <input bind:value={dateTo} name="dateTo" type="date" on:change={onFilterChange} />
-            </label>
-
-            <label class="select-field select-field--subtle select-field--compact">
-              <span class="sr-only">Sorteren</span>
-              <select bind:value={sort} name="sort" on:change={() => void runSearch("replace")}>
-                <option value="date_desc">Nieuwste eerst</option>
-                <option value="date_asc">Oudste eerst</option>
-                <option value="title_asc">Titel A-Z</option>
-              </select>
-            </label>
-          </div>
-        {/if}
       </form>
     </div>
   </header>
@@ -1002,7 +949,60 @@
           <div class="search-results__title-group">
             <h2 class="search-results__title">{resultsTitle}</h2>
           </div>
+          <button
+            type="button"
+            class="ghost-button ghost-button--subtle search-results__toggle"
+            aria-expanded={filtersOpen}
+            on:click={() => {
+              filtersOpen = !filtersOpen;
+            }}
+          >
+            <span class="search-panel__toggle-icon" aria-hidden="true">⚙</span>
+            <span class="search-panel__toggle-label">Meer instellingen</span>
+          </button>
         </div>
+
+        {#if filtersOpen}
+          <div class="search-results__filters">
+            <div class="search-panel__options">
+              <SourcePicker
+                options={sources}
+                bind:value={organization}
+                placeholder="Alle organisaties"
+                valueSelector={(source) => source.key}
+                on:change={onSourceChange}
+              />
+
+              <label class="select-field select-field--subtle select-field--compact">
+                <span class="sr-only">Type resultaat</span>
+                <select bind:value={entityType} name="entityType" on:change={onFilterChange}>
+                  <option value="">Alles</option>
+                  <option value="Document">Documenten</option>
+                  <option value="Meeting">Vergaderingen</option>
+                </select>
+              </label>
+
+              <label class="search-field search-field--subtle search-field--compact">
+                <span class="sr-only">Van datum</span>
+                <input bind:value={dateFrom} name="dateFrom" type="date" on:change={onFilterChange} />
+              </label>
+
+              <label class="search-field search-field--subtle search-field--compact">
+                <span class="sr-only">Tot datum</span>
+                <input bind:value={dateTo} name="dateTo" type="date" on:change={onFilterChange} />
+              </label>
+
+              <label class="select-field select-field--subtle select-field--compact">
+                <span class="sr-only">Sorteren</span>
+                <select bind:value={sort} name="sort" on:change={() => void runSearch("replace")}>
+                  <option value="date_desc">Nieuwste eerst</option>
+                  <option value="date_asc">Oudste eerst</option>
+                  <option value="title_asc">Titel A-Z</option>
+                </select>
+              </label>
+            </div>
+          </div>
+        {/if}
 
         <div class:result-list--loading={loading} class="result-list" aria-busy={loading}>
           {#if initialResultsLoading}
