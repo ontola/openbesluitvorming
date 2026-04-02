@@ -904,7 +904,7 @@
     <div class="hero__glow hero__glow--right"></div>
     <div class="hero__frame">
       <div class="hero__masthead">
-        <p class="hero__admin-link"><a href="/admin.html">Admin</a> · <a href="/API.md" on:click|preventDefault={() => void openApiDocs()}>API</a></p>
+        <p class="hero__admin-link"><a href="/admin.html">Admin</a></p>
         <div bind:this={brandBlockEl} class="hero__brand-block">
           <h1 class="brand">
             <a
@@ -1085,48 +1085,53 @@
     <main class="content content--home" transition:fade={{ duration: 220 }}>
       <section class="section section--intro">
         <div class="section__heading">
-          <p class="section__label">Waarom dit bestaat</p>
-          <h2>Doorzoek besluitvorming zonder omwegen</h2>
+          <p class="section__label">Over dit project</p>
+          <h2>Open infrastructuur voor publieke besluitvorming</h2>
         </div>
         <div class="prose">
           <p>
-            OpenBesluitvorming brengt agenda&apos;s, vergaderingen, documenten en stemmingen samen
-            in één zoekmachine. Niet als gesloten loket, maar als open infrastructuur die
-            herbruikbaar is voor publieke verantwoording, journalistiek en lokaal bestuur.
+            OpenBesluitvorming brengt agenda&apos;s, vergaderingen, documenten en besluiten van
+            gemeenten, provincies en waterschappen samen in één zoekomgeving. Niet als gesloten
+            loket, maar als open infrastructuur die herbruikbaar is voor publieke verantwoording,
+            journalistiek en lokaal bestuur.
           </p>
           <p>
-            De nieuwe Woozi-architectuur zet bronextractie, events en zoekprojecties los van
-            elkaar. Daardoor blijft de keten beheersbaar, ook als het aantal documenten fors
-            groeit.
+            Zowel deze zoekmachine als de server zijn open source. Alle data — moties, vergaderingen,
+            documenten, agendapunten — is vrij te gebruiken via de zoekindex.
           </p>
         </div>
       </section>
 
       <section class="section section--cards">
         <div class="section__heading">
-          <p class="section__label">Wat je hier ziet</p>
-          <h2>Een eenvoudige startpagina voor publieke zoektoegang</h2>
+          <p class="section__label">Voor wie</p>
+          <h2>Eén dataset, veel toepassingen</h2>
         </div>
         <div class="feature-grid">
           <article class="surface-card feature-card">
-            <h3>Snel zoeken</h3>
+            <h3>Burgers &amp; journalisten</h3>
             <p>
-              Eén zoekveld voor besluiten, agenda&apos;s, documenten en vergaderstukken. Gericht op
-              publieke vindbaarheid, niet op intern beheer.
+              Zoek wat overheden hebben gezegd over een onderwerp, of volg hoe besluitvorming zich
+              heeft ontwikkeld over tijd.
             </p>
           </article>
           <article class="surface-card feature-card">
-            <h3>Open bronnen</h3>
+            <h3>Ambtenaren</h3>
             <p>
-              Notubiz en andere leveranciers worden via extractors opgehaald, genormaliseerd en als
-              herbruikbare events gepubliceerd.
+              Zoek hoe andere overheden vergelijkbare vraagstukken hebben aangepakt. Meer dan 330
+              organisaties, doorzoekbaar in één zoekveld.
             </p>
           </article>
           <article class="surface-card feature-card">
-            <h3>Schaalbaar zoeken</h3>
+            <h3>Ontwikkelaars</h3>
             <p>
-              Zoekdocumenten landen in Quickwit als projectie. De bron van waarheid blijft buiten
-              de zoekindex.
+              Bouw eigen applicaties op de zoekindex. De volledige Quickwit search API is publiek
+              beschikbaar.
+              <button
+                type="button"
+                class="inline-link"
+                on:click={() => void openApiDocs()}
+              >Bekijk de API-documentatie →</button>
             </p>
           </article>
         </div>

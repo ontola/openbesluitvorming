@@ -192,6 +192,46 @@ curl -X POST https://beta.openraadsinformatie.nl/api/v1/woozi-events-prod/search
 }
 ```
 
+## Fetching full document text
+
+Search hits include a `payload.derived_content.markdown_key` field for documents that have extracted text. This is an internal storage key — to retrieve the full markdown text, use the entity detail endpoint:
+
+```
+GET https://beta.openraadsinformatie.nl/api/entities/{entity_id}
+```
+
+### Response
+
+```json
+{
+  "entityId": "ibabs:soest:document:abc123",
+  "entityType": "Document",
+  "title": "Raadsvoorstel begroting 2024",
+  "organization": "Soest",
+  "date": "7 november 2024",
+  "markdownText": "# Raadsvoorstel begroting 2024\n\n...",
+  "downloadUrl": "https://...",
+  "contentType": "application/pdf",
+  "pdfUrl": "https://..."
+}
+```
+
+For meetings, the response includes an `agenda` array with the full nested agenda tree instead of `markdownText`.
+
+### Example: fetch document text
+
+```bash
+curl https://beta.openraadsinformatie.nl/api/entities/ibabs%3Asoest%3Adocument%3Aabc123
+```
+
+> **Note:** `entity_id` values come from the `entity_id` field in search hits. URL-encode the colons: `ibabs:soest:document:abc123` → `ibabs%3Asoest%3Adocument%3Aabc123`.
+
+### Typical workflow
+
+1. Search with the Quickwit API to find relevant documents
+2. Take the `entity_id` from a hit
+3. Call `/api/entities/{entity_id}` to retrieve the full text
+
 ## Schemas
 
 The canonical entity schemas are published as JSON Schema documents:
