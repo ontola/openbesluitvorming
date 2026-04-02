@@ -1315,7 +1315,6 @@
             {#key detailItem.entityId}
               <PdfDocumentView
                 initialPage={parsePageNumber(detailPage) ?? detailItem.matchedPage ?? null}
-                matchPreview={detailItem.summary}
                 on:pagechange={handlePdfPageChange}
                 query={query}
                 url={entityPdfProxyUrl(detailItem.entityId)}

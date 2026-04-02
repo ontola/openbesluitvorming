@@ -644,10 +644,43 @@ select {
   gap: 1rem;
 }
 
+.admin-coverage__toggle {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.admin-coverage__toggle h2 {
+  margin: 0;
+}
+
+.admin-coverage__toggle span {
+  color: var(--muted);
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.admin-coverage__toggle:hover span,
+.admin-coverage__toggle:focus-visible span {
+  color: var(--accent-deep);
+}
+
+.admin-coverage__toggle:focus-visible {
+  outline: none;
+}
+
 .admin-coverage__controls {
   display: flex;
   align-items: center;
   gap: 0.75rem;
+  margin-top: 0.85rem;
 }
 
 .admin-form {
