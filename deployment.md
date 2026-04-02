@@ -83,6 +83,71 @@ The backend entrypoint is:
 deno run -A web/server.ts
 ```
 
+## Deployment Model
+
+Routine production deploys should be image-based, not file-based.
+
+The intended flow is:
+
+1. push a commit to `main`
+2. GitHub Actions builds and publishes the app image to GHCR
+3. the server pulls the new image and restarts the app service
+
+Published image tags:
+
+- `ghcr.io/openstate/woozi-openbesluitvorming:main`
+- `ghcr.io/openstate/woozi-openbesluitvorming:sha-<git-sha>`
+- `ghcr.io/openstate/woozi-openbesluitvorming:latest`
+
+The workflow lives in:
+
+- [publish-openbesluitvorming.yml](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/.github/workflows/publish-openbesluitvorming.yml)
+
+This is the normal beta deploy command after CI has published the current commit image:
+
+```sh
+pnpm run deploy:beta
+```
+
+That script:
+
+- resolves the current local Git commit SHA in the same short form GHCR publishes
+- targets `ghcr.io/openstate/woozi-openbesluitvorming:sha-<short-git-sha>`
+- SSHes into the server
+- runs `docker compose pull openbesluitvorming`
+- restarts `openbesluitvorming` and `caddy`
+
+The script is:
+
+- [scripts/deploy-beta.sh](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/scripts/deploy-beta.sh)
+
+The deploy helper derives the GHCR owner from the local `origin` remote by default. If that is not what you want, set:
+
+- `IMAGE_REPOSITORY=ghcr.io/<owner>/woozi-openbesluitvorming`
+
+### Infra File Updates
+
+Production still depends on a small set of repo-managed runtime files on the server:
+
+- [docker-compose.production.yml](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/docker-compose.production.yml)
+- [Caddyfile](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/Caddyfile)
+- [quickwit/quickwit.yaml](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/quickwit/quickwit.yaml)
+
+When those files change, sync them explicitly:
+
+```sh
+pnpm run deploy:beta:infra
+```
+
+That helper is:
+
+- [scripts/deploy-beta-infra.sh](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/scripts/deploy-beta-infra.sh)
+
+So the operational split is:
+
+- code changes: publish image, then `deploy:beta`
+- infra/config file changes: `deploy:beta:infra`
+
 ## Import Concurrency
 
 Imports are queued in-process and use a memory-aware concurrency limit.
@@ -251,6 +316,8 @@ The intended simple production shape is:
 - `openbesluitvorming` container
 - external Hetzner Object Storage
 - `Caddy` in front for TLS termination and reverse proxy
+
+The production compose file should use a published app image, not build on the server.
 
 Production traffic should look like:
 

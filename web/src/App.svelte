@@ -58,6 +58,18 @@
   let filtersOpen = false;
   let searchRequestId = 0;
 
+  let showApiDocs = false;
+  let apiDocsHtml = "";
+
+  async function openApiDocs() {
+    if (!apiDocsHtml) {
+      const res = await fetch("/API.md");
+      const text = await res.text();
+      apiDocsHtml = renderMarkdown(text);
+    }
+    showApiDocs = true;
+  }
+
   let detailOpen = false;
   let detailLoading = false;
   let detailItem: SearchResult | null = null;
@@ -892,7 +904,7 @@
     <div class="hero__glow hero__glow--right"></div>
     <div class="hero__frame">
       <div class="hero__masthead">
-        <p class="hero__admin-link"><a href="/admin.html">Admin</a></p>
+        <p class="hero__admin-link"><a href="/admin.html">Admin</a> · <a href="/API.md" on:click|preventDefault={() => void openApiDocs()}>API</a></p>
         <div bind:this={brandBlockEl} class="hero__brand-block">
           <h1 class="brand">
             <a
@@ -1275,6 +1287,49 @@
             {/key}
           </div>
         {/if}
+      </div>
+    </div>
+  </section>
+{/if}
+
+{#if showApiDocs}
+  <section class="detail-overlay" transition:fade={{ duration: 160 }}>
+    <button
+      type="button"
+      class="detail-overlay__backdrop"
+      aria-label="Sluiten"
+      on:click={() => (showApiDocs = false)}
+    ></button>
+    <div
+      class="detail-sheet detail-sheet--reader"
+      aria-modal="true"
+      role="dialog"
+      in:scale={{ duration: 200, start: 0.97 }}
+      out:scale={{ duration: 160, start: 0.985 }}
+    >
+      <div class="detail-sheet__header">
+        <div class="detail-sheet__header-bar">
+          <div class="detail-sheet__meta">
+            <span class="pill">API</span>
+          </div>
+          <div class="detail-sheet__header-actions">
+            <button
+              type="button"
+              class="ghost-button"
+              aria-label="Sluiten"
+              on:click={() => (showApiDocs = false)}
+            >✕</button>
+          </div>
+        </div>
+        <div class="detail-sheet__header-top">
+          <h2 class="detail-sheet__title">Search API</h2>
+        </div>
+      </div>
+      <div class="detail-sheet__body">
+        <div class="detail-sheet__text prose-detail">
+          <!-- eslint-disable-next-line svelte/no-at-html-tags -->
+          {@html apiDocsHtml}
+        </div>
       </div>
     </div>
   </section>

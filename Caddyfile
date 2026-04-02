@@ -9,5 +9,13 @@
 
   encode gzip zstd
 
+  # Expose Quickwit search API publicly (read-only paths only)
+  @quickwit {
+    path /api/v1/*
+    method GET POST
+    not path /api/v1/*/ingest /api/v1/*/delete /api/v1/indexes
+  }
+  reverse_proxy @quickwit quickwit:7280
+
   reverse_proxy openbesluitvorming:8787
 }

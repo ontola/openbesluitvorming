@@ -27,6 +27,8 @@ COPY package.json ./
 COPY quickwit ./quickwit
 COPY src ./src
 COPY web ./web
+COPY API.md ./
+COPY schemas ./schemas
 COPY --from=web-build /app/node_modules ./node_modules
 COPY --from=web-build /app/web/dist ./web/dist
 
