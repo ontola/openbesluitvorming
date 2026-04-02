@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -rn \"openbesluitvorming.nl\\\\|beta\\\\.\" /Users/joep/dev/github/openstate/open-raadsinformatie/woozi/scripts/ /Users/joep/dev/github/openstate/open-raadsinformatie/woozi/*.md)"
+    ]
+  }
+}

@@ -103,13 +103,51 @@ That setup is intended for:
 
 with external S3-compatible object storage from `.env`.
 
-Preferred beta deploy from a clean local Git checkout:
+Preferred beta deploy flow:
+
+```sh
+git push origin main
+```
+
+That triggers the GitHub Actions workflow in [.github/workflows/publish-openbesluitvorming.yml](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/.github/workflows/publish-openbesluitvorming.yml), which builds and publishes:
+
+- `ghcr.io/openstate/woozi-openbesluitvorming:main`
+- `ghcr.io/openstate/woozi-openbesluitvorming:sha-<git-sha>`
+- `ghcr.io/openstate/woozi-openbesluitvorming:latest`
+
+Then update beta to the exact current commit image:
 
 ```sh
 pnpm run deploy:beta
 ```
 
-This pushes a committed Git ref over SSH to the server and redeploys from a clean Git worktree there, instead of syncing loose files with `rsync`.
+`deploy:beta` now does one thing: over SSH, it tells the server to pull `ghcr.io/openstate/woozi-openbesluitvorming:sha-<short-git-sha>` and restart the app container.
+
+Before it deploys, it checks the running server for active imports and refuses to restart the app if any imports are still `running`.
+
+To override that safety check:
+
+```sh
+FORCE=1 pnpm run deploy:beta
+```
+
+By default, `deploy:beta` derives the GHCR owner from your `origin` remote. If you need to override it explicitly:
+
+```sh
+IMAGE_REPOSITORY=ghcr.io/your-org/woozi-openbesluitvorming pnpm run deploy:beta
+```
+
+When production infra files change, sync those separately:
+
+```sh
+pnpm run deploy:beta:infra
+```
+
+That is only for runtime config such as:
+
+- [docker-compose.production.yml](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/docker-compose.production.yml)
+- [Caddyfile](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/Caddyfile)
+- [quickwit/quickwit.yaml](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/quickwit/quickwit.yaml)
 
 Required production env includes:
 

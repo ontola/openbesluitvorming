@@ -14,6 +14,7 @@
     "dev:web": "vite",
     "dev:down": "docker compose down",
     "deploy:beta": "bash scripts/deploy-beta.sh",
+    "deploy:beta:infra": "bash scripts/deploy-beta-infra.sh",
     "build:web": "vite build",
     "test": "deno test -A",
     "test:e2e": "deno test -A tests/notubiz.test.ts",

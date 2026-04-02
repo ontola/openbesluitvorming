@@ -13,6 +13,7 @@ import { getEntityContent, searchMeetings } from "./search_api.ts";
 
 const root = new URL("./", import.meta.url);
 const distRoot = new URL("./dist/", import.meta.url);
+const projectRoot = new URL("../", import.meta.url);
 const port = Number(Deno.env.get("PORT") ?? "8787");
 
 const reconciledRuns = await reconcileInterruptedRuns();
@@ -57,6 +58,17 @@ async function readStaticFile(pathname: string): Promise<Uint8Array | null> {
 
 Deno.serve({ port }, async (request) => {
   const url = new URL(request.url);
+
+  if (url.pathname === "/API.md") {
+    const file = await Deno.readFile(new URL("./API.md", projectRoot));
+    return new Response(file, { headers: { "content-type": "text/plain; charset=utf-8" } });
+  }
+
+  const schemaMatch = url.pathname.match(/^\/schemas\/([\w.-]+\.schema\.json)$/);
+  if (schemaMatch) {
+    const file = await Deno.readFile(new URL(`./schemas/${schemaMatch[1]}`, projectRoot));
+    return new Response(file, { headers: { "content-type": "application/schema+json; charset=utf-8" } });
+  }
 
   if (url.pathname === "/api/admin/sources") {
     return Response.json<AdminSourcesResponse>({

@@ -36,9 +36,8 @@ services:
       - ./quickwit/quickwit.yaml:/quickwit/config/quickwit.yaml:ro
 
   openbesluitvorming:
-    build:
-      context: .
-      dockerfile: Dockerfile.web
+    image: ${OPENBESLUITVORMING_IMAGE:-ghcr.io/openstate/woozi-openbesluitvorming:main}
+    pull_policy: always
     depends_on:
       - quickwit
     restart: unless-stopped
