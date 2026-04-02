@@ -12,3 +12,11 @@ storage:
     endpoint: ${S3_STORAGE_ENDPOINT}
     region: ${S3_STORAGE_REGION}
     force_path_style_access: true
+searcher:
+  fast_field_cache_capacity: ${QUICKWIT_FAST_FIELD_CACHE_CAPACITY:-1G}
+  split_footer_cache_capacity: ${QUICKWIT_SPLIT_FOOTER_CACHE_CAPACITY:-512M}
+  partial_request_cache_capacity: ${QUICKWIT_PARTIAL_REQUEST_CACHE_CAPACITY:-128M}
+  split_cache:
+    max_num_bytes: ${QUICKWIT_SPLIT_CACHE_MAX_NUM_BYTES:-10G}
+    max_num_splits: ${QUICKWIT_SPLIT_CACHE_MAX_NUM_SPLITS:-10000}
+    num_concurrent_downloads: ${QUICKWIT_SPLIT_CACHE_NUM_CONCURRENT_DOWNLOADS:-2}
