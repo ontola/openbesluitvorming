@@ -61,6 +61,12 @@ Common app/runtime values:
 - `QUICKWIT_CLUSTER_ID`
 - `QUICKWIT_NODE_ID`
 - `QUICKWIT_INDEX_ROOT_PREFIX`
+- `QUICKWIT_FAST_FIELD_CACHE_CAPACITY`
+- `QUICKWIT_SPLIT_FOOTER_CACHE_CAPACITY`
+- `QUICKWIT_PARTIAL_REQUEST_CACHE_CAPACITY`
+- `QUICKWIT_SPLIT_CACHE_MAX_NUM_BYTES`
+- `QUICKWIT_SPLIT_CACHE_MAX_NUM_SPLITS`
+- `QUICKWIT_SPLIT_CACHE_NUM_CONCURRENT_DOWNLOADS`
 - `WOOZI_KV_PATH`
 - `INGEST_CONCURRENCY`
 - `INGEST_MEMORY_PER_JOB_MB`
@@ -201,12 +207,47 @@ Important current behavior:
 - Quickwit stores index data in S3-compatible object storage
 - metastore is also in S3-compatible object storage
 - local disk still matters for runtime state and temp work, but persistent index storage is remote
+- search latency is therefore influenced by object-storage round trips unless searcher caches are configured well
 
 So this stack is not "just Node" and it is not "just the app container":
 
 - `openbesluitvorming` serves search/admin/document APIs
 - `quickwit` handles indexing/search
 - S3-compatible object storage holds document artifacts and Quickwit index data
+
+### Quickwit Search Tuning
+
+The current production config now enables explicit Quickwit searcher caches.
+
+Configured areas:
+
+- in-memory fast field cache
+- in-memory split footer cache
+- in-memory partial request cache
+- on-disk split cache under `data_dir`
+
+This matters because the production stack stores both the metastore and the index splits in
+S3-compatible object storage. Without these caches, repeated searches are much more exposed to:
+
+- S3/object-storage latency variance
+- repeated split downloads
+- repeated fast-field reads for date filters and aggregations
+
+Current default tuning for the `cpx32` box:
+
+- `QUICKWIT_FAST_FIELD_CACHE_CAPACITY=1G`
+- `QUICKWIT_SPLIT_FOOTER_CACHE_CAPACITY=512M`
+- `QUICKWIT_PARTIAL_REQUEST_CACHE_CAPACITY=128M`
+- `QUICKWIT_SPLIT_CACHE_MAX_NUM_BYTES=10G`
+- `QUICKWIT_SPLIT_CACHE_MAX_NUM_SPLITS=10000`
+- `QUICKWIT_SPLIT_CACHE_NUM_CONCURRENT_DOWNLOADS=2`
+
+These are intentionally moderate values for an `8 GB` VM that is also running the app container.
+If search remains slow after caches are warm, the next things to look at are:
+
+- moving from `cpx32` to `cpx42` or a dedicated `ccx` instance
+- separating heavy import activity from search traffic
+- verifying that repeated queries are actually hitting the warm caches
 
 ### Quickwit Environment Split
 
