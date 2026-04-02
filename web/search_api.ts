@@ -350,6 +350,32 @@ function groupIndexedHits(items: IndexedHit[]): IndexedHit[] {
   return [...grouped.values()];
 }
 
+function searchSamplingOptions(query: string, offset: number, limit: number): {
+  maxHits: number;
+  snippetFields: string[];
+} {
+  const queryLength = query.trim().length;
+
+  if (queryLength >= 4) {
+    return {
+      maxHits: Math.min(Math.max((offset + limit) * 3, 72), 240),
+      snippetFields: ["content", "name"],
+    };
+  }
+
+  if (queryLength >= 2) {
+    return {
+      maxHits: Math.min(Math.max((offset + limit) * 2, 48), 144),
+      snippetFields: [],
+    };
+  }
+
+  return {
+    maxHits: Math.min(Math.max(offset + limit, 24), 96),
+    snippetFields: [],
+  };
+}
+
 export async function searchMeetings(
   options: {
     query?: string;
@@ -371,12 +397,12 @@ export async function searchMeetings(
   const offset = Math.max(0, options.offset ?? 0);
   const limit = Math.max(1, Math.min(options.limit ?? 24, 100));
   const quickwit = new QuickwitClient();
-  const maxHits = Math.min(Math.max((offset + limit) * 4, 96), 400);
+  const { maxHits, snippetFields } = searchSamplingOptions(query, offset, limit);
   const response = await quickwit.search(
     buildQuickwitQuery(query, organization, entityType),
     maxHits,
     {
-      snippetFields: query ? ["content", "name"] : [],
+      snippetFields,
     },
   );
 

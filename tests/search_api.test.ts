@@ -16,7 +16,7 @@ Deno.test("searchMeetings dedupes to the latest hit and keeps the newest snippet
     }
 
     const body = JSON.parse(String((init as { body?: string } | undefined)?.body ?? "{}"));
-    assert(body.max_hits === 96, "search should over-fetch before deduping");
+    assert(body.max_hits === 72, "search should still over-fetch before deduping");
 
     return new Response(
       JSON.stringify({
@@ -201,7 +201,7 @@ Deno.test("searchMeetings supports offset paging and signals more results approx
 
   globalThis.fetch = async (_input, init) => {
     const body = JSON.parse(String((init as { body?: string } | undefined)?.body ?? "{}"));
-    assert(body.max_hits === 192, "search should increase over-fetch for deeper pages");
+    assert(body.max_hits === 144, "search should still increase over-fetch for deeper pages");
 
     const hits = Array.from({ length: 30 }, (_, index) => ({
       time: `2026-03-31T${String(index).padStart(2, "0")}:00:00Z`,
@@ -235,6 +235,35 @@ Deno.test("searchMeetings supports offset paging and signals more results approx
     assert(response.results.length === 6, "second page should contain remaining results");
     assert(response.hasMore === false, "paging should stop when the fetched page is exhausted");
     assert(response.totalCount === 30, "total count should be forwarded");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+Deno.test("searchMeetings uses cheaper search settings for short queries", async () => {
+  const originalFetch = globalThis.fetch;
+
+  globalThis.fetch = async (_input, init) => {
+    const body = JSON.parse(String((init as { body?: string } | undefined)?.body ?? "{}"));
+    assert(body.max_hits === 48, "two-character queries should not over-fetch as aggressively");
+    assert(
+      body.snippet_fields === undefined,
+      "short queries should skip snippet generation to reduce search cost",
+    );
+
+    return new Response(
+      JSON.stringify({
+        num_hits: 0,
+        hits: [],
+      }),
+      {
+        headers: { "content-type": "application/json" },
+      },
+    );
+  };
+
+  try {
+    await searchMeetings({ query: "de" });
   } finally {
     globalThis.fetch = originalFetch;
   }
