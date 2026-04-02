@@ -9,6 +9,7 @@ type QuickwitSearchResponse = {
   num_hits: number;
   hits: Array<Record<string, unknown>>;
   snippets?: Array<Record<string, string[]>>;
+  aggregations?: Record<string, unknown>;
 };
 
 function isRetryableSearchError(error: unknown): boolean {
@@ -53,6 +54,13 @@ async function fetchJson<T>(input: string, init?: RequestInit): Promise<T> {
   }
   return (await response.json()) as T;
 }
+
+type QuickwitSearchRequest = {
+  query: string;
+  max_hits?: number;
+  snippet_fields?: string;
+  aggs?: Record<string, unknown>;
+};
 
 export class QuickwitClient {
   constructor(
@@ -164,20 +172,21 @@ export class QuickwitClient {
   ): Promise<QuickwitSearchResponse> {
     const { snippetFields = [] } = options;
 
-    return await fetchJson<QuickwitSearchResponse>(
-      `${this.baseUrl}/api/v1/${this.indexId}/search`,
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({
-          query,
-          max_hits: maxHits,
-          ...(snippetFields.length > 0 ? { snippet_fields: snippetFields.join(",") } : {}),
-        }),
+    return await this.searchRequest({
+      query,
+      max_hits: maxHits,
+      ...(snippetFields.length > 0 ? { snippet_fields: snippetFields.join(",") } : {}),
+    });
+  }
+
+  async searchRequest(body: QuickwitSearchRequest): Promise<QuickwitSearchResponse> {
+    return await fetchJson<QuickwitSearchResponse>(`${this.baseUrl}/api/v1/${this.indexId}/search`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
       },
-    );
+      body: JSON.stringify(body),
+    });
   }
 
   async searchEventually(

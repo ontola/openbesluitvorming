@@ -1,4 +1,5 @@
 import {
+  getCatalogSourceByKey,
   getCatalogSourceByRef,
   listCatalogSources,
   listImplementedCatalogSources,
@@ -11,15 +12,21 @@ function assert(condition: unknown, message: string): asserts condition {
   }
 }
 
-Deno.test("generated source catalog includes the full ORI inventory with unique source refs", () => {
+Deno.test("source catalog includes the full ORI inventory with unique source refs and keys", () => {
   const sources = listCatalogSources();
   const refs = new Set(sources.map((source) => source.sourceRef));
+  const keys = new Set(sources.map((source) => source.key));
 
   assert(sources.length === 330, "expected the full ORI source inventory");
   assert(refs.size === sources.length, "sourceRef must be unique across all imported ORI sources");
+  assert(keys.size === sources.length, "key must be globally unique across the source catalog");
   assert(
     getCatalogSourceByRef("notubiz:gemeente:haarlem").allmanakId === 38688,
     "expected Haarlem Notubiz source in the catalog",
+  );
+  assert(
+    getCatalogSourceByKey("haarlem").sourceRef === "notubiz:gemeente:haarlem",
+    "expected bare source key lookup to resolve uniquely",
   );
   assert(
     getCatalogSourceByRef("ibabs:provincie:noord-holland").ibabsSitename === "noord-holland",

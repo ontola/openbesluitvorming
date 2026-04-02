@@ -1,6 +1,8 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
   import type {
+    AdminCoverageResponse,
+    AdminCoverageRow,
     AdminRunDetailResponse,
     AdminRerunRequest,
     AdminRerunResponse,
@@ -24,10 +26,19 @@
   let filterSources: AdminSourceOption[] = [];
   let runs: IngestRunRecord[] = [];
   let runSummary: AdminRunSummary | null = null;
+  let coverageRows: AdminCoverageRow[] = [];
+  let coverageMonths: string[] = [];
+  let coverageMaxDocuments = 0;
   let issuesByRun = new Map<string, IngestRunIssueRecord[]>();
   let runsHasMore = false;
   let runsBusy = false;
   let loadingOlderRuns = false;
+  let coverageBusy = false;
+  let bootLoading = true;
+  let bootError = "";
+
+  let coverageMonthCount = "12";
+  let coverageOpen = false;
 
   const RUNS_PAGE_SIZE = 50;
 
@@ -124,6 +135,36 @@
     return dateValue;
   }
 
+  function monthLabel(month: string): string {
+    const date = new Date(`${month}T00:00:00Z`);
+    return date.toLocaleDateString("nl-NL", {
+      month: "short",
+      year: "numeric",
+      timeZone: "UTC",
+    });
+  }
+
+  function coverageIntensity(documentCount: number): number {
+    if (documentCount <= 0 || coverageMaxDocuments <= 0) return 0;
+    return Math.max(0.18, Math.min(1, documentCount / coverageMaxDocuments));
+  }
+
+  function coverageTooltip(
+    sourceLabel: string,
+    month: string,
+    cell: AdminCoverageRow["months"][number],
+  ): string {
+    if (cell.documentCount <= 0) {
+      return `${sourceLabel} · ${monthLabel(month)} · geen documenten geïndexeerd`;
+    }
+
+    return [
+      sourceLabel,
+      monthLabel(month),
+      `${cell.documentCount} documenten`,
+    ].filter(Boolean).join(" · ");
+  }
+
   function searchUrlForRun(run: IngestRunRecord): string {
     const params = new URLSearchParams({
       organization: run.source_key,
@@ -174,12 +215,23 @@
   async function fetchJson<TPayload>(url: string, options?: RequestInit): Promise<TPayload> {
     const response = await fetch(url, options);
     const body = await response.text();
-    const payload = body ? JSON.parse(body) as TPayload & { error?: string } : null;
+    const payload = body
+      ? (() => {
+          try {
+            return JSON.parse(body) as TPayload & { error?: string };
+          } catch {
+            return null;
+          }
+        })()
+      : null;
     if (!response.ok) {
+      const fallbackMessage = response.status >= 500 && !payload
+        ? "De admin-backend is niet beschikbaar of start nog op."
+        : `Verzoek mislukt (${response.status})`;
       throw new Error(
         payload && typeof payload === "object" && "error" in payload && payload.error
           ? String(payload.error)
-          : `Verzoek mislukt (${response.status})`,
+          : body.trim() || fallbackMessage,
       );
     }
     if (payload === null) {
@@ -195,8 +247,8 @@
   function schedulePolling(): void {
     if (pollTimer !== null) return;
     pollTimer = window.setInterval(() => {
-      void loadRuns();
-    }, 1500);
+      void refreshPolledState();
+    }, 5000);
   }
 
   function stopPolling(): void {
@@ -230,6 +282,49 @@
   async function loadRunSummary(): Promise<void> {
     const payload = await fetchJson<AdminRunSummaryResponse>("/api/admin/summary");
     runSummary = payload.summary;
+  }
+
+  async function loadCoverage(): Promise<void> {
+    coverageBusy = true;
+    try {
+      const payload = await fetchJson<AdminCoverageResponse>(
+        `/api/admin/coverage?months=${coverageMonthCount}`,
+      );
+      coverageRows = payload.rows ?? [];
+      coverageMonths = payload.months ?? [];
+      coverageMaxDocuments = payload.maxDocumentCount ?? 0;
+    } finally {
+      coverageBusy = false;
+    }
+  }
+
+  async function refreshPolledState(): Promise<void> {
+    await loadRunSummary();
+
+    const params = new URLSearchParams();
+    if (filterSource) params.set("source", filterSource);
+    if (filterStatus) params.set("status", filterStatus);
+    params.set("limit", `${RUNS_PAGE_SIZE}`);
+
+    const payload = await fetchJson<AdminRunsResponse>(`/api/admin/runs?${params.toString()}`);
+    const fetchedRuns = payload.runs ?? [];
+    runsHasMore = Boolean(payload.hasMore);
+    runs = fetchedRuns;
+    issuesByRun = await mergeRunIssues(runs);
+
+    if (openRun) {
+      const current = runs.find((run) => run.id === openRun?.id);
+      if (current) {
+        openRun = current;
+        openIssues = issuesByRun.get(current.id) ?? [];
+      } else {
+        closeDetail();
+      }
+    }
+
+    if (!hasActiveRuns(runs)) {
+      stopPolling();
+    }
   }
 
   async function mergeRunIssues(items: IngestRunRecord[]): Promise<Map<string, IngestRunIssueRecord[]>> {
@@ -403,8 +498,17 @@
     lastWeek.setDate(lastWeek.getDate() - 7);
     importDateFrom = formatDateInputValue(lastWeek);
 
-    await loadSources();
-    await loadRuns();
+    try {
+      bootLoading = true;
+      bootError = "";
+      await loadSources();
+      await loadCoverage();
+      await loadRuns();
+    } catch (error) {
+      bootError = error instanceof Error ? error.message : "Admin laden mislukt.";
+    } finally {
+      bootLoading = false;
+    }
     document.addEventListener("keydown", handleEscape);
   });
 
@@ -416,6 +520,15 @@
 
 <div class="page-shell">
   <main class="content content--admin">
+    {#if bootLoading}
+      <section class="section">
+        <div class="result-state">Loading...</div>
+      </section>
+    {:else if bootError}
+      <section class="section">
+        <div class="result-state">{bootError}</div>
+      </section>
+    {:else}
     <section class="section">
       <a class="admin-back-link" href="/">← Terug naar zoeken</a>
       <div class="section__heading">
@@ -486,6 +599,95 @@
         </div>
       </section>
     {/if}
+
+    <section class="section">
+      <div class="section__heading admin-section-heading">
+        <div>
+          <h2>Dekking gemeenten</h2>
+          <p class="admin-inline-note">
+            Snel zicht op documentvolume per maand, zodat gaten en opvallende dalingen meteen zichtbaar zijn.
+          </p>
+        </div>
+        <div class="admin-coverage__controls">
+          <label class="select-field select-field--compact">
+            <span class="sr-only">Periode voor dekkingsoverzicht</span>
+            <select
+              bind:value={coverageMonthCount}
+              on:change={() => {
+                void loadCoverage();
+              }}
+            >
+              <option value="6">Laatste 6 maanden</option>
+              <option value="12">Laatste 12 maanden</option>
+              <option value="24">Laatste 24 maanden</option>
+            </select>
+          </label>
+          <button
+            type="button"
+            class="ghost-button"
+            aria-expanded={coverageOpen}
+            on:click={() => {
+              coverageOpen = !coverageOpen;
+            }}
+          >
+            {coverageOpen ? "Verberg dekking" : "Toon dekking"}
+          </button>
+        </div>
+      </div>
+      {#if coverageOpen && coverageRows.length > 0}
+        <div class="admin-coverage">
+          <div class="admin-coverage__legend">
+            <span>Geen documenten</span>
+            <div class="admin-coverage__legend-scale" aria-hidden="true">
+              <span></span>
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+            <span>Meer documenten</span>
+          </div>
+          <div
+            class="admin-coverage__months"
+            style={`--coverage-column-count:${coverageMonths.length}`}
+          >
+            <div class="admin-coverage__months-spacer"></div>
+            {#each coverageMonths as month}
+              <div class="admin-coverage__month">{monthLabel(month)}</div>
+            {/each}
+          </div>
+          <div class="admin-coverage__rows">
+            {#each coverageRows as row}
+              <article class="surface-card admin-coverage__row">
+                <div class="admin-coverage__row-meta">
+                  <strong>{row.label}</strong>
+                  <span>{row.totalDocumentCount} documenten</span>
+                </div>
+                <div
+                  class="admin-coverage__sparkline"
+                  style={`--coverage-column-count:${coverageMonths.length}`}
+                >
+                  {#each row.months as cell}
+                    <div
+                      class={`admin-coverage__bar ${cell.documentCount > 0 ? "admin-coverage__bar--filled" : "admin-coverage__bar--empty"}`}
+                      style={`--coverage-intensity:${coverageIntensity(cell.documentCount)}`}
+                      title={coverageTooltip(row.label, cell.month, cell)}
+                    >
+                      {#if cell.documentCount > 0}
+                        <span>{cell.documentCount}</span>
+                      {/if}
+                    </div>
+                  {/each}
+                </div>
+              </article>
+            {/each}
+          </div>
+        </div>
+      {:else if coverageOpen && coverageBusy}
+        <div class="result-state">Dekkingsoverzicht laden...</div>
+      {:else if coverageOpen}
+        <div class="result-state">Nog geen gemeentelijke importgeschiedenis beschikbaar.</div>
+      {/if}
+    </section>
 
     <section class="section">
       <div class="section__heading admin-section-heading">
@@ -581,6 +783,7 @@
         {/if}
       </div>
     </section>
+    {/if}
   </main>
 </div>
 

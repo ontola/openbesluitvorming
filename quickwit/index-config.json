@@ -36,8 +36,29 @@
         "fast": true
       },
       {
+        "name": "supplier",
+        "type": "text",
+        "tokenizer": "raw",
+        "record": "basic",
+        "fast": true
+      },
+      {
+        "name": "source_key",
+        "type": "text",
+        "tokenizer": "raw",
+        "record": "basic",
+        "fast": true
+      },
+      {
         "name": "name",
         "type": "text"
+      },
+      {
+        "name": "document_month",
+        "type": "text",
+        "tokenizer": "raw",
+        "record": "basic",
+        "fast": true
       },
       {
         "name": "classification",

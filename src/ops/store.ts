@@ -1,6 +1,9 @@
 import { DatabaseSync } from "node:sqlite";
 import { getConfigValue } from "../config.ts";
 import type {
+  AdminCoverageCell,
+  AdminCoverageResponse,
+  AdminCoverageRow,
   AdminRunSummary,
   ExtractionIssue,
   IngestExecutionMode,
@@ -523,6 +526,132 @@ export async function getRunSummary(): Promise<AdminRunSummary> {
   summary.oldestQueuedRun = oldestQueuedRun ? normalizeRunRecord(oldestQueuedRun) : undefined;
 
   return summary;
+}
+
+function monthStartLabel(date: Date): string {
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  return `${year}-${month}-01`;
+}
+
+function buildCoverageMonths(monthCount: number): string[] {
+  const now = new Date();
+  const currentMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const months: string[] = [];
+
+  for (let index = monthCount - 1; index >= 0; index -= 1) {
+    const month = new Date(currentMonth);
+    month.setUTCMonth(month.getUTCMonth() - index);
+    months.push(monthStartLabel(month));
+  }
+
+  return months;
+}
+
+export async function getRunCoverage(options: {
+  monthCount?: number;
+  sourceKeys?: string[];
+  executionMode?: IngestExecutionMode;
+  labelsBySourceKey?: Record<string, { label: string; supplier: string }>;
+} = {}): Promise<AdminCoverageResponse> {
+  const db = await getDatabase();
+  const monthCount = Math.max(3, Math.min(options.monthCount ?? 12, 36));
+  const months = buildCoverageMonths(monthCount);
+  const firstMonth = months[0];
+  const params: Record<string, string> = {
+    first_month: firstMonth,
+    execution_mode: options.executionMode ?? "full",
+  };
+  const sourceClause = options.sourceKeys && options.sourceKeys.length > 0
+    ? `AND source_key IN (${options.sourceKeys.map((_, index) => `@source_key_${index}`).join(", ")})`
+    : "";
+
+  for (const [index, sourceKey] of (options.sourceKeys ?? []).entries()) {
+    params[`source_key_${index}`] = sourceKey;
+  }
+
+  const rows = db.prepare(
+    `SELECT
+      id, source_key, supplier, date_from, date_to, trigger_mode as trigger,
+      execution_mode, parent_run_id, projection_version, derivation_version, status,
+      started_at, finished_at, meeting_count, document_count, cache_hits, downloaded_count,
+      issue_count, quickwit_index_id, error_message
+     FROM ingest_run
+     WHERE execution_mode = @execution_mode
+       AND date_from >= @first_month
+       ${sourceClause}
+     ORDER BY started_at DESC`,
+  ).all(params) as RunRow[];
+
+  const rowsBySource = new Map<string, Map<string, AdminCoverageCell>>();
+  for (const sourceKey of options.sourceKeys ?? []) {
+    rowsBySource.set(sourceKey, new Map());
+  }
+
+  for (const row of rows.map(normalizeRunRecord)) {
+    const month = row.date_from.slice(0, 7) + "-01";
+    if (!months.includes(month)) {
+      continue;
+    }
+
+    let sourceMonths = rowsBySource.get(row.source_key);
+    if (!sourceMonths) {
+      sourceMonths = new Map();
+      rowsBySource.set(row.source_key, sourceMonths);
+    }
+
+    if (sourceMonths.has(month)) {
+      continue;
+    }
+
+    sourceMonths.set(month, {
+      month,
+      status: row.status,
+      documentCount: row.document_count,
+      meetingCount: row.meeting_count,
+      issueCount: row.issue_count,
+      startedAt: row.started_at,
+      runId: row.id,
+    });
+  }
+
+  let maxDocumentCount = 0;
+  const coverageRows: AdminCoverageRow[] = [...rowsBySource.entries()]
+    .map(([sourceKey, sourceMonths]) => {
+      const labelInfo = options.labelsBySourceKey?.[sourceKey];
+      const monthCells = months.map((month) =>
+        sourceMonths.get(month) ?? {
+          month,
+          documentCount: 0,
+          meetingCount: 0,
+          issueCount: 0,
+        }
+      );
+      const totalDocumentCount = monthCells.reduce((sum, cell) => sum + cell.documentCount, 0);
+      const coveredMonthCount = monthCells.filter((cell) => Boolean(cell.status)).length;
+      const rowMax = monthCells.reduce((max, cell) => Math.max(max, cell.documentCount), 0);
+      maxDocumentCount = Math.max(maxDocumentCount, rowMax);
+
+      return {
+        sourceKey,
+        label: labelInfo?.label ?? sourceKey,
+        supplier: labelInfo?.supplier ?? "onbekend",
+        months: monthCells,
+        totalDocumentCount,
+        coveredMonthCount,
+      };
+    })
+    .sort((left, right) =>
+      right.totalDocumentCount - left.totalDocumentCount ||
+      right.coveredMonthCount - left.coveredMonthCount ||
+      left.label.localeCompare(right.label, "nl")
+    );
+
+  return {
+    months,
+    rows: coverageRows,
+    maxDocumentCount,
+  };
 }
 
 export async function getRunDetails(runId: string): Promise<RunDetails | null> {

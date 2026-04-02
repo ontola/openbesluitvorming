@@ -1,4 +1,5 @@
 import type {
+  AdminCoverageResponse,
   AdminRerunRequest,
   AdminRunSummaryResponse,
   AdminSourcesResponse,
@@ -6,10 +7,15 @@ import type {
   SearchResponse,
 } from "../src/types.ts";
 import { resumeQueuedIngests, startIngest } from "../src/ingest.ts";
-import { getRunDetails, getRunSummary, listRuns, reconcileInterruptedRuns } from "../src/ops/store.ts";
+import {
+  getRunDetails,
+  getRunSummary,
+  listRuns,
+  reconcileInterruptedRuns,
+} from "../src/ops/store.ts";
 import { listAdminSourceOptions, listAggregateRunnableSourceRefs } from "../src/sources/index.ts";
 import type { Supplier } from "../src/types.ts";
-import { getEntityContent, searchMeetings } from "./search_api.ts";
+import { getDocumentCoverage, getEntityContent, searchMeetings } from "./search_api.ts";
 
 const root = new URL("./", import.meta.url);
 const distRoot = new URL("./dist/", import.meta.url);
@@ -115,6 +121,19 @@ Deno.serve({ port }, async (request) => {
     } catch (error) {
       return Response.json(
         { error: error instanceof Error ? error.message : "Importsamenvatting ophalen mislukt" },
+        { status: 500 },
+      );
+    }
+  }
+
+  if (url.pathname === "/api/admin/coverage" && request.method === "GET") {
+    try {
+      const monthCount = Number(url.searchParams.get("months") ?? "12");
+      const coverage = await getDocumentCoverage(monthCount);
+      return Response.json<AdminCoverageResponse>(coverage);
+    } catch (error) {
+      return Response.json(
+        { error: error instanceof Error ? error.message : "Importdekking ophalen mislukt" },
         { status: 500 },
       );
     }

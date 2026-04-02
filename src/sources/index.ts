@@ -1,4 +1,4 @@
-import { getCatalogSourceByRef, listCatalogSources } from "./catalog.ts";
+import { getCatalogSourceByKey, getCatalogSourceByRef, listCatalogSources } from "./catalog.ts";
 import type {
   AdminSourceOption,
   IbabsSourceDefinition,
@@ -76,20 +76,7 @@ export function listAggregateAdminSourceOptions(): AdminSourceOption[] {
 export function getSource(sourceKeyOrRef: string): SourceDefinition {
   const catalogSource = sourceKeyOrRef.includes(":")
     ? getCatalogSourceByRef(sourceKeyOrRef)
-    : (() => {
-        const matches = getImplementedCatalogSources().filter(
-          (source) => source.key === sourceKeyOrRef,
-        );
-        if (matches.length === 0) {
-          throw new Error(`Unknown source "${sourceKeyOrRef}"`);
-        }
-        if (matches.length > 1) {
-          throw new Error(
-            `Ambiguous source key "${sourceKeyOrRef}". Use the full source reference instead.`,
-          );
-        }
-        return matches[0];
-      })();
+    : getCatalogSourceByKey(sourceKeyOrRef);
 
   if (!catalogSource.implemented) {
     throw new Error(`Unknown or unsupported source "${sourceKeyOrRef}"`);

@@ -17,6 +17,7 @@ export interface QuickwitSearchDocument {
   content_hash: string;
   supplier?: string;
   source_key?: string;
+  document_month?: string;
   name?: string;
   classification?: string[];
   file_name?: string;
@@ -29,6 +30,25 @@ export interface QuickwitSearchDocument {
   page_number?: number;
   projection_version: string;
   payload: unknown;
+}
+
+function documentReferenceDate(payload?: DocumentEntity): string | undefined {
+  return payload?.last_discussed_at ?? payload?.date_modified;
+}
+
+function toDocumentMonth(value?: string): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return undefined;
+  }
+
+  const year = parsed.getUTCFullYear();
+  const month = String(parsed.getUTCMonth() + 1).padStart(2, "0");
+  return `${year}-${month}`;
 }
 
 function flattenAgendaContent(items?: MeetingEntity["agenda"]): string[] {
@@ -142,6 +162,7 @@ function projectDocumentPageDocuments(
     content_hash: event.data.content_hash,
     supplier: event.data.source.supplier,
     source_key: event.data.source.source,
+    document_month: toDocumentMonth(documentReferenceDate(payload)),
     name: payload.name,
     classification: payload.classification,
     file_name: payload.file_name,
@@ -179,10 +200,13 @@ export function projectEntityCommitToQuickwitDocuments(
     content_hash: event.data.content_hash,
     supplier: event.data.source.supplier,
     source_key: event.data.source.source,
+    document_month: payload?.type === "Document"
+      ? toDocumentMonth(documentReferenceDate(payload))
+      : undefined,
     name: payload?.name,
     classification: payload?.classification,
     file_name: payload?.type === "Document" ? payload.file_name : undefined,
-    start_date: payload?.type === "Meeting" ? payload.start_date : payload?.last_discussed_at,
+    start_date: payload?.type === "Meeting" ? payload.start_date : documentReferenceDate(payload),
     end_date: payload?.type === "Meeting" ? payload.end_date : undefined,
     organization: payload?.organization,
     committee: payload?.type === "Meeting" ? payload.committee : undefined,
