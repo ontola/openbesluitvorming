@@ -85,25 +85,29 @@ deno run -A web/server.ts
 
 ## Deployment Model
 
-Routine production deploys should be image-based, not file-based.
+Routine production deploys are now image-based.
 
-The intended flow is:
+The current flow is:
 
 1. push a commit to `main`
 2. GitHub Actions builds and publishes the app image to GHCR
-3. the server pulls the new image and restarts the app service
-
-Published image tags:
-
-- `ghcr.io/openstate/woozi-openbesluitvorming:main`
-- `ghcr.io/openstate/woozi-openbesluitvorming:sha-<git-sha>`
-- `ghcr.io/openstate/woozi-openbesluitvorming:latest`
+3. the server pulls the selected image and restarts the app service
 
 The workflow lives in:
 
 - [publish-openbesluitvorming.yml](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/.github/workflows/publish-openbesluitvorming.yml)
 
-This is the normal beta deploy command after CI has published the current commit image:
+The published image repository currently follows the GitHub repo owner. In the current setup that means:
+
+- `ghcr.io/ontola/woozi-openbesluitvorming:main`
+- `ghcr.io/ontola/woozi-openbesluitvorming:sha-<short-git-sha>`
+- `ghcr.io/ontola/woozi-openbesluitvorming:latest`
+
+If the package owner changes, treat the repository path as configurable rather than hardcoded.
+
+### Normal Deploy
+
+After CI has published the current commit image:
 
 ```sh
 pnpm run deploy:beta
@@ -112,7 +116,9 @@ pnpm run deploy:beta
 That script:
 
 - resolves the current local Git commit SHA in the same short form GHCR publishes
-- targets `ghcr.io/openstate/woozi-openbesluitvorming:sha-<short-git-sha>`
+- derives the GHCR image repository from the local `origin` remote by default
+- checks deploy readiness on the server
+- refuses to restart the app if imports are still `running`
 - SSHes into the server
 - runs `docker compose pull openbesluitvorming`
 - restarts `openbesluitvorming` and `caddy`
@@ -121,9 +127,16 @@ The script is:
 
 - [scripts/deploy-beta.sh](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/scripts/deploy-beta.sh)
 
-The deploy helper derives the GHCR owner from the local `origin` remote by default. If that is not what you want, set:
+Useful overrides:
 
+- `FORCE=1`
+  bypass the running-import safety check
+- `DEPLOY_REF=<short-sha>`
+  deploy a specific already-published commit image, even if the local tree is dirty
+- `DEPLOY_IMAGE=ghcr.io/<owner>/woozi-openbesluitvorming:<tag>`
+  deploy an explicit image tag directly
 - `IMAGE_REPOSITORY=ghcr.io/<owner>/woozi-openbesluitvorming`
+  override the derived image repository
 
 ### Infra File Updates
 
@@ -398,27 +411,17 @@ The expected public endpoint is the Caddy domain, not port `8787` directly.
 
 ## Production Commands
 
-Current preferred deployment flow is Git-over-SSH from the local repo, not `rsync`.
-
-Deploy from the local machine:
+Current preferred deployment flow is image-based from the local machine:
 
 ```sh
 pnpm run deploy:beta
 ```
 
-That script:
-
-- refuses to deploy if the local tree is dirty
-- bootstraps a bare repo at `/opt/woozi.git` on the server if needed
-- pushes the selected Git ref over SSH
-- checks it out into `/opt/woozi-git`
-- reuses the existing `/opt/woozi/.env` on first deploy
-- runs production compose from `/opt/woozi-git` with `COMPOSE_PROJECT_NAME=woozi`
-
-The older direct server command still works for manual recovery:
+Manual recovery on the server should normally be:
 
 ```sh
-docker compose -f docker-compose.production.yml up -d --build
+docker compose -f docker-compose.production.yml pull
+docker compose -f docker-compose.production.yml up -d
 ```
 
 Required `.env` values for that production compose file:
@@ -471,11 +474,12 @@ ADMIN_PASSWORD_HASH=$$2a$$14$$exampleexampleexampleexampleexampleexampleexamplee
 - startup reconciliation for interrupted runs is now implemented in [src/ops/store.ts](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/src/ops/store.ts)
 - duplicate active imports for the same source/date/execution mode are blocked in [src/ingest.ts](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/src/ingest.ts)
 - background imports are now queued in-process with bounded concurrency from `INGEST_CONCURRENCY`
-- default ingest concurrency is `1`, which is the intended safe production setting for now
-- large aggregate imports should therefore mostly appear as many `queued` runs and one `running` run
+- the current production behavior is memory-aware concurrency, not a fixed `1`
+- large aggregate imports should therefore mostly appear as many `queued` runs plus a bounded number of `running` runs
 - admin now has a queue/status summary backed by `/api/admin/summary`
 - startup now reconciles only previously `running` imports as interrupted and resumes `queued` imports
-- aggregate `__all__` imports are currently restricted to verified Notubiz sources and exclude known stale Notubiz org mappings
+- aggregate imports are now supplier-specific, such as `__supplier__:notubiz` and `__supplier__:ibabs`
+- the deploy helper now refuses to restart the app while imports are still running, unless forced
 - browser-side fetch helpers now handle empty/non-JSON 500 responses more safely
 
 ## Keep Updated When These Change

@@ -6,6 +6,7 @@ DEPLOY_DIR="${DEPLOY_DIR:-/opt/woozi}"
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.production.yml}"
 COMPOSE_PROJECT_NAME_VALUE="${COMPOSE_PROJECT_NAME_VALUE:-woozi}"
 FORCE_DEPLOY="${FORCE:-0}"
+DEPLOY_TARGET_EXPLICIT="${DEPLOY_REF:-${DEPLOY_IMAGE:-}}"
 
 derive_image_repository() {
   local remote_url owner
@@ -23,7 +24,7 @@ IMAGE_REPOSITORY="${IMAGE_REPOSITORY:-$(derive_image_repository)}"
 DEPLOY_REF="${DEPLOY_REF:-$(git rev-parse --short=7 HEAD)}"
 DEPLOY_IMAGE="${DEPLOY_IMAGE:-${IMAGE_REPOSITORY}:sha-${DEPLOY_REF}}"
 
-if ! git diff --quiet || ! git diff --cached --quiet; then
+if [ -z "${DEPLOY_TARGET_EXPLICIT:-}" ] && (! git diff --quiet || ! git diff --cached --quiet); then
   echo "Refusing to deploy with uncommitted changes."
   echo "Commit and push first so CI can publish an image for this revision."
   exit 1

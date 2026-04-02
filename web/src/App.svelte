@@ -57,6 +57,7 @@
   let searched = initialRouteState ? routeHasSearchIntent(initialRouteState) : false;
   let filtersOpen = false;
   let searchRequestId = 0;
+  let searchAbortController: AbortController | null = null;
 
   let showApiDocs = false;
   let apiDocsHtml = "";
@@ -345,8 +346,8 @@
     }
   }
 
-  async function fetchJson<T>(url: string): Promise<T> {
-    const response = await fetch(url);
+  async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
+    const response = await fetch(url, init);
     const body = await response.text();
     const payload = body ? JSON.parse(body) as T & { error?: string } : null;
 
@@ -623,17 +624,19 @@
     return JSON.stringify({ query, organization, entityType, sort, dateFrom, dateTo });
   }
 
-  async function fetchSearchPage(offset: number): Promise<SearchResponse> {
+  async function fetchSearchPage(offset: number, signal?: AbortSignal): Promise<SearchResponse> {
     const params = routeStateToSearchParams({ ...currentRouteState(), view: "" });
     params.set("offset", `${offset}`);
     params.set("limit", `${PAGE_SIZE}`);
-    return await fetchJson<SearchResponse>(`/api/search?${params.toString()}`);
+    return await fetchJson<SearchResponse>(`/api/search?${params.toString()}`, { signal });
   }
 
   async function runSearch(mode: "push" | "replace" = "push"): Promise<void> {
     const hasFilters = hasActiveSearchFilters();
 
     if (!hasFilters) {
+      searchAbortController?.abort();
+      searchAbortController = null;
       results = [];
       totalCount = 0;
       totalIsApproximate = false;
@@ -650,9 +653,12 @@
     const requestId = ++searchRequestId;
     const signature = currentSearchSignature();
     activeSearchSignature = signature;
+    searchAbortController?.abort();
+    searchAbortController = new AbortController();
+    const { signal } = searchAbortController;
 
     try {
-      const payload = await fetchSearchPage(0);
+      const payload = await fetchSearchPage(0, signal);
       if (requestId !== searchRequestId) return;
       results = payload.results ?? [];
       totalCount = payload.totalCount ?? null;
@@ -669,7 +675,10 @@
       } else {
         closeDetail(false);
       }
-    } catch {
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return;
+      }
       if (requestId === searchRequestId) {
         results = [];
         totalCount = null;
@@ -678,6 +687,9 @@
       }
     } finally {
       if (requestId === searchRequestId) {
+        if (searchAbortController?.signal === signal) {
+          searchAbortController = null;
+        }
         loading = false;
       }
     }
@@ -708,6 +720,11 @@
       totalCount = payload.totalCount ?? totalCount;
       totalIsApproximate = payload.totalIsApproximate ?? totalIsApproximate;
       hasMore = payload.hasMore ?? false;
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return;
+      }
+      throw error;
     } finally {
       if (requestId === searchRequestId) {
         loadingMore = false;
@@ -715,7 +732,7 @@
     }
   }
 
-  function scheduleSearch(delayMs = 100): void {
+  function scheduleSearch(delayMs = 300): void {
     if (debounceTimer) window.clearTimeout(debounceTimer);
     debounceTimer = window.setTimeout(() => {
       debounceTimer = undefined;
@@ -730,6 +747,19 @@
 
     if (!query.trim()) {
       void runSearch("replace");
+      return;
+    }
+
+    if (query.trim().length < 2 && !hasAdvancedSearchFilters()) {
+      searchAbortController?.abort();
+      searchAbortController = null;
+      results = [];
+      totalCount = null;
+      totalIsApproximate = false;
+      hasMore = false;
+      loading = false;
+      loadingMore = false;
+      activeSearchSignature = "";
       return;
     }
 
@@ -861,6 +891,7 @@
       window.clearTimeout(debounceTimer);
       debounceTimer = undefined;
     }
+    searchAbortController?.abort();
     document.removeEventListener("keydown", handleEscape);
     window.removeEventListener("resize", updateInitialLoadingCardCount);
     loadMoreObserver?.disconnect();
