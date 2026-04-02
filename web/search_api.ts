@@ -39,7 +39,6 @@ type SearchHit = {
       markdown_key?: string;
       page_count?: number;
     };
-    md_text?: string[];
     agenda?: MeetingAgendaItem[];
   };
 };
@@ -582,10 +581,10 @@ export async function getEntityContent(entityId: string): Promise<EntityContentR
     ? downloadUrl
     : undefined;
 
-  let markdownText = hit.payload?.md_text?.join("\n\n");
+  let markdownText: string | undefined;
   const markdownKey = hit.payload?.derived_content?.markdown_key;
 
-  if (!markdownText && markdownKey) {
+  if (markdownKey) {
     const storage = await ObjectStorageClient.fromEnvironment();
     markdownText = await storage.getObjectText(markdownKey);
   }

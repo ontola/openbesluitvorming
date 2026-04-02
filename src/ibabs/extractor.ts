@@ -47,6 +47,8 @@ export class IbabsMeetingExtractor {
       onIssue?: (issue: ExtractionIssue, stats: ExtractionBundle["stats"]) => Promise<void> | void;
       onEntity?: (entity: MeetingEntity | DocumentEntity) => Promise<void> | void;
       executionMode?: IngestExecutionMode;
+      retainEntities?: boolean;
+      retainIssues?: boolean;
     } = {},
   ): Promise<ExtractionBundle> {
     const meetingTypes = await this.client.getMeetingTypes(source);
@@ -57,23 +59,31 @@ export class IbabsMeetingExtractor {
       ]),
     );
     const rawMeetings = await this.client.listMeetingsByDateRange(source, dateFrom, dateTo);
+    const retainEntities = options.retainEntities ?? true;
+    const retainIssues = options.retainIssues ?? true;
     const meetings: MeetingEntity[] = [];
     const documents: DocumentEntity[] = [];
     const issues: ExtractionIssue[] = [];
     let cacheHits = 0;
     let downloadedCount = 0;
+    let meetingCount = 0;
+    let documentCount = 0;
+    let issueCount = 0;
     const storage = await this.storageProvider();
 
     const currentStats = (): ExtractionBundle["stats"] => ({
-      meeting_count: meetings.length,
-      document_count: documents.length,
+      meeting_count: meetingCount,
+      document_count: documentCount,
       cache_hits: cacheHits,
       downloaded_count: downloadedCount,
-      issue_count: issues.length,
+      issue_count: issueCount,
     });
 
     const registerIssue = async (issue: ExtractionIssue): Promise<void> => {
-      issues.push(issue);
+      issueCount += 1;
+      if (retainIssues) {
+        issues.push(issue);
+      }
       await options.onIssue?.(issue, currentStats());
     };
 
@@ -81,7 +91,10 @@ export class IbabsMeetingExtractor {
 
     for (const rawMeeting of rawMeetings) {
       const meeting = normalizeIbabsMeeting(source, rawMeeting, meetingTypeMap);
-      meetings.push(meeting);
+      meetingCount += 1;
+      if (retainEntities) {
+        meetings.push(meeting);
+      }
       await options.onProgress?.(currentStats());
       await options.onEntity?.(meeting);
 
@@ -100,7 +113,10 @@ export class IbabsMeetingExtractor {
         for (const issue of materialized.issues) {
           await registerIssue(issue);
         }
-        documents.push(materialized.document);
+        documentCount += 1;
+        if (retainEntities) {
+          documents.push(materialized.document);
+        }
         if (materialized.cacheHit) {
           cacheHits += 1;
         } else {

@@ -97,17 +97,24 @@ export class NotubizMeetingExtractor {
       onIssue?: (issue: ExtractionIssue, stats: ExtractionBundle["stats"]) => Promise<void> | void;
       onEntity?: (entity: MeetingEntity | DocumentEntity) => Promise<void> | void;
       executionMode?: IngestExecutionMode;
+      retainEntities?: boolean;
+      retainIssues?: boolean;
     } = {},
   ): Promise<ExtractionBundle> {
     const organizationAttributes = await this.client.getOrganizationAttributes(
       source.notubizOrganizationId,
     );
 
+    const retainEntities = options.retainEntities ?? true;
+    const retainIssues = options.retainIssues ?? true;
     const meetings: MeetingEntity[] = [];
     const documents: DocumentEntity[] = [];
     const issues: ExtractionIssue[] = [];
     let cacheHits = 0;
     let downloadedCount = 0;
+    let meetingCount = 0;
+    let documentCount = 0;
+    let issueCount = 0;
     let page = 1;
     const storage = await this.storageProvider();
     const meetingConcurrency = Number(
@@ -118,15 +125,18 @@ export class NotubizMeetingExtractor {
     );
 
     const currentStats = (): ExtractionBundle["stats"] => ({
-      meeting_count: meetings.length,
-      document_count: documents.length,
+      meeting_count: meetingCount,
+      document_count: documentCount,
       cache_hits: cacheHits,
       downloaded_count: downloadedCount,
-      issue_count: issues.length,
+      issue_count: issueCount,
     });
 
     const registerIssue = async (issue: ExtractionIssue): Promise<void> => {
-      issues.push(issue);
+      issueCount += 1;
+      if (retainIssues) {
+        issues.push(issue);
+      }
       await options.onIssue?.(issue, currentStats());
     };
 
@@ -165,7 +175,10 @@ export class NotubizMeetingExtractor {
               organizationAttributes,
               meetingResponse.meeting,
             );
-            meetings.push(meeting);
+            meetingCount += 1;
+            if (retainEntities) {
+              meetings.push(meeting);
+            }
             await options.onProgress?.(currentStats());
             await options.onEntity?.(meeting);
             return meeting;
@@ -201,7 +214,10 @@ export class NotubizMeetingExtractor {
           for (const issue of materialized.issues) {
             await registerIssue(issue);
           }
-          documents.push(materialized.document);
+          documentCount += 1;
+          if (retainEntities) {
+            documents.push(materialized.document);
+          }
           if (materialized.cacheHit) {
             cacheHits += 1;
           } else {

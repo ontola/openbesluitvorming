@@ -126,6 +126,8 @@ async function executeIngest(
 
     const extraction = await extractor.extractForDateRange(source, dateFrom, dateTo, {
       executionMode: options.executionMode,
+      retainEntities: false,
+      retainIssues: false,
       onProgress: async (stats) => {
         currentRun = await updateRun(run.id, {
           meeting_count: stats.meeting_count,
@@ -157,7 +159,7 @@ async function executeIngest(
     });
     await flushQuickwitBatch();
 
-    const status = extraction.issues.length > 0 ? "partial" : "succeeded";
+    const status = extraction.stats.issue_count > 0 ? "partial" : "succeeded";
     const updated = await updateRun(run.id, {
       ...currentRun,
       status,
