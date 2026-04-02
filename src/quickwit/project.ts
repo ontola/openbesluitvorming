@@ -120,7 +120,6 @@ function compactPayload(payload?: WooziEntity): unknown {
       organization: payload.organization,
       derived_content: payload.derived_content,
       media_urls: payload.media_urls,
-      md_text: payload.md_text,
     };
   }
 

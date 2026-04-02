@@ -1,0 +1,45 @@
+name: Deploy Beta
+
+on:
+  workflow_run:
+    workflows:
+      - Publish OpenBesluitvorming Image
+    types:
+      - completed
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    if: >-
+      ${{
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.head_branch == 'main'
+      }}
+    runs-on: ubuntu-latest
+    environment: beta
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Set up SSH agent
+        uses: webfactory/ssh-agent@v0.9.1
+        with:
+          ssh-private-key: ${{ secrets.BETA_DEPLOY_SSH_KEY }}
+
+      - name: Trust beta host key
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H 91.98.32.151 >> ~/.ssh/known_hosts
+
+      - name: Deploy published image to beta
+        env:
+          DEPLOY_REF: ${{ github.event.workflow_run.head_sha }}
+          IMAGE_REPOSITORY: ghcr.io/${{ github.event.workflow_run.repository.owner.login }}/woozi-openbesluitvorming
+        run: |
+          export DEPLOY_REF="${DEPLOY_REF:0:7}"
+          bash scripts/deploy-beta.sh

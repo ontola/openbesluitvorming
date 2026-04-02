@@ -93,6 +93,15 @@ deno run -A web/server.ts
 
 Routine production deploys are now image-based.
 
+The server should be treated as runtime state only, not as a source checkout.
+
+That means:
+
+- application code should arrive via published container images
+- the live server should not be treated as a Git worktree
+- the live server should not be used as the normal place to build app images from source
+- the only repo-managed files expected on the server are runtime config files such as Compose, Caddy, and Quickwit config
+
 The current flow is:
 
 1. push a commit to `main`
@@ -102,6 +111,7 @@ The current flow is:
 The workflow lives in:
 
 - [publish-openbesluitvorming.yml](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/.github/workflows/publish-openbesluitvorming.yml)
+- [deploy-beta.yml](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/.github/workflows/deploy-beta.yml)
 
 The published image repository currently follows the GitHub repo owner. In the current setup that means:
 
@@ -112,6 +122,29 @@ The published image repository currently follows the GitHub repo owner. In the c
 If the package owner changes, treat the repository path as configurable rather than hardcoded.
 
 ### Normal Deploy
+
+The current setup now supports automatic beta deployment after a successful image publish on `main`.
+
+The `deploy-beta.yml` workflow:
+
+- waits for `Publish OpenBesluitvorming Image` to finish successfully
+- checks out the exact published commit
+- connects to the beta server over SSH
+- deploys the exact `sha-<short-git-sha>` image that was just published
+- reuses the same safety logic as the local deploy script, so it will refuse to restart the app if imports are still `running`
+
+That means the normal CD path is now:
+
+1. push to `main`
+2. GitHub Actions publishes the image
+3. GitHub Actions automatically deploys the published image to beta
+
+Required GitHub secret for this workflow:
+
+- `BETA_DEPLOY_SSH_KEY`
+  private SSH key that can log into `root@91.98.32.151`
+
+### Manual Deploy
 
 After CI has published the current commit image:
 
@@ -166,6 +199,11 @@ So the operational split is:
 
 - code changes: publish image, then `deploy:beta`
 - infra/config file changes: `deploy:beta:infra`
+
+Operational rule:
+
+- `/opt/woozi` on the server is runtime config, not an authoritative source tree
+- if an emergency manual server-side build is ever needed, do it from a clearly temporary sync/build path, not from a long-lived stale checkout
 
 ## Import Concurrency
 
