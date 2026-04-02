@@ -116,6 +116,13 @@
     return labels[supplier] ?? supplier;
   }
 
+  function toggleCoverage(): void {
+    coverageOpen = !coverageOpen;
+    if (coverageOpen && !coverageLoaded && !coverageBusy) {
+      void loadCoverage();
+    }
+  }
+
   function organizationTypeLabel(type: string): string {
     const labels: Record<string, string> = {
       gemeente: "Gemeenten",
@@ -833,13 +840,18 @@
     {/if}
 
     <section class="section">
-      <div class="section__heading admin-section-heading">
-        <div>
-          <h2>Dekking gemeenten</h2>
-          <p class="admin-inline-note">
-            Snel zicht op documentvolume per maand, zodat gaten en opvallende dalingen meteen zichtbaar zijn.
-          </p>
-        </div>
+      <div class="section__heading">
+        <button
+          type="button"
+          class="admin-coverage__toggle"
+          aria-expanded={coverageOpen}
+          on:click={toggleCoverage}
+        >
+          <h2>Dekking</h2>
+          <span>{coverageOpen ? "Verberg" : "Toon"}</span>
+        </button>
+      </div>
+      {#if coverageOpen}
         <div class="admin-coverage__controls">
           <label class="select-field select-field--compact">
             <span class="sr-only">Groepering voor dekkingsoverzicht</span>
@@ -867,21 +879,8 @@
               <option value="60">Laatste 60 maanden</option>
             </select>
           </label>
-          <button
-            type="button"
-            class="ghost-button"
-            aria-expanded={coverageOpen}
-            on:click={() => {
-              coverageOpen = !coverageOpen;
-              if (coverageOpen && !coverageLoaded && !coverageBusy) {
-                void loadCoverage();
-              }
-            }}
-          >
-            {coverageOpen ? "Verberg dekking" : "Toon dekking"}
-          </button>
         </div>
-      </div>
+      {/if}
       {#if coverageOpen && coverageLoaded && coverageRows.length > 0}
         <div class="admin-coverage">
           {#if coverageSelectedRange}

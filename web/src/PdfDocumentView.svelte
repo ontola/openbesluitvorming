@@ -19,7 +19,6 @@
   export let url = "";
   export let initialPage: number | null = null;
   export let query = "";
-  export let matchPreview = "";
 
   const dispatch = createEventDispatcher<{ pagechange: { page: number } }>();
   const wasmUrl = jbig2WasmUrl.slice(0, jbig2WasmUrl.lastIndexOf("/") + 1);
