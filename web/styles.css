@@ -665,6 +665,11 @@ select {
   align-items: center;
 }
 
+.admin-form--rerun .search-field,
+.admin-form--rerun .select-field {
+  margin-bottom: 0;
+}
+
 .source-picker,
 .admin-source-picker {
   position: relative;
@@ -814,29 +819,71 @@ select {
 
 .admin-coverage {
   display: grid;
-  gap: 0.9rem;
+  gap: 0.65rem;
+}
+
+.admin-coverage__selection-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.admin-coverage__selection-note strong {
+  color: var(--accent-deep);
+}
+
+.admin-coverage__groups {
+  display: grid;
+  gap: 1rem;
+}
+
+.admin-coverage__group {
+  display: grid;
+  gap: 0.32rem;
+}
+
+.admin-coverage__group-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.admin-coverage__group-header h3 {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.admin-coverage__group-header span {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .admin-coverage__legend {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 0.7rem;
-  color: var(--muted);
-  font-size: 0.84rem;
+  gap: 0.55rem;
+  color: color-mix(in srgb, var(--muted) 76%, var(--text) 24%);
+  font-size: 0.78rem;
 }
 
 .admin-coverage__legend-scale {
   display: inline-grid;
-  grid-template-columns: repeat(4, 1.1rem);
-  gap: 0.3rem;
+  grid-template-columns: repeat(4, 0.82rem);
+  gap: 0.2rem;
 }
 
 .admin-coverage__legend-scale span {
-  height: 0.8rem;
+  height: 0.6rem;
   border-radius: 999px;
-  border: 1px solid rgba(41, 88, 153, 0.12);
-  background: linear-gradient(180deg, rgba(78, 166, 255, 0.12), rgba(41, 88, 153, 0.18));
+  border: 1px solid rgba(49, 91, 155, 0.14);
+  background: linear-gradient(180deg, rgba(65, 166, 204, 0.14), rgba(49, 91, 155, 0.22));
 }
 
 .admin-coverage__legend-scale span:nth-child(1) {
@@ -862,11 +909,11 @@ select {
 
 .admin-coverage__months {
   display: grid;
-  grid-template-columns: minmax(14rem, 16rem) repeat(
+  grid-template-columns: minmax(11rem, 12.5rem) repeat(
       var(--coverage-column-count, 12),
-      minmax(2rem, 1fr)
+      minmax(0.5rem, 1fr)
     );
-  gap: 0.4rem;
+  gap: 0.08rem;
   align-items: end;
 }
 
@@ -875,71 +922,117 @@ select {
 }
 
 .admin-coverage__month {
-  color: var(--muted);
-  font-size: 0.74rem;
+  color: color-mix(in srgb, var(--muted) 72%, var(--text) 28%);
+  font-size: 0.56rem;
   font-weight: 700;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.02em;
   text-transform: uppercase;
   text-align: center;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  min-height: 2.9rem;
 }
 
 .admin-coverage__rows {
   display: grid;
-  gap: 0.6rem;
 }
 
 .admin-coverage__row {
   display: grid;
-  grid-template-columns: minmax(14rem, 16rem) minmax(0, 1fr);
-  gap: 1rem;
+  grid-template-columns: minmax(11rem, 12.5rem) minmax(0, 1fr);
+  gap: 0.45rem;
   align-items: center;
-  padding: 0.8rem 1rem;
 }
 
 .admin-coverage__row-meta {
   display: grid;
-  gap: 0.12rem;
+  gap: 0.06rem;
+}
+
+.admin-coverage__source-button {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+
+.admin-coverage__source-button:hover .admin-coverage__count,
+.admin-coverage__source-button:focus-visible .admin-coverage__count {
+  color: var(--accent-deep);
+}
+
+.admin-coverage__source-button:focus-visible {
+  outline: none;
 }
 
 .admin-coverage__row-meta strong {
-  font-size: 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem;
+  font-size: 0.84rem;
+  line-height: 1.1;
 }
 
-.admin-coverage__row-meta span {
+.admin-coverage__count {
   color: var(--muted);
-  font-size: 0.84rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.admin-coverage__count {
+  color: color-mix(in srgb, var(--accent-deep) 38%, var(--muted) 62%);
 }
 
 .admin-coverage__sparkline {
-  display: grid;
-  grid-template-columns: repeat(var(--coverage-column-count, 12), minmax(2rem, 1fr));
-  gap: 0.35rem;
-  align-items: stretch;
+  min-height: 1.35rem;
 }
 
-.admin-coverage__bar {
-  min-height: 3rem;
-  border: 1px solid rgba(41, 88, 153, 0.12);
-  border-radius: 0.95rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.8rem;
+.admin-coverage__canvas-host {
+  --coverage-empty: #f7f9fc;
+  --coverage-low: rgb(220, 232, 255);
+  --coverage-high: rgb(31, 95, 196);
+  --coverage-selected-filled: #1f5fc4;
+  --coverage-selected-empty: #6da8ff;
+  --coverage-preview-filled: #48cdb8;
+  --coverage-preview-empty: #b8f0e6;
+  --coverage-anchor: #12957e;
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  height: 1.5rem;
+  cursor: pointer;
+}
+
+.admin-coverage__canvas {
+  display: block;
+  width: 100%;
+  height: 1.5rem;
+}
+
+.admin-coverage__tooltip {
+  position: absolute;
+  bottom: calc(100% + 0.35rem);
+  transform: translateX(-50%);
+  padding: 0.26rem 0.42rem;
+  border-radius: 0.45rem;
+  background: rgba(16, 24, 39, 0.96);
+  color: #fff;
+  font-size: 0.68rem;
   font-weight: 700;
-  color: var(--text);
-}
-
-.admin-coverage__bar--empty {
-  border-style: dashed;
-  background: linear-gradient(135deg, rgba(41, 88, 153, 0.04), rgba(41, 88, 153, 0.015));
-}
-
-.admin-coverage__bar--filled {
-  background: linear-gradient(
-    180deg,
-    rgba(78, 166, 255, calc(0.08 + var(--coverage-intensity) * 0.22)),
-    rgba(41, 88, 153, calc(0.1 + var(--coverage-intensity) * 0.32))
-  );
+  line-height: 1.2;
+  white-space: nowrap;
+  box-shadow: 0 10px 18px rgba(15, 23, 42, 0.2);
+  pointer-events: none;
+  z-index: 5;
 }
 
 .admin-coverage__header,
@@ -1075,8 +1168,8 @@ select {
 
 .admin-runs-table {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) repeat(5, 4.75rem) 11rem;
-  gap: 0.75rem;
+  grid-template-columns: minmax(9rem, 1fr) 6.5rem 6.25rem 6.25rem repeat(5, 4.25rem) 6rem;
+  gap: 0.45rem;
   margin: 1rem 0 0.55rem;
   padding: 0 0.9rem;
   color: var(--muted);
@@ -1136,8 +1229,8 @@ select {
 
 .admin-run__row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) repeat(5, 4.75rem) 11rem;
-  gap: 0.75rem;
+  grid-template-columns: minmax(9rem, 1fr) 6.5rem 6.25rem 6.25rem repeat(5, 4.25rem) 6rem;
+  gap: 0.45rem;
   align-items: center;
 }
 
@@ -1145,16 +1238,12 @@ select {
   min-width: 0;
 }
 
-.admin-run__meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.admin-run__date {
-  color: var(--muted);
-  font-size: 0.95rem;
+.admin-run__primary strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.96rem;
 }
 
 .admin-run__metric {
@@ -1164,19 +1253,29 @@ select {
 
 .admin-run__metric strong {
   color: var(--text);
-  font-size: 1rem;
+  font-size: 0.94rem;
   font-weight: 700;
 }
 
+.admin-run__metric--date strong {
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.admin-run__status {
+  display: flex;
+  justify-content: center;
+}
+
 .admin-run__time {
-  text-align: right;
+  text-align: center;
   white-space: nowrap;
 }
 
 .admin-run small {
   margin: 0;
   color: var(--muted);
-  font-size: 0.92rem;
+  font-size: 0.82rem;
 }
 
 .admin-run__issue {
@@ -2498,12 +2597,15 @@ select {
     background: linear-gradient(90deg, rgba(9, 11, 15, 0.98), rgba(9, 11, 15, 0.9));
   }
 
-  .admin-coverage__bar {
-    border-color: rgba(114, 163, 232, 0.16);
-  }
-
-  .admin-coverage__bar--empty {
-    background: linear-gradient(135deg, rgba(114, 163, 232, 0.06), rgba(114, 163, 232, 0.02));
+  .admin-coverage__canvas-host {
+    --coverage-empty: #0f141b;
+    --coverage-low: rgb(42, 53, 69);
+    --coverage-high: rgb(248, 251, 255);
+    --coverage-selected-filled: #3f8cff;
+    --coverage-selected-empty: #274f83;
+    --coverage-preview-filled: #38c7b0;
+    --coverage-preview-empty: #173b37;
+    --coverage-anchor: #3ed0b6;
   }
 
   .admin-coverage__label {
@@ -2769,15 +2871,15 @@ select {
   }
 
   .admin-coverage__months {
-    grid-template-columns: minmax(9rem, 11rem) repeat(
+    grid-template-columns: minmax(8rem, 9rem) repeat(
         var(--coverage-column-count, 12),
-        minmax(1.8rem, 1fr)
+        minmax(0.42rem, 1fr)
       );
   }
 
   .admin-coverage__row {
     grid-template-columns: 1fr;
-    gap: 0.7rem;
+    gap: 0.4rem;
   }
 
   .admin-runs-table {
@@ -2785,7 +2887,7 @@ select {
   }
 
   .admin-run__row {
-    grid-template-columns: 1fr 3.6rem 3.6rem 3.6rem 3.8rem 4.8rem;
+    grid-template-columns: 1fr 5.8rem 5.2rem 5.2rem 3.6rem 3.6rem 3.6rem 3.6rem 3.8rem 5rem;
   }
 
   .admin-run__time {
@@ -2806,12 +2908,13 @@ select {
   }
 
   .admin-coverage__month {
-    font-size: 0.68rem;
+    font-size: 0.5rem;
+    min-height: 2.4rem;
   }
 
-  .admin-coverage__bar {
-    min-height: 2.5rem;
-    font-size: 0.72rem;
+  .admin-coverage__dot {
+    width: 0.48rem;
+    height: 0.48rem;
   }
 
   .hero {

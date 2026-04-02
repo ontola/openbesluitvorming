@@ -15,6 +15,7 @@
     IngestRunIssueRecord,
     IngestRunRecord,
   } from "../../src/types.ts";
+  import CoverageHeatmapRow from "./CoverageHeatmapRow.svelte";
   import SourcePicker from "./SourcePicker.svelte";
 
   const relativeTimeFormatter = new Intl.RelativeTimeFormat("nl-NL", {
@@ -37,8 +38,14 @@
   let bootLoading = true;
   let bootError = "";
 
-  let coverageMonthCount = "12";
+  let coverageMonthCount = "60";
   let coverageOpen = false;
+  let coverageLoaded = false;
+  let coverageRangeAnchor: { sourceKey: string; month: string } | null = null;
+  let coverageRangeHoverMonth = "";
+  let coverageSelectedRange: { sourceKey: string; startMonth: string; endMonth: string } | null = null;
+  let coverageGrouping: "alphabetical" | "supplier" | "type" = "alphabetical";
+  let coverageGroups: Array<{ key: string; label: string; rows: AdminCoverageRow[] }> = [];
 
   const RUNS_PAGE_SIZE = 50;
 
@@ -100,6 +107,59 @@
     return labels[mode] ?? mode;
   }
 
+  function supplierLabel(supplier: string): string {
+    const labels: Record<string, string> = {
+      notubiz: "Notubiz",
+      ibabs: "iBabs",
+    };
+
+    return labels[supplier] ?? supplier;
+  }
+
+  function organizationTypeLabel(type: string): string {
+    const labels: Record<string, string> = {
+      gemeente: "Gemeenten",
+      provincie: "Provincies",
+      waterschap: "Waterschappen",
+    };
+
+    return labels[type] ?? type;
+  }
+
+  function coverageGroupingLabel(grouping: typeof coverageGrouping): string {
+    const labels: Record<typeof coverageGrouping, string> = {
+      alphabetical: "Alfabetisch",
+      supplier: "Per leverancier",
+      type: "Per bestuurslaag",
+    };
+
+    return labels[grouping];
+  }
+
+  $: coverageGroups = (() => {
+    if (coverageGrouping === "alphabetical") {
+      return [{
+        key: "alphabetical",
+        label: coverageGroupingLabel("alphabetical"),
+        rows: [...coverageRows].sort((left, right) => left.label.localeCompare(right.label, "nl")),
+      }];
+    }
+
+    const grouped = coverageRows.reduce<Record<string, AdminCoverageRow[]>>((groups, row) => {
+      const key = coverageGrouping === "supplier" ? row.supplier : row.organizationType;
+      (groups[key] ??= []).push(row);
+      return groups;
+    }, {});
+
+    return Object.entries(grouped)
+      .map(([key, rows]) => ({
+        key,
+        label: coverageGrouping === "supplier" ? supplierLabel(key) : organizationTypeLabel(key),
+        rows: [...rows].sort((left, right) => left.label.localeCompare(right.label, "nl")),
+      }))
+      .sort((left, right) => left.label.localeCompare(right.label, "nl"));
+  })();
+
   function periodLabel(run: IngestRunRecord): string {
     return `${run.date_from} t/m ${run.date_to}`;
   }
@@ -135,11 +195,59 @@
     return dateValue;
   }
 
+  function formatRunDuration(run: Pick<IngestRunRecord, "started_at" | "finished_at">): string {
+    const startedAt = Date.parse(run.started_at);
+    if (Number.isNaN(startedAt)) {
+      return "Onbekend";
+    }
+
+    const endedAt = run.finished_at ? Date.parse(run.finished_at) : Date.now();
+    if (Number.isNaN(endedAt)) {
+      return "Onbekend";
+    }
+
+    const totalSeconds = Math.max(0, Math.round((endedAt - startedAt) / 1000));
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    if (hours > 0) {
+      return `${hours}u ${String(minutes).padStart(2, "0")}m`;
+    }
+
+    if (minutes > 0) {
+      return `${minutes}m ${String(seconds).padStart(2, "0")}s`;
+    }
+
+    return `${seconds}s`;
+  }
+
+  function formatDateCell(dateValue?: string): string {
+    if (!dateValue) return "Onbekend";
+    const date = new Date(`${dateValue}T00:00:00Z`);
+    if (Number.isNaN(date.getTime())) return dateValue;
+    return date.toLocaleDateString("nl-NL", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      timeZone: "UTC",
+    });
+  }
+
   function monthLabel(month: string): string {
     const date = new Date(`${month}T00:00:00Z`);
     return date.toLocaleDateString("nl-NL", {
       month: "short",
       year: "numeric",
+      timeZone: "UTC",
+    });
+  }
+
+  function compactMonthLabel(month: string): string {
+    const date = new Date(`${month}T00:00:00Z`);
+    return date.toLocaleDateString("nl-NL", {
+      month: "short",
+      year: coverageMonths.length > 24 ? "2-digit" : undefined,
       timeZone: "UTC",
     });
   }
@@ -174,6 +282,130 @@
     });
 
     return `/?${params.toString()}`;
+  }
+
+  function applyCoverageSourceSelection(sourceKey: string): boolean {
+    const source = allSources.find((candidate) => candidate.key === sourceKey);
+    if (!source) {
+      return false;
+    }
+
+    importSourceRef = source.sourceRef;
+    importStatus = "";
+    return true;
+  }
+
+  function selectCoverageSource(sourceKey: string): void {
+    if (!applyCoverageSourceSelection(sourceKey)) {
+      return;
+    }
+
+    coverageRangeAnchor = null;
+    coverageRangeHoverMonth = "";
+    coverageSelectedRange = null;
+  }
+
+  function coverageMonthStart(month: string): string {
+    return `${month}-01`;
+  }
+
+  function coverageMonthEnd(month: string): string {
+    const [yearValue, monthValue] = month.split("-").map(Number);
+    const end = new Date(Date.UTC(yearValue, monthValue, 0));
+    const year = end.getUTCFullYear();
+    const normalizedMonth = String(end.getUTCMonth() + 1).padStart(2, "0");
+    const day = String(end.getUTCDate()).padStart(2, "0");
+    return `${year}-${normalizedMonth}-${day}`;
+  }
+
+  function monthRangeBounds(left: string, right: string): [string, string] {
+    return left <= right ? [left, right] : [right, left];
+  }
+
+  function isCoverageCellInRange(sourceKey: string, month: string): boolean {
+    if (!coverageRangeAnchor || coverageRangeAnchor.sourceKey !== sourceKey) {
+      return false;
+    }
+
+    const rangeEnd = coverageRangeHoverMonth || coverageRangeAnchor.month;
+    const [startMonth, endMonth] = monthRangeBounds(coverageRangeAnchor.month, rangeEnd);
+    return month >= startMonth && month <= endMonth;
+  }
+
+  function isCoverageCellAnchor(sourceKey: string, month: string): boolean {
+    return coverageRangeAnchor?.sourceKey === sourceKey && coverageRangeAnchor.month === month;
+  }
+
+  function isCoverageCellSelected(sourceKey: string, month: string): boolean {
+    if (!coverageSelectedRange || coverageSelectedRange.sourceKey !== sourceKey) {
+      return false;
+    }
+
+    return month >= coverageSelectedRange.startMonth && month <= coverageSelectedRange.endMonth;
+  }
+
+  function previewCoverageRange(sourceKey: string, month: string): void {
+    if (!coverageRangeAnchor || coverageRangeAnchor.sourceKey !== sourceKey) {
+      return;
+    }
+
+    coverageRangeHoverMonth = month;
+  }
+
+  function clearCoverageRangePreview(sourceKey?: string): void {
+    if (!coverageRangeAnchor) {
+      return;
+    }
+
+    if (!sourceKey || coverageRangeAnchor.sourceKey === sourceKey) {
+      coverageRangeHoverMonth = "";
+    }
+  }
+
+  function coveragePreviewRangeForSource(
+    sourceKey: string,
+  ): { startMonth: string; endMonth: string } | null {
+    if (!coverageRangeAnchor || coverageRangeAnchor.sourceKey !== sourceKey) {
+      return null;
+    }
+
+    const rangeEnd = coverageRangeHoverMonth || coverageRangeAnchor.month;
+    const [startMonth, endMonth] = monthRangeBounds(coverageRangeAnchor.month, rangeEnd);
+    return { startMonth, endMonth };
+  }
+
+  function coverageSelectedSourceLabel(): string {
+    if (!coverageSelectedRange) {
+      return "";
+    }
+
+    return coverageRows.find((row) => row.sourceKey === coverageSelectedRange.sourceKey)?.label ??
+      coverageSelectedRange.sourceKey;
+  }
+
+  function selectCoverageCell(sourceKey: string, month: string): void {
+    if (!applyCoverageSourceSelection(sourceKey)) {
+      return;
+    }
+
+    if (!coverageRangeAnchor || coverageRangeAnchor.sourceKey !== sourceKey) {
+      coverageRangeAnchor = { sourceKey, month };
+      coverageRangeHoverMonth = "";
+      importDateFrom = coverageMonthStart(month);
+      importDateTo = coverageMonthEnd(month);
+      return;
+    }
+
+    const [startMonth, endMonth] = monthRangeBounds(coverageRangeAnchor.month, month);
+    importDateFrom = coverageMonthStart(startMonth);
+    importDateTo = coverageMonthEnd(endMonth);
+    coverageSelectedRange = {
+      sourceKey,
+      startMonth,
+      endMonth,
+    };
+    coverageRangeAnchor = null;
+    coverageRangeHoverMonth = "";
   }
 
   function summarizeIssueTypes(run: IngestRunRecord): Array<{ label: string; count: number }> {
@@ -293,6 +525,7 @@
       coverageRows = payload.rows ?? [];
       coverageMonths = payload.months ?? [];
       coverageMaxDocuments = payload.maxDocumentCount ?? 0;
+      coverageLoaded = true;
     } finally {
       coverageBusy = false;
     }
@@ -502,7 +735,6 @@
       bootLoading = true;
       bootError = "";
       await loadSources();
-      await loadCoverage();
       await loadRuns();
     } catch (error) {
       bootError = error instanceof Error ? error.message : "Admin laden mislukt.";
@@ -554,10 +786,10 @@
           subtitle={(source) =>
             `${source.supplier} · ${source.organizationType}${source.implemented ? "" : " · nog niet ondersteund"}`}
         />
-        <label class="search-field admin-field">
+        <label class="search-field search-field--subtle search-field--compact admin-field">
           <input bind:value={importDateFrom} type="date" />
         </label>
-        <label class="search-field admin-field">
+        <label class="search-field search-field--subtle search-field--compact admin-field">
           <input bind:value={importDateTo} type="date" />
         </label>
         <button type="submit" class="primary-button" disabled={importBusy}>Import uitvoeren</button>
@@ -610,16 +842,29 @@
         </div>
         <div class="admin-coverage__controls">
           <label class="select-field select-field--compact">
+            <span class="sr-only">Groepering voor dekkingsoverzicht</span>
+            <select bind:value={coverageGrouping}>
+              <option value="alphabetical">Alfabetisch</option>
+              <option value="supplier">Per leverancier</option>
+              <option value="type">Per bestuurslaag</option>
+            </select>
+          </label>
+          <label class="select-field select-field--compact">
             <span class="sr-only">Periode voor dekkingsoverzicht</span>
             <select
               bind:value={coverageMonthCount}
               on:change={() => {
-                void loadCoverage();
+                coverageLoaded = false;
+                if (coverageOpen) {
+                  void loadCoverage();
+                }
               }}
             >
               <option value="6">Laatste 6 maanden</option>
               <option value="12">Laatste 12 maanden</option>
               <option value="24">Laatste 24 maanden</option>
+              <option value="36">Laatste 36 maanden</option>
+              <option value="60">Laatste 60 maanden</option>
             </select>
           </label>
           <button
@@ -628,24 +873,26 @@
             aria-expanded={coverageOpen}
             on:click={() => {
               coverageOpen = !coverageOpen;
+              if (coverageOpen && !coverageLoaded && !coverageBusy) {
+                void loadCoverage();
+              }
             }}
           >
             {coverageOpen ? "Verberg dekking" : "Toon dekking"}
           </button>
         </div>
       </div>
-      {#if coverageOpen && coverageRows.length > 0}
+      {#if coverageOpen && coverageLoaded && coverageRows.length > 0}
         <div class="admin-coverage">
-          <div class="admin-coverage__legend">
-            <span>Geen documenten</span>
-            <div class="admin-coverage__legend-scale" aria-hidden="true">
-              <span></span>
-              <span></span>
-              <span></span>
-              <span></span>
-            </div>
-            <span>Meer documenten</span>
-          </div>
+          {#if coverageSelectedRange}
+            <p class="admin-coverage__selection-note">
+              Geselecteerd:
+              <strong>{coverageSelectedSourceLabel()}</strong>
+              · {monthLabel(coverageSelectedRange.startMonth)}
+              t/m
+              {monthLabel(coverageSelectedRange.endMonth)}
+            </p>
+          {/if}
           <div
             class="admin-coverage__months"
             style={`--coverage-column-count:${coverageMonths.length}`}
@@ -655,36 +902,38 @@
               <div class="admin-coverage__month">{monthLabel(month)}</div>
             {/each}
           </div>
-          <div class="admin-coverage__rows">
-            {#each coverageRows as row}
-              <article class="surface-card admin-coverage__row">
-                <div class="admin-coverage__row-meta">
-                  <strong>{row.label}</strong>
-                  <span>{row.totalDocumentCount} documenten</span>
-                </div>
-                <div
-                  class="admin-coverage__sparkline"
-                  style={`--coverage-column-count:${coverageMonths.length}`}
-                >
-                  {#each row.months as cell}
-                    <div
-                      class={`admin-coverage__bar ${cell.documentCount > 0 ? "admin-coverage__bar--filled" : "admin-coverage__bar--empty"}`}
-                      style={`--coverage-intensity:${coverageIntensity(cell.documentCount)}`}
-                      title={coverageTooltip(row.label, cell.month, cell)}
-                    >
-                      {#if cell.documentCount > 0}
-                        <span>{cell.documentCount}</span>
-                      {/if}
-                    </div>
+          <div class="admin-coverage__groups">
+            {#each coverageGroups as group}
+              <section class="admin-coverage__group">
+                {#if coverageGrouping !== "alphabetical"}
+                  <div class="admin-coverage__group-header">
+                    <h3>{group.label}</h3>
+                    <span>{group.rows.length} overheden</span>
+                  </div>
+                {/if}
+                <div class="admin-coverage__rows">
+                  {#each group.rows as row}
+                    <CoverageHeatmapRow
+                      {row}
+                      months={coverageMonths}
+                      maxDocuments={coverageMaxDocuments}
+                      selectedRange={coverageSelectedRange?.sourceKey === row.sourceKey ? coverageSelectedRange : null}
+                      previewRange={coveragePreviewRangeForSource(row.sourceKey)}
+                      anchorMonth={coverageRangeAnchor?.sourceKey === row.sourceKey ? coverageRangeAnchor.month : ""}
+                      on:selectsource={(event) => selectCoverageSource(event.detail.sourceKey)}
+                      on:hovermonth={(event) => previewCoverageRange(event.detail.sourceKey, event.detail.month)}
+                      on:leave={(event) => clearCoverageRangePreview(event.detail.sourceKey)}
+                      on:selectmonth={(event) => selectCoverageCell(event.detail.sourceKey, event.detail.month)}
+                    />
                   {/each}
                 </div>
-              </article>
+              </section>
             {/each}
           </div>
         </div>
       {:else if coverageOpen && coverageBusy}
         <div class="result-state">Dekkingsoverzicht laden...</div>
-      {:else if coverageOpen}
+      {:else if coverageOpen && coverageLoaded}
         <div class="result-state">Nog geen gemeentelijke importgeschiedenis beschikbaar.</div>
       {/if}
     </section>
@@ -715,13 +964,16 @@
         <button type="button" class="ghost-button" on:click={() => void loadRuns("replace")}>Verversen</button>
       </div>
       <div class="admin-runs-table" aria-hidden="true">
-        <div>Import</div>
+        <div>Bron</div>
+        <div>Status</div>
+        <div>Start</div>
+        <div>Eind</div>
         <div>Verg.</div>
         <div>Doc.</div>
         <div>Issues</div>
         <div>Cache</div>
-        <div>Download</div>
-        <div>Tijd</div>
+        <div>Dl.</div>
+        <div>Looptijd</div>
       </div>
       <div class="admin-runs">
         {#if runs.length === 0 && !runsBusy}
@@ -735,16 +987,18 @@
             >
               <div class="admin-run__row">
                 <div class="admin-run__primary">
-                  <div class="admin-run__meta">
-                    <span class="pill">{run.source_key}</span>
-                    <span class={`pill pill--soft ${statusClassName(run.status)}`}>
-                      {statusLabel(run.status)}
-                    </span>
-                    {#if run.trigger === "scheduled"}
-                      <span class="pill pill--soft">Planner</span>
-                    {/if}
-                    <span class="admin-run__date">{periodLabel(run)}</span>
-                  </div>
+                  <strong>{run.source_key}</strong>
+                </div>
+                <div class="admin-run__status">
+                  <span class={`pill pill--soft ${statusClassName(run.status)}`}>
+                    {statusLabel(run.status)}
+                  </span>
+                </div>
+                <div class="admin-run__metric admin-run__metric--date">
+                  <strong>{formatDateCell(run.date_from)}</strong>
+                </div>
+                <div class="admin-run__metric admin-run__metric--date">
+                  <strong>{formatDateCell(run.date_to)}</strong>
                 </div>
                 <div class="admin-run__metric"><strong>{run.meeting_count}</strong></div>
                 <div class="admin-run__metric"><strong>{run.document_count}</strong></div>
@@ -752,7 +1006,7 @@
                 <div class="admin-run__metric"><strong>{run.cache_hits}</strong></div>
                 <div class="admin-run__metric"><strong>{run.downloaded_count}</strong></div>
                 <div class="admin-run__time">
-                  <small title={run.started_at}>{formatRelativeTime(run.started_at)}</small>
+                  <small title={run.started_at}>{formatRunDuration(run)}</small>
                 </div>
               </div>
 
@@ -847,6 +1101,7 @@
             <div><strong>Status</strong><p>{statusLabel(openRun.status)}</p></div>
             <div><strong>Periode</strong><p>{periodLabel(openRun)}</p></div>
             <div><strong>Gestart</strong><p>{openRun.started_at}</p></div>
+            <div><strong>Looptijd</strong><p>{formatRunDuration(openRun)}</p></div>
             <div><strong>Projectie</strong><p>{openRun.projection_version ?? "onbekend"}</p></div>
             <div><strong>Afleiding</strong><p>{openRun.derivation_version ?? "onbekend"}</p></div>
             <div><strong>Vergaderingen</strong><p>{openRun.meeting_count}</p></div>

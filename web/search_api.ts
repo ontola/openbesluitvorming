@@ -414,8 +414,8 @@ function coverageMonthLabels(monthCount: number): string[] {
 }
 
 export async function getDocumentCoverage(monthCount = 12): Promise<AdminCoverageResponse> {
-  const months = coverageMonthLabels(Math.max(3, Math.min(monthCount, 24)));
-  const municipalitySources = listSources().filter((source) => source.organizationType === "gemeente");
+  const months = coverageMonthLabels(Math.max(3, Math.min(monthCount, 60)));
+  const coverageSources = listSources();
   const quickwit = new QuickwitClient();
   const response = await quickwit.searchRequest({
     query: `projection_version:${escapeTerm(currentProjectionVersion())} AND entity_type:Document`,
@@ -430,7 +430,7 @@ export async function getDocumentCoverage(monthCount = 12): Promise<AdminCoverag
           by_month: {
             terms: {
               field: "document_month",
-              size: Math.max(months.length, 24),
+              size: months.length,
             },
           },
         },
@@ -443,7 +443,7 @@ export async function getDocumentCoverage(monthCount = 12): Promise<AdminCoverag
   const bySource = new Map(sourceBuckets.map((bucket) => [bucket.key ?? "", bucket]));
   let maxDocumentCount = 0;
 
-  const rows: AdminCoverageRow[] = municipalitySources
+  const rows: AdminCoverageRow[] = coverageSources
     .map((source) => {
       const sourceBucket = bySource.get(source.key);
       const byMonth = new Map(
@@ -469,6 +469,7 @@ export async function getDocumentCoverage(monthCount = 12): Promise<AdminCoverag
         sourceKey: source.key,
         label: source.label ?? source.key,
         supplier: source.supplier,
+        organizationType: source.organizationType,
         months: monthCells,
         totalDocumentCount,
         coveredMonthCount,

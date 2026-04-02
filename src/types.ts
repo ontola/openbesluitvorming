@@ -317,6 +317,7 @@ export interface AdminCoverageRow {
   sourceKey: string;
   label: string;
   supplier: string;
+  organizationType: string;
   months: AdminCoverageCell[];
   totalDocumentCount: number;
   coveredMonthCount: number;
