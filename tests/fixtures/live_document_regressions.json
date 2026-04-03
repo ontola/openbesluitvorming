@@ -1,0 +1,18 @@
+[
+  {
+    "id": "notubiz-baarn-13165092",
+    "label": "Baarn gibberish PDF",
+    "url": "https://api.notubiz.nl/document/13165092/1",
+    "fileName": "13165092.pdf",
+    "contentType": "application/pdf",
+    "expectedQuality": "suspect"
+  },
+  {
+    "id": "notubiz-maassluis-14901610",
+    "label": "Maassluis mixed-quality PDF",
+    "url": "https://api.notubiz.nl/document/14901610/1",
+    "fileName": "14901610.pdf",
+    "contentType": "application/pdf",
+    "expectedQuality": "suspect"
+  }
+]

@@ -90,6 +90,8 @@ export interface DocumentDerivedContent {
   markdown_key?: string;
   page_chunks_key?: string;
   page_count?: number;
+  extraction_quality_score?: number;
+  extraction_quality_status?: "good" | "suspect";
 }
 
 export interface DocumentEntity {
