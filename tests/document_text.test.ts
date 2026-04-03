@@ -347,6 +347,125 @@ Deno.test("extractDocumentMarkdown surfaces a clear error when transmutation is 
   }
 });
 
+Deno.test("extractDocumentMarkdown prefers pymupdf4llm for PDFs when configured", async () => {
+  const transmutationScript = await Deno.makeTempFile({ suffix: ".sh" });
+  await Deno.writeTextFile(
+    transmutationScript,
+    "#!/bin/sh\nprintf 'transmutation should not run when pymupdf4llm is configured' 1>&2\nexit 1\n",
+  );
+  await Deno.chmod(transmutationScript, 0o755);
+
+  const fallbackScript = await Deno.makeTempFile({ suffix: ".sh" });
+  await Deno.writeTextFile(
+    fallbackScript,
+    [
+      "#!/bin/sh",
+      'input="$1"',
+      'output="$2"',
+      'if [ -z "$input" ] || [ -z "$output" ]; then',
+      "  printf 'expected input and output' 1>&2",
+      "  exit 1",
+      "fi",
+      "printf '# PyMuPDF4LLM\\n\\nFallback markdown' > \"$output\"",
+    ].join("\n"),
+  );
+  await Deno.chmod(fallbackScript, 0o755);
+
+  const previousTransmutation = Deno.env.get("WOOZI_TRANSMUTATION_BIN");
+  const previousFallback = Deno.env.get("WOOZI_PYMUPDF4LLM_BIN");
+  Deno.env.set("WOOZI_TRANSMUTATION_BIN", transmutationScript);
+  Deno.env.set("WOOZI_PYMUPDF4LLM_BIN", fallbackScript);
+
+  try {
+    const result = await extractDocumentMarkdown(new TextEncoder().encode("%PDF-1.4 invalid"), {
+      contentType: "application/pdf",
+      fileName: "fallback.pdf",
+    });
+
+    assert(result.markdown.includes("Fallback markdown"), "expected fallback markdown to be returned");
+    assert(result.warnings.length === 0, "expected pymupdf4llm-first path to be clean");
+  } finally {
+    if (previousTransmutation === undefined) {
+      Deno.env.delete("WOOZI_TRANSMUTATION_BIN");
+    } else {
+      Deno.env.set("WOOZI_TRANSMUTATION_BIN", previousTransmutation);
+    }
+    if (previousFallback === undefined) {
+      Deno.env.delete("WOOZI_PYMUPDF4LLM_BIN");
+    } else {
+      Deno.env.set("WOOZI_PYMUPDF4LLM_BIN", previousFallback);
+    }
+    await Deno.remove(transmutationScript).catch(() => undefined);
+    await Deno.remove(fallbackScript).catch(() => undefined);
+  }
+});
+
+Deno.test("extractDocumentMarkdown falls back to transmutation when pymupdf4llm fails", async () => {
+  const transmutationScript = await Deno.makeTempFile({ suffix: ".sh" });
+  await Deno.writeTextFile(
+    transmutationScript,
+    [
+      "#!/bin/sh",
+      'outdir=""',
+      'if [ "$1" = "convert" ]; then',
+      "  shift",
+      "fi",
+      'while [ "$#" -gt 0 ]; do',
+      '  if [ "$1" = "--output-dir" ] || [ "$1" = "-d" ]; then',
+      '    outdir="$2"',
+      "    shift 2",
+      "    continue",
+      "  fi",
+      "  shift",
+      "done",
+      'mkdir -p "$outdir"',
+      "printf '## Pagina 1\\n\\nTransmutation fallback' > \"$outdir/page-001.md\"",
+    ].join("\n"),
+  );
+  await Deno.chmod(transmutationScript, 0o755);
+
+  const fallbackScript = await Deno.makeTempFile({ suffix: ".sh" });
+  await Deno.writeTextFile(
+    fallbackScript,
+    "#!/bin/sh\nprintf 'pymupdf4llm failed' 1>&2\nexit 1\n",
+  );
+  await Deno.chmod(fallbackScript, 0o755);
+
+  const previousTransmutation = Deno.env.get("WOOZI_TRANSMUTATION_BIN");
+  const previousFallback = Deno.env.get("WOOZI_PYMUPDF4LLM_BIN");
+  Deno.env.set("WOOZI_TRANSMUTATION_BIN", transmutationScript);
+  Deno.env.set("WOOZI_PYMUPDF4LLM_BIN", fallbackScript);
+
+  try {
+    const result = await extractDocumentMarkdown(new TextEncoder().encode("%PDF-1.4 invalid"), {
+      contentType: "application/pdf",
+      fileName: "fallback.pdf",
+    });
+
+    assert(
+      result.markdown.includes("Transmutation fallback"),
+      "expected transmutation fallback markdown to be returned",
+    );
+    assert(
+      result.warnings.some((warning) => warning.includes("pymupdf4llm PDF extraction failed")),
+      "expected warning to mention pymupdf4llm failure",
+    );
+  } finally {
+    if (previousTransmutation === undefined) {
+      Deno.env.delete("WOOZI_TRANSMUTATION_BIN");
+    } else {
+      Deno.env.set("WOOZI_TRANSMUTATION_BIN", previousTransmutation);
+    }
+    if (previousFallback === undefined) {
+      Deno.env.delete("WOOZI_PYMUPDF4LLM_BIN");
+    } else {
+      Deno.env.set("WOOZI_PYMUPDF4LLM_BIN", previousFallback);
+    }
+    await Deno.remove(transmutationScript).catch(() => undefined);
+    await Deno.remove(fallbackScript).catch(() => undefined);
+  }
+});
+
 Deno.test("deriveMarkdownFromText preserves simple headings and list blocks", () => {
   const markdown = deriveMarkdownFromText("Agenda\n\n- punt 1\n- punt 2\n\nBesluitvorming");
 

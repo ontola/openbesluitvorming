@@ -3,5 +3,5 @@ export function currentProjectionVersion(): string {
 }
 
 export function currentDerivationVersion(): string {
-  return Deno.env.get("WOOZI_DERIVATION_VERSION")?.trim() || "transmutation-pages-v1";
+  return Deno.env.get("WOOZI_DERIVATION_VERSION")?.trim() || "pymupdf-v1";
 }

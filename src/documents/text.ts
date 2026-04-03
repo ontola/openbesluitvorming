@@ -1,5 +1,4 @@
 import type { DocumentPageChunk } from "../types.ts";
-
 export interface DocumentMarkdownExtractionResult {
   markdown: string;
   warnings: string[];
@@ -19,6 +18,24 @@ const TRANSMUTATION_MARKDOWN_EXTENSIONS = new Set([
   ".rtf",
   ".odt",
 ]);
+
+function pymupdf4llmBinary(): string | null {
+  const value = Deno.env.get("WOOZI_PYMUPDF4LLM_BIN")?.trim();
+  if (value) {
+    return value;
+  }
+
+  for (const candidate of ["/usr/local/bin/pymupdf4llm_extract", "/app/scripts/pymupdf4llm_extract.sh"]) {
+    try {
+      Deno.statSync(candidate);
+      return candidate;
+    } catch {
+      continue;
+    }
+  }
+
+  return null;
+}
 
 function isCommandMissing(error: unknown): boolean {
   return (
@@ -97,9 +114,30 @@ function normalizeCliError(command: string, stderr: string): string {
 }
 
 async function extractPdf(bytes: Uint8Array): Promise<DocumentMarkdownExtractionResult> {
+  const pymupdfBin = pymupdf4llmBinary();
+
+  if (pymupdfBin) {
+    try {
+      return await extractPdfWithPymupdf4llmCli(bytes, pymupdfBin);
+    } catch {
+      const fallback = await extractPdfWithTransmutation(bytes);
+      return {
+        markdown: fallback.markdown,
+        pageChunks: fallback.pageChunks,
+        warnings: [
+          `pymupdf4llm PDF extraction failed; using transmutation fallback.`,
+          ...fallback.warnings,
+        ],
+      };
+    }
+  }
+
+  return await extractPdfWithTransmutation(bytes);
+}
+
+async function extractPdfWithTransmutation(bytes: Uint8Array): Promise<DocumentMarkdownExtractionResult> {
   try {
     const pageChunks = await extractPdfMarkdownPagesWithCli(bytes);
-
     return {
       markdown: normalizeWhitespace(pageChunks.map((page) => page.markdown).join("\n\n")),
       pageChunks,
@@ -121,6 +159,32 @@ async function extractPdf(bytes: Uint8Array): Promise<DocumentMarkdownExtraction
     }
 
     throw error;
+  }
+}
+
+async function extractPdfWithPymupdf4llmCli(
+  bytes: Uint8Array,
+  command: string,
+): Promise<DocumentMarkdownExtractionResult> {
+  const workDir = await Deno.makeTempDir();
+  const inputPath = `${workDir}/document.pdf`;
+  const outputPath = `${workDir}/document.md`;
+  await Deno.writeFile(inputPath, bytes);
+
+  try {
+    await readCommandOutput(command, [inputPath, outputPath]);
+    const markdown = normalizeWhitespace(await Deno.readTextFile(outputPath));
+    return {
+      markdown,
+      warnings: [],
+    };
+  } catch (error) {
+    if (isCommandMissing(error)) {
+      throw new Error(`PyMuPDF4LLM fallback CLI not found at '${command}'.`);
+    }
+    throw error;
+  } finally {
+    await removePath(workDir);
   }
 }
 

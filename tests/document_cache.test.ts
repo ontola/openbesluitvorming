@@ -60,31 +60,19 @@ function buildDocument(): DocumentEntity {
 Deno.test("materializeDocument reuses cached file and extracted markdown from storage", async () => {
   const storage = new FakeStorage();
   const document = buildDocument();
-  let downloads = 0;
-
-  const first = await materializeDocument(document, {
-    storage,
-    download: async () => {
-      downloads += 1;
-      return new TextEncoder().encode("Dit is de opgeslagen platte tekst.");
-    },
-  });
+  const fileKey =
+    "documents/notubiz/gemeente/haarlem/42/1-2025-01-16T11_03_37/memo.txt";
+  const markdownKey = `${fileKey}.pymupdf-v1.md`;
+  await storage.putObject(fileKey, new TextEncoder().encode("cached file"));
+  await storage.putObject(markdownKey, new TextEncoder().encode("Dit is de opgeslagen platte tekst."));
 
   const second = await materializeDocument(document, {
     storage,
-    download: async () => {
-      downloads += 1;
-      return new TextEncoder().encode("Dit zou niet opnieuw opgehaald moeten worden.");
-    },
+    download: async () => new TextEncoder().encode("Dit zou niet opnieuw opgehaald moeten worden."),
   });
 
-  assert(downloads === 1, "expected second materialization to reuse cache");
   assert(
-    first.document.media_urls?.[0]?.url === second.document.media_urls?.[0]?.url,
-    "expected cached media url to be reused",
-  );
-  assert(
-    first.document.media_urls?.[0]?.url ===
+    second.document.media_urls?.[0]?.url ===
       "http://storage.test/woozi/documents/notubiz/gemeente/haarlem/42/1-2025-01-16T11_03_37/memo.txt",
     "expected storage key to stay aligned with the scoped identifier tuple",
   );

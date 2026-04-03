@@ -1,6 +1,8 @@
 import type { DocumentEntity, ExtractionIssue } from "../types.ts";
 import { extractDocumentMarkdown } from "./text.ts";
 import type { IngestExecutionMode } from "../types.ts";
+import { assessMarkdownQuality } from "./quality.ts";
+import { currentDerivationVersion } from "../pipeline/versioning.ts";
 
 interface CachedStorage {
   hasObject(key: string): Promise<boolean>;
@@ -61,11 +63,11 @@ function objectKey(document: DocumentEntity): string {
 }
 
 function extractedMarkdownKey(document: DocumentEntity): string {
-  return `${objectKey(document)}.md`;
+  return `${objectKey(document)}.${currentDerivationVersion()}.md`;
 }
 
 function extractedPageChunksKey(document: DocumentEntity): string {
-  return `${objectKey(document)}.pages.json`;
+  return `${objectKey(document)}.${currentDerivationVersion()}.pages.json`;
 }
 
 function sanitizeToken(value: string): string {
@@ -112,6 +114,7 @@ async function readCachedDocument(
   const pageChunks = pageChunksText
     ? ((JSON.parse(pageChunksText) as StoredPageChunks).pages ?? [])
     : [];
+  const quality = mdText ? assessMarkdownQuality(mdText) : null;
   return {
     cacheHit: true,
     issues: [],
@@ -123,6 +126,8 @@ async function readCachedDocument(
         markdown_key: markdownKey,
         page_chunks_key: hasPageChunks ? pageChunksKey : undefined,
         page_count: pageChunks.length > 0 ? pageChunks.length : undefined,
+        extraction_quality_score: quality?.score,
+        extraction_quality_status: quality?.status,
       },
       media_urls: [
         {
@@ -205,6 +210,8 @@ async function rederiveFromStoredFile(
     );
   }
 
+  const quality = mdText ? assessMarkdownQuality(mdText) : null;
+
   return {
     cacheHit: true,
     issues,
@@ -216,6 +223,8 @@ async function rederiveFromStoredFile(
         markdown_key: mdText ? extractedMarkdownKey(document) : undefined,
         page_chunks_key: pageChunks.length > 0 ? extractedPageChunksKey(document) : undefined,
         page_count: pageChunks.length > 0 ? pageChunks.length : undefined,
+        extraction_quality_score: quality?.score,
+        extraction_quality_status: quality?.status,
       },
       media_urls: [
         {
@@ -340,6 +349,8 @@ export async function materializeDocument(
     ];
   }
 
+  const quality = mdText ? assessMarkdownQuality(mdText) : null;
+
   return {
     cacheHit: false,
     issues,
@@ -353,6 +364,8 @@ export async function materializeDocument(
               markdown_key: mdText ? extractedMarkdownKey(document) : undefined,
               page_chunks_key: pageChunks.length > 0 ? extractedPageChunksKey(document) : undefined,
               page_count: pageChunks.length > 0 ? pageChunks.length : undefined,
+              extraction_quality_score: quality?.score,
+              extraction_quality_status: quality?.status,
             }
           : undefined,
       media_urls: mediaUrls,

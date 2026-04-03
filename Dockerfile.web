@@ -15,11 +15,12 @@ FROM denoland/deno:2.7.7
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates build-essential pkg-config libssl-dev \
+RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates build-essential pkg-config libssl-dev python3 python3-pip python3-venv tesseract-ocr \
   && curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal \
   && . "$HOME/.cargo/env" \
   && cargo install --locked transmutation --features cli \
   && cp "$HOME/.cargo/bin/transmutation" /usr/local/bin/transmutation \
+  && python3 -m pip install --break-system-packages --no-cache-dir pymupdf pymupdf4llm \
   && rm -rf /var/lib/apt/lists/*
 
 COPY deno.json ./
@@ -29,7 +30,11 @@ COPY src ./src
 COPY web ./web
 COPY API.md ./
 COPY schemas ./schemas
+COPY scripts ./scripts
 COPY --from=web-build /app/node_modules ./node_modules
 COPY --from=web-build /app/web/dist ./web/dist
+
+RUN chmod +x /app/scripts/pymupdf4llm_extract.sh /app/scripts/pymupdf4llm_extract.py \
+  && ln -sf /app/scripts/pymupdf4llm_extract.sh /usr/local/bin/pymupdf4llm_extract
 
 CMD ["run", "-A", "web/server.ts"]
