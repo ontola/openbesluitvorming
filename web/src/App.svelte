@@ -78,6 +78,7 @@
   let detailMode: "text" | "pdf" = "text";
   let preferredDetailMode: "text" | "pdf" = "text";
   let detailPage = "";
+  let detailPdfPageCount = 0;
 
   const detailCache = new Map<string, EntityContentResponse | null>();
   const detailRequests = new Map<string, Promise<EntityContentResponse | null>>();
@@ -401,6 +402,7 @@
     detailContent = null;
     detailMode = "text";
     detailPage = "";
+    detailPdfPageCount = 0;
     if (updateUrl && view) {
       view = "";
       writeRouteState();
@@ -626,6 +628,7 @@
     detailContent = null;
     detailMode = "text";
     detailPage = `${pageOverride ?? item.matchedPage ?? 1}`;
+    detailPdfPageCount = 0;
     scrollResultCardIntoView(item.entityId);
 
     if (updateUrl && view !== item.entityId) {
@@ -650,6 +653,15 @@
     if (detailMode === "text") {
       await syncDetailText();
     }
+  }
+
+  function jumpToFirstPdfPage(): void {
+    if (!detailOpen || detailMode !== "pdf") {
+      return;
+    }
+
+    detailPage = "1";
+    writeRouteState("replace");
   }
 
   async function openDetailById(entityId: string, updateUrl = true): Promise<void> {
@@ -900,11 +912,12 @@
     filtersOpen = hasAdvancedSearchFilters();
   }
 
-  function handlePdfPageChange(event: CustomEvent<{ page: number }>): void {
+  function handlePdfPageChange(event: CustomEvent<{ page: number; pageCount: number }>): void {
     if (!detailOpen || !detailItem || detailMode !== "pdf") {
       return;
     }
 
+    detailPdfPageCount = event.detail.pageCount;
     const nextPage = `${event.detail.page}`;
     if (detailPage === nextPage) {
       return;
@@ -1434,6 +1447,21 @@
 
         <div class="detail-sheet__header-top">
           <h2 id="detail-title">{detailItem.title}</h2>
+          {#if detailMode === "pdf"}
+            <div class="detail-sheet__pdf-summary">
+              <span class="detail-sheet__pdf-counter">
+                Pagina {parsePageNumber(detailPage) ?? 1}{#if detailPdfPageCount > 0} / {detailPdfPageCount}{/if}
+              </span>
+              <button
+                type="button"
+                class="ghost-button detail-sheet__pdf-jump"
+                disabled={(parsePageNumber(detailPage) ?? 1) <= 1}
+                on:click={jumpToFirstPdfPage}
+              >
+                Eerste pagina
+              </button>
+            </div>
+          {/if}
         </div>
       </div>
 

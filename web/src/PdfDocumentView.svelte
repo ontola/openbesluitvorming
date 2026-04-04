@@ -4,7 +4,7 @@
   export let url = "";
   export let initialPage: number | null = null;
 
-  const dispatch = createEventDispatcher<{ pagechange: { page: number } }>();
+  const dispatch = createEventDispatcher<{ pagechange: { page: number; pageCount: number } }>();
 
   type PageEntry = {
     number: number;
@@ -15,23 +15,22 @@
 
   const PAGE_WINDOW_BEHIND = 2;
   const PAGE_WINDOW_AHEAD = 5;
+  const PAGE_FETCH_BUFFER = 8;
+  const PAGE_CACHE_BUFFER = 24;
 
   let containerEl: HTMLDivElement | null = null;
   let resizeObserver: ResizeObserver | null = null;
   let scrollCheckTimer: number | undefined;
   let activePage = 0;
   let pageCount = 0;
-  let windowPages: number[] = [];
   let pageEntries = new Map<number, PageEntry>();
   let pages: PageEntry[] = [];
   let loading = true;
   let error = "";
   let loadedUrl = "";
-  let applyingWindow = false;
   let abortControllers = new Map<number, AbortController>();
   let lastScrollSignature = "";
   let pendingCenterPage = 0;
-  let initializingTargetOnly = false;
 
   function targetPageNumber(): number {
     const value = initialPage ?? 1;
@@ -46,25 +45,59 @@
     const bounded = Math.max(1, pageCount > 0 ? Math.min(pageCount, centerPage) : centerPage);
     const start = Math.max(1, bounded - PAGE_WINDOW_BEHIND);
     const end = pageCount > 0 ? Math.min(pageCount, bounded + PAGE_WINDOW_AHEAD) : bounded + PAGE_WINDOW_AHEAD;
-    return Array.from({ length: end - start + 1 }, (_, i) => start + i);
+    return Array.from({ length: end - start + 1 }, (_, index) => start + index);
   }
 
   function pageLookahead(centerPage: number): number[] {
     const bounded = Math.max(1, pageCount > 0 ? Math.min(pageCount, centerPage) : centerPage);
-    const start = Math.max(1, bounded - 1);
-    const end = pageCount > 0 ? Math.min(pageCount, bounded + 2) : bounded + 2;
-    return Array.from({ length: end - start + 1 }, (_, i) => start + i);
+    const start = Math.max(1, bounded - PAGE_FETCH_BUFFER);
+    const end = pageCount > 0 ? Math.min(pageCount, bounded + PAGE_FETCH_BUFFER) : bounded + PAGE_FETCH_BUFFER;
+    return Array.from({ length: end - start + 1 }, (_, index) => start + index);
+  }
+
+  function pageCacheRange(centerPage: number): number[] {
+    const bounded = Math.max(1, pageCount > 0 ? Math.min(pageCount, centerPage) : centerPage);
+    const start = Math.max(1, bounded - PAGE_CACHE_BUFFER);
+    const end = pageCount > 0 ? Math.min(pageCount, bounded + PAGE_CACHE_BUFFER) : bounded + PAGE_CACHE_BUFFER;
+    return Array.from({ length: end - start + 1 }, (_, index) => start + index);
+  }
+
+  function desiredPageNumbers(): number[] {
+    if (pageCount > 0) {
+      return Array.from({ length: pageCount }, (_, index) => index + 1);
+    }
+    return pendingCenterPage > 0 ? [pendingCenterPage] : [];
+  }
+
+  function syncPages(): void {
+    pages = desiredPageNumbers().map((pageNumber) =>
+      pageEntries.get(pageNumber) ?? {
+        number: pageNumber,
+        blobUrl: null,
+        loading: pageNumber === pendingCenterPage || pageCount === 0,
+        error: false,
+      }
+    );
   }
 
   function warmPages(pageNumbers: number[]): void {
     for (const pageNum of pageNumbers) {
-      if (!pageEntries.has(pageNum) && !abortControllers.has(pageNum)) {
-        void fetchPage(pageNum);
-      }
+      const entry = pageEntries.get(pageNum);
+      if (abortControllers.has(pageNum) || entry?.blobUrl || entry?.loading) continue;
+      void fetchPage(pageNum);
     }
   }
 
   async function fetchPage(pageNumber: number): Promise<void> {
+    const existingEntry = pageEntries.get(pageNumber);
+    pageEntries.set(pageNumber, {
+      number: pageNumber,
+      blobUrl: existingEntry?.blobUrl ?? null,
+      loading: true,
+      error: false,
+    });
+    syncPages();
+
     const controller = new AbortController();
     abortControllers.set(pageNumber, controller);
 
@@ -75,95 +108,59 @@
         const count = parseInt(response.headers.get("x-pdf-page-count") ?? "", 10);
         if (!isNaN(count) && count > 0) {
           pageCount = count;
-          // Trim window pages that are now out of range
-          const validWindow = windowPages.filter((n) => n <= pageCount);
-          if (validWindow.length !== windowPages.length) {
-            windowPages = validWindow;
-          }
+          dispatch("pagechange", { page: activePage || targetPageNumber(), pageCount });
+          syncPages();
         }
       }
 
       if (!response.ok) {
-        if (!windowPages.includes(pageNumber)) return;
         pageEntries.set(pageNumber, { number: pageNumber, blobUrl: null, loading: false, error: true });
-        pages = windowPages.map((n) => pageEntries.get(n) ?? { number: n, blobUrl: null, loading: true, error: false });
+        syncPages();
         return;
       }
 
       const blob = await response.blob();
-      if (!windowPages.includes(pageNumber)) {
-        URL.revokeObjectURL(URL.createObjectURL(blob));
-        return;
-      }
-
       const blobUrl = URL.createObjectURL(blob);
+      const previousEntry = pageEntries.get(pageNumber);
+      if (previousEntry?.blobUrl) {
+        URL.revokeObjectURL(previousEntry.blobUrl);
+      }
       pageEntries.set(pageNumber, { number: pageNumber, blobUrl, loading: false, error: false });
-      pages = windowPages.map((n) => pageEntries.get(n) ?? { number: n, blobUrl: null, loading: true, error: false });
-    } catch (e) {
-      if (e instanceof Error && e.name === "AbortError") return;
-      if (!windowPages.includes(pageNumber)) return;
+      syncPages();
+    } catch (errorValue) {
+      if (errorValue instanceof Error && errorValue.name === "AbortError") return;
       pageEntries.set(pageNumber, { number: pageNumber, blobUrl: null, loading: false, error: true });
-      pages = windowPages.map((n) => pageEntries.get(n) ?? { number: n, blobUrl: null, loading: true, error: false });
+      syncPages();
     } finally {
       abortControllers.delete(pageNumber);
     }
   }
 
-  async function applyPageWindow(centerPage: number): Promise<void> {
-    if (applyingWindow) return;
-    applyingWindow = true;
-
-    try {
-      const nextWindow = pageWindow(centerPage);
-
-      // Cancel and evict pages leaving the window
-      for (const pageNum of windowPages) {
-        if (!nextWindow.includes(pageNum)) {
-          abortControllers.get(pageNum)?.abort();
-          abortControllers.delete(pageNum);
-          const entry = pageEntries.get(pageNum);
-          if (entry?.blobUrl) URL.revokeObjectURL(entry.blobUrl);
-          pageEntries.delete(pageNum);
-        }
+  function trimPageCache(centerPage: number): void {
+    const keepPages = new Set(pageCacheRange(centerPage));
+    for (const [pageNumber, entry] of pageEntries.entries()) {
+      if (keepPages.has(pageNumber) || pageNumber === pendingCenterPage) {
+        continue;
       }
-
-      windowPages = nextWindow;
-
-      // Start fetching pages not yet loaded
-      warmPages(nextWindow);
-
-      pages = windowPages.map((n) => pageEntries.get(n) ?? { number: n, blobUrl: null, loading: true, error: false });
-    } finally {
-      applyingWindow = false;
+      abortControllers.get(pageNumber)?.abort();
+      abortControllers.delete(pageNumber);
+      if (entry.blobUrl) {
+        URL.revokeObjectURL(entry.blobUrl);
+      }
+      pageEntries.delete(pageNumber);
     }
+    syncPages();
   }
 
   async function ensurePageVisible(pageNumber: number, behavior: ScrollBehavior = "smooth"): Promise<void> {
     activePage = pageNumber;
+    dispatch("pagechange", { page: pageNumber, pageCount });
+    warmPages(pageLookahead(pageNumber));
+    trimPageCache(pageNumber);
+
     await tick();
     const pageEl = containerEl?.querySelector<HTMLElement>(`.pdf-document__page[data-page-number="${pageNumber}"]`);
     pageEl?.scrollIntoView({ block: "start", behavior });
-  }
-
-  async function expandAroundPagePreservingPosition(pageNumber: number): Promise<void> {
-    if (!containerEl) return;
-
-    const currentPageEl =
-      containerEl.querySelector<HTMLElement>(`.pdf-document__page[data-page-number="${pageNumber}"]`);
-    const previousTop = currentPageEl?.getBoundingClientRect().top ?? 0;
-
-    windowPages = pageWindow(pageNumber);
-    warmPages(windowPages);
-    pages = windowPages.map((n) => pageEntries.get(n) ?? { number: n, blobUrl: null, loading: true, error: false });
-
-    await tick();
-
-    const nextPageEl =
-      containerEl.querySelector<HTMLElement>(`.pdf-document__page[data-page-number="${pageNumber}"]`);
-    if (!nextPageEl) return;
-
-    const nextTop = nextPageEl.getBoundingClientRect().top;
-    containerEl.scrollTop += nextTop - previousTop;
   }
 
   async function initialize(): Promise<void> {
@@ -179,17 +176,14 @@
     loadedUrl = url;
     activePage = 0;
     pageCount = 0;
-    windowPages = [];
     pages = [];
     pageEntries = new Map();
     abortControllers = new Map();
     lastScrollSignature = "";
-    initializingTargetOnly = true;
 
     const targetPage = targetPageNumber();
     pendingCenterPage = targetPage;
-    windowPages = [targetPage];
-    pages = [{ number: targetPage, blobUrl: null, loading: true, error: false }];
+    syncPages();
     warmPages([targetPage]);
     loading = false;
 
@@ -206,21 +200,17 @@
         void ensurePageVisible(pageNumber, "auto");
       });
     });
-    if (initializingTargetOnly) {
-      initializingTargetOnly = false;
-      void expandAroundPagePreservingPosition(pageNumber);
-    }
   }
 
   function mostVisiblePageNumber(): number | null {
-    if (!containerEl || windowPages.length === 0) return null;
+    if (!containerEl || pages.length === 0) return null;
 
     const containerRect = containerEl.getBoundingClientRect();
     const viewportCenter = containerRect.top + containerRect.height / 2;
     let bestPage: number | null = null;
     let bestDistance = Infinity;
 
-    for (const pageNum of windowPages) {
+    for (const pageNum of desiredPageNumbers()) {
       const pageEl = containerEl.querySelector<HTMLElement>(`.pdf-document__page[data-page-number="${pageNum}"]`);
       if (!pageEl) continue;
       const rect = pageEl.getBoundingClientRect();
@@ -235,18 +225,15 @@
   }
 
   async function checkScrollPrefetch(): Promise<void> {
-    if (applyingWindow || pendingCenterPage > 0 || initializingTargetOnly) return;
+    if (pendingCenterPage > 0) return;
 
     const nextVisiblePage = mostVisiblePageNumber();
     if (!nextVisiblePage || nextVisiblePage === activePage) return;
 
     activePage = nextVisiblePage;
-    dispatch("pagechange", { page: nextVisiblePage });
-
-    const desiredWindow = pageWindow(nextVisiblePage);
-    if (desiredWindow.join(",") !== windowPages.join(",")) {
-      await applyPageWindow(nextVisiblePage);
-    }
+    dispatch("pagechange", { page: nextVisiblePage, pageCount });
+    warmPages(pageLookahead(nextVisiblePage));
+    trimPageCache(nextVisiblePage);
   }
 
   function scheduleScrollCheck(): void {
@@ -272,11 +259,9 @@
     loading = false;
     error = "";
     activePage = 0;
-    windowPages = [];
     pageEntries = new Map();
     abortControllers = new Map();
     pendingCenterPage = 0;
-    initializingTargetOnly = false;
   }
 
   $: {
@@ -285,7 +270,7 @@
       lastScrollSignature = signature;
       const targetPage = targetPageNumber();
       warmPages(pageLookahead(targetPage));
-      if (targetPage !== activePage || !windowPages.includes(targetPage)) {
+      if (targetPage !== activePage) {
         void ensurePageVisible(targetPage);
       }
     }
@@ -325,18 +310,20 @@
           class="pdf-document__page"
           data-page-number={page.number}
         >
-          {#if page.blobUrl}
-            <img
-              alt={`PDF pagina ${page.number}`}
-              class="pdf-document__image"
-              on:load={() => void recenterOnLoadedPage(page.number)}
-              src={page.blobUrl}
-            />
-          {:else if page.error}
-            <div class="pdf-document__page-placeholder" aria-hidden="true"></div>
-          {:else}
-            <div class="pdf-document__page-placeholder pdf-document__skeleton" aria-hidden="true"></div>
-          {/if}
+          <div class="pdf-document__page-media">
+            {#if page.blobUrl}
+              <img
+                alt={`PDF pagina ${page.number}`}
+                class="pdf-document__image"
+                on:load={() => void recenterOnLoadedPage(page.number)}
+                src={page.blobUrl}
+              />
+            {:else if page.error}
+              <div class="pdf-document__page-placeholder" aria-hidden="true"></div>
+            {:else}
+              <div class="pdf-document__page-placeholder pdf-document__page-placeholder--loading" aria-hidden="true"></div>
+            {/if}
+          </div>
         </figure>
       {/each}
     </div>

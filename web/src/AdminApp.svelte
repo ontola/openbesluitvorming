@@ -18,6 +18,14 @@
   import CoverageHeatmapRow from "./CoverageHeatmapRow.svelte";
   import SourcePicker from "./SourcePicker.svelte";
 
+  type ExecutionModeOption = {
+    value: IngestExecutionMode;
+    label: string;
+    description: string;
+    available: boolean;
+    availabilityNote?: string;
+  };
+
   const relativeTimeFormatter = new Intl.RelativeTimeFormat("nl-NL", {
     numeric: "auto",
   });
@@ -54,6 +62,7 @@
   let importSourceRef = "";
   let importDateTo = "";
   let importDateFrom = "";
+  let importExecutionMode: IngestExecutionMode = "full";
   let importStatus = "";
   let importBusy = false;
 
@@ -64,6 +73,41 @@
   let retryExecutionMode: IngestExecutionMode = "full";
 
   let pollTimer: number | null = null;
+
+  const executionModeOptions: ExecutionModeOption[] = [
+    {
+      value: "full",
+      label: "Bron-API verversen",
+      description:
+        "Haalt bron-API's opnieuw op, bouwt meetings en documenten opnieuw op, hergebruikt bestaande downloads en afleidingen waar mogelijk, en indexeert daarna opnieuw.",
+      available: true,
+    },
+    {
+      value: "rederive_cached",
+      label: "Herleid uit opslag",
+      description:
+        "Gebruikt opgeslagen bronbestanden om markdown en paginachunks opnieuw af te leiden en daarna opnieuw te indexeren. De bron-API wordt nu nog wel geraadpleegd om de documentset opnieuw vast te stellen.",
+      available: true,
+    },
+    {
+      value: "reindex_only",
+      label: "Alleen herindexeren",
+      description:
+        "Zou alleen de zoekprojectie opnieuw moeten opbouwen zonder bron-API's of parserstap opnieuw uit te voeren.",
+      available: false,
+      availabilityNote:
+        "Nog niet beschikbaar: hiervoor ontbreekt nog een replaybare opslag van entities buiten Quickwit.",
+    },
+    {
+      value: "retry_failed_documents",
+      label: "Alleen mislukte documenten",
+      description:
+        "Zou alleen documentdownload- en extractiefouten uit een eerdere run opnieuw moeten uitvoeren.",
+      available: false,
+      availabilityNote:
+        "Nog niet beschikbaar: hiervoor ontbreekt nog een gerichte retry-pad op documentniveau.",
+    },
+  ];
 
   function statusLabel(status: string): string {
     const labels: Record<string, string> = {
@@ -98,13 +142,56 @@
   }
 
   function executionModeLabel(mode: IngestExecutionMode): string {
-    const labels: Record<IngestExecutionMode, string> = {
-      full: "Volledige import",
-      rederive_cached: "Herleid uit cache",
-      reindex_only: "Alleen herindexeren",
-      retry_failed_documents: "Alleen mislukte documenten",
-    };
-    return labels[mode] ?? mode;
+    return executionModeOption(mode)?.label ?? mode;
+  }
+
+  function executionModeOption(mode: IngestExecutionMode): ExecutionModeOption | undefined {
+    return executionModeOptions.find((option) => option.value === mode);
+  }
+
+  function executionModeDescription(mode: IngestExecutionMode): string {
+    const option = executionModeOption(mode);
+    if (!option) {
+      return mode;
+    }
+
+    return option.availabilityNote
+      ? `${option.description} ${option.availabilityNote}`
+      : option.description;
+  }
+
+  function isAggregateSourceRef(sourceRef: string): boolean {
+    return sourceRef.startsWith("__supplier__:");
+  }
+
+  function isExecutionModeSelectable(mode: IngestExecutionMode, sourceRef = ""): boolean {
+    const option = executionModeOption(mode);
+    if (!option?.available) {
+      return false;
+    }
+
+    if (sourceRef && isAggregateSourceRef(sourceRef) && mode !== "full") {
+      return false;
+    }
+
+    return true;
+  }
+
+  function executionModeAvailabilityNote(mode: IngestExecutionMode, sourceRef = ""): string | null {
+    const option = executionModeOption(mode);
+    if (!option) {
+      return null;
+    }
+
+    if (!option.available) {
+      return option.availabilityNote ?? "Nog niet beschikbaar.";
+    }
+
+    if (sourceRef && isAggregateSourceRef(sourceRef) && mode !== "full") {
+      return "Nog niet beschikbaar voor leverancier-brede imports; kies eerst een individuele bron.";
+    }
+
+    return null;
   }
 
   function supplierLabel(supplier: string): string {
@@ -686,11 +773,18 @@
       importStatus = "De startdatum moet op of voor de einddatum liggen.";
       return;
     }
+    if (!isExecutionModeSelectable(importExecutionMode, importSourceRef)) {
+      importStatus = executionModeAvailabilityNote(importExecutionMode, importSourceRef) ??
+        "Deze uitvoermodus is niet beschikbaar.";
+      return;
+    }
 
     importBusy = true;
     importStatus = "Import gestart...";
     try {
-      await startImport(importSourceRef, importDateFrom, importDateTo);
+      await startImport(importSourceRef, importDateFrom, importDateTo, {
+        executionMode: importExecutionMode,
+      });
     } catch (error) {
       importStatus = error instanceof Error ? error.message : "Import mislukt.";
     } finally {
@@ -700,11 +794,16 @@
 
   async function importOpenRunAgain(): Promise<void> {
     if (!openRun) return;
+    const source = allSources.find((item) => item.key === openRun?.source_key);
+    const sourceRef = source?.sourceRef ?? openRun.source_key;
+    if (!isExecutionModeSelectable(retryExecutionMode, sourceRef)) {
+      importStatus = executionModeAvailabilityNote(retryExecutionMode, sourceRef) ??
+        "Deze uitvoermodus is niet beschikbaar.";
+      return;
+    }
     detailImportBusy = true;
     importStatus = "Import gestart...";
     try {
-      const source = allSources.find((item) => item.key === openRun?.source_key);
-      const sourceRef = source?.sourceRef ?? openRun.source_key;
       const startedRuns = await startImport(sourceRef, openRun.date_from, openRun.date_to, {
         executionMode: retryExecutionMode,
         parentRunId: openRun.id,
@@ -731,6 +830,9 @@
   }
 
   $: filteredSourceOptions = implementedSources;
+  $: if (!isExecutionModeSelectable(importExecutionMode, importSourceRef)) {
+    importExecutionMode = "full";
+  }
 
   onMount(async () => {
     importDateTo = formatDateInputValue(new Date());
@@ -799,8 +901,47 @@
         <label class="search-field search-field--subtle search-field--compact admin-field">
           <input bind:value={importDateTo} type="date" />
         </label>
+        <label class="select-field select-field--compact admin-field admin-field--mode">
+          <span class="sr-only">Importniveau</span>
+          <select bind:value={importExecutionMode}>
+            {#each executionModeOptions as option}
+              <option
+                value={option.value}
+                disabled={!isExecutionModeSelectable(option.value, importSourceRef)}
+              >
+                {option.label}
+              </option>
+            {/each}
+          </select>
+        </label>
         <button type="submit" class="primary-button" disabled={importBusy}>Import uitvoeren</button>
       </form>
+      <p class="admin-mode-help">
+        <strong>{executionModeLabel(importExecutionMode)}</strong>:
+        {executionModeDescription(importExecutionMode)}
+      </p>
+      {#if executionModeAvailabilityNote(importExecutionMode, importSourceRef)}
+        <p class="admin-mode-note">{executionModeAvailabilityNote(importExecutionMode, importSourceRef)}</p>
+      {/if}
+      <div class="admin-mode-grid">
+        {#each executionModeOptions as option}
+          <article
+            class="surface-card admin-mode-card"
+            class:admin-mode-card--disabled={Boolean(executionModeAvailabilityNote(option.value, importSourceRef))}
+          >
+            <div class="admin-mode-card__header">
+              <strong>{option.label}</strong>
+              <span class={`pill pill--soft ${option.available ? "status-succeeded" : "status-queued"}`}>
+                {executionModeAvailabilityNote(option.value, importSourceRef) ? "Nog niet" : "Beschikbaar"}
+              </span>
+            </div>
+            <p>{option.description}</p>
+            {#if executionModeAvailabilityNote(option.value, importSourceRef)}
+              <p class="admin-mode-card__note">{executionModeAvailabilityNote(option.value, importSourceRef)}</p>
+            {/if}
+          </article>
+        {/each}
+      </div>
       <p class="admin-status">{importStatus}</p>
     </section>
 
@@ -1070,8 +1211,17 @@
             <label class="select-field select-field--compact">
               <span class="sr-only">Retry-modus</span>
               <select bind:value={retryExecutionMode}>
-                <option value="full">Volledige import</option>
-                <option value="rederive_cached">Herleid uit cache</option>
+                {#each executionModeOptions as option}
+                  <option
+                    value={option.value}
+                    disabled={!isExecutionModeSelectable(
+                      option.value,
+                      allSources.find((item) => item.key === openRun.source_key)?.sourceRef ?? openRun.source_key,
+                    )}
+                  >
+                    {option.label}
+                  </option>
+                {/each}
               </select>
             </label>
             <button
@@ -1112,6 +1262,21 @@
           </div>
 
           <div class="admin-detail__issues">
+            <div class="admin-mode-detail">
+              <strong>{executionModeLabel(retryExecutionMode)}</strong>
+              <p>{executionModeDescription(retryExecutionMode)}</p>
+              {#if executionModeAvailabilityNote(
+                retryExecutionMode,
+                allSources.find((item) => item.key === openRun.source_key)?.sourceRef ?? openRun.source_key,
+              )}
+                <p class="admin-mode-note">
+                  {executionModeAvailabilityNote(
+                    retryExecutionMode,
+                    allSources.find((item) => item.key === openRun.source_key)?.sourceRef ?? openRun.source_key,
+                  )}
+                </p>
+              {/if}
+            </div>
             <h3>Issues</h3>
             {#if openIssues.length > 0}
               <ul>
