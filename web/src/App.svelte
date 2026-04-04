@@ -79,6 +79,9 @@
   let preferredDetailMode: "text" | "pdf" = "text";
   let detailPage = "";
   let detailPdfPageCount = 0;
+  let detailPdfCurrentPage = 1;
+  let detailPdfJumpOpen = false;
+  let detailPdfJumpValue = "";
 
   const detailCache = new Map<string, EntityContentResponse | null>();
   const detailRequests = new Map<string, Promise<EntityContentResponse | null>>();
@@ -89,6 +92,7 @@
   let detailDialogEl: HTMLDivElement | null = null;
   let detailTextEl: HTMLElement | null = null;
   let detailPdfEl: HTMLDivElement | null = null;
+  let detailPdfJumpInputEl: HTMLInputElement | null = null;
   let loadMoreSentinelEl: HTMLDivElement | null = null;
   let debounceTimer: number | undefined;
   let loadMoreObserver: IntersectionObserver | null = null;
@@ -403,6 +407,9 @@
     detailMode = "text";
     detailPage = "";
     detailPdfPageCount = 0;
+    detailPdfCurrentPage = 1;
+    detailPdfJumpOpen = false;
+    detailPdfJumpValue = "";
     if (updateUrl && view) {
       view = "";
       writeRouteState();
@@ -517,6 +524,10 @@
     return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
   }
 
+  function currentDetailPdfPage(): number {
+    return detailPdfCurrentPage;
+  }
+
   async function loadDetailContent(entityId: string): Promise<EntityContentResponse | null> {
     if (detailCache.has(entityId)) {
       return detailCache.get(entityId) ?? null;
@@ -629,6 +640,9 @@
     detailMode = "text";
     detailPage = `${pageOverride ?? item.matchedPage ?? 1}`;
     detailPdfPageCount = 0;
+    detailPdfCurrentPage = parsePageNumber(detailPage) ?? 1;
+    detailPdfJumpOpen = false;
+    detailPdfJumpValue = "";
     scrollResultCardIntoView(item.entityId);
 
     if (updateUrl && view !== item.entityId) {
@@ -660,8 +674,47 @@
       return;
     }
 
+    detailPdfJumpOpen = false;
+    detailPdfJumpValue = "1";
     detailPage = "1";
+    detailPdfCurrentPage = 1;
     writeRouteState("replace");
+  }
+
+  async function openPdfPageJump(): Promise<void> {
+    if (!detailOpen || detailMode !== "pdf") {
+      return;
+    }
+
+    detailPdfJumpOpen = true;
+    detailPdfJumpValue = `${currentDetailPdfPage()}`;
+    await tick();
+    detailPdfJumpInputEl?.focus();
+    detailPdfJumpInputEl?.select();
+  }
+
+  function closePdfPageJump(): void {
+    detailPdfJumpOpen = false;
+    detailPdfJumpValue = "";
+  }
+
+  function submitPdfPageJump(): void {
+    if (!detailOpen || detailMode !== "pdf") {
+      closePdfPageJump();
+      return;
+    }
+
+    const parsed = parsePageNumber(detailPdfJumpValue);
+    if (!parsed) {
+      closePdfPageJump();
+      return;
+    }
+
+    const bounded = detailPdfPageCount > 0 ? Math.min(detailPdfPageCount, parsed) : parsed;
+    detailPage = `${Math.max(1, bounded)}`;
+    detailPdfCurrentPage = Math.max(1, bounded);
+    writeRouteState("replace");
+    closePdfPageJump();
   }
 
   async function openDetailById(entityId: string, updateUrl = true): Promise<void> {
@@ -909,6 +962,7 @@
     dateTo = state.dateTo;
     view = state.view;
     detailPage = state.page;
+    detailPdfCurrentPage = parsePageNumber(state.page) ?? 1;
     filtersOpen = hasAdvancedSearchFilters();
   }
 
@@ -918,6 +972,10 @@
     }
 
     detailPdfPageCount = event.detail.pageCount;
+    detailPdfCurrentPage = event.detail.page;
+    if (!detailPdfJumpOpen) {
+      detailPdfJumpValue = `${event.detail.page}`;
+    }
     const nextPage = `${event.detail.page}`;
     if (detailPage === nextPage) {
       return;
@@ -1447,21 +1505,6 @@
 
         <div class="detail-sheet__header-top">
           <h2 id="detail-title">{detailItem.title}</h2>
-          {#if detailMode === "pdf"}
-            <div class="detail-sheet__pdf-summary">
-              <span class="detail-sheet__pdf-counter">
-                Pagina {parsePageNumber(detailPage) ?? 1}{#if detailPdfPageCount > 0} / {detailPdfPageCount}{/if}
-              </span>
-              <button
-                type="button"
-                class="ghost-button detail-sheet__pdf-jump"
-                disabled={(parsePageNumber(detailPage) ?? 1) <= 1}
-                on:click={jumpToFirstPdfPage}
-              >
-                Eerste pagina
-              </button>
-            </div>
-          {/if}
         </div>
       </div>
 
@@ -1502,6 +1545,52 @@
           {/if}
         {:else}
           <div bind:this={detailPdfEl} class="detail-sheet__pdf" tabindex="-1">
+            <div class="detail-sheet__pdf-overlay">
+              {#if detailPdfJumpOpen}
+                <form class="detail-sheet__pdf-page-form" on:submit|preventDefault={submitPdfPageJump}>
+                  <input
+                    bind:this={detailPdfJumpInputEl}
+                    bind:value={detailPdfJumpValue}
+                    class="detail-sheet__pdf-page-input"
+                    inputmode="numeric"
+                    min="1"
+                    max={detailPdfPageCount > 0 ? `${detailPdfPageCount}` : undefined}
+                    on:blur={closePdfPageJump}
+                    on:keydown={(event) => {
+                      if (event.key === "Escape") {
+                        event.preventDefault();
+                        closePdfPageJump();
+                      }
+                    }}
+                    pattern="[0-9]*"
+                    type="number"
+                  />
+                  {#if detailPdfPageCount > 0}
+                    <span class="detail-sheet__pdf-counter">/ {detailPdfPageCount}</span>
+                  {/if}
+                </form>
+              {:else}
+                <button
+                  type="button"
+                  class="detail-sheet__pdf-page-button"
+                  aria-label="Ga naar pagina"
+                  on:click={() => void openPdfPageJump()}
+                >
+                  <span class="detail-sheet__pdf-counter">
+                    {detailPdfCurrentPage}{#if detailPdfPageCount > 0} / {detailPdfPageCount}{/if}
+                  </span>
+                </button>
+              {/if}
+              <button
+                type="button"
+                class="detail-sheet__pdf-jump"
+                aria-label="Ga naar eerste pagina"
+                disabled={detailPdfCurrentPage <= 1}
+                on:click={jumpToFirstPdfPage}
+              >
+                ↑
+              </button>
+            </div>
             {#key detailItem.entityId}
               <PdfDocumentView
                 initialPage={parsePageNumber(detailPage) ?? detailItem.matchedPage ?? null}

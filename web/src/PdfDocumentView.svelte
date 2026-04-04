@@ -13,10 +13,10 @@
     error: boolean;
   };
 
-  const PAGE_WINDOW_BEHIND = 2;
-  const PAGE_WINDOW_AHEAD = 5;
-  const PAGE_FETCH_BUFFER = 8;
+  const PAGE_FETCH_BEHIND = 1;
+  const PAGE_FETCH_AHEAD = 2;
   const PAGE_CACHE_BUFFER = 24;
+  const DEFAULT_PAGE_ASPECT_RATIO = 1 / 1.414;
 
   let containerEl: HTMLDivElement | null = null;
   let resizeObserver: ResizeObserver | null = null;
@@ -31,6 +31,7 @@
   let abortControllers = new Map<number, AbortController>();
   let lastScrollSignature = "";
   let pendingCenterPage = 0;
+  let documentPageAspectRatio = DEFAULT_PAGE_ASPECT_RATIO;
 
   function targetPageNumber(): number {
     const value = initialPage ?? 1;
@@ -41,17 +42,15 @@
     return `${url}/page/${pageNumber}`;
   }
 
-  function pageWindow(centerPage: number): number[] {
-    const bounded = Math.max(1, pageCount > 0 ? Math.min(pageCount, centerPage) : centerPage);
-    const start = Math.max(1, bounded - PAGE_WINDOW_BEHIND);
-    const end = pageCount > 0 ? Math.min(pageCount, bounded + PAGE_WINDOW_AHEAD) : bounded + PAGE_WINDOW_AHEAD;
-    return Array.from({ length: end - start + 1 }, (_, index) => start + index);
+  function applyDocumentPageAspectRatio(ratio: number): void {
+    documentPageAspectRatio = ratio;
+    containerEl?.style.setProperty("--pdf-page-aspect-ratio", String(ratio));
   }
 
   function pageLookahead(centerPage: number): number[] {
     const bounded = Math.max(1, pageCount > 0 ? Math.min(pageCount, centerPage) : centerPage);
-    const start = Math.max(1, bounded - PAGE_FETCH_BUFFER);
-    const end = pageCount > 0 ? Math.min(pageCount, bounded + PAGE_FETCH_BUFFER) : bounded + PAGE_FETCH_BUFFER;
+    const start = Math.max(1, bounded - PAGE_FETCH_BEHIND);
+    const end = pageCount > 0 ? Math.min(pageCount, bounded + PAGE_FETCH_AHEAD) : bounded + PAGE_FETCH_AHEAD;
     return Array.from({ length: end - start + 1 }, (_, index) => start + index);
   }
 
@@ -88,6 +87,36 @@
     }
   }
 
+  async function detectBlobAspectRatio(blob: Blob): Promise<number | null> {
+    try {
+      if ("createImageBitmap" in window) {
+        const bitmap = await createImageBitmap(blob);
+        const ratio = bitmap.width > 0 && bitmap.height > 0 ? bitmap.width / bitmap.height : null;
+        bitmap.close();
+        return ratio;
+      }
+    } catch {
+      // Fall back to DOM image probing below.
+    }
+
+    return await new Promise<number | null>((resolve) => {
+      const probeUrl = URL.createObjectURL(blob);
+      const probe = new Image();
+      probe.onload = () => {
+        const ratio = probe.naturalWidth > 0 && probe.naturalHeight > 0
+          ? probe.naturalWidth / probe.naturalHeight
+          : null;
+        URL.revokeObjectURL(probeUrl);
+        resolve(ratio);
+      };
+      probe.onerror = () => {
+        URL.revokeObjectURL(probeUrl);
+        resolve(null);
+      };
+      probe.src = probeUrl;
+    });
+  }
+
   async function fetchPage(pageNumber: number): Promise<void> {
     const existingEntry = pageEntries.get(pageNumber);
     pageEntries.set(pageNumber, {
@@ -120,6 +149,10 @@
       }
 
       const blob = await response.blob();
+      const detectedAspectRatio = await detectBlobAspectRatio(blob);
+      if (detectedAspectRatio && Number.isFinite(detectedAspectRatio) && detectedAspectRatio > 0) {
+        applyDocumentPageAspectRatio(detectedAspectRatio);
+      }
       const blobUrl = URL.createObjectURL(blob);
       const previousEntry = pageEntries.get(pageNumber);
       if (previousEntry?.blobUrl) {
@@ -180,6 +213,7 @@
     pageEntries = new Map();
     abortControllers = new Map();
     lastScrollSignature = "";
+    applyDocumentPageAspectRatio(DEFAULT_PAGE_ASPECT_RATIO);
 
     const targetPage = targetPageNumber();
     pendingCenterPage = targetPage;
@@ -200,6 +234,10 @@
         void ensurePageVisible(pageNumber, "auto");
       });
     });
+  }
+
+  function handlePageImageLoad(pageNumber: number): void {
+    void recenterOnLoadedPage(pageNumber);
   }
 
   function mostVisiblePageNumber(): number | null {
@@ -262,6 +300,7 @@
     pageEntries = new Map();
     abortControllers = new Map();
     pendingCenterPage = 0;
+    applyDocumentPageAspectRatio(DEFAULT_PAGE_ASPECT_RATIO);
   }
 
   $: {
@@ -315,7 +354,7 @@
               <img
                 alt={`PDF pagina ${page.number}`}
                 class="pdf-document__image"
-                on:load={() => void recenterOnLoadedPage(page.number)}
+                on:load={() => handlePageImageLoad(page.number)}
                 src={page.blobUrl}
               />
             {:else if page.error}

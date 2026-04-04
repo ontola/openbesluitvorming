@@ -84,6 +84,22 @@ async function readCommandOutput(command: string, args: string[]): Promise<strin
   return new TextDecoder().decode(output.stdout);
 }
 
+export async function countPdfPages(bytes: Uint8Array): Promise<number | null> {
+  const workDir = await Deno.makeTempDir();
+  const inputPath = `${workDir}/document.pdf`;
+  await Deno.writeFile(inputPath, bytes);
+
+  try {
+    const output = await readCommandOutput("mutool", ["show", inputPath, "trailer/Root/Pages/Count"]);
+    const parsed = Number.parseInt(output.trim(), 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  } catch {
+    return null;
+  } finally {
+    await removePath(workDir);
+  }
+}
+
 async function removePath(path: string): Promise<void> {
   await Deno.remove(path, { recursive: true }).catch(() => undefined);
 }
