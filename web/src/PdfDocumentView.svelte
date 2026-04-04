@@ -1,324 +1,233 @@
 <script lang="ts">
   import { createEventDispatcher, onDestroy, tick } from "svelte";
-  import { getDocument, GlobalWorkerOptions, TextLayer } from "pdfjs-dist";
-  import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
-  import jbig2WasmUrl from "pdfjs-dist/wasm/jbig2.wasm?url";
-
-  GlobalWorkerOptions.workerSrc = workerUrl;
-
-  type PdfPageView = {
-    number: number;
-    dataUrl: string;
-    width: number;
-    height: number;
-    scale: number;
-    viewport: unknown;
-    textContent: unknown;
-  };
 
   export let url = "";
   export let initialPage: number | null = null;
-  export let query = "";
 
   const dispatch = createEventDispatcher<{ pagechange: { page: number } }>();
-  const wasmUrl = jbig2WasmUrl.slice(0, jbig2WasmUrl.lastIndexOf("/") + 1);
+
+  type PageEntry = {
+    number: number;
+    blobUrl: string | null;
+    loading: boolean;
+    error: boolean;
+  };
+
+  const PAGE_WINDOW_BEHIND = 2;
+  const PAGE_WINDOW_AHEAD = 5;
 
   let containerEl: HTMLDivElement | null = null;
   let resizeObserver: ResizeObserver | null = null;
-  let resizeTimer: number | undefined;
-  let renderToken = 0;
-  let renderWidth = 0;
-  let loading = false;
-  let error = "";
-  let pages: PdfPageView[] = [];
-  let pageCount = 0;
-  let loadedUrl = "";
-  let pdfDocument: Awaited<ReturnType<typeof getDocument>>["promise"] extends Promise<infer T> ? T : never | null =
-    null;
-  let lastScrollSignature = "";
   let scrollCheckTimer: number | undefined;
   let activePage = 0;
+  let pageCount = 0;
   let windowPages: number[] = [];
-  let pageCache = new Map<number, PdfPageView>();
+  let pageEntries = new Map<number, PageEntry>();
+  let pages: PageEntry[] = [];
+  let loading = true;
+  let error = "";
+  let loadedUrl = "";
   let applyingWindow = false;
-
-  const MIN_PAGE_WIDTH = 320;
-  const PAGE_WINDOW_BEHIND = 2;
-  const PAGE_WINDOW_AHEAD = 5;
-  const textLayerTasks = new Map<number, { cancel: () => void }>();
-
-  function escapeHtml(value: string): string {
-    return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
-  }
-
-  function escapeRegex(value: string): string {
-    return value.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  }
-
-  function queryTerms(): string[] {
-    const normalized = query.trim();
-    if (!normalized) return [];
-    return [...new Set(
-      normalized
-        .split(/\s+/)
-        .map((term) => term.trim())
-        .filter((term) => term.length >= 2),
-    )].sort((left, right) => right.length - left.length);
-  }
-
-  function highlightText(value: string): { html: string; hasMatch: boolean } {
-    const terms = queryTerms();
-    if (terms.length === 0) {
-      return { html: escapeHtml(value), hasMatch: false };
-    }
-
-    const pattern = new RegExp(`(${terms.map(escapeRegex).join("|")})`, "gi");
-    let hasMatch = false;
-    const html = escapeHtml(value).replace(pattern, (match) => {
-      hasMatch = true;
-      return `<mark>${escapeHtml(match)}</mark>`;
-    });
-    return { html, hasMatch };
-  }
-
-  function applyHighlightsToTextLayer(container: HTMLElement): void {
-    const spans = container.querySelectorAll<HTMLElement>('span:not([role="img"])');
-    for (const span of spans) {
-      const rawText = span.dataset.rawText ?? span.textContent ?? "";
-      span.dataset.rawText = rawText;
-      if (!rawText.trim()) {
-        span.textContent = rawText;
-        continue;
-      }
-
-      const highlighted = highlightText(rawText);
-      if (highlighted.hasMatch) {
-        span.innerHTML = highlighted.html;
-      } else {
-        span.textContent = rawText;
-      }
-    }
-  }
+  let abortControllers = new Map<number, AbortController>();
+  let lastScrollSignature = "";
+  let pendingCenterPage = 0;
+  let initializingTargetOnly = false;
 
   function targetPageNumber(): number {
     const value = initialPage ?? 1;
     return Math.max(1, Math.min(pageCount || value, value));
   }
 
-  function availableWidth(): number {
-    return Math.max((containerEl?.clientWidth ?? 0) - 24, MIN_PAGE_WIDTH);
-  }
-
-  function visiblePageNumbers(): number[] {
-    return pages.map((page) => page.number).sort((left, right) => left - right);
+  function pageImageUrl(pageNumber: number): string {
+    return `${url}/page/${pageNumber}`;
   }
 
   function pageWindow(centerPage: number): number[] {
-    const boundedCenter = Math.max(1, Math.min(pageCount || centerPage, centerPage));
-    const start = Math.max(1, boundedCenter - PAGE_WINDOW_BEHIND);
-    const end = Math.min(pageCount, boundedCenter + PAGE_WINDOW_AHEAD);
-    return Array.from({ length: end - start + 1 }, (_, index) => start + index);
+    const bounded = Math.max(1, pageCount > 0 ? Math.min(pageCount, centerPage) : centerPage);
+    const start = Math.max(1, bounded - PAGE_WINDOW_BEHIND);
+    const end = pageCount > 0 ? Math.min(pageCount, bounded + PAGE_WINDOW_AHEAD) : bounded + PAGE_WINDOW_AHEAD;
+    return Array.from({ length: end - start + 1 }, (_, i) => start + i);
   }
 
-  async function renderSinglePage(pageNumber: number): Promise<PdfPageView> {
-    if (!pdfDocument) {
-      throw new Error("PDF document is not loaded");
-    }
-
-    const page = await pdfDocument.getPage(pageNumber);
-    const viewport = page.getViewport({ scale: 1 });
-    const scale = renderWidth / viewport.width;
-    const scaledViewport = page.getViewport({ scale });
-    const canvas = document.createElement("canvas");
-    const context = canvas.getContext("2d", { alpha: false });
-    if (!context) {
-      throw new Error("Canvas kon niet worden aangemaakt");
-    }
-
-    const deviceScale = window.devicePixelRatio || 1;
-    canvas.width = Math.floor(scaledViewport.width * deviceScale);
-    canvas.height = Math.floor(scaledViewport.height * deviceScale);
-    context.setTransform(deviceScale, 0, 0, deviceScale, 0, 0);
-    context.fillStyle = "#ffffff";
-    context.fillRect(0, 0, scaledViewport.width, scaledViewport.height);
-
-    await page.render({
-      canvasContext: context,
-      viewport: scaledViewport,
-    }).promise;
-
-    const textContent = await page.getTextContent();
-
-    const renderedPage = {
-      number: pageNumber,
-      dataUrl: canvas.toDataURL("image/png"),
-      width: scaledViewport.width,
-      height: scaledViewport.height,
-      scale: scaledViewport.scale,
-      viewport: scaledViewport,
-      textContent,
-    };
-
-    page.cleanup();
-    return renderedPage;
+  function pageLookahead(centerPage: number): number[] {
+    const bounded = Math.max(1, pageCount > 0 ? Math.min(pageCount, centerPage) : centerPage);
+    const start = Math.max(1, bounded - 1);
+    const end = pageCount > 0 ? Math.min(pageCount, bounded + 2) : bounded + 2;
+    return Array.from({ length: end - start + 1 }, (_, i) => start + i);
   }
 
-  async function renderPageSet(pageNumbers: number[]): Promise<PdfPageView[]> {
-    const uniqueNumbers = [...new Set(pageNumbers)].sort((left, right) => left - right);
-    const rendered = await Promise.all(uniqueNumbers.map((pageNumber) => renderSinglePage(pageNumber)));
-    return rendered.sort((left, right) => left.number - right.number);
+  function warmPages(pageNumbers: number[]): void {
+    for (const pageNum of pageNumbers) {
+      if (!pageEntries.has(pageNum) && !abortControllers.has(pageNum)) {
+        void fetchPage(pageNum);
+      }
+    }
   }
 
-  async function scheduleRender(delay = 0): Promise<void> {
-    if (resizeTimer) {
-      window.clearTimeout(resizeTimer);
-    }
-
-    resizeTimer = window.setTimeout(() => {
-      resizeTimer = undefined;
-      void renderDocument();
-    }, delay);
-  }
-
-  async function renderDocument(): Promise<void> {
-    if (!url || !containerEl) {
-      pages = [];
-      pageCount = 0;
-      pdfDocument = null;
-      loading = false;
-      error = "";
-      return;
-    }
-
-    const nextWidth = availableWidth();
-    if (nextWidth <= 0) {
-      return;
-    }
-
-    if (pdfDocument && loadedUrl === url && pageCount > 0 && Math.abs(nextWidth - renderWidth) < 1) {
-      return;
-    }
-
-    renderWidth = nextWidth;
-    const token = ++renderToken;
-    loading = true;
-    error = "";
-    pages = [];
-    pageCount = 0;
-    activePage = 0;
-    windowPages = [];
-    pageCache = new Map();
-    lastScrollSignature = "";
+  async function fetchPage(pageNumber: number): Promise<void> {
+    const controller = new AbortController();
+    abortControllers.set(pageNumber, controller);
 
     try {
-      const loadingTask = getDocument({ url, wasmUrl });
-      const pdf = await loadingTask.promise;
-      if (token !== renderToken) {
-        await pdf.destroy();
+      const response = await fetch(pageImageUrl(pageNumber), { signal: controller.signal });
+
+      if (pageCount === 0 && response.ok) {
+        const count = parseInt(response.headers.get("x-pdf-page-count") ?? "", 10);
+        if (!isNaN(count) && count > 0) {
+          pageCount = count;
+          // Trim window pages that are now out of range
+          const validWindow = windowPages.filter((n) => n <= pageCount);
+          if (validWindow.length !== windowPages.length) {
+            windowPages = validWindow;
+          }
+        }
+      }
+
+      if (!response.ok) {
+        if (!windowPages.includes(pageNumber)) return;
+        pageEntries.set(pageNumber, { number: pageNumber, blobUrl: null, loading: false, error: true });
+        pages = windowPages.map((n) => pageEntries.get(n) ?? { number: n, blobUrl: null, loading: true, error: false });
         return;
       }
 
-      pdfDocument = pdf;
-      loadedUrl = url;
-      pageCount = pdf.numPages;
-      const targetPage = targetPageNumber();
-      activePage = 0;
-      await applyPageWindow(targetPage);
-      await ensurePageVisible(targetPage, "auto");
-    } catch (cause) {
-      if (token === renderToken) {
-        console.error(cause);
-        error = "PDF-weergave kon niet worden geladen.";
+      const blob = await response.blob();
+      if (!windowPages.includes(pageNumber)) {
+        URL.revokeObjectURL(URL.createObjectURL(blob));
+        return;
       }
+
+      const blobUrl = URL.createObjectURL(blob);
+      pageEntries.set(pageNumber, { number: pageNumber, blobUrl, loading: false, error: false });
+      pages = windowPages.map((n) => pageEntries.get(n) ?? { number: n, blobUrl: null, loading: true, error: false });
+    } catch (e) {
+      if (e instanceof Error && e.name === "AbortError") return;
+      if (!windowPages.includes(pageNumber)) return;
+      pageEntries.set(pageNumber, { number: pageNumber, blobUrl: null, loading: false, error: true });
+      pages = windowPages.map((n) => pageEntries.get(n) ?? { number: n, blobUrl: null, loading: true, error: false });
     } finally {
-      if (token === renderToken) {
-        loading = false;
-      }
+      abortControllers.delete(pageNumber);
     }
   }
 
-  async function applyPageWindow(centerPage: number, preservePageNumber?: number): Promise<void> {
-    if (!pdfDocument || centerPage < 1 || centerPage > pageCount || applyingWindow) {
-      return;
-    }
-
+  async function applyPageWindow(centerPage: number): Promise<void> {
+    if (applyingWindow) return;
     applyingWindow = true;
-    const nextWindow = pageWindow(centerPage);
-    const preserveNumber = preservePageNumber ?? centerPage;
-    const preserveSelector = `.pdf-document__page[data-page-number="${preserveNumber}"]`;
-    const preserveEl = containerEl?.querySelector<HTMLElement>(preserveSelector) ?? null;
-    const previousTop = preserveEl ? preserveEl.getBoundingClientRect().top : null;
 
     try {
-      const missing = nextWindow.filter((pageNumber) => !pageCache.has(pageNumber));
-      if (missing.length > 0) {
-        const rendered = await renderPageSet(missing);
-        for (const page of rendered) {
-          pageCache.set(page.number, page);
+      const nextWindow = pageWindow(centerPage);
+
+      // Cancel and evict pages leaving the window
+      for (const pageNum of windowPages) {
+        if (!nextWindow.includes(pageNum)) {
+          abortControllers.get(pageNum)?.abort();
+          abortControllers.delete(pageNum);
+          const entry = pageEntries.get(pageNum);
+          if (entry?.blobUrl) URL.revokeObjectURL(entry.blobUrl);
+          pageEntries.delete(pageNum);
         }
       }
 
       windowPages = nextWindow;
-      pages = nextWindow
-        .map((pageNumber) => pageCache.get(pageNumber))
-        .filter((page): page is PdfPageView => Boolean(page));
 
-      await tick();
+      // Start fetching pages not yet loaded
+      warmPages(nextWindow);
 
-      if (previousTop !== null) {
-        const nextPreserveEl = containerEl?.querySelector<HTMLElement>(preserveSelector) ?? null;
-        if (nextPreserveEl && containerEl) {
-          const nextTop = nextPreserveEl.getBoundingClientRect().top;
-          containerEl.scrollTop += nextTop - previousTop;
-        }
-      }
+      pages = windowPages.map((n) => pageEntries.get(n) ?? { number: n, blobUrl: null, loading: true, error: false });
     } finally {
       applyingWindow = false;
     }
   }
 
   async function ensurePageVisible(pageNumber: number, behavior: ScrollBehavior = "smooth"): Promise<void> {
-    if (!pdfDocument || pageNumber < 1 || pageNumber > pageCount) {
-      return;
-    }
-
     activePage = pageNumber;
-    await applyPageWindow(pageNumber, pageNumber);
     await tick();
     const pageEl = containerEl?.querySelector<HTMLElement>(`.pdf-document__page[data-page-number="${pageNumber}"]`);
-    if (!pageEl) {
-      return;
+    pageEl?.scrollIntoView({ block: "start", behavior });
+  }
+
+  async function expandAroundPagePreservingPosition(pageNumber: number): Promise<void> {
+    if (!containerEl) return;
+
+    const currentPageEl =
+      containerEl.querySelector<HTMLElement>(`.pdf-document__page[data-page-number="${pageNumber}"]`);
+    const previousTop = currentPageEl?.getBoundingClientRect().top ?? 0;
+
+    windowPages = pageWindow(pageNumber);
+    warmPages(windowPages);
+    pages = windowPages.map((n) => pageEntries.get(n) ?? { number: n, blobUrl: null, loading: true, error: false });
+
+    await tick();
+
+    const nextPageEl =
+      containerEl.querySelector<HTMLElement>(`.pdf-document__page[data-page-number="${pageNumber}"]`);
+    if (!nextPageEl) return;
+
+    const nextTop = nextPageEl.getBoundingClientRect().top;
+    containerEl.scrollTop += nextTop - previousTop;
+  }
+
+  async function initialize(): Promise<void> {
+    if (!url || !containerEl) return;
+
+    for (const ctrl of abortControllers.values()) ctrl.abort();
+    for (const entry of pageEntries.values()) {
+      if (entry.blobUrl) URL.revokeObjectURL(entry.blobUrl);
     }
 
-    pageEl.scrollIntoView({
-      block: "center",
-      behavior,
+    loading = true;
+    error = "";
+    loadedUrl = url;
+    activePage = 0;
+    pageCount = 0;
+    windowPages = [];
+    pages = [];
+    pageEntries = new Map();
+    abortControllers = new Map();
+    lastScrollSignature = "";
+    initializingTargetOnly = true;
+
+    const targetPage = targetPageNumber();
+    pendingCenterPage = targetPage;
+    windowPages = [targetPage];
+    pages = [{ number: targetPage, blobUrl: null, loading: true, error: false }];
+    warmPages([targetPage]);
+    loading = false;
+
+    await tick();
+    await ensurePageVisible(targetPage, "auto");
+  }
+
+  async function recenterOnLoadedPage(pageNumber: number): Promise<void> {
+    if (pageNumber !== pendingCenterPage || !containerEl || loadedUrl !== url) return;
+    pendingCenterPage = 0;
+    await tick();
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        void ensurePageVisible(pageNumber, "auto");
+      });
     });
+    if (initializingTargetOnly) {
+      initializingTargetOnly = false;
+      void expandAroundPagePreservingPosition(pageNumber);
+    }
   }
 
   function mostVisiblePageNumber(): number | null {
-    if (!containerEl || pages.length === 0) {
-      return null;
-    }
+    if (!containerEl || windowPages.length === 0) return null;
 
     const containerRect = containerEl.getBoundingClientRect();
     const viewportCenter = containerRect.top + containerRect.height / 2;
     let bestPage: number | null = null;
-    let bestDistance = Number.POSITIVE_INFINITY;
+    let bestDistance = Infinity;
 
-    for (const page of pages) {
-      const pageEl = containerEl.querySelector<HTMLElement>(`.pdf-document__page[data-page-number="${page.number}"]`);
-      if (!pageEl) {
-        continue;
-      }
-
+    for (const pageNum of windowPages) {
+      const pageEl = containerEl.querySelector<HTMLElement>(`.pdf-document__page[data-page-number="${pageNum}"]`);
+      if (!pageEl) continue;
       const rect = pageEl.getBoundingClientRect();
-      const pageCenter = rect.top + rect.height / 2;
-      const distance = Math.abs(pageCenter - viewportCenter);
-
+      const distance = Math.abs(rect.top + rect.height / 2 - viewportCenter);
       if (distance < bestDistance) {
         bestDistance = distance;
-        bestPage = page.number;
+        bestPage = pageNum;
       }
     }
 
@@ -326,148 +235,74 @@
   }
 
   async function checkScrollPrefetch(): Promise<void> {
-    if (!containerEl || loading || applyingWindow) {
-      return;
-    }
+    if (applyingWindow || pendingCenterPage > 0 || initializingTargetOnly) return;
 
     const nextVisiblePage = mostVisiblePageNumber();
-    if (!nextVisiblePage || nextVisiblePage === activePage) {
-      return;
-    }
+    if (!nextVisiblePage || nextVisiblePage === activePage) return;
 
     activePage = nextVisiblePage;
     dispatch("pagechange", { page: nextVisiblePage });
+
     const desiredWindow = pageWindow(nextVisiblePage);
     if (desiredWindow.join(",") !== windowPages.join(",")) {
-      await applyPageWindow(nextVisiblePage, nextVisiblePage);
+      await applyPageWindow(nextVisiblePage);
     }
   }
 
   function scheduleScrollCheck(): void {
-    if (scrollCheckTimer) {
-      window.clearTimeout(scrollCheckTimer);
-    }
-
+    if (scrollCheckTimer) window.clearTimeout(scrollCheckTimer);
     scrollCheckTimer = window.setTimeout(() => {
       scrollCheckTimer = undefined;
       void checkScrollPrefetch();
     }, 20);
   }
 
-  function mountTextLayer(node: HTMLDivElement, page: PdfPageView): { update: (page: PdfPageView) => void; destroy: () => void } {
-    let destroyed = false;
-    let currentTask: { cancel: () => void } | null = null;
-
-    async function renderLayer(nextPage: PdfPageView): Promise<void> {
-      currentTask?.cancel();
-      node.replaceChildren();
-      node.classList.add("textLayer");
-      node.style.setProperty("--scale-factor", `${nextPage.scale}`);
-      node.style.setProperty("--user-unit", "1");
-      node.style.setProperty("--total-scale-factor", `${nextPage.scale}`);
-
-      const textLayer = new TextLayer({
-        textContentSource: nextPage.textContent as never,
-        container: node,
-        viewport: nextPage.viewport as never,
-      });
-
-      currentTask = {
-        cancel: () => textLayer.cancel(),
-      };
-      textLayerTasks.set(nextPage.number, currentTask);
-
-      try {
-        await textLayer.render();
-        if (destroyed) {
-          return;
-        }
-        applyHighlightsToTextLayer(node);
-      } catch (cause) {
-        if (!destroyed) {
-          console.error(cause);
-        }
-      }
-    }
-
-    void renderLayer(page);
-
-    return {
-      update(nextPage) {
-        void renderLayer(nextPage);
-      },
-      destroy() {
-        destroyed = true;
-        currentTask?.cancel();
-        textLayerTasks.delete(page.number);
-      },
-    };
-  }
-
-  $: if (containerEl && url) {
-    void scheduleRender();
+  $: if (containerEl && url && url !== loadedUrl) {
+    void initialize();
   }
 
   $: if (!url) {
+    for (const ctrl of abortControllers.values()) ctrl.abort();
+    for (const entry of pageEntries.values()) {
+      if (entry.blobUrl) URL.revokeObjectURL(entry.blobUrl);
+    }
     pages = [];
     pageCount = 0;
     loadedUrl = "";
-    pdfDocument = null;
     loading = false;
     error = "";
     activePage = 0;
     windowPages = [];
-    pageCache = new Map();
+    pageEntries = new Map();
+    abortControllers = new Map();
+    pendingCenterPage = 0;
+    initializingTargetOnly = false;
   }
 
   $: {
     const signature = `${url}::${initialPage ?? 1}`;
-    if (pdfDocument && pageCount > 0 && signature !== lastScrollSignature) {
+    if (loadedUrl === url && pageCount > 0 && signature !== lastScrollSignature) {
       lastScrollSignature = signature;
       const targetPage = targetPageNumber();
-      if (targetPage !== activePage || !visiblePageNumbers().includes(targetPage)) {
+      warmPages(pageLookahead(targetPage));
+      if (targetPage !== activePage || !windowPages.includes(targetPage)) {
         void ensurePageVisible(targetPage);
       }
     }
   }
 
-  $: if (pages.length >= 0) {
-    void tick().then(() => {
-      for (const page of pages) {
-        const layer = containerEl?.querySelector<HTMLDivElement>(`.pdf-document__text-layer[data-page-number="${page.number}"]`);
-        if (layer) {
-          applyHighlightsToTextLayer(layer);
-        }
-      }
-    });
-  }
-
   $: if (containerEl && !resizeObserver) {
-    resizeObserver = new ResizeObserver(() => {
-      const nextWidth = availableWidth();
-      if (Math.abs(nextWidth - renderWidth) > 24) {
-        void scheduleRender(120);
-      }
-    });
+    resizeObserver = new ResizeObserver(() => void checkScrollPrefetch());
     resizeObserver.observe(containerEl);
   }
 
-  onDestroy(async () => {
-    renderToken += 1;
-    if (resizeTimer) {
-      window.clearTimeout(resizeTimer);
+  onDestroy(() => {
+    for (const ctrl of abortControllers.values()) ctrl.abort();
+    for (const entry of pageEntries.values()) {
+      if (entry.blobUrl) URL.revokeObjectURL(entry.blobUrl);
     }
-    if (scrollCheckTimer) {
-      window.clearTimeout(scrollCheckTimer);
-    }
-    for (const task of textLayerTasks.values()) {
-      task.cancel();
-    }
-    textLayerTasks.clear();
     resizeObserver?.disconnect();
-    resizeObserver = null;
-    await pdfDocument?.destroy();
-    pdfDocument = null;
+    if (scrollCheckTimer) window.clearTimeout(scrollCheckTimer);
   });
 </script>
 
@@ -490,20 +325,18 @@
           class="pdf-document__page"
           data-page-number={page.number}
         >
-          <img
-            alt={`PDF pagina ${page.number}`}
-            class="pdf-document__image"
-            height={page.height}
-            loading="lazy"
-            src={page.dataUrl}
-            width={page.width}
-          />
-          <div
-            use:mountTextLayer={page}
-            class="pdf-document__text-layer"
-            data-page-number={page.number}
-            aria-label={`Tekstlaag pagina ${page.number}`}
-          ></div>
+          {#if page.blobUrl}
+            <img
+              alt={`PDF pagina ${page.number}`}
+              class="pdf-document__image"
+              on:load={() => void recenterOnLoadedPage(page.number)}
+              src={page.blobUrl}
+            />
+          {:else if page.error}
+            <div class="pdf-document__page-placeholder" aria-hidden="true"></div>
+          {:else}
+            <div class="pdf-document__page-placeholder pdf-document__skeleton" aria-hidden="true"></div>
+          {/if}
         </figure>
       {/each}
     </div>
