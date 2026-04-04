@@ -985,14 +985,6 @@ select {
   opacity: 1;
 }
 
-.admin-coverage__table {
-  display: grid;
-  grid-template-columns: minmax(15rem, 18rem) repeat(12, minmax(4.4rem, 1fr));
-  gap: 0.45rem;
-  overflow: auto;
-  align-items: stretch;
-}
-
 .admin-coverage__months {
   display: grid;
   grid-template-columns: minmax(11rem, 12.5rem) repeat(
@@ -1065,18 +1057,10 @@ select {
 }
 
 .admin-coverage__count {
-  color: var(--muted);
+  color: color-mix(in srgb, var(--accent-deep) 38%, var(--muted) 62%);
   font-size: 0.68rem;
   font-weight: 600;
   line-height: 1.1;
-}
-
-.admin-coverage__count {
-  color: color-mix(in srgb, var(--accent-deep) 38%, var(--muted) 62%);
-}
-
-.admin-coverage__sparkline {
-  min-height: 1.35rem;
 }
 
 .admin-coverage__canvas-host {
@@ -1119,127 +1103,6 @@ select {
   box-shadow: 0 10px 18px rgba(15, 23, 42, 0.2);
   pointer-events: none;
   z-index: 5;
-}
-
-.admin-coverage__header,
-.admin-coverage__label,
-.admin-coverage__cell {
-  min-height: 3.15rem;
-}
-
-.admin-coverage__header {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.2rem;
-  color: var(--muted);
-  font-size: 0.8rem;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  text-align: center;
-}
-
-.admin-coverage__header--sticky {
-  position: sticky;
-  left: 0;
-  z-index: 2;
-  justify-content: flex-start;
-  background: linear-gradient(90deg, rgba(244, 249, 255, 1), rgba(244, 249, 255, 0.9));
-}
-
-.admin-coverage__label {
-  position: sticky;
-  left: 0;
-  z-index: 1;
-  display: grid;
-  gap: 0.12rem;
-  align-content: center;
-  padding: 0.75rem 0.9rem;
-  border: 1px solid var(--line);
-  border-radius: 1rem;
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0.96), rgba(247, 251, 255, 0.9));
-  box-shadow: 0 10px 22px rgba(35, 71, 128, 0.05);
-}
-
-.admin-coverage__label strong {
-  font-size: 0.95rem;
-}
-
-.admin-coverage__label span {
-  color: var(--muted);
-  font-size: 0.8rem;
-}
-
-.admin-coverage__cell {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid rgba(41, 88, 153, 0.12);
-  border-radius: 1rem;
-  background: rgba(255, 255, 255, 0.72);
-  color: var(--text);
-  font-size: 0.88rem;
-  font-weight: 700;
-  transition:
-    transform var(--motion-fast) ease,
-    border-color var(--motion-fast) ease,
-    box-shadow var(--motion-fast) ease;
-}
-
-.admin-coverage__cell:not(:disabled) {
-  cursor: pointer;
-}
-
-.admin-coverage__cell:hover:not(:disabled),
-.admin-coverage__cell:focus-visible:not(:disabled) {
-  transform: translateY(-1px);
-  border-color: rgba(78, 166, 255, 0.36);
-  box-shadow: 0 10px 18px rgba(35, 71, 128, 0.1);
-  outline: none;
-}
-
-.admin-coverage__cell--empty {
-  border-style: dashed;
-  background: linear-gradient(135deg, rgba(41, 88, 153, 0.04), rgba(41, 88, 153, 0.015));
-}
-
-.admin-coverage__cell--succeeded,
-.admin-coverage__cell--partial,
-.admin-coverage__cell--failed,
-.admin-coverage__cell--running,
-.admin-coverage__cell--queued {
-  background: linear-gradient(
-    180deg,
-    rgba(78, 166, 255, calc(0.08 + var(--coverage-intensity) * 0.22)),
-    rgba(41, 88, 153, calc(0.1 + var(--coverage-intensity) * 0.32))
-  );
-}
-
-.admin-coverage__cell--partial {
-  border-color: rgba(186, 140, 28, 0.34);
-  background: linear-gradient(
-    180deg,
-    rgba(243, 192, 64, calc(0.08 + var(--coverage-intensity) * 0.22)),
-    rgba(186, 140, 28, calc(0.1 + var(--coverage-intensity) * 0.28))
-  );
-}
-
-.admin-coverage__cell--failed {
-  border-color: rgba(194, 72, 72, 0.32);
-  background: linear-gradient(
-    180deg,
-    rgba(238, 121, 121, calc(0.08 + var(--coverage-intensity) * 0.2)),
-    rgba(194, 72, 72, calc(0.1 + var(--coverage-intensity) * 0.24))
-  );
-}
-
-.admin-coverage__cell--queued {
-  background: linear-gradient(
-    180deg,
-    rgba(139, 160, 208, calc(0.08 + var(--coverage-intensity) * 0.16)),
-    rgba(94, 117, 173, calc(0.09 + var(--coverage-intensity) * 0.2))
-  );
 }
 
 .admin-runs {
@@ -1858,7 +1721,7 @@ select {
   border: 0;
   border-radius: 0.3rem;
   background: rgba(37, 89, 168, 0.08);
-  color: var(--accent-ink);
+  color: var(--text);
   font: inherit;
   font-size: 0.78rem;
   font-weight: 700;
@@ -2417,25 +2280,6 @@ select {
   gap: 1.1rem;
 }
 
-.pdf-document__location {
-  margin: 0;
-  color: var(--muted);
-  font-size: 0.9rem;
-}
-
-.pdf-document__pager {
-  display: flex;
-  justify-content: center;
-  color: var(--muted);
-  font-size: 0.88rem;
-  text-align: center;
-}
-
-.pdf-document__pager .ghost-button {
-  min-height: 2.6rem;
-  padding-inline: 1rem;
-}
-
 .pdf-document__page {
   position: relative;
   margin: 0;
@@ -2452,27 +2296,6 @@ select {
 .pdf-document__page--match {
   outline: 0.2rem solid rgba(78, 166, 255, 0.22);
   outline-offset: 0.15rem;
-}
-
-.pdf-document__match-badge {
-  display: grid;
-  gap: 0.3rem;
-  margin: 0 0 0.8rem;
-  padding: 0.85rem 0.95rem;
-  border-radius: 0.85rem;
-  border: 1px solid rgba(78, 166, 255, 0.2);
-  background: linear-gradient(180deg, rgba(78, 166, 255, 0.14), rgba(78, 166, 255, 0.08));
-  color: var(--accent-deep);
-  font-size: 0.84rem;
-  line-height: 1.45;
-}
-
-.pdf-document__match-badge strong {
-  font-size: 0.86rem;
-}
-
-.pdf-document__match-badge span {
-  color: var(--text);
 }
 
 .pdf-document__image {
@@ -2797,10 +2620,6 @@ select {
     color: var(--text);
   }
 
-  .admin-coverage__header--sticky {
-    background: linear-gradient(90deg, rgba(9, 11, 15, 0.98), rgba(9, 11, 15, 0.9));
-  }
-
   .admin-coverage__canvas-host {
     --coverage-empty: #0f141b;
     --coverage-low: rgb(42, 53, 69);
@@ -2810,21 +2629,6 @@ select {
     --coverage-preview-filled: #38c7b0;
     --coverage-preview-empty: #173b37;
     --coverage-anchor: #3ed0b6;
-  }
-
-  .admin-coverage__label {
-    background: linear-gradient(90deg, rgba(14, 16, 20, 0.98), rgba(14, 16, 20, 0.9));
-    border-color: rgba(114, 163, 232, 0.16);
-    box-shadow: 0 14px 26px rgba(0, 0, 0, 0.22);
-  }
-
-  .admin-coverage__cell {
-    border-color: rgba(114, 163, 232, 0.16);
-    background: rgba(16, 19, 24, 0.88);
-  }
-
-  .admin-coverage__cell--empty {
-    background: linear-gradient(135deg, rgba(114, 163, 232, 0.06), rgba(114, 163, 232, 0.02));
   }
 
   .surface-card--lift:hover,
@@ -2941,8 +2745,7 @@ select {
     );
   }
 
-  .detail-sheet__text mark,
-  .pdf-document__text-layer mark {
+  .detail-sheet__text mark {
     background: rgba(114, 183, 255, 0.28);
   }
 
@@ -3122,11 +2925,6 @@ select {
   .admin-coverage__month {
     font-size: 0.5rem;
     min-height: 2.4rem;
-  }
-
-  .admin-coverage__dot {
-    width: 0.48rem;
-    height: 0.48rem;
   }
 
   .hero {
