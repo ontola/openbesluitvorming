@@ -16,11 +16,48 @@ import {
 import { listAdminSourceOptions, listAggregateRunnableSourceRefs } from "../src/sources/index.ts";
 import type { Supplier } from "../src/types.ts";
 import { getDocumentCoverage, getEntityContent, searchMeetings } from "./search_api.ts";
+import { ObjectStorageClient } from "../src/storage/s3.ts";
 
 const root = new URL("./", import.meta.url);
 const distRoot = new URL("./dist/", import.meta.url);
 const projectRoot = new URL("../", import.meta.url);
 const port = Number(Deno.env.get("PORT") ?? "8787");
+
+const storage = await ObjectStorageClient.fromEnvironment();
+const renderScriptPath = new URL("../scripts/pdf_render_page.sh", import.meta.url).pathname;
+
+// Short-lived cache to deduplicate concurrent PDF downloads for the same document.
+const pdfFetchCache = new Map<string, Promise<Uint8Array>>();
+
+function pdfPageCacheKey(entityId: string, pageNumber: number): string {
+  return `pdf-pages-v2/${entityId}/${pageNumber}.png`;
+}
+
+function pdfPageMetaKey(entityId: string): string {
+  return `pdf-pages-v2/${entityId}/meta.json`;
+}
+
+function toResponseBuffer(bytes: Uint8Array): ArrayBuffer {
+  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+}
+
+function cachedFetchPdf(pdfUrl: string): Promise<Uint8Array> {
+  if (!pdfFetchCache.has(pdfUrl)) {
+    const promise = fetch(pdfUrl, { redirect: "follow" })
+      .then((r) => {
+        if (!r.ok) throw new Error(`PDF ophalen mislukt: ${r.status}`);
+        return r.arrayBuffer();
+      })
+      .then((ab) => new Uint8Array(ab))
+      .catch((err) => {
+        pdfFetchCache.delete(pdfUrl);
+        throw err;
+      });
+    pdfFetchCache.set(pdfUrl, promise);
+    setTimeout(() => pdfFetchCache.delete(pdfUrl), 30_000);
+  }
+  return pdfFetchCache.get(pdfUrl)!;
+}
 
 const reconciledRuns = await reconcileInterruptedRuns();
 if (reconciledRuns.length > 0) {
@@ -35,7 +72,7 @@ if (resumedRuns.length > 0) {
   );
 }
 
-function contentType(pathname) {
+function contentType(pathname: string): string {
   if (pathname.endsWith(".css")) return "text/css; charset=utf-8";
   if (pathname.endsWith(".js")) return "application/javascript; charset=utf-8";
   if (pathname.endsWith(".mjs")) return "application/javascript; charset=utf-8";
@@ -217,6 +254,92 @@ Deno.serve({ port }, async (request) => {
     }
   }
 
+  const pageRenderMatch = url.pathname.match(/^\/api\/entities\/([^/]+)\/pdf\/page\/(\d+)$/);
+  if (pageRenderMatch && request.method === "GET") {
+    const entityId = decodeURIComponent(pageRenderMatch[1]);
+    const pageNumber = parseInt(pageRenderMatch[2], 10);
+
+    if (isNaN(pageNumber) || pageNumber < 1) {
+      return Response.json({ error: "Ongeldig paginanummer" }, { status: 400 });
+    }
+
+    const cacheKey = pdfPageCacheKey(entityId, pageNumber);
+    const cached = await storage.getObjectBytes(cacheKey);
+    if (cached) {
+      const headers = new Headers({
+        "content-type": "image/png",
+        "cache-control": "public, max-age=31536000, immutable",
+      });
+      const metadataText = await storage.getObjectText(pdfPageMetaKey(entityId)).catch(() => "");
+      if (metadataText) {
+        try {
+          const metadata = JSON.parse(metadataText) as { page_count?: number };
+          if (typeof metadata.page_count === "number" && metadata.page_count > 0) {
+            headers.set("x-pdf-page-count", String(metadata.page_count));
+          }
+        } catch {
+          // Ignore malformed cache metadata and serve the image bytes anyway.
+        }
+      }
+      return new Response(toResponseBuffer(cached), {
+        headers,
+      });
+    }
+
+    try {
+      const content = await getEntityContent(entityId);
+      if (!content?.pdfUrl) {
+        return Response.json({ error: "PDF niet gevonden" }, { status: 404 });
+      }
+
+      const pdfBytes = await cachedFetchPdf(content.pdfUrl);
+
+      const command = new Deno.Command("sh", {
+        args: [renderScriptPath, String(pageNumber)],
+        stdin: "piped",
+        stdout: "piped",
+        stderr: "piped",
+      });
+      const process = command.spawn();
+      const writer = process.stdin.getWriter();
+      await writer.write(pdfBytes);
+      await writer.close();
+      const result = await process.output();
+
+      if (!result.success) {
+        const status = result.code === 1 ? 404 : 500;
+        const msg = status === 404 ? "Pagina niet gevonden" : "PDF-pagina kon niet worden weergegeven";
+        return Response.json({ error: msg }, { status });
+      }
+
+      const pageCount = parseInt(new TextDecoder().decode(result.stderr).trim(), 10);
+      const imageBytes = result.stdout;
+
+      await storage.putObject(cacheKey, imageBytes, { contentType: "image/png" });
+      if (!isNaN(pageCount) && pageCount > 0) {
+        await storage.putObject(
+          pdfPageMetaKey(entityId),
+          new TextEncoder().encode(JSON.stringify({ page_count: pageCount })),
+          { contentType: "application/json; charset=utf-8" },
+        );
+      }
+
+      const headers = new Headers({
+        "content-type": "image/png",
+        "cache-control": "public, max-age=31536000, immutable",
+      });
+      if (!isNaN(pageCount)) {
+        headers.set("x-pdf-page-count", String(pageCount));
+      }
+      return new Response(imageBytes, { headers });
+    } catch (error) {
+      return Response.json(
+        { error: error instanceof Error ? error.message : "PDF-pagina kon niet worden weergegeven" },
+        { status: 500 },
+      );
+    }
+  }
+
   if (
     url.pathname.startsWith("/api/entities/") &&
     url.pathname.endsWith("/pdf") &&
@@ -306,7 +429,7 @@ Deno.serve({ port }, async (request) => {
   const file = await readStaticFile(pathname);
 
   if (file) {
-    return new Response(file, {
+    return new Response(toResponseBuffer(file), {
       headers: {
         "content-type": contentType(pathname),
       },

@@ -91,6 +91,7 @@
   let loadMoreObserver: IntersectionObserver | null = null;
   let activeSearchSignature = "";
   let initialLoadingCardCount = 6;
+  let loadedPreviewImages = new Set<string>();
 
   const PAGE_SIZE = 24;
   const DETAIL_MODE_STORAGE_KEY = "woozi.detailMode";
@@ -248,6 +249,14 @@
     return `/api/entities/${encodeURIComponent(entityId)}/pdf`;
   }
 
+  function previewLoadKey(item: SearchResult): string {
+    return `${item.entityId}:${item.previewImageUrl ?? ""}`;
+  }
+
+  function markPreviewLoaded(item: SearchResult): void {
+    loadedPreviewImages = new Set([...loadedPreviewImages, previewLoadKey(item)]);
+  }
+
   function sanitizeMarkdownSource(markdown: string): string {
     return markdown.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
   }
@@ -390,7 +399,6 @@
     detailContent = null;
     detailMode = "text";
     detailPage = "";
-    document.body.classList.remove("body--locked");
     if (updateUrl && view) {
       view = "";
       writeRouteState();
@@ -546,7 +554,6 @@
     detailContent = null;
     detailMode = "text";
     detailPage = `${pageOverride ?? item.matchedPage ?? 1}`;
-    document.body.classList.add("body--locked");
     scrollResultCardIntoView(item.entityId);
 
     if (updateUrl && view !== item.entityId) {
@@ -892,7 +899,7 @@
       if (entries.some((entry) => entry.isIntersecting)) {
         void loadMoreResults();
       }
-    }, { rootMargin: "320px 0px" });
+    }, { rootMargin: "960px 0px" });
     if (!hasActiveSearchFilters() && !view) {
       focusQuery();
     }
@@ -908,6 +915,7 @@
     window.removeEventListener("resize", updateInitialLoadingCardCount);
     loadMoreObserver?.disconnect();
     loadMoreObserver = null;
+    document.body.classList.remove("body--locked");
   });
 
   $: {
@@ -915,6 +923,11 @@
     if (loadMoreObserver && loadMoreSentinelEl && searched && hasMore) {
       loadMoreObserver.observe(loadMoreSentinelEl);
     }
+  }
+
+  $: {
+    const shouldLockBody = detailOpen || showApiDocs;
+    document.body.classList.toggle("body--locked", shouldLockBody);
   }
 
   $: if (detailOpen && detailMode === "text" && detailContent) {
@@ -934,6 +947,9 @@
   $: hasPreviousDetail = detailIndex > 0;
   $: hasNextDetail = detailIndex >= 0 && (detailIndex < results.length - 1 || hasMore);
   $: detailMarkdownHtml = renderMarkdown(detailContent?.markdownText);
+  $: loadMoreSkeletonCount = totalCount !== null
+    ? Math.max(1, Math.min(PAGE_SIZE, totalCount - results.length))
+    : PAGE_SIZE;
   $: if (detailOpen && detailMode === "text" && detailContent && detailMarkdownHtml) {
     void syncDetailText();
   }
@@ -1082,12 +1098,12 @@
           {:else if results.length === 0 && !loading}
             <div class="result-state">Geen resultaten gevonden voor deze zoekopdracht.</div>
           {:else}
-            {#each results as item, index}
+            {#each results as item, index (item.entityId)}
               <button
                 type="button"
                 class="surface-card surface-card--lift result-card"
+                class:result-card--with-preview={Boolean(item.previewImageUrl)}
                 data-result-id={item.entityId}
-                style={`animation-delay:${index * 70}ms`}
                 on:click={() => void openDetail(item)}
                 on:keydown={(event) => {
                   if (event.key === "Enter" || event.key === " ") {
@@ -1096,29 +1112,71 @@
                   }
                 }}
               >
-                <div class="result-card__meta">
-                  <div class="result-card__tags">
-                    <span class="pill">{item.organization}</span>
-                    <span class="pill pill--soft">{item.entityTypeLabel}</span>
-                    {#if item.pageCount && item.entityType === "Document"}
-                      <span class="pill pill--soft">{item.pageCount} pagina's</span>
+                <div class:result-card__layout--with-preview={Boolean(item.previewImageUrl)} class="result-card__layout">
+                  {#if item.previewImageUrl}
+                    <div
+                      class="result-card__preview"
+                      class:result-card__preview--loaded={loadedPreviewImages.has(previewLoadKey(item))}
+                      aria-hidden="true"
+                    >
+                      <img
+                        alt=""
+                        class="result-card__preview-image"
+                        loading="lazy"
+                        on:load={() => markPreviewLoaded(item)}
+                        src={item.previewImageUrl}
+                      />
+                    </div>
+                  {/if}
+
+                  <div class="result-card__content">
+                    <div class="result-card__meta">
+                      <div class="result-card__tags">
+                        <span class="pill">{item.organization}</span>
+                        <span class="pill pill--soft">{item.entityTypeLabel}</span>
+                        {#if item.pageCount && item.entityType === "Document"}
+                          <span class="pill pill--soft">{item.pageCount} pagina's</span>
+                        {/if}
+                      </div>
+                      <span class="result-card__date">{item.date}</span>
+                    </div>
+                    <h3>{item.title}</h3>
+                    {#if item.summaryHtml}
+                      <p>{@html item.summaryHtml}</p>
+                    {:else}
+                      <p>{item.summary}</p>
                     {/if}
                   </div>
-                  <span class="result-card__date">{item.date}</span>
                 </div>
-                <h3>{item.title}</h3>
-                {#if item.summaryHtml}
-                  <p>{@html item.summaryHtml}</p>
-                {:else}
-                  <p>{item.summary}</p>
-                {/if}
               </button>
             {/each}
 
+            {#if loadingMore}
+              {#each Array.from({ length: loadMoreSkeletonCount }) as _, index}
+                <article
+                  class="surface-card result-card result-card--skeleton"
+                  aria-hidden="true"
+                  style={`animation-delay:${index * 70}ms`}
+                >
+                  <div class="result-card__meta">
+                    <div class="result-card__tags">
+                      <span class="pill pill--skeleton"></span>
+                      <span class="pill pill--soft pill--skeleton"></span>
+                    </div>
+                    <span class="result-card__date result-card__line result-card__line--date"></span>
+                  </div>
+                  <span class="result-card__line result-card__line--title"></span>
+                  <span class="result-card__line result-card__line--body"></span>
+                  <span class="result-card__line result-card__line--body result-card__line--short"></span>
+                </article>
+              {/each}
+            {/if}
+
             {#if hasMore}
               <div bind:this={loadMoreSentinelEl} class="result-list__sentinel" aria-hidden="true">
-                {#if loadingMore}Meer resultaten laden...{/if}
               </div>
+            {:else if searched && results.length > 0 && !loading && !loadingMore}
+              <div class="result-list__end">Geen verdere resultaten.</div>
             {/if}
           {/if}
         </div>
@@ -1328,7 +1386,6 @@
               <PdfDocumentView
                 initialPage={parsePageNumber(detailPage) ?? detailItem.matchedPage ?? null}
                 on:pagechange={handlePdfPageChange}
-                query={query}
                 url={entityPdfProxyUrl(detailItem.entityId)}
               />
             {/key}

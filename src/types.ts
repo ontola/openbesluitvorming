@@ -366,6 +366,7 @@ export interface SearchResult {
   downloadUrl?: string;
   matchedPage?: number;
   pageCount?: number;
+  previewImageUrl?: string;
 }
 
 export interface SearchResponse {

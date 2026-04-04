@@ -1234,9 +1234,86 @@ select {
 }
 
 .result-card {
-  padding: 1.25rem 1.25rem 1.35rem;
+  display: block;
+  width: 100%;
+  padding: 0.95rem 1.05rem 1rem;
   animation: rise 520ms ease-out both;
   text-align: left;
+}
+
+.result-card--with-preview {
+  min-height: 11.5rem;
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-right: 0;
+}
+
+.result-card__layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.7rem;
+  align-items: start;
+}
+
+.result-card__layout--with-preview {
+  grid-template-columns: minmax(0, 1fr) 7rem;
+  grid-template-areas: "content preview";
+  align-items: stretch;
+  gap: 0;
+  min-height: 100%;
+}
+
+.result-card__content {
+  min-width: 0;
+  grid-area: content;
+  padding: 0;
+}
+
+.result-card--with-preview .result-card__content {
+  display: grid;
+  align-content: start;
+  padding-block: 1.25rem 1.35rem;
+  padding-right: 1rem;
+}
+
+.result-card__preview {
+  overflow: hidden;
+  grid-area: preview;
+  width: 7rem;
+  height: 100%;
+  min-height: 100%;
+  border-radius: 0 1rem 1rem 0;
+  justify-self: end;
+  position: relative;
+  background:
+    linear-gradient(
+      110deg,
+      rgba(255, 255, 255, 0.02) 18%,
+      rgba(255, 255, 255, 0.08) 38%,
+      rgba(255, 255, 255, 0.02) 58%
+    ),
+    rgba(255, 255, 255, 0.03);
+  background-size: 220% 100%;
+  animation: result-preview-loading 1.8s linear infinite;
+}
+
+.result-card__preview--loaded {
+  animation: none;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.result-card__preview-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
+  opacity: 0;
+  transition: opacity 180ms ease;
+}
+
+.result-card__preview--loaded .result-card__preview-image {
+  opacity: 1;
 }
 
 .result-card--returning {
@@ -1416,7 +1493,7 @@ select {
 
 .feature-card h3,
 .result-card h3 {
-  margin: 0 0 0.7rem;
+  margin: 0 0 0.5rem;
   font-size: 1.2rem;
 }
 
@@ -1425,6 +1502,13 @@ select {
   margin: 0;
   color: var(--muted);
   line-height: 1.7;
+}
+
+.result-card__content > p {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
 }
 
 .result-card p b {
@@ -1513,6 +1597,13 @@ select {
   text-align: center;
 }
 
+.result-list__end {
+  padding: 0.35rem 0 0.15rem;
+  color: var(--muted);
+  font-size: 0.95rem;
+  text-align: center;
+}
+
 .result-state {
   grid-column: 1 / -1;
   padding: 1.8rem;
@@ -1532,7 +1623,7 @@ select {
   justify-content: space-between;
   align-items: flex-start;
   gap: 0.8rem;
-  margin-bottom: 0.85rem;
+  margin-bottom: 0.55rem;
 }
 
 .result-card__tags {
@@ -1638,7 +1729,7 @@ select {
 
 .detail-overlay__backdrop {
   position: absolute;
-  inset: 0;
+  inset: -10px;
   background: rgba(17, 32, 61, 0.48);
   backdrop-filter: blur(8px);
 }
@@ -2255,61 +2346,10 @@ select {
   background: white;
 }
 
-.pdf-document__text-layer {
-  position: absolute;
-  inset: 0.9rem;
-  overflow: hidden;
-  opacity: 1;
-  line-height: 1;
-  text-size-adjust: none;
-  transform-origin: 0 0;
-  user-select: text;
-  pointer-events: auto;
-  z-index: 1;
-  --min-font-size: 1;
-  --text-scale-factor: calc(var(--total-scale-factor, 1) * var(--min-font-size));
-  --min-font-size-inv: calc(1 / var(--min-font-size));
-}
-
-.pdf-document__text-layer :is(span, br) {
-  position: absolute;
-  color: transparent;
-  white-space: pre;
-  cursor: text;
-  transform-origin: 0 0;
-}
-
-.pdf-document__text-layer > :not(.markedContent),
-.pdf-document__text-layer .markedContent span:not(.markedContent) {
-  z-index: 1;
-  --font-height: 0;
-  font-size: calc(var(--text-scale-factor) * var(--font-height));
-  --scale-x: 1;
-  --rotate: 0deg;
-  transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv));
-}
-
-.pdf-document__text-layer .markedContent {
-  display: contents;
-}
-
-.pdf-document__text-layer span[role="img"] {
-  user-select: none;
-  cursor: default;
-}
-
-.pdf-document__text-layer ::selection {
-  background: rgba(78, 166, 255, 0.32);
-  color: transparent;
-}
-
-.pdf-document__text-layer mark {
-  padding: 0.04em 0.1em;
-  border-radius: 0.3rem;
-  background: rgba(78, 166, 255, 0.24);
-  color: transparent;
-  box-shadow: 0 0 0 rgba(78, 166, 255, 0);
-  animation: detail-highlight-bloom 820ms ease-out both;
+.pdf-document__page-placeholder {
+  width: 100%;
+  aspect-ratio: 1 / 1.414;
+  border-radius: 0.55rem;
 }
 
 @keyframes pdf-page-match-bloom {
@@ -2940,6 +2980,23 @@ select {
 }
 
 @media (max-width: 640px) {
+  .result-card__layout--with-preview {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "preview"
+      "content";
+  }
+
+  .result-card__content {
+    padding-right: 0;
+  }
+
+  .result-card__preview {
+    max-width: 7rem;
+    min-height: 7.5rem;
+    border-radius: 0.7rem;
+  }
+
   .hero__meta {
     flex-direction: column;
     align-items: center;
@@ -3064,5 +3121,15 @@ select {
 
   .detail-sheet__body {
     padding: 1rem;
+  }
+}
+
+@keyframes result-preview-loading {
+  0% {
+    background-position: 200% 0;
+  }
+
+  100% {
+    background-position: -20% 0;
   }
 }

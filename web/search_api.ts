@@ -394,6 +394,111 @@ function searchSamplingOptions(query: string, offset: number, limit: number): {
   };
 }
 
+async function collectSearchWindow(
+  quickwit: QuickwitClient,
+  options: {
+    query: string;
+    organization: string;
+    entityType: string;
+    sort: string;
+    offset: number;
+    limit: number;
+    dateFrom: string;
+    dateTo: string;
+  },
+): Promise<{
+  results: SearchResult[];
+  totalCount: number;
+  totalIsApproximate: boolean;
+  hasMore: boolean;
+}> {
+  const queryString = buildQuickwitQuery(options.query, options.organization, options.entityType);
+  const targetCount = options.offset + options.limit + 1;
+  const collected = new Map<string, SearchResult>();
+  let rawOffset = 0;
+  let totalCount = 0;
+  let exhausted = false;
+
+  while (!exhausted && collected.size < targetCount) {
+    const { maxHits, snippetFields } = searchSamplingOptions(options.query, rawOffset, options.limit);
+    const response = await quickwit.searchRequest({
+      query: queryString,
+      max_hits: maxHits,
+      start_offset: rawOffset,
+      ...(snippetFields.length > 0 ? { snippet_fields: snippetFields.join(",") } : {}),
+    });
+
+    totalCount = response.num_hits;
+    const hits = response.hits as SearchHit[];
+    if (hits.length === 0) {
+      exhausted = true;
+      break;
+    }
+
+    const indexedHits = hits.map((hit, index) => ({
+      hit,
+      snippet: response.snippets?.[index] as SearchSnippet | undefined,
+    }));
+    const dedupedHits = groupIndexedHits(dedupeLatestIndexedHits(indexedHits));
+
+    for (const { hit: document, snippet: snippets } of dedupedHits) {
+      const snippetHtml = sanitizeSnippet(snippets?.content?.[0] ?? snippets?.name?.[0]);
+      const normalizedEntityType = searchResultEntityType(document);
+      const result: SearchResult = {
+        entityId: searchResultEntityId(document),
+        organization: displayOrganization(document),
+        entityType: normalizedEntityType,
+        entityTypeLabel: entityTypeLabel(normalizedEntityType),
+        date: formatDate(document.start_date),
+        sortDate: document.start_date,
+        title:
+          document.name ??
+          (normalizedEntityType === "Document"
+            ? (document.file_name ?? "Ongetiteld document")
+            : "Ongetitelde vergadering"),
+        summary: snippetHtml
+          ? snippetHtml.replaceAll(/<\/?b>/g, "")
+          : summarizeContent(document.content),
+        summaryHtml: snippetHtml,
+        downloadUrl: document.payload?.media_urls?.[0]?.url ?? document.payload?.original_url,
+        matchedPage: document.entity_type === "DocumentPage" ? document.page_number : undefined,
+        pageCount: document.payload?.derived_content?.page_count,
+        previewImageUrl: normalizedEntityType === "Document" &&
+            looksLikePdf({
+              contentType: document.content_type ?? document.payload?.media_urls?.[0]?.content_type,
+              fileName: document.file_name,
+              url: document.payload?.media_urls?.[0]?.url ?? document.payload?.original_url,
+            })
+          ? `/api/entities/${encodeURIComponent(searchResultEntityId(document))}/pdf/page/${
+            document.entity_type === "DocumentPage" && document.page_number ? document.page_number : 1
+          }`
+          : undefined,
+      };
+
+      const existing = collected.get(result.entityId);
+      if (!existing) {
+        collected.set(result.entityId, result);
+      }
+    }
+
+    rawOffset += hits.length;
+    exhausted = rawOffset >= response.num_hits || hits.length < maxHits;
+  }
+
+  const filteredResults = filterResultsByDateRange([...collected.values()], {
+    dateFrom: options.dateFrom,
+    dateTo: options.dateTo,
+  });
+  const sortedResults = sortResults(filteredResults, options.sort);
+
+  return {
+    results: sortedResults.slice(options.offset, options.offset + options.limit),
+    totalCount,
+    totalIsApproximate: true,
+    hasMore: sortedResults.length > options.offset + options.limit || !exhausted,
+  };
+}
+
 function monthKey(month: Date): string {
   const year = month.getUTCFullYear();
   const value = String(month.getUTCMonth() + 1).padStart(2, "0");
@@ -504,58 +609,16 @@ export async function searchMeetings(
   const offset = Math.max(0, options.offset ?? 0);
   const limit = Math.max(1, Math.min(options.limit ?? 24, 100));
   const quickwit = new QuickwitClient();
-  const { maxHits, snippetFields } = searchSamplingOptions(query, offset, limit);
-  const response = await quickwit.search(
-    buildQuickwitQuery(query, organization, entityType),
-    maxHits,
-    {
-      snippetFields,
-    },
-  );
-
-  const indexedHits = (response.hits as SearchHit[]).map((hit, index) => ({
-    hit,
-    snippet: response.snippets?.[index] as SearchSnippet | undefined,
-  }));
-  const dedupedHits = groupIndexedHits(dedupeLatestIndexedHits(indexedHits));
-
-  const results = dedupedHits.map(({ hit: document, snippet: snippets }) => {
-    const snippetHtml = sanitizeSnippet(snippets?.content?.[0] ?? snippets?.name?.[0]);
-    const normalizedEntityType = searchResultEntityType(document);
-
-    return {
-      entityId: searchResultEntityId(document),
-      organization: displayOrganization(document),
-      entityType: normalizedEntityType,
-      entityTypeLabel: entityTypeLabel(normalizedEntityType),
-      date: formatDate(document.start_date),
-      sortDate: document.start_date,
-      title:
-        document.name ??
-        (normalizedEntityType === "Document"
-          ? (document.file_name ?? "Ongetiteld document")
-          : "Ongetitelde vergadering"),
-      summary: snippetHtml
-        ? snippetHtml.replaceAll(/<\/?b>/g, "")
-        : summarizeContent(document.content),
-      summaryHtml: snippetHtml,
-      downloadUrl: document.payload?.media_urls?.[0]?.url ?? document.payload?.original_url,
-      matchedPage: document.entity_type === "DocumentPage" ? document.page_number : undefined,
-      pageCount: document.payload?.derived_content?.page_count,
-    };
+  return await collectSearchWindow(quickwit, {
+    query,
+    organization,
+    entityType,
+    sort,
+    dateFrom,
+    dateTo,
+    offset,
+    limit,
   });
-
-  const filteredResults = filterResultsByDateRange(results, { dateFrom, dateTo });
-
-  const sortedResults = sortResults(filteredResults, sort);
-  const pagedResults = sortedResults.slice(offset, offset + limit);
-
-  return {
-    results: pagedResults,
-    totalCount: response.num_hits,
-    totalIsApproximate: true,
-    hasMore: sortedResults.length > offset + limit || response.num_hits > offset + limit,
-  };
 }
 
 export async function getEntityContent(entityId: string): Promise<EntityContentResponse | null> {

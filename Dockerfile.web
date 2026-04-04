@@ -15,7 +15,7 @@ FROM denoland/deno:2.7.7
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates build-essential pkg-config libssl-dev python3 python3-pip python3-venv tesseract-ocr \
+RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates build-essential pkg-config libssl-dev python3 python3-pip python3-venv tesseract-ocr mupdf-tools \
   && curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal \
   && . "$HOME/.cargo/env" \
   && cargo install --locked transmutation --features cli \
@@ -34,7 +34,7 @@ COPY scripts ./scripts
 COPY --from=web-build /app/node_modules ./node_modules
 COPY --from=web-build /app/web/dist ./web/dist
 
-RUN chmod +x /app/scripts/pymupdf4llm_extract.sh /app/scripts/pymupdf4llm_extract.py \
+RUN chmod +x /app/scripts/pymupdf4llm_extract.sh /app/scripts/pymupdf4llm_extract.py /app/scripts/pdf_render_page.sh \
   && ln -sf /app/scripts/pymupdf4llm_extract.sh /usr/local/bin/pymupdf4llm_extract
 
 CMD ["run", "-A", "web/server.ts"]
