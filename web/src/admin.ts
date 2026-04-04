@@ -1,4 +1,5 @@
 import "./../styles.css";
+import "./../admin.css";
 import { mount } from "svelte";
 import AdminApp from "./AdminApp.svelte";
 
