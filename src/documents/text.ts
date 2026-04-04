@@ -5,6 +5,8 @@ export interface DocumentMarkdownExtractionResult {
   pageChunks?: DocumentPageChunk[];
 }
 
+const MAX_PDF_PAGES = 40;
+
 const TRANSMUTATION_MARKDOWN_EXTENSIONS = new Set([
   ".pdf",
   ".docx",
@@ -130,14 +132,21 @@ function normalizeCliError(command: string, stderr: string): string {
 }
 
 async function extractPdf(bytes: Uint8Array): Promise<DocumentMarkdownExtractionResult> {
+  const pageCount = await countPdfPages(bytes);
+  const truncationWarning =
+    pageCount !== null && pageCount > MAX_PDF_PAGES
+      ? `Document has ${pageCount} pages; only the first ${MAX_PDF_PAGES} were imported.`
+      : null;
+
   const pymupdfBin = pymupdf4llmBinary();
 
+  let result: DocumentMarkdownExtractionResult;
   if (pymupdfBin) {
     try {
-      return await extractPdfWithPymupdf4llmCli(bytes, pymupdfBin);
+      result = await extractPdfWithPymupdf4llmCli(bytes, pymupdfBin);
     } catch {
       const fallback = await extractPdfWithTransmutation(bytes);
-      return {
+      result = {
         markdown: fallback.markdown,
         pageChunks: fallback.pageChunks,
         warnings: [
@@ -146,9 +155,15 @@ async function extractPdf(bytes: Uint8Array): Promise<DocumentMarkdownExtraction
         ],
       };
     }
+  } else {
+    result = await extractPdfWithTransmutation(bytes);
   }
 
-  return await extractPdfWithTransmutation(bytes);
+  if (truncationWarning) {
+    result.warnings = [truncationWarning, ...result.warnings];
+  }
+
+  return result;
 }
 
 async function extractPdfWithTransmutation(bytes: Uint8Array): Promise<DocumentMarkdownExtractionResult> {
@@ -188,7 +203,7 @@ async function extractPdfWithPymupdf4llmCli(
   await Deno.writeFile(inputPath, bytes);
 
   try {
-    await readCommandOutput(command, [inputPath, outputPath]);
+    await readCommandOutput(command, [inputPath, outputPath, "--max-pages", String(MAX_PDF_PAGES)]);
     const markdown = normalizeWhitespace(await Deno.readTextFile(outputPath));
     return {
       markdown,
@@ -295,10 +310,11 @@ async function extractPdfMarkdownPagesWithCli(bytes: Uint8Array): Promise<Docume
     ]);
 
     const markdownFilesInOutputDir = await collectMarkdownFiles(outputDir);
-    const markdownFiles =
+    const allMarkdownFiles =
       markdownFilesInOutputDir.length > 0
         ? markdownFilesInOutputDir
         : (await collectMarkdownFiles(workDir)).filter((path) => !path.startsWith(`${outputDir}/`));
+    const markdownFiles = allMarkdownFiles.slice(0, MAX_PDF_PAGES);
     if (markdownFiles.length === 0) {
       throw new Error("transmutation failed: no per-page markdown files were produced");
     }

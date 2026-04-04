@@ -1,4 +1,5 @@
 services:
+  # Only if you need a local S3-compatible storage
   minio:
     profiles: ["local-s3"]
     image: minio/minio:latest
@@ -11,7 +12,6 @@ services:
       - "9001:9001"
     volumes:
       - minio-data:/data
-
   minio-setup:
     profiles: ["local-s3"]
     image: minio/mc:latest
@@ -30,6 +30,7 @@ services:
         done
         /usr/bin/mc mb --ignore-existing local/$$S3_STORAGE_BUCKET_NAME
 
+  # Does the search, needs an S3 bucket and a volume
   quickwit:
     image: quickwit/quickwit:0.8.1
     command:
@@ -48,9 +49,11 @@ services:
     ports:
       - "7280:7280"
     volumes:
+      # Thid won't store the document or the main indexes - only some hot cache for speedy results.
       - quickwit-data:/quickwit/qwdata
       - ./quickwit/quickwit.yaml:/quickwit/config/quickwit.yaml:ro
 
+  # The Deno web app + GUI, does some python things for text extraction
   openbesluitvorming:
     build:
       context: .
