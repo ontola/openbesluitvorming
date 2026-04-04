@@ -306,7 +306,7 @@
   });
 </script>
 
-<div bind:this={containerEl} class="pdf-document" on:scroll={scheduleScrollCheck}>
+<div bind:this={containerEl} class="pdf-document" on:scroll={scheduleScrollCheck} tabindex="-1">
   {#if loading && pages.length === 0}
     <div class="pdf-document__loading" aria-hidden="true">
       <div class="pdf-document__skeleton"></div>

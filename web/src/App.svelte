@@ -85,7 +85,9 @@
   let queryInputEl: HTMLInputElement | null = null;
   let primarySearchFieldEl: HTMLLabelElement | null = null;
   let brandBlockEl: HTMLDivElement | null = null;
+  let detailDialogEl: HTMLDivElement | null = null;
   let detailTextEl: HTMLElement | null = null;
+  let detailPdfEl: HTMLDivElement | null = null;
   let loadMoreSentinelEl: HTMLDivElement | null = null;
   let debounceTimer: number | undefined;
   let loadMoreObserver: IntersectionObserver | null = null;
@@ -406,28 +408,35 @@
 
     if (closingEntityId) {
       window.setTimeout(() => {
-        const card = document.querySelector<HTMLElement>(
-          `.result-card[data-result-id="${CSS.escape(closingEntityId)}"]`,
-        );
-        if (!card) {
-          return;
-        }
-
-        scrollResultCardIntoView(closingEntityId);
-        card.classList.remove("result-card--returning");
-        void card.offsetWidth;
-        card.classList.add("result-card--returning");
-        window.setTimeout(() => {
-          card.classList.remove("result-card--returning");
-        }, 1200);
+        restoreResultCardFocus(closingEntityId);
       }, 40);
     }
   }
 
-  function scrollResultCardIntoView(entityId: string): void {
-    const card = document.querySelector<HTMLElement>(
+  function resultCardForEntity(entityId: string): HTMLElement | null {
+    return document.querySelector<HTMLElement>(
       `.result-card[data-result-id="${CSS.escape(entityId)}"]`,
     );
+  }
+
+  function restoreResultCardFocus(entityId: string): void {
+    const card = resultCardForEntity(entityId);
+    if (!card) {
+      return;
+    }
+
+    scrollResultCardIntoView(entityId);
+    card.focus({ preventScroll: true });
+    card.classList.remove("result-card--returning");
+    void card.offsetWidth;
+    card.classList.add("result-card--returning");
+    window.setTimeout(() => {
+      card.classList.remove("result-card--returning");
+    }, 1200);
+  }
+
+  function scrollResultCardIntoView(entityId: string): void {
+    const card = resultCardForEntity(entityId);
     if (!card) {
       return;
     }
@@ -436,6 +445,69 @@
       block: "center",
       behavior: "smooth",
     });
+  }
+
+  function activeDetailScrollContainer(): HTMLElement | null {
+    if (!detailOpen) {
+      return null;
+    }
+
+    if (detailMode === "pdf") {
+      return detailPdfEl?.querySelector<HTMLElement>(".pdf-document") ?? detailPdfEl;
+    }
+
+    if (detailItem?.entityType === "Document") {
+      return detailTextEl;
+    }
+
+    return detailDialogEl;
+  }
+
+  async function focusActiveDetailSurface(): Promise<void> {
+    await tick();
+    activeDetailScrollContainer()?.focus({ preventScroll: true });
+  }
+
+  function scrollActiveDetailContent(event: KeyboardEvent): boolean {
+    const container = activeDetailScrollContainer();
+    if (!container) {
+      return false;
+    }
+
+    const pageStep = Math.max(120, Math.round(container.clientHeight * 0.85));
+    const lineStep = 72;
+
+    switch (event.key) {
+      case "ArrowDown":
+        container.scrollBy({ top: lineStep, behavior: "smooth" });
+        return true;
+      case "ArrowUp":
+        container.scrollBy({ top: -lineStep, behavior: "smooth" });
+        return true;
+      case "PageDown":
+      case " ":
+        container.scrollBy({ top: pageStep, behavior: "smooth" });
+        return true;
+      case "PageUp":
+        container.scrollBy({ top: -pageStep, behavior: "smooth" });
+        return true;
+      case "Home":
+        container.scrollTo({ top: 0, behavior: "smooth" });
+        return true;
+      case "End":
+        container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  function isEditableKeyboardTarget(target: EventTarget | null): boolean {
+    if (!(target instanceof HTMLElement)) {
+      return false;
+    }
+
+    return Boolean(target.closest("input, textarea, select, [contenteditable='true']"));
   }
 
   function parsePageNumber(value: string): number | null {
@@ -885,6 +957,15 @@
     if (event.key === "ArrowRight") {
       event.preventDefault();
       void navigateDetail(1);
+      return;
+    }
+
+    if (isEditableKeyboardTarget(event.target)) {
+      return;
+    }
+
+    if (scrollActiveDetailContent(event)) {
+      event.preventDefault();
     }
   }
 
@@ -952,6 +1033,15 @@
     : PAGE_SIZE;
   $: if (detailOpen && detailMode === "text" && detailContent && detailMarkdownHtml) {
     void syncDetailText();
+  }
+
+  $: if (detailOpen) {
+    detailMode;
+    detailLoading;
+    detailItem?.entityType;
+    detailTextEl;
+    detailPdfEl;
+    void focusActiveDetailSurface();
   }
 </script>
 
@@ -1250,9 +1340,11 @@
       on:click={() => closeDetail()}
     ></button>
     <div
+      bind:this={detailDialogEl}
       class="detail-sheet detail-sheet--reader"
       aria-modal="true"
       aria-labelledby="detail-title"
+      tabindex="-1"
       role="dialog"
       in:scale={{ duration: 200, start: 0.97 }}
       out:scale={{ duration: 160, start: 0.985 }}
@@ -1364,7 +1456,7 @@
               {/if}
             </div>
           {:else}
-            <div bind:this={detailTextEl} class="detail-sheet__text prose-detail">
+            <div bind:this={detailTextEl} class="detail-sheet__text prose-detail" tabindex="-1">
               {#if detailLoading}
                 <div class="detail-sheet__loading" aria-hidden="true">
                   <span class="detail-sheet__loading-line detail-sheet__loading-line--title"></span>
@@ -1381,7 +1473,7 @@
             </div>
           {/if}
         {:else}
-          <div class="detail-sheet__pdf">
+          <div bind:this={detailPdfEl} class="detail-sheet__pdf" tabindex="-1">
             {#key detailItem.entityId}
               <PdfDocumentView
                 initialPage={parsePageNumber(detailPage) ?? detailItem.matchedPage ?? null}
