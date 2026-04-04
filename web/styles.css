@@ -1093,9 +1093,26 @@ select {
 
 .detail-sheet__header-top {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.detail-sheet__meeting-crumb {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: color var(--motion-fast) ease;
+}
+
+.detail-sheet__meeting-crumb:hover {
+  color: var(--accent-deep);
 }
 
 .detail-sheet__pdf-counter {

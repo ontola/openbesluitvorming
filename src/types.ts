@@ -388,5 +388,6 @@ export interface EntityContentResponse {
   downloadUrl?: string;
   contentType?: string;
   pdfUrl?: string;
+  meetingId?: string;
   agenda?: MeetingAgendaItem[];
 }

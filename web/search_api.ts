@@ -695,6 +695,7 @@ export async function getEntityContent(entityId: string): Promise<EntityContentR
     downloadUrl,
     contentType,
     pdfUrl,
+    meetingId: hit.payload?.is_referenced_by,
     agenda,
   };
 }
