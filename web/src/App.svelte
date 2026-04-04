@@ -1504,6 +1504,15 @@
         </div>
 
         <div class="detail-sheet__header-top">
+          {#if detailContent?.meetingId}
+            <button
+              type="button"
+              class="detail-sheet__meeting-crumb"
+              on:click={() => void openDetailById(detailContent.meetingId)}
+            >
+              ← Bekijk vergadering
+            </button>
+          {/if}
           <h2 id="detail-title">{detailItem.title}</h2>
         </div>
       </div>

@@ -117,6 +117,7 @@ function compactPayload(payload?: WooziEntity): unknown {
       content_type: payload.content_type,
       date_modified: payload.date_modified,
       last_discussed_at: payload.last_discussed_at,
+      is_referenced_by: payload.is_referenced_by,
       organization: payload.organization,
       derived_content: payload.derived_content,
       media_urls: payload.media_urls,
