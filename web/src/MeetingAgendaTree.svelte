@@ -15,6 +15,13 @@
     return markdown.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
   }
 
+  function isPdfDocument(document: { content_type?: string; file_name?: string; original_url?: string }): boolean {
+    if (document.content_type?.toLowerCase().includes("application/pdf")) return true;
+    if (document.file_name?.toLowerCase().endsWith(".pdf")) return true;
+    if (document.original_url?.toLowerCase().includes(".pdf")) return true;
+    return false;
+  }
+
   function renderMarkdown(markdown?: string | null): string {
     if (!markdown?.trim()) {
       return "<p>Geen documenttekst beschikbaar.</p>";
@@ -118,30 +125,42 @@
                     >
                       <span class="meeting-agenda__document-pill-icon" aria-hidden="true">📄</span>
                       <span class="meeting-agenda__document-pill-label">{document.name}</span>
+                      {#if isPdfDocument(document)}
+                        <div class="meeting-agenda__document-thumb" aria-hidden="true">
+                          <img
+                            src={`/api/entities/${encodeURIComponent(document.id)}/pdf/page/1`}
+                            alt=""
+                            loading="lazy"
+                          />
+                        </div>
+                      {/if}
                     </button>
-                    <button
-                      type="button"
-                      class="meeting-agenda__document-toggle"
-                      aria-expanded={expandedDocumentId === document.id}
-                      aria-label={`${expandedDocumentId === document.id ? "Verberg" : "Toon"} tekst van ${document.name}`}
-                      on:click|stopPropagation={() => {
-                        void toggleDocumentText(document.id);
-                      }}
-                    >
-                      <span aria-hidden="true">{expandedDocumentId === document.id ? "−" : "≣"}</span>
-                      <span>{expandedDocumentId === document.id ? "Sluit" : "Tekst"}</span>
-                    </button>
-                    <a
-                      class="meeting-agenda__document-download"
-                      href={document.original_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      aria-label={`Download ${document.name}`}
-                      on:click|stopPropagation
-                    >
-                      <span aria-hidden="true">↓</span>
-                      <span>Download</span>
-                    </a>
+
+                    <div class="meeting-agenda__document-actions">
+                      <button
+                        type="button"
+                        class="meeting-agenda__document-toggle"
+                        aria-expanded={expandedDocumentId === document.id}
+                        aria-label={`${expandedDocumentId === document.id ? "Verberg" : "Toon"} tekst van ${document.name}`}
+                        on:click|stopPropagation={() => {
+                          void toggleDocumentText(document.id);
+                        }}
+                      >
+                        <span aria-hidden="true">{expandedDocumentId === document.id ? "−" : "≣"}</span>
+                        <span>{expandedDocumentId === document.id ? "Sluit" : "Tekst"}</span>
+                      </button>
+                      <a
+                        class="meeting-agenda__document-download"
+                        href={document.original_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label={`Download ${document.name}`}
+                        on:click|stopPropagation
+                      >
+                        <span aria-hidden="true">↓</span>
+                        <span>Download</span>
+                      </a>
+                    </div>
                   </div>
 
                   {#if expandedDocumentId === document.id}
