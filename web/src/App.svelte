@@ -397,7 +397,7 @@
 
   async function loadSources(): Promise<void> {
     const payload = await fetchJson<AdminSourcesResponse>("/api/sources?implemented=true");
-    sources = (payload.sources ?? []).filter((source) => source.implemented);
+    sources = (payload.sources ?? []).filter((source) => source.implemented && !source.isAggregate);
   }
 
   function closeDetail(updateUrl = true): void {
