@@ -1,0 +1,17 @@
+#cloud-config
+
+package_update: true
+
+runcmd:
+  # Log in to GHCR (public images don't need auth, but private ones do)
+  # - echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+
+  # Pull and run the extraction service
+  - docker pull ${extraction_service_image}
+  - |
+    docker run -d \
+      --name woozi-extraction \
+      --restart unless-stopped \
+      -p 8000:8000 \
+      ${extraction_service_image} \
+      uvicorn main:app --host 0.0.0.0 --port 8000 --workers ${uvicorn_workers}

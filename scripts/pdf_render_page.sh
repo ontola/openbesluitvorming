@@ -37,4 +37,4 @@ if [ "$PAGE_NUMBER" -lt 1 ] || [ "$PAGE_NUMBER" -gt "$PAGE_COUNT" ]; then
   exit 1
 fi
 
-exec mutool draw -q -F png -r 144 -o - "$PDF_FILE" "$PAGE_NUMBER"
+mutool draw -q -F png -r 96 -o - "$PDF_FILE" "$PAGE_NUMBER" | ffmpeg -loglevel quiet -i pipe:0 -q:v 5 -f mjpeg pipe:1

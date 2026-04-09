@@ -5,7 +5,7 @@ export interface DocumentMarkdownExtractionResult {
   pageChunks?: DocumentPageChunk[];
 }
 
-const MAX_PDF_PAGES = 40;
+export const MAX_PDF_PAGES = 40;
 
 const TRANSMUTATION_MARKDOWN_EXTENSIONS = new Set([
   ".pdf",
@@ -20,6 +20,22 @@ const TRANSMUTATION_MARKDOWN_EXTENSIONS = new Set([
   ".rtf",
   ".odt",
 ]);
+
+let extractionServiceUrls: string[] | null = null;
+let extractionRoundRobin = 0;
+
+function nextExtractionServiceUrl(): string | null {
+  if (extractionServiceUrls === null) {
+    const raw = Deno.env.get("WOOZI_EXTRACTION_SERVICE_URL")?.trim();
+    extractionServiceUrls = raw
+      ? raw.split(",").map((u) => u.trim()).filter(Boolean)
+      : [];
+  }
+  if (extractionServiceUrls.length === 0) return null;
+  const url = extractionServiceUrls[extractionRoundRobin % extractionServiceUrls.length];
+  extractionRoundRobin++;
+  return url;
+}
 
 function pymupdf4llmBinary(): string | null {
   const value = Deno.env.get("WOOZI_PYMUPDF4LLM_BIN")?.trim();
@@ -138,10 +154,33 @@ async function extractPdf(bytes: Uint8Array): Promise<DocumentMarkdownExtraction
       ? `Document has ${pageCount} pages; only the first ${MAX_PDF_PAGES} were imported.`
       : null;
 
+  const serviceUrl = nextExtractionServiceUrl();
   const pymupdfBin = pymupdf4llmBinary();
 
   let result: DocumentMarkdownExtractionResult;
-  if (pymupdfBin) {
+  if (serviceUrl) {
+    try {
+      result = await extractPdfWithService(bytes, serviceUrl);
+    } catch {
+      if (pymupdfBin) {
+        try {
+          result = await extractPdfWithPymupdf4llmCli(bytes, pymupdfBin);
+        } catch {
+          result = await extractPdfWithTransmutation(bytes);
+          result.warnings = [
+            "Extraction service and pymupdf4llm both failed; using transmutation fallback.",
+            ...result.warnings,
+          ];
+        }
+      } else {
+        result = await extractPdfWithTransmutation(bytes);
+        result.warnings = [
+          "Extraction service failed; using transmutation fallback.",
+          ...result.warnings,
+        ];
+      }
+    }
+  } else if (pymupdfBin) {
     try {
       result = await extractPdfWithPymupdf4llmCli(bytes, pymupdfBin);
     } catch {
@@ -217,6 +256,35 @@ async function extractPdfWithPymupdf4llmCli(
   } finally {
     await removePath(workDir);
   }
+}
+
+async function extractPdfWithService(
+  bytes: Uint8Array,
+  serviceUrl: string,
+): Promise<DocumentMarkdownExtractionResult> {
+  const formData = new FormData();
+  formData.append("file", new Blob([bytes], { type: "application/pdf" }), "document.pdf");
+
+  const response = await fetch(
+    `${serviceUrl}/extract?max_pages=${MAX_PDF_PAGES}`,
+    { method: "POST", body: formData },
+  );
+
+  if (!response.ok) {
+    const body = await response.text().catch(() => "");
+    throw new Error(`Extraction service returned ${response.status}: ${body}`);
+  }
+
+  const payload = (await response.json()) as {
+    markdown: string;
+    page_count: number;
+    warnings: string[];
+  };
+
+  return {
+    markdown: normalizeWhitespace(payload.markdown),
+    warnings: payload.warnings,
+  };
 }
 
 async function extractMarkdownWithCli(

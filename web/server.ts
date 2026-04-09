@@ -30,7 +30,7 @@ const renderScriptPath = new URL("../scripts/pdf_render_page.sh", import.meta.ur
 const pdfFetchCache = new Map<string, Promise<Uint8Array>>();
 
 function pdfPageCacheKey(entityId: string, pageNumber: number): string {
-  return `pdf-pages-v2/${entityId}/${pageNumber}.png`;
+  return `pdf-pages-v4/${entityId}/${pageNumber}.jpg`;
 }
 
 function pdfPageMetaKey(entityId: string): string {
@@ -163,6 +163,26 @@ Deno.serve({ port }, async (request) => {
     }
   }
 
+  if (url.pathname === "/api/admin/extractors" && request.method === "GET") {
+    const raw = Deno.env.get("WOOZI_EXTRACTION_SERVICE_URL")?.trim() ?? "";
+    const urls = raw ? raw.split(",").map((u) => u.trim()).filter(Boolean) : [];
+    const workers = await Promise.all(
+      urls.map(async (workerUrl) => {
+        try {
+          const response = await fetch(`${workerUrl}/stats`, {
+            signal: AbortSignal.timeout(3000),
+          });
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          const stats = await response.json();
+          return { url: workerUrl, status: "ok" as const, ...stats };
+        } catch {
+          return { url: workerUrl, status: "unreachable" as const };
+        }
+      }),
+    );
+    return Response.json({ workers });
+  }
+
   if (url.pathname === "/api/admin/coverage" && request.method === "GET") {
     try {
       const monthCount = Number(url.searchParams.get("months") ?? "12");
@@ -267,7 +287,7 @@ Deno.serve({ port }, async (request) => {
     const cached = await storage.getObjectBytes(cacheKey);
     if (cached) {
       const headers = new Headers({
-        "content-type": "image/png",
+        "content-type": "image/jpeg",
         "cache-control": "public, max-age=31536000, immutable",
       });
       const metadataText = await storage.getObjectText(pdfPageMetaKey(entityId)).catch(() => "");
@@ -315,7 +335,7 @@ Deno.serve({ port }, async (request) => {
       const pageCount = parseInt(new TextDecoder().decode(result.stderr).trim(), 10);
       const imageBytes = result.stdout;
 
-      await storage.putObject(cacheKey, imageBytes, { contentType: "image/png" });
+      await storage.putObject(cacheKey, imageBytes, { contentType: "image/jpeg" });
       if (!isNaN(pageCount) && pageCount > 0) {
         await storage.putObject(
           pdfPageMetaKey(entityId),
@@ -325,7 +345,7 @@ Deno.serve({ port }, async (request) => {
       }
 
       const headers = new Headers({
-        "content-type": "image/png",
+        "content-type": "image/jpeg",
         "cache-control": "public, max-age=31536000, immutable",
       });
       if (!isNaN(pageCount)) {

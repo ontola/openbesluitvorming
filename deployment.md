@@ -229,6 +229,22 @@ Example safe starting point on the current `cpx32` server:
 - `INGEST_MEMORY_PER_JOB_MB=1400`
 - `INGEST_MIN_FREE_MEMORY_MB=1024`
 
+When using remote extraction workers, the memory per job is much lower (PDF extraction is offloaded), so `INGEST_MEMORY_PER_JOB_MB` can be reduced to `600` and `INGEST_CONCURRENCY` can be raised.
+
+Additional env for extraction:
+
+- `WOOZI_EXTRACTION_SERVICE_URL`
+  comma-separated list of extraction worker URLs (e.g. `http://10.0.1.3:8000,http://10.0.1.4:8000`).
+  When set, PDF extraction is sent to remote workers via HTTP instead of spawning local pymupdf4llm subprocesses.
+  The ingest server round-robins requests across workers.
+  When empty or unset, falls back to local subprocess extraction.
+
+- `WOOZI_DOCUMENT_CONCURRENCY`
+  number of documents to process concurrently per import (default: 3).
+  With remote extraction workers this can be raised (e.g. 10-30) since PDF extraction no longer uses local CPU.
+
+Warning: setting both `INGEST_CONCURRENCY` and `WOOZI_DOCUMENT_CONCURRENCY` too high can saturate the event loop with outbound HTTP connections and make the server unresponsive. If the server becomes unresponsive after restart, the likely cause is too many queued imports resuming simultaneously. Fix by stopping the container, resetting queued/running imports in SQLite to `failed`, and restarting with lower concurrency.
+
 Quickwit projection writes are now streamed during extraction in small batches instead of one big end-of-run push.
 
 Relevant env:
@@ -400,27 +416,81 @@ hcloud server create --name woozi-1 --type cpx32 --location fsn1 --image docker-
 
 ## Planned Production Layout
 
-The intended simple production shape is:
+The production shape is:
 
-- one Hetzner Cloud VM
-- Docker Compose on the VM
-- `quickwit` container
-- `openbesluitvorming` container
+- one Hetzner Cloud VM (`woozi-1`) for the app, Quickwit, and Caddy
+- optional extraction worker VMs for PDF extraction during imports
 - external Hetzner Object Storage
 - `Caddy` in front for TLS termination and reverse proxy
 
 The production compose file should use a published app image, not build on the server.
 
-Production traffic should look like:
+Production traffic:
 
 ```text
 internet
   -> Caddy (:80 / :443)
   -> openbesluitvorming (:8787, private to the VM)
   -> quickwit (:7280, private to the VM)
+
+During imports:
+  openbesluitvorming -> extraction workers (:8000, separate VMs)
 ```
 
 Quickwit should not be exposed publicly.
+
+## Extraction Server
+
+PDF extraction can be offloaded to a dedicated server running the `services/extraction/` Docker image. This is a stateless FastAPI service wrapping pymupdf4llm with multiple uvicorn worker processes.
+
+Infrastructure is managed with OpenTofu in `infra/`.
+
+### Architecture
+
+Instead of many small cloud VMs, a single dedicated Hetzner server gives more CPU per euro:
+
+| Server | Cores/Threads | RAM | Price/hour | Price/month |
+|--------|--------------|-----|-----------|-------------|
+| cpx22 (cloud) | 2 vCPU | 4 GB | €0.01 | €7.50 |
+| AX41-NVMe | 6c/12t | 64 GB | €0.06 | €38 |
+| EX44 | 14c/20t | 64 GB | €0.07 | €44 |
+
+One AX41-NVMe (€0.06/hr) with 12 uvicorn workers replaces 6× cpx22 VMs (€0.06/hr total) and is simpler to manage.
+
+### Provisioning
+
+To spin up the extraction server for an import:
+
+```sh
+cd infra
+TF_VAR_hcloud_token="..." tofu apply \
+  -var="extraction_server_enabled=true" \
+  -var="extraction_server_type=cpx22" \
+  -var="extraction_uvicorn_workers=2"
+```
+
+For production imports with a dedicated server:
+
+```sh
+TF_VAR_hcloud_token="..." tofu apply \
+  -var="extraction_server_enabled=true" \
+  -var="extraction_server_type=ax41-nvme" \
+  -var="extraction_uvicorn_workers=12"
+```
+
+To tear down after import:
+
+```sh
+TF_VAR_hcloud_token="..." tofu apply -var="extraction_server_enabled=false"
+```
+
+After provisioning, set `WOOZI_EXTRACTION_SERVICE_URL` on the ingest server to the extraction server URL from `tofu output extraction_service_url_env`. The worker firewall only allows port 8000 from the ingest server's IP (`91.98.32.151`).
+
+The extraction service image is published to GHCR via `.github/workflows/publish-extraction.yml`.
+
+The admin panel shows extraction server status (health, CPU load, request count) in the "Extractie-workers" section when `WOOZI_EXTRACTION_SERVICE_URL` is configured.
+
+See [`docs/scaling-pdf-extraction.md`](docs/scaling-pdf-extraction.md) for detailed analysis and architecture options.
 
 ## HTTPS
 
@@ -560,6 +630,8 @@ ADMIN_PASSWORD_HASH=$$2a$$14$$exampleexampleexampleexampleexampleexampleexamplee
 - aggregate imports are now supplier-specific, such as `__supplier__:notubiz` and `__supplier__:ibabs`
 - the deploy helper now refuses to restart the app while imports are still running, unless forced
 - browser-side fetch helpers now handle empty/non-JSON 500 responses more safely
+- resuming many queued imports on startup with high concurrency can make the server unresponsive (event loop saturated with HTTP connections). If this happens: stop the container, reset queued/running rows in SQLite to `failed`, restart with lower concurrency
+- the current import bottleneck for all-source imports is Notubiz API pagination, not PDF extraction. Each source paginates through `api.notubiz.nl` events sequentially. `INGEST_CONCURRENCY` controls how many sources are queried in parallel
 
 ## Keep Updated When These Change
 
@@ -572,3 +644,5 @@ Update this file whenever any of the following change:
 - production entrypoint
 - reverse proxy choice
 - one-command dev workflow
+- extraction worker topology or scaling approach
+- Hetzner account limits

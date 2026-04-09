@@ -48,6 +48,18 @@
 
   let coverageMonthCount = "60";
   let coverageOpen = false;
+
+  type ExtractorWorker = {
+    url: string;
+    status: "ok" | "unreachable";
+    requests_total?: number;
+    requests_failed?: number;
+    uptime_seconds?: number;
+    load_1m?: number;
+    load_5m?: number;
+  };
+  let extractorWorkers: ExtractorWorker[] = [];
+  let extractorsLoaded = false;
   let coverageLoaded = false;
   let coverageRangeAnchor: { sourceKey: string; month: string } | null = null;
   let coverageRangeHoverMonth = "";
@@ -610,6 +622,16 @@
     runSummary = payload.summary;
   }
 
+  async function loadExtractors(): Promise<void> {
+    try {
+      const payload = await fetchJson<{ workers: ExtractorWorker[] }>("/api/admin/extractors");
+      extractorWorkers = payload.workers ?? [];
+      extractorsLoaded = true;
+    } catch {
+      // Extraction workers are optional — ignore failures.
+    }
+  }
+
   async function loadCoverage(): Promise<void> {
     coverageBusy = true;
     try {
@@ -627,11 +649,12 @@
 
   async function refreshPolledState(): Promise<void> {
     await loadRunSummary();
+    void loadExtractors();
 
     const params = new URLSearchParams();
     if (filterSource) params.set("source", filterSource);
     if (filterStatus) params.set("status", filterStatus);
-    params.set("limit", `${RUNS_PAGE_SIZE}`);
+    params.set("limit", `${Math.max(runs.length, RUNS_PAGE_SIZE)}`);
 
     const payload = await fetchJson<AdminRunsResponse>(`/api/admin/runs?${params.toString()}`);
     const fetchedRuns = payload.runs ?? [];
@@ -845,6 +868,7 @@
       bootError = "";
       await loadSources();
       await loadRuns();
+      void loadExtractors();
     } catch (error) {
       bootError = error instanceof Error ? error.message : "Admin laden mislukt.";
     } finally {
@@ -976,6 +1000,42 @@
             <strong class="admin-summary-card__value">{runSummary.failedCount}</strong>
             <p>Imports die handmatige inspectie of een gerichte retry nodig hebben.</p>
           </article>
+        </div>
+      </section>
+    {/if}
+
+    {#if extractorsLoaded && extractorWorkers.length > 0}
+      <section class="section">
+        <h2>Extractie-workers</h2>
+        <div class="admin-extractors">
+          {#each extractorWorkers as worker}
+            <article class="surface-card admin-extractor-card" class:admin-extractor-card--down={worker.status !== "ok"}>
+              <div class="admin-extractor-card__header">
+                <span
+                  class="admin-extractor-card__status"
+                  class:admin-extractor-card__status--ok={worker.status === "ok"}
+                  title={worker.status === "ok" ? "Online" : "Offline"}
+                ></span>
+                <span class="admin-extractor-card__url">{worker.url.replace("http://", "").replace(":8000", "")}</span>
+              </div>
+              {#if worker.status === "ok"}
+                <div class="admin-extractor-card__stats">
+                  <div class="admin-extractor-card__stat">
+                    <span class="admin-extractor-card__stat-value">{worker.load_1m ?? "—"}</span>
+                    <span class="admin-extractor-card__stat-label">CPU load</span>
+                  </div>
+                  <div class="admin-extractor-card__stat">
+                    <span class="admin-extractor-card__stat-value">{worker.requests_total ?? 0}</span>
+                    <span class="admin-extractor-card__stat-label">Verwerkt</span>
+                  </div>
+                  <div class="admin-extractor-card__stat">
+                    <span class="admin-extractor-card__stat-value">{worker.uptime_seconds ? `${Math.round((worker.uptime_seconds) / 60)}m` : "—"}</span>
+                    <span class="admin-extractor-card__stat-label">Uptime</span>
+                  </div>
+                </div>
+              {/if}
+            </article>
+          {/each}
         </div>
       </section>
     {/if}

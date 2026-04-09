@@ -53,6 +53,14 @@ services:
       - quickwit-data:/quickwit/qwdata
       - ./quickwit/quickwit.yaml:/quickwit/config/quickwit.yaml:ro
 
+  # Optional: PDF extraction workers (set EXTRACTION_WORKERS=1 to enable)
+  extraction:
+    profiles: ["extraction"]
+    build:
+      context: services/extraction
+    ports:
+      - "8321:8000"
+
   # The Deno web app + GUI, does some python things for text extraction
   openbesluitvorming:
     build:
@@ -73,6 +81,7 @@ services:
       S3_STORAGE_BUCKET_NAME: ${S3_STORAGE_BUCKET_NAME:-woozi}
       S3_STORAGE_ENDPOINT: ${S3_STORAGE_ENDPOINT:-http://minio:9000}
       S3_STORAGE_REGION: ${S3_STORAGE_REGION:-us-east-1}
+      WOOZI_EXTRACTION_SERVICE_URL: ${WOOZI_EXTRACTION_SERVICE_URL:-}
     ports:
       - "8787:8787"
     volumes:
