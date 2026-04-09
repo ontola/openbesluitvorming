@@ -15,7 +15,7 @@ import {
 } from "../src/ops/store.ts";
 import { listAdminSourceOptions, listAggregateRunnableSourceRefs } from "../src/sources/index.ts";
 import type { Supplier } from "../src/types.ts";
-import { getDocumentCoverage, getEntityContent, searchMeetings } from "./search_api.ts";
+import { getDocumentCoverage, getEntityContent, getIndexStats, searchMeetings } from "./search_api.ts";
 import { ObjectStorageClient } from "../src/storage/s3.ts";
 
 const root = new URL("./", import.meta.url);
@@ -245,6 +245,20 @@ Deno.serve({ port }, async (request) => {
     } catch (error) {
       return Response.json(
         { error: error instanceof Error ? error.message : "Import mislukt" },
+        { status: 500 },
+      );
+    }
+  }
+
+  if (url.pathname === "/api/stats") {
+    try {
+      const stats = await getIndexStats();
+      return Response.json(stats, {
+        headers: { "cache-control": "public, max-age=3600" },
+      });
+    } catch (error) {
+      return Response.json(
+        { error: error instanceof Error ? error.message : "Statistieken ophalen mislukt" },
         { status: 500 },
       );
     }
