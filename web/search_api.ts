@@ -699,3 +699,23 @@ export async function getEntityContent(entityId: string): Promise<EntityContentR
     agenda,
   };
 }
+
+export async function getIndexStats(): Promise<{ documentCount: number; organizationCount: number }> {
+  const quickwit = new QuickwitClient();
+  const response = await quickwit.searchRequest({
+    query: `projection_version:${escapeTerm(currentProjectionVersion())}`,
+    max_hits: 0,
+    aggs: {
+      organizations: {
+        terms: { field: "organization", size: 1000 },
+      },
+    },
+  });
+
+  const orgBuckets = (response.aggregations?.organizations as { buckets?: unknown[] })?.buckets ?? [];
+
+  return {
+    documentCount: response.num_hits,
+    organizationCount: orgBuckets.length,
+  };
+}

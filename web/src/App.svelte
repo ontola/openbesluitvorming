@@ -49,6 +49,8 @@
 
   let sources: AdminSourceOption[] = [];
   let results: SearchResult[] = [];
+  let indexDocumentCount: number | null = null;
+  let indexOrganizationCount: number | null = null;
   let totalCount: number | null = null;
   let totalIsApproximate = false;
   let hasMore = false;
@@ -1043,6 +1045,13 @@
   onMount(async () => {
     preferredDetailMode = loadPreferredDetailMode();
     updateInitialLoadingCardCount();
+    fetch("/api/stats")
+      .then((r) => r.json())
+      .then((stats: { documentCount?: number; organizationCount?: number }) => {
+        indexDocumentCount = stats.documentCount ?? null;
+        indexOrganizationCount = stats.organizationCount ?? null;
+      })
+      .catch(() => {});
     await loadSources();
     await syncFromUrl(true);
     document.addEventListener("keydown", handleEscape);
@@ -1142,8 +1151,8 @@
             snelle zoekomgeving.
           </p>
           <ul class="hero__meta">
-            <li><strong>5.153.921</strong> vergaderstukken</li>
-            <li><strong>330+</strong> organisaties</li>
+            <li><strong>{indexDocumentCount !== null ? indexDocumentCount.toLocaleString("nl-NL") : "..."}</strong> vergaderstukken</li>
+            <li><strong>{indexOrganizationCount !== null ? `${indexOrganizationCount}+` : "..."}</strong> organisaties</li>
           </ul>
         </div>
       </div>
