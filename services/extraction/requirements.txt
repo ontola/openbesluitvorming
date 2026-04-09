@@ -1,0 +1,5 @@
+fastapi>=0.115,<1
+uvicorn[standard]>=0.34,<1
+pymupdf>=1.25,<2
+pymupdf4llm>=0.0.17,<1
+python-multipart>=0.0.18,<1

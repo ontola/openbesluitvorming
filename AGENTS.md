@@ -17,6 +17,8 @@ Key directories:
 - [`tests/`](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/tests)
 - [`quickwit/`](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/quickwit)
 - [`schemas/`](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/schemas)
+- [`services/extraction/`](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/services/extraction) — stateless PDF extraction microservice (FastAPI + pymupdf4llm)
+- [`infra/`](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/infra) — OpenTofu infrastructure definitions for Hetzner Cloud
 
 ## Architecture
 
@@ -76,6 +78,9 @@ Current implemented slices:
 - Original downloaded files must be stored in S3-compatible storage.
 - Full-document markdown should remain available in one detail request.
 - PDF page chunks are optional derived artifacts for search/navigation, not a replacement for full markdown.
+- PDF extraction is limited to 40 pages per document (`MAX_PDF_PAGES` in `src/documents/text.ts`).
+- PDF extraction can be offloaded to remote workers via `WOOZI_EXTRACTION_SERVICE_URL` (comma-separated list of URLs). The ingest server round-robins requests across workers and falls back to local pymupdf4llm subprocess when no URL is configured.
+- The extraction service (`services/extraction/`) is a stateless FastAPI wrapper around pymupdf4llm. It accepts PDF bytes via `POST /extract` and returns markdown.
 - Cache invalidation is still partly source-specific; preserve comments where behavior is Notubiz-specific and needs later generalization.
 
 ### Operations and state
@@ -83,6 +88,7 @@ Current implemented slices:
 - Current admin/run state is SQLite-backed for the prototype.
 - Treat SQLite as pragmatic prototype state, not the final metadata-store design.
 - Store enough run metadata to distinguish user-triggered, scheduled, full, cache-rederived, and later reindex-only executions.
+- Beware of queued imports resuming on restart: if many imports are queued in SQLite, they all resume simultaneously on startup and can overwhelm the server. High concurrency settings (`INGEST_CONCURRENCY` > 8 combined with `DOCUMENT_CONCURRENCY` > 10) can saturate the event loop with outbound HTTP connections.
 
 ## Development Commands
 

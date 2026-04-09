@@ -173,6 +173,78 @@
   margin-bottom: 1rem;
 }
 
+/* ── Extractor workers ────────────────────────────────────── */
+
+.admin-extractors {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  gap: 0.65rem;
+}
+
+.admin-extractor-card {
+  padding: 0.85rem 1rem;
+}
+
+.admin-extractor-card--down {
+  opacity: 0.5;
+}
+
+.admin-extractor-card__header {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.6rem;
+  min-width: 0;
+}
+
+.admin-extractor-card__status {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--muted);
+  flex-shrink: 0;
+}
+
+.admin-extractor-card__status--ok {
+  background: #34c759;
+}
+
+.admin-extractor-card__url {
+  font-size: 0.8rem;
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.admin-extractor-card__stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.4rem;
+}
+
+.admin-extractor-card__stat {
+  text-align: center;
+}
+
+.admin-extractor-card__stat-value {
+  display: block;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--accent-deep);
+  line-height: 1.2;
+}
+
+.admin-extractor-card__stat-label {
+  font-size: 0.72rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 /* ── Status summary cards ─────────────────────────────────── */
 
 .admin-summary-grid {

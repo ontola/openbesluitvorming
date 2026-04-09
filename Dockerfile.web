@@ -15,7 +15,7 @@ FROM denoland/deno:2.7.7
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates build-essential pkg-config libssl-dev python3 python3-pip python3-venv tesseract-ocr mupdf-tools \
+RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates build-essential pkg-config libssl-dev python3 python3-pip python3-venv tesseract-ocr mupdf-tools ffmpeg \
   && curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal \
   && . "$HOME/.cargo/env" \
   && cargo install --locked transmutation --features cli \

@@ -1,7 +1,27 @@
 {
   "permissions": {
     "allow": [
-      "Bash(grep -rn \"openbesluitvorming.nl\\\\|beta\\\\.\" /Users/joep/dev/github/openstate/open-raadsinformatie/woozi/scripts/ /Users/joep/dev/github/openstate/open-raadsinformatie/woozi/*.md)"
+      "Bash(grep -rn \"openbesluitvorming.nl\\\\|beta\\\\.\" /Users/joep/dev/github/openstate/open-raadsinformatie/woozi/scripts/ /Users/joep/dev/github/openstate/open-raadsinformatie/woozi/*.md)",
+      "Bash(brew install:*)",
+      "Bash(tofu --version)",
+      "Bash(tofu init:*)",
+      "Bash(TF_VAR_hcloud_token=\"6CYyZqjdOZeIhcrjZInro7PFjoxK2azSsj89NPQjK3JhTNSs3QwSndT6Y5JP0Mw3\" tofu plan -var=\"extraction_worker_count=0\")",
+      "Bash(TF_VAR_hcloud_token=\"6CYyZqjdOZeIhcrjZInro7PFjoxK2azSsj89NPQjK3JhTNSs3QwSndT6Y5JP0Mw3\" tofu apply -var=\"extraction_worker_count=0\" -auto-approve)",
+      "Bash(ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 root@178.105.1.41 \"hostname && docker --version\")",
+      "Bash(TF_VAR_hcloud_token=\"6CYyZqjdOZeIhcrjZInro7PFjoxK2azSsj89NPQjK3JhTNSs3QwSndT6Y5JP0Mw3\" tofu apply -var=\"extraction_worker_count=2\" -auto-approve)",
+      "Bash(docker build:*)",
+      "Bash(docker run:*)",
+      "Bash(curl -s http://localhost:8321/health)",
+      "Bash(curl -s -o /tmp/test-extract.pdf \"https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf\")",
+      "Read(//tmp/**)",
+      "Bash(ssh root@91.98.32.151 'docker exec woozi-caddy-1 curl -s --max-time 10 http://openbesluitvorming:8787/api/admin/runs?limit=20')",
+      "Bash(python3 -c ':*)",
+      "Bash(WOOZI_EXTRACTION_SERVICE_URL=http://extraction:8000 docker compose --profile extraction up -d extraction openbesluitvorming)",
+      "Bash(WOOZI_EXTRACTION_SERVICE_URL=http://extraction:8000 docker compose --profile extraction up -d --build extraction openbesluitvorming)",
+      "Bash(curl -s http://localhost:8787/api/admin/extractors)",
+      "Bash(docker exec:*)",
+      "Bash(ssh root@91.98.32.151 'docker logs woozi-openbesluitvorming-1 --tail 30 2>&1 | grep -i \"error\\\\|killed\\\\|oom\\\\|memory\\\\|terminated\\\\|quickwit\"')",
+      "Bash(ssh root@91.98.32.151 'free -m && uptime')"
     ]
   }
 }
