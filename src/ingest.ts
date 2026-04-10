@@ -151,7 +151,13 @@ async function executeIngest(
         if (!quickwit) {
           return;
         }
-        pendingEvents.push(await buildEntityCommitEvent(entity));
+        // Strip large text fields before buffering — the Quickwit projection
+        // uses compactPayload() which drops these anyway. Holding them in
+        // pendingEvents causes multi-GB memory usage under high concurrency.
+        const lightweight = entity.type === "Document"
+          ? { ...entity, md_text: undefined, page_chunks: undefined, raw: undefined }
+          : { ...entity, raw: undefined };
+        pendingEvents.push(await buildEntityCommitEvent(lightweight));
         if (pendingEvents.length >= quickwitBatchSize) {
           await flushQuickwitBatch();
         }
