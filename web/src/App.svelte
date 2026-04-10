@@ -1133,7 +1133,7 @@
     <div class="hero__glow hero__glow--right"></div>
     <div class="hero__frame">
       <div class="hero__masthead">
-        <p class="hero__admin-link"><a href="/admin.html">Admin</a></p>
+        <!-- Admin link removed — double-click "vergaderstukken" to access admin -->
         <div bind:this={brandBlockEl} class="hero__brand-block">
           <h1 class="brand">
             <a
@@ -1151,7 +1151,7 @@
             snelle zoekomgeving.
           </p>
           <ul class="hero__meta">
-            <li><strong>{indexDocumentCount !== null ? indexDocumentCount.toLocaleString("nl-NL") : "..."}</strong> vergaderstukken</li>
+            <li on:dblclick={() => { window.location.href = "/admin.html"; }}><strong>{indexDocumentCount !== null ? indexDocumentCount.toLocaleString("nl-NL") : "..."}</strong> vergaderstukken</li>
             <li><strong>{indexOrganizationCount !== null ? `${indexOrganizationCount}+` : "..."}</strong> organisaties</li>
           </ul>
         </div>
