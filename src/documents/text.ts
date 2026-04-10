@@ -159,27 +159,28 @@ async function extractPdf(bytes: Uint8Array): Promise<DocumentMarkdownExtraction
 
   let result: DocumentMarkdownExtractionResult;
   if (serviceUrl) {
-    try {
-      result = await extractPdfWithService(bytes, serviceUrl);
-    } catch {
-      if (pymupdfBin) {
-        try {
-          result = await extractPdfWithPymupdf4llmCli(bytes, pymupdfBin);
-        } catch {
-          result = await extractPdfWithTransmutation(bytes);
-          result.warnings = [
-            "Extraction service and pymupdf4llm both failed; using transmutation fallback.",
-            ...result.warnings,
-          ];
+    // Retry with backoff — if the extraction service is temporarily down,
+    // wait for it to come back instead of falling back to local subprocess
+    // (which can OOM the ingest server).
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= 5; attempt++) {
+      try {
+        result = await extractPdfWithService(bytes, serviceUrl);
+        lastError = null;
+        break;
+      } catch (error) {
+        lastError = error;
+        if (attempt < 5) {
+          await new Promise((resolve) => setTimeout(resolve, 2000 * attempt));
         }
-      } else {
-        result = await extractPdfWithTransmutation(bytes);
-        result.warnings = [
-          "Extraction service failed; using transmutation fallback.",
-          ...result.warnings,
-        ];
       }
     }
+    if (lastError) {
+      throw new Error(
+        `Extraction service failed after 5 attempts: ${lastError instanceof Error ? lastError.message : String(lastError)}`,
+      );
+    }
+    result = result!;
   } else if (pymupdfBin) {
     try {
       result = await extractPdfWithPymupdf4llmCli(bytes, pymupdfBin);
