@@ -1,6 +1,8 @@
 import { buildEntityCommitEvent } from "./events/entity_commit.ts";
 import { IbabsMeetingExtractor } from "./ibabs/extractor.ts";
 import { NotubizMeetingExtractor } from "./notubiz/extractor.ts";
+import type { QuickwitSearchDocument } from "./quickwit/project.ts";
+import { projectEntityCommitToQuickwitDocuments } from "./quickwit/project.ts";
 import {
   appendRunIssue,
   createRun,
@@ -106,14 +108,14 @@ async function executeIngest(
     let currentRun = run;
     let quickwit: QuickwitClient | null = null;
     let quickwitIndexId: string | undefined;
-    const pendingEvents: Array<EntityCommitEvent<WooziEntity>> = [];
+    const pendingDocuments: QuickwitSearchDocument[] = [];
 
     const flushQuickwitBatch = async (): Promise<void> => {
-      if (!quickwit || pendingEvents.length === 0) {
+      if (!quickwit || pendingDocuments.length === 0) {
         return;
       }
-      const batch = pendingEvents.splice(0, pendingEvents.length);
-      await quickwit.ingestEvents(batch);
+      const batch = pendingDocuments.splice(0, pendingDocuments.length);
+      await quickwit.ingestDocuments(batch);
     };
 
     if (options.ingestToQuickwit) {
@@ -151,14 +153,13 @@ async function executeIngest(
         if (!quickwit) {
           return;
         }
-        // Strip large text fields before buffering — the Quickwit projection
-        // uses compactPayload() which drops these anyway. Holding them in
-        // pendingEvents causes multi-GB memory usage under high concurrency.
-        const lightweight = entity.type === "Document"
-          ? { ...entity, md_text: undefined, page_chunks: undefined, raw: undefined }
-          : { ...entity, raw: undefined };
-        pendingEvents.push(await buildEntityCommitEvent(lightweight));
-        if (pendingEvents.length >= quickwitBatchSize) {
+        // Project immediately to compact Quickwit documents and discard the
+        // large entity (md_text, page_chunks, raw) right away. Only the small
+        // projected documents are buffered until the next flush.
+        const event = await buildEntityCommitEvent(entity);
+        const projected = projectEntityCommitToQuickwitDocuments(event);
+        pendingDocuments.push(...projected);
+        if (pendingDocuments.length >= quickwitBatchSize) {
           await flushQuickwitBatch();
         }
       },
