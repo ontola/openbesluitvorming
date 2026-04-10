@@ -21,7 +21,9 @@
       "Bash(curl -s http://localhost:8787/api/admin/extractors)",
       "Bash(docker exec:*)",
       "Bash(ssh root@91.98.32.151 'docker logs woozi-openbesluitvorming-1 --tail 30 2>&1 | grep -i \"error\\\\|killed\\\\|oom\\\\|memory\\\\|terminated\\\\|quickwit\"')",
-      "Bash(ssh root@91.98.32.151 'free -m && uptime')"
+      "Bash(ssh root@91.98.32.151 'free -m && uptime')",
+      "Bash(ssh -i ~/.ssh/id_ed25519 root@91.98.32.151 'docker logs woozi-openbesluitvorming-1 2>&1 | grep -i \"error\\\\|killed\\\\|oom\\\\|restart\\\\|exit\\\\|signal\\\\|crash\\\\|fatal\" | tail -30')",
+      "Bash(ssh -i ~/.ssh/id_ed25519 root@91.98.32.151 'docker inspect woozi-openbesluitvorming-1 --format \"{{.RestartCount}} restarts, started at {{.State.StartedAt}}\"')"
     ]
   }
 }

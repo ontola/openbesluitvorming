@@ -6,3 +6,9 @@ quickwit/data/
 .zed/
 .env
 woozi-ops.sqlite3
+
+# OpenTofu / Terraform
+infra/.terraform/
+infra/*.tfstate
+infra/*.tfstate.backup
+infra/.terraform.lock.hcl
