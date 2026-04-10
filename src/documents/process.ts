@@ -217,8 +217,6 @@ async function rederiveFromStoredFile(
     issues,
     document: {
       ...document,
-      md_text: mdText ? [mdText] : undefined,
-      page_chunks: pageChunks.length > 0 ? pageChunks : undefined,
       derived_content: {
         markdown_key: mdText ? extractedMarkdownKey(document) : undefined,
         page_chunks_key: pageChunks.length > 0 ? extractedPageChunksKey(document) : undefined,

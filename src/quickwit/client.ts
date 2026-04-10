@@ -1,3 +1,4 @@
+import type { QuickwitSearchDocument } from "./project.ts";
 import { projectEntityCommitToQuickwitDocuments } from "./project.ts";
 import type { EntityCommitEvent, WooziEntity } from "../types.ts";
 
@@ -111,6 +112,10 @@ export class QuickwitClient {
 
   async ingestEvents(events: Array<EntityCommitEvent<WooziEntity>>): Promise<void> {
     const documents = events.flatMap(projectEntityCommitToQuickwitDocuments);
+    await this.ingestDocuments(documents);
+  }
+
+  async ingestDocuments(documents: QuickwitSearchDocument[]): Promise<void> {
     const bodies: string[] = [];
     let currentLines: string[] = [];
     let currentBytes = 0;
