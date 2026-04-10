@@ -338,6 +338,14 @@ function preferIndexedHit(existing: IndexedHit | undefined, candidate: IndexedHi
     return recency > 0;
   }
 
+  // Prefer DocumentPage hits over Document hits — they carry matchedPage
+  // which lets the PDF viewer open to the right page.
+  const existingIsPage = existing.hit.entity_type === "DocumentPage";
+  const candidateIsPage = candidate.hit.entity_type === "DocumentPage";
+  if (existingIsPage !== candidateIsPage) {
+    return candidateIsPage;
+  }
+
   const existingHasSnippet = Boolean(existing.snippet?.content?.[0] ?? existing.snippet?.name?.[0]);
   const candidateHasSnippet = Boolean(
     candidate.snippet?.content?.[0] ?? candidate.snippet?.name?.[0],

@@ -267,16 +267,113 @@ terraform {
 }
 ```
 
-## Back-of-Envelope Math
+## Observed Performance (2026-04-09)
 
-Current throughput (observed): ~200 municipalities × 3 months in 5 days.
+Tested on production (`cpx32`, 4 vCPU, 8 GB) with remote extraction workers (`cpx22`, 2 vCPU each).
 
-That's roughly:
-- ~40 municipalities per day per server
-- ~200 municipalities / 40 per day = 5 days
+| Import scope | Workers | INGEST_CONCURRENCY | Duration |
+|---|---|---|---|
+| 1 day, all sources | 3× cpx22 | 20 | ~1 min |
+| 1 month, all sources | 3× cpx22 | 20 | ~2 min |
+| 1 year, all sources | 10× cpx22 | 12 | ~40 min |
+| Original baseline (no workers) | 0 | 4 | ~5 days for 3 months |
 
-To hit 1 day: need 5× throughput → 5 servers (Option C) or equivalent CPU via Option A/B.
+Key findings:
+- The primary bottleneck is **Notubiz API pagination**, not PDF extraction
+- `INGEST_CONCURRENCY` is the main throughput lever
+- `INGEST_CONCURRENCY=20` is unstable on cpx32 (connection drops under sustained load)
+- `INGEST_CONCURRENCY=12` is the stable max on cpx32
+- `INGEST_MEMORY_PER_JOB_MB` must be set to ~200 when using remote extraction, otherwise the memory limiter silently caps concurrency
+- Extraction workers are well-utilized for year-long imports (~50-100% CPU) but overkill for shorter periods
+- For daily imports of recent data (~7 days), local subprocess is fast enough — no workers needed
 
-To hit same-day for a full year of 350 municipalities:
-- ~4× more data than current 3-month/200-muni run
-- Need ~20× throughput → 20 extraction replicas (Option A) or 4 large servers (Option C)
+### OOM crashes with local extraction (2026-04-10)
+
+Running overnight with `INGEST_CONCURRENCY=12` and **local** pymupdf4llm (no remote workers), the container was OOM-killed **10 times**. The kernel `dmesg` log showed:
+
+- `python3` (pymupdf4llm) using **6.1 GB RSS** on a single PDF
+- `deno` process using **3.2 GB RSS** from accumulated concurrent import state
+- Total server RAM: 8 GB, shared with Quickwit + Caddy
+
+Each OOM kill triggers a container restart, which runs `reconcileInterruptedRuns` and marks all in-progress imports as `"Process terminated before completion"` with step `ingest_quickwit`. This is **not** a Quickwit failure — it's the reconciliation labeling.
+
+**Root cause — two separate memory issues:**
+
+1. **Deno process accumulating memory (8 out of 10 OOM kills):** With `INGEST_CONCURRENCY=12`, the Deno process holds meeting data, document metadata, S3 connections, and Quickwit batches for 12 concurrent imports. This accumulates to 3+ GB on the 8 GB server.
+
+2. **pymupdf4llm spiking on large PDFs (2 out of 10 OOM kills):** A single pymupdf4llm subprocess used 6.1 GB RSS processing one PDF. Even with `MAX_PDF_PAGES=40`, complex pages can spike memory.
+
+**Fixes:**
+
+- **Remote extraction** fixes issue #2 (pymupdf4llm spikes). The memory spike happens on the disposable worker instead of the ingest server.
+- **Lower `INGEST_CONCURRENCY`** or **set `DENO_V8_FLAGS=--max-old-space-size=4096`** to address issue #1 (Deno heap growth). A V8 heap cap causes a JS exception instead of an OOM kill, allowing the process to recover gracefully.
+- **A bigger ingest server** (e.g. cpx42 with 16 GB RAM) gives more headroom for concurrent imports without changing concurrency settings.
+
+**Conclusion:** Remote extraction is required for stability, but on its own it only prevents the pymupdf4llm OOM spikes. The Deno heap growth from high concurrency is a separate issue that needs either a memory cap, lower concurrency, or a bigger server.
+
+## Planned: Auto-scaling and Scheduled Imports
+
+### Daily scheduled imports (no workers needed)
+
+For ongoing daily imports, a cron trigger is sufficient. The local pymupdf4llm subprocess handles a few days of data in under a minute.
+
+Implementation:
+1. Add a cron job (either on the ingest server or as a GitHub Action schedule) that calls `POST /api/admin/rerun` with a rolling 7-day date range
+2. No extraction workers needed — `WOOZI_EXTRACTION_SERVICE_URL` stays empty, falls back to local subprocess
+3. Runs daily at a quiet hour (e.g. 03:00 UTC)
+
+### Auto-scaling for manual large imports
+
+When a user manually triggers a large import (e.g. backfill a full year), extraction workers should spin up automatically and tear down when the import finishes.
+
+#### Design
+
+```
+User starts large import via admin panel
+  → ingest server detects large job (queued count > threshold)
+  → calls Hetzner Cloud API to create extraction server(s)
+  → waits for health check to pass
+  → updates its own WOOZI_EXTRACTION_SERVICE_URL at runtime (no restart needed)
+  → import runs with remote extraction
+  → periodic check: if queued + running = 0 for 10 minutes
+  → calls Hetzner API to delete extraction server(s)
+  → clears WOOZI_EXTRACTION_SERVICE_URL
+```
+
+#### Requirements
+
+- `HCLOUD_TOKEN` in the ingest server's environment
+- Extraction service image must be public on GHCR (already done)
+- Firewall rules must allow port 8000 from the ingest server (already configured in Tofu)
+
+#### Implementation steps
+
+1. **Add a Hetzner Cloud client** to the ingest server (`src/infra/hcloud.ts` or similar):
+   - `createExtractionServer(serverType, image)` → returns IP
+   - `deleteExtractionServer(serverId)`
+   - `listExtractionServers()` → returns running extraction servers
+
+2. **Add auto-scale logic** to `src/ingest.ts`:
+   - On import queue start: if queued > 10 and no extraction URL configured, call `createExtractionServer()`
+   - Store the server ID in memory (or SQLite) for teardown
+   - After creation, wait for `/health` to respond, then set `WOOZI_EXTRACTION_SERVICE_URL` in-process (no env file, no restart)
+   - The `nextExtractionServiceUrl()` function in `text.ts` already reads the URL list dynamically
+
+3. **Add idle teardown** to the polling loop:
+   - When `runningCount + queuedCount === 0` for 10 minutes, delete extraction servers and clear the URL
+
+4. **Add admin UI controls** (optional):
+   - "Start extractors" / "Stop extractors" buttons in the admin panel as manual override
+   - Show current auto-scale state (idle, scaling up, active, cooling down)
+
+#### What stays manual
+
+- Backfill imports: user decides when to start from the admin panel
+- The system auto-provisions compute, but the user initiates the import
+- Tofu remains for initial infrastructure setup (firewalls, SSH keys), but runtime scaling bypasses it
+
+#### Cost model
+
+- Daily imports: €0 extra (local subprocess)
+- Manual large import: one cpx22 for the duration (~€0.01/hr), auto-deleted when done
+- Full backfill: 10× cpx22 for ~1 hour (~€0.10 total)
