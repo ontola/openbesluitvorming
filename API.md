@@ -1,28 +1,220 @@
-# Open Besluitvorming – Search API
+# Open Besluitvorming – API
 
-This page documents the search API for Open Besluitvorming (Woozi), which indexes public Dutch government documents — council meetings, agendas, minutes, and attached documents — from municipalities (_gemeenten_), provinces (_provincies_), and water boards (_waterschappen_).
-
-The search index is powered by [Quickwit](https://quickwit.io), a search engine with an HTTP API.
+This page documents the API for Open Besluitvorming (Woozi), which indexes public Dutch government documents — council meetings, agendas, minutes, and attached documents — from municipalities (_gemeenten_), provinces (_provincies_), and water boards (_waterschappen_).
 
 ## Base URL
 
 ```
-https://beta.openraadsinformatie.nl
+https://beta.openbesluitvorming.nl
 ```
 
-The index ID is `woozi-events-prod`. All search requests go to:
+## Endpoints overview
 
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/search` | GET | Search meetings and documents (recommended) |
+| `/api/stats` | GET | Index statistics (document count, organization count) |
+| `/api/sources` | GET | List available data sources |
+| `/api/entities/{entity_id}` | GET | Full entity detail (text, agenda, download URL) |
+| `/api/entities/{entity_id}/pdf/page/{n}` | GET | Rendered PDF page as JPEG image |
+| `/api/v1/woozi-events-prod/search` | POST | Raw Quickwit search (advanced) |
+
+No authentication is required. All endpoints are read-only.
+
+---
+
+## Search
+
+### `GET /api/search`
+
+The recommended search endpoint. Returns grouped, deduplicated results with document-level grouping of page hits.
+
+**Query parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `query` | string | Search query (required) |
+| `organization` | string | Filter by source key (e.g. `soest`, `amsterdam`) |
+| `entityType` | string | Filter by type: `Meeting` or `Document` |
+| `sort` | string | Sort order: `date_desc` (default), `date_asc`, or `relevance` |
+| `dateFrom` | string | Start date filter (ISO 8601, e.g. `2024-01-01`) |
+| `dateTo` | string | End date filter |
+| `offset` | integer | Pagination offset (default: 0) |
+| `limit` | integer | Results per page (default: 24) |
+
+**Example:**
+
+```bash
+curl "https://beta.openbesluitvorming.nl/api/search?query=begroting&organization=soest&sort=date_desc&limit=10"
 ```
-POST https://beta.openraadsinformatie.nl/api/v1/woozi-events-prod/search
+
+**Response:**
+
+```json
+{
+  "results": [
+    {
+      "entityId": "document:notubiz:gemeente:soest:12345",
+      "entityType": "Document",
+      "entityTypeLabel": "Document",
+      "organization": "Soest",
+      "date": "7 november 2024",
+      "sortDate": "2024-11-07 00:00:00",
+      "title": "Raadsvoorstel begroting 2024",
+      "summary": "De begroting voor 2024 bedraagt...",
+      "summaryHtml": "De <b>begroting</b> voor 2024 bedraagt...",
+      "downloadUrl": "https://...",
+      "matchedPage": 3,
+      "pageCount": 12,
+      "previewImageUrl": "/api/entities/document%3Anotubiz%3Agemeente%3Asoest%3A12345/pdf/page/3"
+    }
+  ],
+  "totalCount": 42,
+  "totalIsApproximate": true,
+  "hasMore": true
+}
 ```
 
-The production domain is configured via the `DOMAIN` environment variable. The Quickwit search API is proxied at `/api/v1/` alongside the regular application routes.
+---
 
-> **Note:** The Quickwit API is read-only for external consumers. No authentication is required for search queries.
+## Index statistics
 
-## Search request
+### `GET /api/stats`
 
-Send a `POST` request with a JSON body:
+Returns the total number of indexed documents and unique organizations.
+
+**Response:**
+
+```json
+{
+  "documentCount": 3045470,
+  "organizationCount": 124
+}
+```
+
+Cached for 1 hour.
+
+---
+
+## Sources
+
+### `GET /api/sources`
+
+Lists all configured data sources.
+
+**Query parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `implemented` | string | Set to `true` to only return active sources |
+
+**Response:**
+
+```json
+{
+  "sources": [
+    {
+      "key": "soest",
+      "label": "Soest",
+      "supplier": "notubiz",
+      "organizationType": "gemeente",
+      "implemented": true,
+      "isAggregate": false
+    }
+  ]
+}
+```
+
+---
+
+## Entity detail
+
+### `GET /api/entities/{entity_id}`
+
+Returns the full content for a meeting or document.
+
+> **Note:** `entity_id` values contain colons. URL-encode them: `document:notubiz:gemeente:soest:12345` → `document%3Anotubiz%3Agemeente%3Asoest%3A12345`.
+
+**Example:**
+
+```bash
+curl "https://beta.openbesluitvorming.nl/api/entities/document%3Anotubiz%3Agemeente%3Asoest%3A12345"
+```
+
+**Response (document):**
+
+```json
+{
+  "entityId": "document:notubiz:gemeente:soest:12345",
+  "entityType": "Document",
+  "entityTypeLabel": "Document",
+  "title": "Raadsvoorstel begroting 2024",
+  "organization": "Soest",
+  "date": "7 november 2024",
+  "sortDate": "2024-11-07 00:00:00",
+  "markdownText": "# Raadsvoorstel begroting 2024\n\n...",
+  "downloadUrl": "https://...",
+  "contentType": "application/pdf",
+  "pdfUrl": "https://...",
+  "meetingId": "meeting:notubiz:gemeente:soest:830424"
+}
+```
+
+**Response (meeting):**
+
+```json
+{
+  "entityId": "meeting:notubiz:gemeente:soest:830424",
+  "entityType": "Meeting",
+  "entityTypeLabel": "Vergadering",
+  "title": "Raadsvergadering 2024-11-07",
+  "organization": "Soest",
+  "date": "7 november 2024",
+  "sortDate": "2024-11-07 20:00:00",
+  "agenda": [
+    {
+      "id": "...",
+      "title": "Opening",
+      "number": "1",
+      "documents": [
+        {
+          "id": "document:notubiz:gemeente:soest:12345",
+          "name": "Raadsvoorstel begroting 2024",
+          "original_url": "https://..."
+        }
+      ],
+      "agenda_items": []
+    }
+  ]
+}
+```
+
+---
+
+## PDF page rendering
+
+### `GET /api/entities/{entity_id}/pdf/page/{page_number}`
+
+Returns a rendered page of a PDF document as a PNG image. Pages are rendered at 96 DPI and cached permanently.
+
+**Response headers:**
+- `Content-Type: image/png`
+- `Cache-Control: public, max-age=31536000, immutable`
+- `X-Pdf-Page-Count: 12` (total pages in the document)
+
+**Example:**
+
+```bash
+curl -o page1.png "https://beta.openbesluitvorming.nl/api/entities/document%3Anotubiz%3Agemeente%3Asoest%3A12345/pdf/page/1"
+```
+
+---
+
+## Raw Quickwit search (advanced)
+
+For advanced queries, the Quickwit search API is proxied at `/api/v1/`. This gives direct access to Quickwit's query syntax, aggregations, and sorting.
+
+### `POST /api/v1/woozi-events-prod/search`
 
 ```http
 POST /api/v1/woozi-events-prod/search
@@ -37,76 +229,63 @@ Content-Type: application/json
 }
 ```
 
-| Parameter        | Type    | Description                                                 |
-| ---------------- | ------- | ----------------------------------------------------------- |
-| `query`          | string  | Query string (see syntax below). Required.                  |
-| `max_hits`       | integer | Maximum number of results to return. Default: 10, max: 100. |
-| `start_offset`   | integer | Offset for pagination. Default: 0.                          |
-| `sort_by`        | string  | Field to sort by. Prefix with `-` for descending order.     |
-| `snippet_fields` | array   | Fields for which to return highlighted snippets.            |
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `query` | string | Query string (Lucene-like syntax). Required. |
+| `max_hits` | integer | Maximum results. Default: 10, max: 100. |
+| `start_offset` | integer | Pagination offset. Default: 0. |
+| `sort_by` | string | Sort field. Prefix with `-` for descending. |
+| `snippet_fields` | array | Fields for highlighted snippets. |
 
-## Query syntax
+### Query syntax
 
-Quickwit uses a Lucene-like query syntax. The default search fields are `name`, `classification`, and `content`.
+Quickwit uses a Lucene-like query syntax. Default search fields are `name`, `classification`, and `content`.
 
-| Pattern                  | Example                                                     |
-| ------------------------ | ----------------------------------------------------------- |
-| Full-text search         | `begroting 2024`                                            |
-| Exact phrase             | `"raadsvergadering begroting"`                              |
-| Field filter             | `source_key:soest`                                          |
-| Multiple filters (AND)   | `source_key:soest AND entity_type:Document`                 |
-| OR                       | `entity_type:Meeting OR entity_type:Document`               |
-| Date range               | `start_date:[2024-01-01T00:00:00Z TO 2024-12-31T23:59:59Z]` |
-| Combine text and filters | `begroting AND source_key:amsterdam`                        |
+| Pattern | Example |
+|---------|---------|
+| Full-text search | `begroting 2024` |
+| Exact phrase | `"raadsvergadering begroting"` |
+| Field filter | `source_key:soest` |
+| Multiple filters (AND) | `source_key:soest AND entity_type:Document` |
+| OR | `entity_type:Meeting OR entity_type:Document` |
+| Date range | `start_date:[2024-01-01T00:00:00Z TO 2024-12-31T23:59:59Z]` |
+| Combine text and filters | `begroting AND source_key:amsterdam` |
 
-## Document fields
+### Document fields
 
-Each indexed document has the following fields:
-
-| Field              | Type     | Description                                                |
-| ------------------ | -------- | ---------------------------------------------------------- |
-| `entity_id`        | string   | Unique identifier for this entity                          |
-| `entity_type`      | string   | `Meeting`, `Document`, or `DocumentPage`                   |
-| `source_key`       | string   | Organization identifier (e.g. `soest`, `amsterdam`)        |
-| `supplier`         | string   | Source system: `ibabs` or `notubiz`                        |
-| `name`             | string   | Title of the meeting or document                           |
-| `classification`   | string[] | Classification tags (e.g. `["Raadsvergadering"]`)          |
-| `content`          | string   | Full-text content (agenda items, document text, page text) |
-| `start_date`       | datetime | Meeting start time, or last discussed date for documents   |
-| `end_date`         | datetime | Meeting end time (meetings only)                           |
-| `organization`     | string   | Organization reference                                     |
-| `committee`        | string   | Committee name (meetings only)                             |
-| `file_name`        | string   | Original filename (documents only)                         |
-| `page_number`      | integer  | Page number (DocumentPage only)                            |
-| `parent_entity_id` | string   | Parent document ID (DocumentPage only)                     |
-| `time`             | datetime | Timestamp when this event was indexed                      |
-| `payload`          | object   | Compact entity payload with additional detail              |
+| Field | Type | Description |
+|-------|------|-------------|
+| `entity_id` | string | Unique identifier |
+| `entity_type` | string | `Meeting`, `Document`, or `DocumentPage` |
+| `source_key` | string | Organization identifier (e.g. `soest`) |
+| `supplier` | string | Source system: `notubiz` or `ibabs` |
+| `name` | string | Title |
+| `classification` | string[] | Tags (e.g. `["Raadsvergadering"]`) |
+| `content` | string | Full-text content |
+| `start_date` | datetime | Meeting start or document date |
+| `end_date` | datetime | Meeting end time |
+| `organization` | string | Organization name |
+| `committee` | string | Committee name (meetings only) |
+| `file_name` | string | Original filename (documents only) |
+| `page_number` | integer | Page number (DocumentPage only) |
+| `parent_entity_id` | string | Parent document ID (DocumentPage only) |
+| `document_month` | string | Year-month for date faceting (e.g. `2024-11`) |
+| `time` | datetime | Indexing timestamp |
+| `projection_version` | string | Schema version of the projection |
+| `payload` | object | Compact entity payload |
 
 ### Entity types
 
 - **`Meeting`** — a council or committee meeting, with agenda items and attached documents
-- **`Document`** — a PDF or other file attached to meetings (agenda, minutes, report, etc.)
-- **`DocumentPage`** — a single page of a multi-page document, for page-level full-text search. Links back to its parent via `parent_entity_id`.
+- **`Document`** — a PDF or other file attached to meetings
+- **`DocumentPage`** — a single page of a multi-page document, for page-level search. Links to parent via `parent_entity_id`
 
-## Organization keys (`source_key`)
+### Examples
 
-Organization keys are lowercase slugs. Examples:
-
-| Key               | Label           |
-| ----------------- | --------------- |
-| `soest`           | Soest           |
-| `amsterdam`       | Amsterdam       |
-| `haarlemmermeer`  | Haarlemmermeer  |
-| `amsterdam_noord` | Amsterdam Noord |
-
-The full list of indexed organizations is available via the web app source picker.
-
-## Examples
-
-### All documents from Soest from 2024
+**All documents from Soest in 2024:**
 
 ```bash
-curl -X POST https://beta.openraadsinformatie.nl/api/v1/woozi-events-prod/search \
+curl -X POST "https://beta.openbesluitvorming.nl/api/v1/woozi-events-prod/search" \
   -H "Content-Type: application/json" \
   -d '{
     "query": "entity_type:Document AND source_key:soest AND start_date:[2024-01-01T00:00:00Z TO 2024-12-31T23:59:59Z]",
@@ -115,48 +294,10 @@ curl -X POST https://beta.openraadsinformatie.nl/api/v1/woozi-events-prod/search
   }'
 ```
 
-### Search for "begroting" in all meetings
+**Page-level search:**
 
 ```bash
-curl -X POST https://beta.openraadsinformatie.nl/api/v1/woozi-events-prod/search \
-  -H "Content-Type: application/json" \
-  -d '{
-    "query": "entity_type:Meeting AND begroting",
-    "max_hits": 10,
-    "snippet_fields": ["content", "name"]
-  }'
-```
-
-### All meetings from Amsterdam in 2024
-
-```bash
-curl -X POST https://beta.openraadsinformatie.nl/api/v1/woozi-events-prod/search \
-  -H "Content-Type: application/json" \
-  -d '{
-    "query": "entity_type:Meeting AND source_key:amsterdam AND start_date:[2024-01-01T00:00:00Z TO 2024-12-31T23:59:59Z]",
-    "max_hits": 50,
-    "sort_by": "-start_date"
-  }'
-```
-
-### Full-text search across all documents and meetings
-
-```bash
-curl -X POST https://beta.openraadsinformatie.nl/api/v1/woozi-events-prod/search \
-  -H "Content-Type: application/json" \
-  -d '{
-    "query": "\"woningbouw\" AND (entity_type:Meeting OR entity_type:Document)",
-    "max_hits": 20,
-    "snippet_fields": ["content"]
-  }'
-```
-
-### Page-level search inside documents
-
-`DocumentPage` records let you find the exact page within a PDF that mentions a term. Use `parent_entity_id` to retrieve the full parent document.
-
-```bash
-curl -X POST https://beta.openraadsinformatie.nl/api/v1/woozi-events-prod/search \
+curl -X POST "https://beta.openbesluitvorming.nl/api/v1/woozi-events-prod/search" \
   -H "Content-Type: application/json" \
   -d '{
     "query": "entity_type:DocumentPage AND stikstof",
@@ -165,7 +306,7 @@ curl -X POST https://beta.openraadsinformatie.nl/api/v1/woozi-events-prod/search
   }'
 ```
 
-## Response format
+### Response format
 
 ```json
 {
@@ -192,49 +333,19 @@ curl -X POST https://beta.openraadsinformatie.nl/api/v1/woozi-events-prod/search
 }
 ```
 
-## Fetching full document text
+---
 
-Search hits include a `payload.derived_content.markdown_key` field for documents that have extracted text. This is an internal storage key — to retrieve the full markdown text, use the entity detail endpoint:
+## Typical workflow
 
-```
-GET https://beta.openraadsinformatie.nl/api/entities/{entity_id}
-```
-
-### Response
-
-```json
-{
-  "entityId": "ibabs:soest:document:abc123",
-  "entityType": "Document",
-  "title": "Raadsvoorstel begroting 2024",
-  "organization": "Soest",
-  "date": "7 november 2024",
-  "markdownText": "# Raadsvoorstel begroting 2024\n\n...",
-  "downloadUrl": "https://...",
-  "contentType": "application/pdf",
-  "pdfUrl": "https://..."
-}
-```
-
-For meetings, the response includes an `agenda` array with the full nested agenda tree instead of `markdownText`.
-
-### Example: fetch document text
-
-```bash
-curl https://beta.openraadsinformatie.nl/api/entities/ibabs%3Asoest%3Adocument%3Aabc123
-```
-
-> **Note:** `entity_id` values come from the `entity_id` field in search hits. URL-encode the colons: `ibabs:soest:document:abc123` → `ibabs%3Asoest%3Adocument%3Aabc123`.
-
-### Typical workflow
-
-1. Search with the Quickwit API to find relevant documents
-2. Take the `entity_id` from a hit
-3. Call `/api/entities/{entity_id}` to retrieve the full text
+1. Search with `/api/search` to find relevant documents
+2. Take the `entityId` from a result
+3. Call `/api/entities/{entityId}` to retrieve the full text or meeting agenda
+4. Use `meetingId` on a document to navigate to the parent meeting
+5. Use `/api/entities/{entityId}/pdf/page/{n}` to render PDF pages
 
 ## Schemas
 
-The canonical entity schemas are published as JSON Schema documents:
+Canonical entity schemas are published as JSON Schema documents:
 
 | Schema | Description |
 |--------|-------------|
@@ -242,9 +353,9 @@ The canonical entity schemas are published as JSON Schema documents:
 | [document.schema.json](/schemas/document.schema.json) | Attached document or media object |
 | [committee.schema.json](/schemas/committee.schema.json) | Committee or organisation |
 | [vote.schema.json](/schemas/vote.schema.json) | Vote record |
-| [entity-commit.schema.json](/schemas/entity-commit.schema.json) | CloudEvents envelope wrapping the above |
+| [entity-commit.schema.json](/schemas/entity-commit.schema.json) | CloudEvents envelope |
 
-These schemas define the structure of the `payload` field returned in search hits.
+These define the structure of the `payload` field in search hits.
 
 ## Further reading
 
