@@ -37,13 +37,38 @@ services:
 
   openbesluitvorming:
     image: ${OPENBESLUITVORMING_IMAGE:-ghcr.io/openstate/woozi-openbesluitvorming:main}
-    pull_policy: always
+    pull_policy: missing
     depends_on:
       - quickwit
     restart: unless-stopped
     environment:
-      DENO_V8_FLAGS: --max-old-space-size=6144
+      DENO_V8_FLAGS: --max-old-space-size=1024
       PORT: 8787
+      QUICKWIT_URL: http://quickwit:7280
+      QUICKWIT_INDEX_ID: ${QUICKWIT_INDEX_ID:-woozi-events-prod}
+      WOOZI_KV_PATH: /data/woozi-ops.sqlite3
+      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY}
+      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_KEY}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
+      S3_STORAGE_BUCKET_NAME: ${S3_STORAGE_BUCKET_NAME}
+      S3_STORAGE_ENDPOINT: ${S3_STORAGE_ENDPOINT}
+      S3_STORAGE_REGION: ${S3_STORAGE_REGION}
+      WOOZI_EXTRACTION_SERVICE_URL: ${WOOZI_EXTRACTION_SERVICE_URL:-}
+    expose:
+      - "8787"
+    volumes:
+      - woozi-state:/data
+
+  worker:
+    image: ${OPENBESLUITVORMING_IMAGE:-ghcr.io/openstate/woozi-openbesluitvorming:main}
+    pull_policy: missing
+    depends_on:
+      - quickwit
+    restart: unless-stopped
+    command: ["run", "-A", "src/worker.ts"]
+    environment:
+      DENO_V8_FLAGS: --max-old-space-size=4096
       QUICKWIT_URL: http://quickwit:7280
       QUICKWIT_INDEX_ID: ${QUICKWIT_INDEX_ID:-woozi-events-prod}
       QUICKWIT_BATCH_SIZE: ${QUICKWIT_BATCH_SIZE:-64}
@@ -55,8 +80,11 @@ services:
       S3_STORAGE_BUCKET_NAME: ${S3_STORAGE_BUCKET_NAME}
       S3_STORAGE_ENDPOINT: ${S3_STORAGE_ENDPOINT}
       S3_STORAGE_REGION: ${S3_STORAGE_REGION}
-    expose:
-      - "8787"
+      WOOZI_EXTRACTION_SERVICE_URL: ${WOOZI_EXTRACTION_SERVICE_URL:-}
+      INGEST_CONCURRENCY: ${INGEST_CONCURRENCY:-4}
+      INGEST_MEMORY_PER_JOB_MB: ${INGEST_MEMORY_PER_JOB_MB:-1400}
+      INGEST_MIN_FREE_MEMORY_MB: ${INGEST_MIN_FREE_MEMORY_MB:-1024}
+      WOOZI_DOCUMENT_CONCURRENCY: ${WOOZI_DOCUMENT_CONCURRENCY:-3}
     volumes:
       - woozi-state:/data
 
