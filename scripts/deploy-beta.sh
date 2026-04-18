@@ -76,9 +76,9 @@ ssh "$DEPLOY_HOST" "
   cd \"$DEPLOY_DIR\"
   export OPENBESLUITVORMING_IMAGE=\"$DEPLOY_IMAGE\"
   export COMPOSE_PROJECT_NAME=\"$COMPOSE_PROJECT_NAME_VALUE\"
-  docker compose -f \"$COMPOSE_FILE\" pull openbesluitvorming
-  docker compose -f \"$COMPOSE_FILE\" up -d openbesluitvorming caddy
-  docker compose -f \"$COMPOSE_FILE\" ps openbesluitvorming caddy
+  docker compose -f \"$COMPOSE_FILE\" pull openbesluitvorming worker
+  docker compose -f \"$COMPOSE_FILE\" up -d openbesluitvorming worker caddy
+  docker compose -f \"$COMPOSE_FILE\" ps openbesluitvorming worker caddy
 "
 
 echo "Deployed image $DEPLOY_IMAGE to $DEPLOY_HOST:$DEPLOY_DIR"
