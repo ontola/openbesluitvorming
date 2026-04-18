@@ -31,24 +31,10 @@ if [ -z "${DEPLOY_TARGET_EXPLICIT:-}" ] && (! git diff --quiet || ! git diff --c
 fi
 
 if [ "$FORCE_DEPLOY" != "1" ]; then
+  # Port 8787 is exposed on the docker network only, so we probe the admin
+  # endpoint from inside the openbesluitvorming container instead of the host.
   running_count="$(
-    ssh "$DEPLOY_HOST" "
-      set -e
-      python3 - <<'PY'
-import json
-import urllib.request
-
-try:
-    with urllib.request.urlopen('http://127.0.0.1:8787/api/admin/summary', timeout=5) as response:
-        payload = json.load(response)
-except Exception:
-    print('unknown')
-    raise SystemExit(0)
-
-summary = payload.get('summary') or {}
-print(summary.get('runningCount', 0))
-PY
-    "
+    ssh "$DEPLOY_HOST" 'docker exec woozi-openbesluitvorming-1 deno eval "try { const r = await fetch(\"http://127.0.0.1:8787/api/admin/summary\", { signal: AbortSignal.timeout(5000) }); const p = await r.json(); console.log((p.summary ?? {}).runningCount ?? 0); } catch { console.log(\"unknown\"); }" 2>/dev/null || echo unknown'
   )"
 
   case "$running_count" in
