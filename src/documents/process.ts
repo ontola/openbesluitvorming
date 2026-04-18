@@ -1,8 +1,36 @@
 import type { DocumentEntity, ExtractionIssue } from "../types.ts";
-import { extractDocumentMarkdown } from "./text.ts";
+import { extractDocumentMarkdown, MAX_PDF_PAGES } from "./text.ts";
 import type { IngestExecutionMode } from "../types.ts";
 import { assessMarkdownQuality } from "./quality.ts";
 import { currentDerivationVersion } from "../pipeline/versioning.ts";
+
+let extractionServiceUrls: string[] | null = null;
+let extractionRoundRobin = 0;
+
+function nextExtractionServiceUrl(): string | null {
+  if (extractionServiceUrls === null) {
+    const raw = Deno.env.get("WOOZI_EXTRACTION_SERVICE_URL")?.trim();
+    extractionServiceUrls = raw
+      ? raw.split(",").map((u) => u.trim()).filter(Boolean)
+      : [];
+  }
+  if (extractionServiceUrls.length === 0) return null;
+  const url = extractionServiceUrls[extractionRoundRobin % extractionServiceUrls.length];
+  extractionRoundRobin++;
+  return url;
+}
+
+function hasExtractionService(): boolean {
+  if (extractionServiceUrls !== null) return extractionServiceUrls.length > 0;
+  return Boolean(Deno.env.get("WOOZI_EXTRACTION_SERVICE_URL")?.trim());
+}
+
+function isPdf(document: DocumentEntity): boolean {
+  return (
+    document.content_type?.toLowerCase().includes("pdf") === true ||
+    document.file_name?.toLowerCase().endsWith(".pdf") === true
+  );
+}
 
 interface CachedStorage {
   hasObject(key: string): Promise<boolean>;
@@ -99,35 +127,29 @@ async function readCachedDocument(
   const fileKey = objectKey(document);
   const markdownKey = extractedMarkdownKey(document);
   const pageChunksKey = extractedPageChunksKey(document);
-  // We only reuse cache when both the stored source file and the derived markdown sidecar exist
-  // for the same supplier-specific version token.
-  const hasFile = await storage.hasObject(fileKey);
-  const hasMarkdown = await storage.hasObject(markdownKey);
-  const hasPageChunks = await storage.hasObject(pageChunksKey);
+  // Check all three keys in parallel to minimize S3 latency.
+  const [hasFile, hasMarkdown, hasPageChunks] = await Promise.all([
+    storage.hasObject(fileKey),
+    storage.hasObject(markdownKey),
+    storage.hasObject(pageChunksKey),
+  ]);
 
   if (!hasFile || !hasMarkdown) {
     return null;
   }
 
-  const mdText = await storage.getObjectText(markdownKey);
-  const pageChunksText = hasPageChunks ? await storage.getObjectText(pageChunksKey) : "";
-  const pageChunks = pageChunksText
-    ? ((JSON.parse(pageChunksText) as StoredPageChunks).pages ?? [])
-    : [];
-  const quality = mdText ? assessMarkdownQuality(mdText) : null;
+  // Don't download markdown or page chunks from S3 — just confirm they exist.
+  // The document was already indexed in a previous run. Re-downloading the
+  // markdown just to re-index it costs 4+ seconds per document in S3 latency
+  // and dominates import time for cached documents.
   return {
     cacheHit: true,
     issues: [],
     document: {
       ...document,
-      md_text: mdText ? [mdText] : undefined,
-      page_chunks: pageChunks,
       derived_content: {
         markdown_key: markdownKey,
         page_chunks_key: hasPageChunks ? pageChunksKey : undefined,
-        page_count: pageChunks.length > 0 ? pageChunks.length : undefined,
-        extraction_quality_score: quality?.score,
-        extraction_quality_status: quality?.status,
       },
       media_urls: [
         {
@@ -243,35 +265,150 @@ export async function materializeDocument(
     executionMode?: IngestExecutionMode;
   },
 ): Promise<MaterializedDocumentResult> {
+  const t0 = performance.now();
+  const docId = document.id;
+
   if (!document.original_url) {
     return { document, cacheHit: false, issues: [] };
   }
 
   if (options.storage) {
-    if (options.executionMode === "rederive_cached") {
+    if (options.executionMode === "rederive_cached" && !hasExtractionService()) {
       const rederived = await rederiveFromStoredFile(document, options.storage);
       if (rederived) {
+        console.log(`[timing] ${docId} path=rederive ${Math.round(performance.now() - t0)}ms`);
         return rederived;
       }
     } else {
       const cached = await readCachedDocument(document, options.storage);
       if (cached) {
+        console.log(`[timing] ${docId} path=cache_hit ${Math.round(performance.now() - t0)}ms`);
         return cached;
       }
 
-      const canBackfillPageChunks =
-        document.content_type?.toLowerCase().includes("pdf") ||
-        document.file_name?.toLowerCase().endsWith(".pdf");
-      if (canBackfillPageChunks) {
-        const rederived = await rederiveFromStoredFile(document, options.storage);
-        if (rederived) {
-          return rederived;
+      // Skip local rederivation when extraction service is configured —
+      // rederiveFromStoredFile downloads the PDF from S3 and runs pymupdf4llm
+      // locally, which can OOM the server. Let it fall through to the
+      // extraction service path below instead.
+      if (!hasExtractionService()) {
+        const canBackfillPageChunks =
+          document.content_type?.toLowerCase().includes("pdf") ||
+          document.file_name?.toLowerCase().endsWith(".pdf");
+        if (canBackfillPageChunks) {
+          const rederived = await rederiveFromStoredFile(document, options.storage);
+          if (rederived) {
+            return rederived;
+          }
         }
       }
     }
   }
 
+  // When extraction service is configured and the document is a PDF,
+  // delegate download + extraction + S3 upload to the extraction worker.
+  // The ingest server never holds the PDF bytes in memory.
+  const serviceUrl = nextExtractionServiceUrl();
+  if (serviceUrl && isPdf(document) && document.original_url && options.storage) {
+    const pdfKey = objectKey(document);
+    const mdKey = extractedMarkdownKey(document);
+    const issues: ExtractionIssue[] = [];
+
+    const EXTRACTION_TIMEOUT_MS = 180_000; // 3 minutes — p99 is ~127s
+    const MAX_RETRIES = 2;
+
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      // Pick a different worker on each retry so we don't hammer a slow/down node
+      const attemptUrl = attempt === 1 ? serviceUrl : (nextExtractionServiceUrl() ?? serviceUrl);
+      try {
+        const response = await fetch(`${attemptUrl}/extract`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          signal: AbortSignal.timeout(EXTRACTION_TIMEOUT_MS),
+          body: JSON.stringify({
+            source_url: document.original_url,
+            s3_pdf_key: pdfKey,
+            s3_markdown_key: mdKey,
+            max_pages: MAX_PDF_PAGES,
+          }),
+        });
+
+        if (!response.ok) {
+          const body = await response.text().catch(() => "");
+          // Don't retry on 4xx — the source document doesn't exist or isn't downloadable
+          if (response.status >= 400 && response.status < 500) {
+            lastError = new Error(`Extraction service returned ${response.status}: ${body}`);
+            break;
+          }
+          throw new Error(`Extraction service returned ${response.status}: ${body}`);
+        }
+
+        const payload = (await response.json()) as {
+          markdown: string;
+          page_count: number;
+          warnings: string[];
+          s3_pdf_url: string;
+        };
+
+        issues.push(
+          ...payload.warnings.map((message) => ({
+            severity: "warning" as const,
+            step: "extract_text" as const,
+            entity_id: document.id,
+            message,
+          })),
+        );
+
+        const quality = payload.markdown ? assessMarkdownQuality(payload.markdown) : null;
+        console.log(`[timing] ${docId} path=extraction_service ${Math.round(performance.now() - t0)}ms pages=${payload.page_count} md=${Math.round(payload.markdown.length / 1024)}KB`);
+
+        return {
+          cacheHit: false,
+          issues,
+          document: {
+            ...document,
+            md_text: payload.markdown ? [payload.markdown] : undefined,
+            derived_content: {
+              markdown_key: mdKey,
+              page_count: payload.page_count > MAX_PDF_PAGES ? MAX_PDF_PAGES : payload.page_count,
+              extraction_quality_score: quality?.score,
+              extraction_quality_status: quality?.status,
+            },
+            media_urls: [
+              {
+                url: payload.s3_pdf_url,
+                original_url: document.original_url,
+                content_type: document.content_type,
+              },
+            ],
+          },
+        };
+      } catch (error) {
+        lastError = error;
+        if (attempt < MAX_RETRIES) {
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+        }
+      }
+    }
+
+    // Retries exhausted — record as issue and continue without extraction
+    issues.push({
+      severity: "error",
+      step: "extract_text",
+      entity_id: document.id,
+      message: `${documentIssueContext(document)}: Extraction service failed after ${MAX_RETRIES} attempts: ${lastError instanceof Error ? lastError.message : String(lastError)}`,
+      details: issueDetailsFromError(lastError),
+    });
+
+    console.log(`[timing] ${docId} path=extraction_service_failed ${Math.round(performance.now() - t0)}ms`);
+    return { document, cacheHit: false, issues };
+  }
+
+  // Fallback: local download + extraction (no extraction service configured,
+  // or document is not a PDF)
+  const tDl = performance.now();
   const bytes = await options.download(document);
+  const dlMs = Math.round(performance.now() - tDl);
   let mdText = "";
   let pageChunks = document.page_chunks ?? [];
   const issues: ExtractionIssue[] = [];
@@ -348,6 +485,7 @@ export async function materializeDocument(
   }
 
   const quality = mdText ? assessMarkdownQuality(mdText) : null;
+  console.log(`[timing] ${docId} path=local_fallback total=${Math.round(performance.now() - t0)}ms dl=${dlMs}ms bytes=${Math.round(bytes.length / 1024)}KB md=${Math.round(mdText.length / 1024)}KB`);
 
   return {
     cacheHit: false,
