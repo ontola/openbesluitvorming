@@ -23,6 +23,8 @@ async function getDatabase(): Promise<DatabaseSync> {
       }
 
       const db = new DatabaseSync(path);
+      db.exec("PRAGMA busy_timeout=5000");
+      db.exec("PRAGMA journal_mode=WAL");
       db.exec(`
         CREATE TABLE IF NOT EXISTS ingest_run (
           id TEXT PRIMARY KEY,

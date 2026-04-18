@@ -377,3 +377,73 @@ User starts large import via admin panel
 - Daily imports: €0 extra (local subprocess)
 - Manual large import: one cpx22 for the duration (~€0.01/hr), auto-deleted when done
 - Full backfill: 10× cpx22 for ~1 hour (~€0.10 total)
+
+## Planned: Split Web Server and Import Worker
+
+### Problem
+
+Currently one Deno process handles both serving search queries and running imports. During imports, the process consumes all available CPU and memory, making the search UI slow or unresponsive for users. This was observed repeatedly during backfill runs — load averages above 14 on a 4 vCPU server, 5+ GB memory usage, and sluggish page loads.
+
+### Design
+
+Split the single `openbesluitvorming` container into two:
+
+```
+┌──────────────────────────────┐    ┌──────────────────────────────┐
+│  web (always running)        │    │  worker (always running)     │
+│                              │    │                              │
+│  search UI + API             │    │  import pipeline             │
+│  admin panel                 │    │  reads queue from SQLite/DB  │
+│  entity detail API           │    │  talks to extraction workers │
+│  PDF page rendering          │    │  writes to Quickwit + S3     │
+│  source listing              │    │                              │
+│  serves static assets        │    │  no HTTP server needed       │
+│                              │    │  (or minimal admin API)      │
+│  lightweight, fast           │    │  heavy, can use all CPU      │
+└──────────────────────────────┘    └──────────────────────────────┘
+        │                                     │
+        └──── shared Quickwit + S3 ───────────┘
+```
+
+### Why this matters
+
+- **User experience**: search stays fast during imports
+- **Memory isolation**: import worker OOM doesn't take down search
+- **Independent scaling**: worker can run on a bigger/separate machine
+- **Simpler operations**: restart worker without affecting users
+
+### Implementation approach
+
+1. **Extract the import loop** from `web/server.ts` into a standalone entrypoint (e.g. `src/worker.ts`) that:
+   - Reads queued imports from SQLite
+   - Runs the extraction pipeline
+   - Writes to Quickwit and S3
+   - Exits when queue is empty (or runs as a long-lived process)
+
+2. **The admin panel** stays on the web server. It writes import requests to SQLite. The worker polls SQLite for new work. This is the existing pattern — just split across two processes.
+
+3. **SQLite sharing**: both processes access the same SQLite file (on a shared volume). SQLite supports concurrent readers with one writer, which fits this model — the web server mostly reads (admin panel), the worker mostly writes (import progress).
+
+4. **Docker Compose**: add a second service using the same image but a different entrypoint:
+   ```yaml
+   worker:
+     image: ${OPENBESLUITVORMING_IMAGE}
+     command: ["run", "-A", "src/worker.ts"]
+     volumes:
+       - woozi-state:/data
+     environment:
+       # same S3, Quickwit, extraction service config
+   ```
+
+5. **Resource limits**: the web container gets a memory limit (e.g. 1 GB) and the worker gets the rest. If the worker OOMs, it restarts without affecting search.
+
+### What changes for users
+
+Nothing — same admin panel, same search UI, same URLs. Imports just don't slow down search anymore.
+
+### Priority
+
+This should be done after the extraction service architecture stabilizes. The current setup works for periodic imports. The split becomes important when:
+- Multiple users rely on the search UI during business hours
+- Imports need to run during peak traffic
+- The server needs to handle both search traffic and large backfills simultaneously

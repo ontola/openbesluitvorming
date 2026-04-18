@@ -13,11 +13,30 @@ const DEFAULT_IBABS_URL = "https://wcf.ibabs.eu/api/Public.svc";
 const SOAP_ACTION_PREFIX = "http://tempuri.org/IPublic/";
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 300;
+
+// When IBABS_PROXY_URL is set (e.g. http://localhost:8888), all iBabs
+// requests are routed through this HTTP proxy. This allows local development
+// to reach the iBabs API via the production server's whitelisted IP.
+// Set up with: ssh -D 1080 -N root@<production-ip>
+// Then: IBABS_PROXY_URL=socks5://localhost:1080
+let proxyClient: Deno.HttpClient | undefined;
+function getProxyClient(): Deno.HttpClient | undefined {
+  if (proxyClient !== undefined) return proxyClient;
+  const proxyUrl = Deno.env.get("IBABS_PROXY_URL")?.trim();
+  if (proxyUrl) {
+    proxyClient = Deno.createHttpClient({ proxy: { url: proxyUrl } });
+  }
+  return proxyClient;
+}
 const xmlParser = new XMLParser({
   ignoreAttributes: false,
   attributeNamePrefix: "",
   parseTagValue: false,
   trimValues: true,
+  processEntities: {
+    enabled: true,
+    maxTotalExpansions: 100000,
+  },
 });
 
 function sleep(ms: number): Promise<void> {
@@ -260,7 +279,8 @@ async function fetchText(url: string, init: RequestInit): Promise<string> {
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt += 1) {
     try {
-      const response = await fetch(url, init);
+      const client = getProxyClient();
+      const response = await fetch(url, { ...init, ...(client ? { client } : {}) });
       if (!response.ok) {
         throw new Error(`Request failed ${response.status} for ${url}`);
       }
@@ -320,11 +340,13 @@ export class IbabsClient {
       throw new Error("Document has no download URL");
     }
 
+    const client = getProxyClient();
     const response = await fetch(document.original_url, {
       headers: {
         accept: "*/*",
         "user-agent": "woozi/0.1",
       },
+      ...(client ? { client } : {}),
     });
     if (!response.ok) {
       throw new Error(`Request failed ${response.status} for ${document.original_url}`);

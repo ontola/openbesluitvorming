@@ -76,9 +76,16 @@ Deno.test("materializeDocument reuses cached file and extracted markdown from st
       "http://storage.test/woozi/documents/notubiz/gemeente/haarlem/42/1-2025-01-16T11_03_37/memo.txt",
     "expected storage key to stay aligned with the scoped identifier tuple",
   );
+  // Cache hits no longer load md_text from S3 to avoid multi-second latency
+  // per document during bulk imports. The text is still accessible via the
+  // markdown_key in derived_content (served by the entity detail API).
   assert(
-    second.document.md_text?.[0] === "Dit is de opgeslagen platte tekst.",
-    "expected cached extracted markdown",
+    second.document.derived_content?.markdown_key === markdownKey,
+    "expected derived_content.markdown_key to reference the cached markdown",
+  );
+  assert(
+    second.document.md_text === undefined,
+    "cache hits should not load md_text into memory",
   );
 });
 

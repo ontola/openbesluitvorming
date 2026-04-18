@@ -141,6 +141,7 @@ export class NotubizMeetingExtractor {
     };
 
     while (true) {
+      const tPage = performance.now();
       const eventPage = (await this.client.listEvents(
         source.notubizOrganizationId,
         dateFrom,
@@ -149,6 +150,7 @@ export class NotubizMeetingExtractor {
       )) as NotubizEventsResponse;
 
       const events = Array.isArray(eventPage.events) ? eventPage.events : [];
+      console.log(`[timing] ${source.key} api=listEvents page=${page} events=${events.length} ${Math.round(performance.now() - tPage)}ms`);
       if (events.length === 0) {
         break;
       }
@@ -203,6 +205,7 @@ export class NotubizMeetingExtractor {
           documentsById.set(document.id, document);
         }
       }
+      const tDocs = performance.now();
 
       await mapLimit([...documentsById.values()], documentConcurrency, async (document) => {
         try {
@@ -234,6 +237,8 @@ export class NotubizMeetingExtractor {
           });
         }
       });
+
+      console.log(`[timing] ${source.key} page=${page} meetings=${pageMeetings.length} docs=${documentsById.size} docs_time=${Math.round(performance.now() - tDocs)}ms`);
 
       if (!eventPage.pagination?.has_more_pages) {
         break;

@@ -4,6 +4,7 @@ web/dist/
 quickwit/data/
 
 .zed/
+.claude/
 .env
 woozi-ops.sqlite3
 

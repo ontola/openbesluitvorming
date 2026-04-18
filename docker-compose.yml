@@ -58,10 +58,17 @@ services:
     profiles: ["extraction"]
     build:
       context: services/extraction
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
+    environment:
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-woozi}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-woozi-dev-secret}
+      S3_STORAGE_BUCKET_NAME: ${S3_STORAGE_BUCKET_NAME:-woozi}
+      S3_STORAGE_ENDPOINT: ${S3_STORAGE_ENDPOINT:-http://minio:9000}
+      S3_STORAGE_REGION: ${S3_STORAGE_REGION:-us-east-1}
     ports:
       - "8321:8000"
 
-  # The Deno web app + GUI, does some python things for text extraction
+  # The Deno web app + GUI — serves search, admin panel, static assets
   openbesluitvorming:
     build:
       context: .
@@ -70,6 +77,31 @@ services:
       - quickwit
     environment:
       PORT: 8787
+      QUICKWIT_URL: http://quickwit:7280
+      QUICKWIT_INDEX_ID: ${QUICKWIT_INDEX_ID:-woozi-events-dev}
+      WOOZI_KV_PATH: /data/woozi-ops.sqlite3
+      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY:-woozi}
+      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_KEY:-woozi-dev-secret}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-woozi}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-woozi-dev-secret}
+      S3_STORAGE_BUCKET_NAME: ${S3_STORAGE_BUCKET_NAME:-woozi}
+      S3_STORAGE_ENDPOINT: ${S3_STORAGE_ENDPOINT:-http://minio:9000}
+      S3_STORAGE_REGION: ${S3_STORAGE_REGION:-us-east-1}
+      WOOZI_EXTRACTION_SERVICE_URL: ${WOOZI_EXTRACTION_SERVICE_URL:-}
+    ports:
+      - "8787:8787"
+    volumes:
+      - woozi-state:/data
+
+  # Import worker — polls SQLite for queued imports, executes them
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    depends_on:
+      - quickwit
+    command: ["run", "-A", "src/worker.ts"]
+    environment:
       QUICKWIT_URL: http://quickwit:7280
       QUICKWIT_INDEX_ID: ${QUICKWIT_INDEX_ID:-woozi-events-dev}
       QUICKWIT_BATCH_SIZE: ${QUICKWIT_BATCH_SIZE:-64}
@@ -82,8 +114,10 @@ services:
       S3_STORAGE_ENDPOINT: ${S3_STORAGE_ENDPOINT:-http://minio:9000}
       S3_STORAGE_REGION: ${S3_STORAGE_REGION:-us-east-1}
       WOOZI_EXTRACTION_SERVICE_URL: ${WOOZI_EXTRACTION_SERVICE_URL:-}
-    ports:
-      - "8787:8787"
+      INGEST_CONCURRENCY: ${INGEST_CONCURRENCY:-4}
+      INGEST_MEMORY_PER_JOB_MB: ${INGEST_MEMORY_PER_JOB_MB:-1400}
+      INGEST_MIN_FREE_MEMORY_MB: ${INGEST_MIN_FREE_MEMORY_MB:-1024}
+      WOOZI_DOCUMENT_CONCURRENCY: ${WOOZI_DOCUMENT_CONCURRENCY:-3}
     volumes:
       - woozi-state:/data
 

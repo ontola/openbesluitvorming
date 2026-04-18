@@ -80,7 +80,7 @@ function getExtractor(source: SourceDefinition): NotubizMeetingExtractor | Ibabs
   return new IbabsMeetingExtractor();
 }
 
-async function executeIngest(
+export async function executeIngest(
   run: IngestRunRecord,
   sourceKey: string,
   dateFrom: string,
@@ -150,6 +150,12 @@ async function executeIngest(
         });
       },
       onEntity: async (entity) => {
+        const mem = Deno.memoryUsage();
+        const rss = Math.round(mem.rss / 1024 / 1024);
+        const heap = Math.round(mem.heapUsed / 1024 / 1024);
+        const mdSize = entity.type === "Document" && entity.md_text ? entity.md_text.reduce((a, b) => a + b.length, 0) : 0;
+        const chunksSize = entity.type === "Document" && entity.page_chunks ? JSON.stringify(entity.page_chunks).length : 0;
+        console.log(`[mem] ${sourceKey} entity=${entity.type} rss=${rss}MB heap=${heap}MB pending=${pendingDocuments.length} md=${Math.round(mdSize/1024)}KB chunks=${Math.round(chunksSize/1024)}KB`);
         if (!quickwit) {
           return;
         }
@@ -311,15 +317,6 @@ export async function startIngest(
     projection_version: currentProjectionVersion(),
     derivation_version: currentDerivationVersion(),
   });
-
-  enqueueJob({
-    run,
-    sourceKey,
-    dateFrom,
-    dateTo,
-    options,
-  });
-  void drainIngestQueue();
 
   return run;
 }

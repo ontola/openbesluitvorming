@@ -39,6 +39,7 @@ type SearchHit = {
       markdown_key?: string;
       page_count?: number;
     };
+    is_referenced_by?: string;
     agenda?: MeetingAgendaItem[];
   };
 };

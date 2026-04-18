@@ -6,7 +6,7 @@ import type {
   EntityContentResponse,
   SearchResponse,
 } from "../src/types.ts";
-import { resumeQueuedIngests, startIngest } from "../src/ingest.ts";
+import { startIngest } from "../src/ingest.ts";
 import {
   getRunDetails,
   getRunSummary,
@@ -65,12 +65,7 @@ if (reconciledRuns.length > 0) {
     `Reconciled ${reconciledRuns.length} interrupted import${reconciledRuns.length === 1 ? "" : "s"} on startup.`,
   );
 }
-const resumedRuns = await resumeQueuedIngests();
-if (resumedRuns.length > 0) {
-  console.warn(
-    `Resumed ${resumedRuns.length} queued import${resumedRuns.length === 1 ? "" : "s"} on startup.`,
-  );
-}
+// Queued imports are handled by the worker process (src/worker.ts).
 
 function contentType(pathname: string): string {
   if (pathname.endsWith(".css")) return "text/css; charset=utf-8";

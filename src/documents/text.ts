@@ -21,22 +21,6 @@ const TRANSMUTATION_MARKDOWN_EXTENSIONS = new Set([
   ".odt",
 ]);
 
-let extractionServiceUrls: string[] | null = null;
-let extractionRoundRobin = 0;
-
-function nextExtractionServiceUrl(): string | null {
-  if (extractionServiceUrls === null) {
-    const raw = Deno.env.get("WOOZI_EXTRACTION_SERVICE_URL")?.trim();
-    extractionServiceUrls = raw
-      ? raw.split(",").map((u) => u.trim()).filter(Boolean)
-      : [];
-  }
-  if (extractionServiceUrls.length === 0) return null;
-  const url = extractionServiceUrls[extractionRoundRobin % extractionServiceUrls.length];
-  extractionRoundRobin++;
-  return url;
-}
-
 function pymupdf4llmBinary(): string | null {
   const value = Deno.env.get("WOOZI_PYMUPDF4LLM_BIN")?.trim();
   if (value) {
@@ -154,34 +138,13 @@ async function extractPdf(bytes: Uint8Array): Promise<DocumentMarkdownExtraction
       ? `Document has ${pageCount} pages; only the first ${MAX_PDF_PAGES} were imported.`
       : null;
 
-  const serviceUrl = nextExtractionServiceUrl();
   const pymupdfBin = pymupdf4llmBinary();
 
+  // The extraction service path is handled in process.ts (materializeDocument).
+  // This function is only called for local extraction (no service configured,
+  // or non-PDF documents).
   let result: DocumentMarkdownExtractionResult;
-  if (serviceUrl) {
-    // Retry with backoff — if the extraction service is temporarily down,
-    // wait for it to come back instead of falling back to local subprocess
-    // (which can OOM the ingest server).
-    let lastError: unknown;
-    for (let attempt = 1; attempt <= 5; attempt++) {
-      try {
-        result = await extractPdfWithService(bytes, serviceUrl);
-        lastError = null;
-        break;
-      } catch (error) {
-        lastError = error;
-        if (attempt < 5) {
-          await new Promise((resolve) => setTimeout(resolve, 2000 * attempt));
-        }
-      }
-    }
-    if (lastError) {
-      throw new Error(
-        `Extraction service failed after 5 attempts: ${lastError instanceof Error ? lastError.message : String(lastError)}`,
-      );
-    }
-    result = result!;
-  } else if (pymupdfBin) {
+  if (pymupdfBin) {
     try {
       result = await extractPdfWithPymupdf4llmCli(bytes, pymupdfBin);
     } catch {
@@ -257,35 +220,6 @@ async function extractPdfWithPymupdf4llmCli(
   } finally {
     await removePath(workDir);
   }
-}
-
-async function extractPdfWithService(
-  bytes: Uint8Array,
-  serviceUrl: string,
-): Promise<DocumentMarkdownExtractionResult> {
-  const formData = new FormData();
-  formData.append("file", new Blob([bytes], { type: "application/pdf" }), "document.pdf");
-
-  const response = await fetch(
-    `${serviceUrl}/extract?max_pages=${MAX_PDF_PAGES}`,
-    { method: "POST", body: formData },
-  );
-
-  if (!response.ok) {
-    const body = await response.text().catch(() => "");
-    throw new Error(`Extraction service returned ${response.status}: ${body}`);
-  }
-
-  const payload = (await response.json()) as {
-    markdown: string;
-    page_count: number;
-    warnings: string[];
-  };
-
-  return {
-    markdown: normalizeWhitespace(payload.markdown),
-    warnings: payload.warnings,
-  };
 }
 
 async function extractMarkdownWithCli(
