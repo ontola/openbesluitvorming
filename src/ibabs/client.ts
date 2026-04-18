@@ -1,4 +1,5 @@
 import { XMLParser } from "npm:fast-xml-parser";
+import { setDefaultResultOrder } from "node:dns";
 import type {
   DocumentEntity,
   IbabsDocument,
@@ -8,6 +9,11 @@ import type {
   IbabsSourceDefinition,
   IbabsUserBasic,
 } from "../types.ts";
+
+// iBabs whitelists by IPv4 only; dual-stack hosts default to IPv6 which is
+// silently rejected. Prefer IPv4 for DNS lookups so the production worker
+// reaches the API over its whitelisted IPv4 address.
+setDefaultResultOrder("ipv4first");
 
 const DEFAULT_IBABS_URL = "https://wcf.ibabs.eu/api/Public.svc";
 const SOAP_ACTION_PREFIX = "http://tempuri.org/IPublic/";

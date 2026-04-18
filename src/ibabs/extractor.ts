@@ -13,6 +13,9 @@ import type {
 import { ObjectStorageClient } from "../storage/s3.ts";
 import { normalizeIbabsDocuments, normalizeIbabsMeeting } from "./normalize.ts";
 import { IbabsClient } from "./client.ts";
+import { mapLimit } from "../util/map_limit.ts";
+
+const DEFAULT_DOCUMENT_CONCURRENCY = 3;
 
 function issueStepForDocumentError(error: unknown): ExtractionIssue["step"] {
   if (!(error instanceof Error)) {
@@ -87,6 +90,10 @@ export class IbabsMeetingExtractor {
       await options.onIssue?.(issue, currentStats());
     };
 
+    const documentConcurrency = Number(
+      Deno.env.get("WOOZI_DOCUMENT_CONCURRENCY") ?? `${DEFAULT_DOCUMENT_CONCURRENCY}`,
+    );
+
     const documentsById = new Map<string, DocumentEntity>();
 
     for (const rawMeeting of rawMeetings) {
@@ -103,7 +110,7 @@ export class IbabsMeetingExtractor {
       }
     }
 
-    for (const document of documentsById.values()) {
+    await mapLimit([...documentsById.values()], documentConcurrency, async (document) => {
       try {
         const materialized = await materializeDocument(document, {
           download: (documentEntity) => this.client.downloadDocument(documentEntity),
@@ -132,7 +139,7 @@ export class IbabsMeetingExtractor {
           message: error instanceof Error ? error.message : "Document processing failed",
         });
       }
-    }
+    });
 
     return {
       meetings,

@@ -4,6 +4,7 @@ import { buildEntityCommitEvent } from "../events/entity_commit.ts";
 import { canonicalMeetingId } from "../ids.ts";
 import { normalizeNotubizDocuments, normalizeNotubizMeeting } from "./normalize.ts";
 import { ObjectStorageClient } from "../storage/s3.ts";
+import { mapLimit } from "../util/map_limit.ts";
 import type {
   EntityCommitEvent,
   DocumentEntity,
@@ -28,31 +29,6 @@ type NotubizMeetingResponse = {
 
 const DEFAULT_MEETING_CONCURRENCY = 6;
 const DEFAULT_DOCUMENT_CONCURRENCY = 3;
-
-async function mapLimit<TInput, TOutput>(
-  items: TInput[],
-  limit: number,
-  task: (item: TInput) => Promise<TOutput>,
-): Promise<TOutput[]> {
-  const results = Array.from({ length: items.length }) as TOutput[];
-  let index = 0;
-
-  async function worker(): Promise<void> {
-    while (true) {
-      const current = index;
-      index += 1;
-      if (current >= items.length) {
-        return;
-      }
-      results[current] = await task(items[current]);
-    }
-  }
-
-  await Promise.all(
-    Array.from({ length: Math.max(1, Math.min(limit, items.length)) }, () => worker()),
-  );
-  return results;
-}
 
 function isSkippableMeetingError(error: unknown): boolean {
   if (!(error instanceof Error)) {
