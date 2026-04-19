@@ -138,6 +138,11 @@ export class QuickwitClient {
       bodies.push(currentLines.join("\n"));
     }
 
+    // commit=wait_for makes Quickwit hold the response until the batch is
+    // published. Without an explicit timeout the fetch can hang indefinitely
+    // if Quickwit's ingest pipeline stalls, blocking the whole run.
+    const INGEST_TIMEOUT_MS = 120_000;
+
     for (const body of bodies) {
       for (let attempt = 1; attempt <= 5; attempt += 1) {
         try {
@@ -148,6 +153,7 @@ export class QuickwitClient {
               headers: {
                 "content-type": "application/json",
               },
+              signal: AbortSignal.timeout(INGEST_TIMEOUT_MS),
               body,
             },
           );

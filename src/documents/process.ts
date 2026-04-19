@@ -314,7 +314,10 @@ export async function materializeDocument(
     const issues: ExtractionIssue[] = [];
 
     const EXTRACTION_TIMEOUT_MS = 180_000; // 3 minutes — p99 is ~127s
-    const MAX_RETRIES = 2;
+    // One attempt only. Retries don't help when the source PDF server is slow
+    // (the bottleneck is source download, not the extractor), and a second
+    // attempt doubles the worst-case slot-block time.
+    const MAX_RETRIES = 1;
 
     let lastError: unknown;
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
