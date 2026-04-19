@@ -54,6 +54,10 @@ function isRetryableError(error: unknown): boolean {
     return false;
   }
 
+  if (error.name === "TimeoutError" || error.name === "AbortError") {
+    return true;
+  }
+
   const message = error.message.toLowerCase();
   return (
     message.includes("connection reset") ||
@@ -280,13 +284,24 @@ function soapEnvelope(operation: string, params: Record<string, string>): string
 </s:Envelope>`;
 }
 
+// iBabs occasionally holds a connection open without responding. Without an
+// explicit timeout the fetch hangs indefinitely, and a single bad SOAP call
+// wedges an ingest slot for hours. 90s is well above normal response time
+// (observed p99 under 20s) but short enough that we bail and retry instead
+// of hanging a slot for an entire batch.
+const SOAP_TIMEOUT_MS = 90_000;
+
 async function fetchText(url: string, init: RequestInit): Promise<string> {
   let lastError: unknown;
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt += 1) {
     try {
       const client = getProxyClient();
-      const response = await fetch(url, { ...init, ...(client ? { client } : {}) });
+      const response = await fetch(url, {
+        ...init,
+        signal: AbortSignal.timeout(SOAP_TIMEOUT_MS),
+        ...(client ? { client } : {}),
+      });
       if (!response.ok) {
         throw new Error(`Request failed ${response.status} for ${url}`);
       }
