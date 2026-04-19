@@ -16,6 +16,37 @@ import { IbabsClient } from "./client.ts";
 import { mapLimit } from "../util/map_limit.ts";
 
 const DEFAULT_DOCUMENT_CONCURRENCY = 3;
+const DEFAULT_DATE_CHUNK_MONTHS = 6;
+
+function splitDateRange(
+  dateFrom: string,
+  dateTo: string,
+  chunkMonths: number,
+): Array<[string, string]> {
+  if (chunkMonths <= 0) {
+    return [[dateFrom, dateTo]];
+  }
+
+  const chunks: Array<[string, string]> = [];
+  const end = new Date(`${dateTo}T00:00:00Z`);
+  let cursor = new Date(`${dateFrom}T00:00:00Z`);
+
+  while (cursor <= end) {
+    const nextCursor = new Date(cursor);
+    nextCursor.setUTCMonth(nextCursor.getUTCMonth() + chunkMonths);
+
+    const chunkEnd =
+      nextCursor > end ? end : new Date(nextCursor.getTime() - 86_400_000);
+    chunks.push([
+      cursor.toISOString().slice(0, 10),
+      chunkEnd.toISOString().slice(0, 10),
+    ]);
+
+    cursor = nextCursor;
+  }
+
+  return chunks;
+}
 
 function issueStepForDocumentError(error: unknown): ExtractionIssue["step"] {
   if (!(error instanceof Error)) {
@@ -61,7 +92,6 @@ export class IbabsMeetingExtractor {
         meetingType.Description ?? meetingType.Meetingtype ?? meetingType.Id,
       ]),
     );
-    const rawMeetings = await this.client.listMeetingsByDateRange(source, dateFrom, dateTo);
     const retainEntities = options.retainEntities ?? true;
     const retainIssues = options.retainIssues ?? true;
     const meetings: MeetingEntity[] = [];
@@ -93,53 +123,65 @@ export class IbabsMeetingExtractor {
     const documentConcurrency = Number(
       Deno.env.get("WOOZI_DOCUMENT_CONCURRENCY") ?? `${DEFAULT_DOCUMENT_CONCURRENCY}`,
     );
+    const chunkMonths = Number(
+      Deno.env.get("WOOZI_IBABS_DATE_CHUNK_MONTHS") ?? `${DEFAULT_DATE_CHUNK_MONTHS}`,
+    );
 
-    const documentsById = new Map<string, DocumentEntity>();
+    const chunks = splitDateRange(dateFrom, dateTo, chunkMonths);
 
-    for (const rawMeeting of rawMeetings) {
-      const meeting = normalizeIbabsMeeting(source, rawMeeting, meetingTypeMap);
-      meetingCount += 1;
-      if (retainEntities) {
-        meetings.push(meeting);
-      }
-      await options.onProgress?.(currentStats());
-      await options.onEntity?.(meeting);
+    for (const [chunkFrom, chunkTo] of chunks) {
+      const rawMeetings = await this.client.listMeetingsByDateRange(
+        source,
+        chunkFrom,
+        chunkTo,
+      );
+      const documentsById = new Map<string, DocumentEntity>();
 
-      for (const document of normalizeIbabsDocuments(source, meeting)) {
-        documentsById.set(document.id, document);
-      }
-    }
-
-    await mapLimit([...documentsById.values()], documentConcurrency, async (document) => {
-      try {
-        const materialized = await materializeDocument(document, {
-          download: (documentEntity) => this.client.downloadDocument(documentEntity),
-          storage,
-          executionMode: options.executionMode,
-        });
-        for (const issue of materialized.issues) {
-          await registerIssue(issue);
-        }
-        documentCount += 1;
+      for (const rawMeeting of rawMeetings) {
+        const meeting = normalizeIbabsMeeting(source, rawMeeting, meetingTypeMap);
+        meetingCount += 1;
         if (retainEntities) {
-          documents.push(materialized.document);
-        }
-        if (materialized.cacheHit) {
-          cacheHits += 1;
-        } else {
-          downloadedCount += 1;
+          meetings.push(meeting);
         }
         await options.onProgress?.(currentStats());
-        await options.onEntity?.(materialized.document);
-      } catch (error) {
-        await registerIssue({
-          severity: "error",
-          step: issueStepForDocumentError(error),
-          entity_id: document.id,
-          message: error instanceof Error ? error.message : "Document processing failed",
-        });
+        await options.onEntity?.(meeting);
+
+        for (const document of normalizeIbabsDocuments(source, meeting)) {
+          documentsById.set(document.id, document);
+        }
       }
-    });
+
+      await mapLimit([...documentsById.values()], documentConcurrency, async (document) => {
+        try {
+          const materialized = await materializeDocument(document, {
+            download: (documentEntity) => this.client.downloadDocument(documentEntity),
+            storage,
+            executionMode: options.executionMode,
+          });
+          for (const issue of materialized.issues) {
+            await registerIssue(issue);
+          }
+          documentCount += 1;
+          if (retainEntities) {
+            documents.push(materialized.document);
+          }
+          if (materialized.cacheHit) {
+            cacheHits += 1;
+          } else {
+            downloadedCount += 1;
+          }
+          await options.onProgress?.(currentStats());
+          await options.onEntity?.(materialized.document);
+        } catch (error) {
+          await registerIssue({
+            severity: "error",
+            step: issueStepForDocumentError(error),
+            entity_id: document.id,
+            message: error instanceof Error ? error.message : "Document processing failed",
+          });
+        }
+      });
+    }
 
     return {
       meetings,
@@ -159,3 +201,7 @@ export class IbabsMeetingExtractor {
     return await Promise.all(entities.map((entity) => buildEntityCommitEvent(entity)));
   }
 }
+
+export const __test__ = {
+  splitDateRange,
+};

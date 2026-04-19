@@ -1,4 +1,7 @@
-import { IbabsMeetingExtractor } from "../src/ibabs/extractor.ts";
+import {
+  IbabsMeetingExtractor,
+  __test__ as ibabsExtractorTest,
+} from "../src/ibabs/extractor.ts";
 import { __test__ as ibabsClientTest } from "../src/ibabs/client.ts";
 import { getIbabsSource } from "../src/sources/ibabs.ts";
 import { normalizeIbabsDocuments, normalizeIbabsMeeting } from "../src/ibabs/normalize.ts";
@@ -132,6 +135,27 @@ Deno.test("normalizeIbabsMeeting and normalizeIbabsDocuments use the canonical W
     documents[0].id === "document:ibabs:gemeente:amstelveen:doc-42",
     "document ids should use the canonical Woozi grammar",
   );
+});
+
+Deno.test("splitDateRange splits ranges on month boundaries with no overlap or gaps", () => {
+  const { splitDateRange } = ibabsExtractorTest;
+
+  const year = splitDateRange("2023-01-01", "2023-12-31", 6);
+  assert(year.length === 2, "expected two 6-month chunks for a calendar year");
+  assert(year[0][0] === "2023-01-01" && year[0][1] === "2023-06-30", "first chunk should end 2023-06-30");
+  assert(year[1][0] === "2023-07-01" && year[1][1] === "2023-12-31", "second chunk should start 2023-07-01");
+
+  const short = splitDateRange("2024-06-01", "2024-06-15", 6);
+  assert(short.length === 1, "sub-chunk ranges stay single");
+  assert(short[0][0] === "2024-06-01" && short[0][1] === "2024-06-15", "short range preserved");
+
+  const fiveYears = splitDateRange("2020-01-01", "2024-12-31", 6);
+  assert(fiveYears.length === 10, "5 years / 6 months should be 10 chunks");
+  assert(fiveYears[0][0] === "2020-01-01", "first chunk starts at dateFrom");
+  assert(fiveYears[fiveYears.length - 1][1] === "2024-12-31", "last chunk ends at dateTo");
+
+  const disabled = splitDateRange("2020-01-01", "2030-01-01", 0);
+  assert(disabled.length === 1, "chunkMonths=0 disables chunking");
 });
 
 Deno.test("IbabsMeetingExtractor materializes fixture meetings and documents", async () => {
