@@ -686,6 +686,15 @@
           return;
         }
 
+        // Skip the per-run detail fetch if we already have all its issues
+        // cached. Without this, every 5s poll refetches issues for every
+        // run in the list — ~50+ parallel requests that peg the single-
+        // threaded web server and stall user searches.
+        const cached = nextIssues.get(run.id);
+        if (cached && cached.length >= run.issue_count) {
+          return;
+        }
+
         const detail = await fetchJson<AdminRunDetailResponse>(`/api/admin/runs/${run.id}`);
         nextIssues.set(run.id, detail.issues ?? []);
       }),
