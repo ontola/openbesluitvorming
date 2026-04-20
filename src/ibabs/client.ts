@@ -362,7 +362,10 @@ export class IbabsClient {
     }
 
     const client = getProxyClient();
+    // Same rationale as the SOAP fetch: an open but unresponsive connection
+    // would otherwise wedge a document concurrency slot indefinitely.
     const response = await fetch(document.original_url, {
+      signal: AbortSignal.timeout(SOAP_TIMEOUT_MS),
       headers: {
         accept: "*/*",
         "user-agent": "woozi/0.1",

@@ -3,6 +3,8 @@ import type { NotubizOrganizationAttributes } from "../types.ts";
 const DEFAULT_QUERY = "format=json&version=1.17.0";
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 300;
+// Cap each HTTP call so a hung connection can't wedge an ingest slot.
+const FETCH_TIMEOUT_MS = 90_000;
 
 function buildUrl(path: string, params: Record<string, string | number> = {}): string {
   const url = new URL(`https://api.notubiz.nl/${path}`);
@@ -20,6 +22,10 @@ function sleep(ms: number): Promise<void> {
 function isRetryableError(error: unknown): boolean {
   if (!(error instanceof Error)) {
     return false;
+  }
+
+  if (error.name === "TimeoutError" || error.name === "AbortError") {
+    return true;
   }
 
   const message = `${error.name} ${error.message}`.toLowerCase();
@@ -54,6 +60,7 @@ async function fetchJson<T>(url: string): Promise<T> {
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt += 1) {
     try {
       const response = await fetch(url, {
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
         headers: {
           accept: "application/json",
           "user-agent": "woozi/0.1",
@@ -83,6 +90,7 @@ async function fetchBytes(url: string): Promise<Uint8Array> {
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt += 1) {
     try {
       const response = await fetch(url, {
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
         headers: {
           accept: "*/*",
           "user-agent": "woozi/0.1",
