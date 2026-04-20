@@ -39,7 +39,7 @@ jobs:
       - name: Deploy published image to beta
         env:
           DEPLOY_REF: ${{ github.event.workflow_run.head_sha }}
-          IMAGE_REPOSITORY: ghcr.io/${{ github.event.workflow_run.repository.owner.login }}/woozi-openbesluitvorming
+          IMAGE_REPOSITORY: ghcr.io/${{ github.event.workflow_run.repository.owner.login }}/openbesluitvorming
         run: |
           export DEPLOY_REF="${DEPLOY_REF:0:7}"
           bash scripts/deploy-beta.sh

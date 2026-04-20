@@ -36,7 +36,7 @@ services:
       - ./quickwit/quickwit.yaml:/quickwit/config/quickwit.yaml:ro
 
   openbesluitvorming:
-    image: ${OPENBESLUITVORMING_IMAGE:-ghcr.io/openstate/woozi-openbesluitvorming:main}
+    image: ${OPENBESLUITVORMING_IMAGE:-ghcr.io/ontola/openbesluitvorming:main}
     pull_policy: missing
     depends_on:
       - quickwit
@@ -61,7 +61,7 @@ services:
       - woozi-state:/data
 
   worker:
-    image: ${OPENBESLUITVORMING_IMAGE:-ghcr.io/openstate/woozi-openbesluitvorming:main}
+    image: ${OPENBESLUITVORMING_IMAGE:-ghcr.io/ontola/openbesluitvorming:main}
     pull_policy: missing
     depends_on:
       - quickwit

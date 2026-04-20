@@ -118,9 +118,9 @@ The workflow lives in:
 
 The published image repository currently follows the GitHub repo owner. In the current setup that means:
 
-- `ghcr.io/ontola/woozi-openbesluitvorming:main`
-- `ghcr.io/ontola/woozi-openbesluitvorming:sha-<short-git-sha>`
-- `ghcr.io/ontola/woozi-openbesluitvorming:latest`
+- `ghcr.io/ontola/openbesluitvorming:main`
+- `ghcr.io/ontola/openbesluitvorming:sha-<short-git-sha>`
+- `ghcr.io/ontola/openbesluitvorming:latest`
 
 If the package owner changes, treat the repository path as configurable rather than hardcoded.
 
@@ -177,9 +177,9 @@ Useful overrides:
   bypass the running-import safety check
 - `DEPLOY_REF=<short-sha>`
   deploy a specific already-published commit image, even if the local tree is dirty
-- `DEPLOY_IMAGE=ghcr.io/<owner>/woozi-openbesluitvorming:<tag>`
+- `DEPLOY_IMAGE=ghcr.io/<owner>/openbesluitvorming:<tag>`
   deploy an explicit image tag directly
-- `IMAGE_REPOSITORY=ghcr.io/<owner>/woozi-openbesluitvorming`
+- `IMAGE_REPOSITORY=ghcr.io/<owner>/openbesluitvorming`
   override the derived image repository
 
 ### Infra File Updates

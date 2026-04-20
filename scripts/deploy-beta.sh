@@ -13,11 +13,11 @@ derive_image_repository() {
   remote_url="$(git remote get-url origin 2>/dev/null || true)"
   owner="$(printf '%s' "$remote_url" | sed -nE 's#.*github.com[:/]([^/]+)/.*#\1#p')"
   if [ -n "$owner" ]; then
-    printf 'ghcr.io/%s/woozi-openbesluitvorming' "$owner"
+    printf 'ghcr.io/%s/openbesluitvorming' "$owner"
     return
   fi
 
-  printf 'ghcr.io/openstate/woozi-openbesluitvorming'
+  printf 'ghcr.io/ontola/openbesluitvorming'
 }
 
 IMAGE_REPOSITORY="${IMAGE_REPOSITORY:-$(derive_image_repository)}"
