@@ -6,14 +6,17 @@ It should be kept aligned with the real working setup, not an aspirational targe
 
 ## Current Shape
 
-The app is currently designed to run as:
+The app runs as four containers on the main host plus N stateless extraction workers on separate Hetzner Cloud VMs:
 
-- one `openbesluitvorming` container
-- one `quickwit` container
-- external S3-compatible object storage
+- `openbesluitvorming` — HTTP surface (`web/server.ts`): search API, admin API, document preview, admin UI
+- `worker` — import executor (`src/worker.ts`): polls SQLite for queued runs, runs extraction, writes to Quickwit + S3
+- `quickwit` — search index
+- `caddy` — reverse proxy + TLS
+- `extraction` workers (1..N remote hosts, `services/extraction/`) — stateless PDF extraction microservice
 
-In the current setup, object storage is expected to come from environment configuration.
-For Joep's setup, that is Hetzner Object Storage, not local MinIO.
+The HTTP container and the import worker use the **same image** with different entrypoints, sharing a named volume for SQLite state.
+
+Object storage is external (Hetzner Object Storage in the current setup), configured via `.env`.
 
 Vite is development-only and is not part of the production runtime.
 
@@ -156,11 +159,13 @@ That script:
 
 - resolves the current local Git commit SHA in the same short form GHCR publishes
 - derives the GHCR image repository from the local `origin` remote by default
-- checks deploy readiness on the server
-- refuses to restart the app if imports are still `running`
+- checks deploy readiness on the server via `docker exec woozi-openbesluitvorming-1 deno eval ...` (port 8787 is only on the docker network, not the host)
+- refuses to restart the app if imports are still `running` — use `FORCE=1` to override
 - SSHes into the server
-- runs `docker compose pull openbesluitvorming`
-- restarts `openbesluitvorming` and `caddy`
+- runs `docker compose pull openbesluitvorming worker`
+- restarts `openbesluitvorming`, `worker`, and `caddy`
+
+Both `openbesluitvorming` and `worker` must be recreated on every deploy — they share the image and a code change to either process means both need the new image.
 
 The script is:
 
@@ -229,21 +234,26 @@ Example safe starting point on the current `cpx32` server:
 - `INGEST_MEMORY_PER_JOB_MB=1400`
 - `INGEST_MIN_FREE_MEMORY_MB=1024`
 
-When using remote extraction workers, the memory per job is much lower (PDF extraction is offloaded), so `INGEST_MEMORY_PER_JOB_MB` can be reduced to `600` and `INGEST_CONCURRENCY` can be raised.
+When using remote extraction workers, the memory per job is much lower (PDF extraction is offloaded), so `INGEST_MEMORY_PER_JOB_MB` can be reduced to `600` and `INGEST_CONCURRENCY` can be raised. Current production values: `INGEST_CONCURRENCY=8`, `WOOZI_DOCUMENT_CONCURRENCY=10`.
 
 Additional env for extraction:
 
 - `WOOZI_EXTRACTION_SERVICE_URL`
   comma-separated list of extraction worker URLs (e.g. `http://10.0.1.3:8000,http://10.0.1.4:8000`).
   When set, PDF extraction is sent to remote workers via HTTP instead of spawning local pymupdf4llm subprocesses.
-  The ingest server round-robins requests across workers.
+  The ingest worker round-robins requests across workers, with a 180s per-request timeout and one retry onto a different worker before failing the document.
   When empty or unset, falls back to local subprocess extraction.
 
 - `WOOZI_DOCUMENT_CONCURRENCY`
   number of documents to process concurrently per import (default: 3).
   With remote extraction workers this can be raised (e.g. 10-30) since PDF extraction no longer uses local CPU.
 
-Warning: setting both `INGEST_CONCURRENCY` and `WOOZI_DOCUMENT_CONCURRENCY` too high can saturate the event loop with outbound HTTP connections and make the server unresponsive. If the server becomes unresponsive after restart, the likely cause is too many queued imports resuming simultaneously. Fix by stopping the container, resetting queued/running imports in SQLite to `failed`, and restarting with lower concurrency.
+- `WOOZI_IBABS_DATE_CHUNK_MONTHS`
+  window size for splitting large iBabs SOAP calls (default: 6). A multi-year import is split into N calls of this size because iBabs returns all meetings in one response and the XML can grow large enough to time out server-side.
+
+Warning: setting `INGEST_CONCURRENCY` above 8 on a single worker container doesn't help — the worker is a single Deno process (one vCPU ceiling). Past that point the event loop saturates with outbound HTTP connections before it saturates CPU. Future scaling path: run multiple `worker` containers with an atomic claim in `src/ops/store.ts` so they can share the queue without racing.
+
+If the server becomes unresponsive after restart, the likely cause is too many queued imports resuming simultaneously. Fix by stopping the container, resetting queued/running imports in SQLite to `failed`, and restarting with lower concurrency.
 
 Quickwit projection writes are now streamed during extraction in small batches instead of one big end-of-run push.
 
@@ -552,7 +562,7 @@ For production on Hetzner Cloud:
 
 - use the Docker CE marketplace image
 - keep Vite out of the runtime entirely
-- run `openbesluitvorming`, `quickwit`, and `caddy` as the deployed stack
+- run `openbesluitvorming`, `worker`, `quickwit`, and `caddy` as the deployed stack
 - use the real `.env` for Hetzner Object Storage
 - do not start local MinIO
 
@@ -622,16 +632,18 @@ ADMIN_PASSWORD_HASH=$$2a$$14$$exampleexampleexampleexampleexampleexampleexamplee
 - interrupted imports can leave stale run-state unless reconciled on startup
 - startup reconciliation for interrupted runs is now implemented in [src/ops/store.ts](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/src/ops/store.ts)
 - duplicate active imports for the same source/date/execution mode are blocked in [src/ingest.ts](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/src/ingest.ts)
-- background imports are now queued in-process with bounded concurrency from `INGEST_CONCURRENCY`
+- background imports are now queued in SQLite and executed by the `worker` container (`src/worker.ts`), separate from the HTTP-serving `openbesluitvorming` container
 - the current production behavior is memory-aware concurrency, not a fixed `1`
 - large aggregate imports should therefore mostly appear as many `queued` runs plus a bounded number of `running` runs
 - admin now has a queue/status summary backed by `/api/admin/summary`
-- startup now reconciles only previously `running` imports as interrupted and resumes `queued` imports
+- startup marks previously `running` imports as `failed` (not resumed) and starts `queued` imports from scratch
 - aggregate imports are now supplier-specific, such as `__supplier__:notubiz` and `__supplier__:ibabs`
 - the deploy helper now refuses to restart the app while imports are still running, unless forced
 - browser-side fetch helpers now handle empty/non-JSON 500 responses more safely
 - resuming many queued imports on startup with high concurrency can make the server unresponsive (event loop saturated with HTTP connections). If this happens: stop the container, reset queued/running rows in SQLite to `failed`, restart with lower concurrency
-- the current import bottleneck for all-source imports is Notubiz API pagination, not PDF extraction. Each source paginates through `api.notubiz.nl` events sequentially. `INGEST_CONCURRENCY` controls how many sources are queried in parallel
+- **every outbound fetch on the ingest path has an explicit timeout.** Observed failure mode: iBabs/Notubiz/Quickwit/extraction workers occasionally hold a TCP connection open without responding, and a slot hangs for hours — in one incident 7 of 8 slots were wedged for 10+ hours. All fetches now cap at 90-180s with retries on `TimeoutError`/`AbortError`. Any new `fetch()` call in the ingest path must keep this pattern.
+- iBabs is IPv4-whitelisted. The client forces IPv4-first DNS resolution via `node:dns.setDefaultResultOrder("ipv4first")`. On a dual-stack host without this, iBabs requests silently try IPv6 first and get rejected.
+- the admin dashboard polls every 5s. It used to refetch per-run issue details for every run in the list (50+ parallel requests/poll), which pegged the single-threaded `openbesluitvorming` process during big imports and slowed user searches to 18s+. Now it only refetches when a run's `issue_count` has grown. Keep dashboard work per poll small.
 
 ## Keep Updated When These Change
 
