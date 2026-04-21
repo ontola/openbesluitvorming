@@ -78,7 +78,7 @@
   let detailItem: SearchResult | null = null;
   let detailContent: EntityContentResponse | null = null;
   let detailMode: "text" | "pdf" = "text";
-  let preferredDetailMode: "text" | "pdf" = "text";
+  let preferredDetailMode: "text" | "pdf" = "pdf";
   let detailPage = "";
   let detailPdfPageCount = 0;
   let detailPdfCurrentPage = 1;
@@ -285,9 +285,9 @@
   function loadPreferredDetailMode(): "text" | "pdf" {
     try {
       const stored = window.localStorage.getItem(DETAIL_MODE_STORAGE_KEY);
-      return stored === "pdf" ? "pdf" : "text";
+      return stored === "text" ? "text" : "pdf";
     } catch {
-      return "text";
+      return "pdf";
     }
   }
 
