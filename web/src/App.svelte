@@ -1160,7 +1160,12 @@
       <form
         class="search-panel"
         on:submit|preventDefault={() => {
-          void runSearch();
+          // Route form submit through onQuerySearch so the home→results
+          // transition (animateModeChange + searched=true) runs before the
+          // fetch. Calling runSearch() directly here left searched=false,
+          // so {#if searched} gated the results panel away until the input's
+          // separate on:search event happened to fire a second runSearch.
+          void onQuerySearch();
         }}
       >
         <div class="search-panel__query-row">
