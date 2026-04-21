@@ -399,6 +399,25 @@ export async function reconcileInterruptedRuns(): Promise<IngestRunRecord[]> {
   );
 }
 
+// Atomically move a queued run to "running". Multiple workers can race on
+// the same queued id; only one succeeds. The loser gets null and must try
+// another run. Requires SQLite >= 3.35 for UPDATE ... RETURNING.
+export async function claimQueuedRun(runId: string): Promise<IngestRunRecord | null> {
+  const db = await getDatabase();
+  const row = db
+    .prepare(
+      `UPDATE ingest_run
+       SET status = 'running', error_message = NULL
+       WHERE id = @id AND status = 'queued'
+       RETURNING id, source_key, supplier, date_from, date_to, trigger_mode as trigger,
+         execution_mode, parent_run_id, projection_version, derivation_version, status,
+         started_at, finished_at, meeting_count, document_count, cache_hits,
+         downloaded_count, issue_count, quickwit_index_id, error_message`,
+    )
+    .get({ id: runId }) as IngestRunRecord | undefined;
+  return row ? normalizeRunRecord(row) : null;
+}
+
 export async function listQueuedRuns(): Promise<IngestRunRecord[]> {
   const db = await getDatabase();
   return (

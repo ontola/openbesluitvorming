@@ -23,6 +23,10 @@ derive_image_repository() {
 IMAGE_REPOSITORY="${IMAGE_REPOSITORY:-$(derive_image_repository)}"
 DEPLOY_REF="${DEPLOY_REF:-$(git rev-parse --short=7 HEAD)}"
 DEPLOY_IMAGE="${DEPLOY_IMAGE:-${IMAGE_REPOSITORY}:sha-${DEPLOY_REF}}"
+# How many worker replicas to run. Each is a Deno process pinned to one vCPU,
+# so scale to match available cores. Workers share the SQLite queue and claim
+# runs atomically.
+WORKER_REPLICAS="${WORKER_REPLICAS:-3}"
 
 if [ -z "${DEPLOY_TARGET_EXPLICIT:-}" ] && (! git diff --quiet || ! git diff --cached --quiet); then
   echo "Refusing to deploy with uncommitted changes."
@@ -63,7 +67,7 @@ ssh "$DEPLOY_HOST" "
   export OPENBESLUITVORMING_IMAGE=\"$DEPLOY_IMAGE\"
   export COMPOSE_PROJECT_NAME=\"$COMPOSE_PROJECT_NAME_VALUE\"
   docker compose -f \"$COMPOSE_FILE\" pull openbesluitvorming worker
-  docker compose -f \"$COMPOSE_FILE\" up -d openbesluitvorming worker caddy
+  docker compose -f \"$COMPOSE_FILE\" up -d --scale worker=${WORKER_REPLICAS} openbesluitvorming worker caddy
   docker compose -f \"$COMPOSE_FILE\" ps openbesluitvorming worker caddy
 "
 
