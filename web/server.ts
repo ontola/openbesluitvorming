@@ -164,8 +164,12 @@ Deno.serve({ port }, async (request) => {
     const workers = await Promise.all(
       urls.map(async (workerUrl) => {
         try {
+          // 3s was too tight under load — extractors at CPU load ~2 can
+          // legitimately take longer to respond, causing the dashboard
+          // to flap some nodes to "unreachable" even though they're
+          // actively processing.
           const response = await fetch(`${workerUrl}/stats`, {
-            signal: AbortSignal.timeout(3000),
+            signal: AbortSignal.timeout(8_000),
           });
           if (!response.ok) throw new Error(`HTTP ${response.status}`);
           const stats = await response.json();
