@@ -13,6 +13,7 @@ import {
   listRuns,
   reconcileInterruptedRuns,
 } from "../src/ops/store.ts";
+import { startScheduler } from "../src/scheduler.ts";
 import { listAdminSourceOptions, listAggregateRunnableSourceRefs } from "../src/sources/index.ts";
 import type { Supplier } from "../src/types.ts";
 import { getDocumentCoverage, getEntityContent, getIndexStats, searchMeetings } from "./search_api.ts";
@@ -66,6 +67,10 @@ if (reconciledRuns.length > 0) {
   );
 }
 // Queued imports are handled by the worker process (src/worker.ts).
+
+// Start the daily rolling-window scheduler. Gated behind WOOZI_SCHEDULER_ENABLED
+// so only one container (the web one) enqueues scheduled runs.
+startScheduler();
 
 function contentType(pathname: string): string {
   if (pathname.endsWith(".css")) return "text/css; charset=utf-8";
