@@ -32,6 +32,23 @@ function isPdf(document: DocumentEntity): boolean {
   );
 }
 
+// Media we cannot text-search. Audio/video meeting recordings are large
+// (tens to hundreds of MB) and repeatedly blow out S3 write timeouts in the
+// local fallback path. Skipping them entirely saves both the download and
+// the failed S3 write retry storm — Hilversum's "Geluidsbestand agendapunt"
+// MP3s alone generated ~6k failures in a week.
+const UNSEARCHABLE_MEDIA_EXTENSIONS = [
+  ".mp3", ".m4a", ".wav", ".ogg", ".opus", ".aac", ".flac",
+  ".mp4", ".m4v", ".mov", ".avi", ".mkv", ".webm",
+];
+
+function isUnsearchableMedia(document: DocumentEntity): boolean {
+  const ct = document.content_type?.toLowerCase() ?? "";
+  if (ct.startsWith("audio/") || ct.startsWith("video/")) return true;
+  const name = document.file_name?.toLowerCase() ?? "";
+  return UNSEARCHABLE_MEDIA_EXTENSIONS.some((ext) => name.endsWith(ext));
+}
+
 interface CachedStorage {
   hasObject(key: string): Promise<boolean>;
   putObject(
@@ -269,6 +286,11 @@ export async function materializeDocument(
   const docId = document.id;
 
   if (!document.original_url) {
+    return { document, cacheHit: false, issues: [] };
+  }
+
+  if (isUnsearchableMedia(document)) {
+    console.log(`[timing] ${docId} path=skip_media ${Math.round(performance.now() - t0)}ms file=${document.file_name ?? ""}`);
     return { document, cacheHit: false, issues: [] };
   }
 
