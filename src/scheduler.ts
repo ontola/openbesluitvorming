@@ -16,7 +16,7 @@ import {
 
 const WINDOW_DAYS_BEFORE = 7;
 const WINDOW_DAYS_AFTER = 7;
-const SCHEDULE_HOUR_AMSTERDAM = 4;
+const SCHEDULE_HOUR_AMSTERDAM = 2;
 const DAY_MS = 86_400_000;
 
 function amsterdamOffsetHours(date: Date): number {

@@ -5,6 +5,7 @@ import type {
   EntityCommitEvent,
   ExtractionBundle,
   ExtractionIssue,
+  IbabsMeeting,
   IbabsSourceDefinition,
   IngestExecutionMode,
   MeetingEntity,
@@ -17,6 +18,48 @@ import { mapLimit } from "../util/map_limit.ts";
 
 const DEFAULT_DOCUMENT_CONCURRENCY = 3;
 const DEFAULT_DATE_CHUNK_MONTHS = 6;
+// Some sitenames (e.g. Rotterdam) return SOAP payloads large enough to exceed
+// the 90s client timeout at 6-month chunks. When that happens we recursively
+// halve the chunk; this floor stops the recursion if something else is wrong.
+const MIN_ADAPTIVE_CHUNK_DAYS = 14;
+
+function rangeDays(from: string, to: string): number {
+  const fromMs = new Date(`${from}T00:00:00Z`).getTime();
+  const toMs = new Date(`${to}T00:00:00Z`).getTime();
+  return Math.max(0, Math.round((toMs - fromMs) / 86_400_000));
+}
+
+function isSoapTimeout(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  if (error.name === "TimeoutError" || error.name === "AbortError") return true;
+  const msg = error.message.toLowerCase();
+  return msg.includes("signal timed out") || msg.includes("timed out");
+}
+
+async function listMeetingsAdaptive(
+  client: IbabsClient,
+  source: IbabsSourceDefinition,
+  from: string,
+  to: string,
+  onSplit: (from: string, to: string) => Promise<void>,
+): Promise<IbabsMeeting[]> {
+  try {
+    return await client.listMeetingsByDateRange(source, from, to);
+  } catch (error) {
+    if (!isSoapTimeout(error) || rangeDays(from, to) < MIN_ADAPTIVE_CHUNK_DAYS * 2) {
+      throw error;
+    }
+    const fromMs = new Date(`${from}T00:00:00Z`).getTime();
+    const toMs = new Date(`${to}T00:00:00Z`).getTime();
+    const midMs = fromMs + Math.floor((toMs - fromMs) / 2);
+    const midDate = new Date(midMs).toISOString().slice(0, 10);
+    const beforeMid = new Date(midMs - 86_400_000).toISOString().slice(0, 10);
+    await onSplit(from, to);
+    const left = await listMeetingsAdaptive(client, source, from, beforeMid, onSplit);
+    const right = await listMeetingsAdaptive(client, source, midDate, to, onSplit);
+    return [...left, ...right];
+  }
+}
 
 function splitDateRange(
   dateFrom: string,
@@ -130,10 +173,20 @@ export class IbabsMeetingExtractor {
     const chunks = splitDateRange(dateFrom, dateTo, chunkMonths);
 
     for (const [chunkFrom, chunkTo] of chunks) {
-      const rawMeetings = await this.client.listMeetingsByDateRange(
+      const rawMeetings = await listMeetingsAdaptive(
+        this.client,
         source,
         chunkFrom,
         chunkTo,
+        async (splitFrom, splitTo) => {
+          await registerIssue({
+            severity: "warning",
+            step: "list_events",
+            entity_id: source.key,
+            message:
+              `iBabs SOAP timed out for ${source.ibabsSitename} ${splitFrom}..${splitTo}; halving chunk and retrying`,
+          });
+        },
       );
       const documentsById = new Map<string, DocumentEntity>();
 
@@ -204,4 +257,6 @@ export class IbabsMeetingExtractor {
 
 export const __test__ = {
   splitDateRange,
+  listMeetingsAdaptive,
+  isSoapTimeout,
 };

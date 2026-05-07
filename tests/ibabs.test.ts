@@ -158,6 +158,72 @@ Deno.test("splitDateRange splits ranges on month boundaries with no overlap or g
   assert(disabled.length === 1, "chunkMonths=0 disables chunking");
 });
 
+Deno.test("listMeetingsAdaptive halves the chunk on SOAP timeout", async () => {
+  const { listMeetingsAdaptive } = ibabsExtractorTest;
+  const source = getIbabsSource("amstelveen");
+
+  const calls: Array<{ from: string; to: string }> = [];
+  const timeoutAtFullRange = "2025-01-01..2025-12-31";
+  const fakeClient = {
+    listMeetingsByDateRange(_source: typeof source, from: string, to: string) {
+      calls.push({ from, to });
+      if (`${from}..${to}` === timeoutAtFullRange) {
+        const error = new Error("Signal timed out.");
+        error.name = "TimeoutError";
+        return Promise.reject(error);
+      }
+      return Promise.resolve([{ Id: `meeting-${from}` }]);
+    },
+  } as unknown as Parameters<typeof listMeetingsAdaptive>[0];
+
+  const splits: Array<{ from: string; to: string }> = [];
+  const meetings = await listMeetingsAdaptive(
+    fakeClient,
+    source,
+    "2025-01-01",
+    "2025-12-31",
+    async (from, to) => {
+      splits.push({ from, to });
+    },
+  );
+
+  assert(splits.length === 1, "should report exactly one split for a single timeout");
+  assert(meetings.length === 2, "halving yields meetings from each half");
+  assert(calls.length === 3, "one failed full-range call + two half-range calls");
+});
+
+Deno.test("listMeetingsAdaptive stops splitting below the floor and rethrows", async () => {
+  const { listMeetingsAdaptive } = ibabsExtractorTest;
+  const source = getIbabsSource("amstelveen");
+
+  const fakeClient = {
+    listMeetingsByDateRange() {
+      const error = new Error("Signal timed out.");
+      error.name = "TimeoutError";
+      return Promise.reject(error);
+    },
+  } as unknown as Parameters<typeof listMeetingsAdaptive>[0];
+
+  let splits = 0;
+  let caught = false;
+  try {
+    await listMeetingsAdaptive(
+      fakeClient,
+      source,
+      "2025-01-01",
+      "2025-01-10",
+      async () => {
+        splits += 1;
+      },
+    );
+  } catch (error) {
+    caught = true;
+    assert(error instanceof Error && error.name === "TimeoutError", "rethrows the timeout");
+  }
+  assert(caught, "should bubble the error when the range is below the split floor");
+  assert(splits === 0, "no split when the chunk is already short");
+});
+
 Deno.test("IbabsMeetingExtractor materializes fixture meetings and documents", async () => {
   const source = getIbabsSource("amstelveen");
   const storage = new FakeStorage();
