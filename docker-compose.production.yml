@@ -5,7 +5,6 @@ services:
       - openbesluitvorming
     restart: unless-stopped
     environment:
-      DOMAIN: ${DOMAIN}
       ADMIN_PASSWORD_HASH: ${ADMIN_PASSWORD_HASH}
     ports:
       - "80:80"
