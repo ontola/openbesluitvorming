@@ -200,6 +200,20 @@ That helper is:
 
 - [scripts/deploy-beta-infra.sh](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/scripts/deploy-beta-infra.sh)
 
+It rsyncs the three files, then runs `caddy validate` and `caddy reload`
+inside the running Caddy container so a Caddyfile change takes effect
+without a container recreate. The rsync uses `--inplace` because Caddyfile
+and quickwit.yaml are bind-mounted as individual files; without it,
+rsync's atomic-rename creates a new inode that the existing container
+mount doesn't see, and the reload would no-op on the stale view.
+
+If a Caddy *restart* is needed (e.g. a Caddyfile change that reload won't
+pick up, or a stuck cert state), recreate it explicitly:
+
+```sh
+ssh root@91.98.32.151 'cd /opt/woozi && docker compose -f docker-compose.production.yml up -d --no-deps --force-recreate caddy'
+```
+
 So the operational split is:
 
 - code changes: publish image, then `deploy:beta`
@@ -520,29 +534,37 @@ This is preferred over `nginx + certbot` because:
 The practical rule is:
 
 - expose `80` and `443`
-- point the domain `A` record at the Hetzner server
+- point each public domain's `A` record at the Hetzner server
 - let Caddy terminate TLS
 - keep the app itself listening on `127.0.0.1:8787` or a Docker-internal address
 
-Minimal `Caddyfile` shape:
+### Public domains
+
+The production stack serves the same content on multiple hostnames from a
+single Caddy site block. As of 2026-05-07 the live names are:
+
+- `beta.openbesluitvorming.nl` (original)
+- `openbesluitvorming.nl` (apex, added 2026-05-07)
+
+Planned next:
+
+- `zoek.openraadsinformatie.nl` (alternate brand, not yet served — needs DNS
+  `A` record at `91.98.32.151` before adding to the Caddyfile, otherwise the
+  ACME HTTP-01 challenge will fail and Caddy may rate-limit retries)
+
+Adding a new domain is a Caddyfile change committed to the repo, then
+`pnpm run deploy:beta:infra` to sync + validate + reload. There is no env-var
+indirection for the site addresses anymore — they are listed verbatim in the
+Caddyfile so the canonical list lives in version control.
 
 ```caddy
-example.yourdomain.nl {
-  encode gzip zstd
-  reverse_proxy 127.0.0.1:8787
-}
-```
-
-If the app stays inside Docker, a more typical production wiring is:
-
-```caddy
-example.yourdomain.nl {
+beta.openbesluitvorming.nl, openbesluitvorming.nl {
   encode gzip zstd
   reverse_proxy openbesluitvorming:8787
 }
 ```
 
-That implies Caddy should join the same Docker network as the app container.
+That implies Caddy joins the same Docker network as the app container.
 
 The repo now includes:
 
@@ -554,7 +576,9 @@ That production compose file:
 - exposes only `80` and `443` publicly through Caddy
 - keeps `openbesluitvorming` internal to Docker via `expose: 8787`
 - keeps Quickwit private
-- expects `DOMAIN` plus the normal S3 env vars in `.env`
+- expects `ADMIN_PASSWORD_HASH` and the normal S3 env vars in `.env` (the old
+  `DOMAIN` env var was removed once the Caddyfile started listing the public
+  hostnames directly)
 
 ## Production Notes
 
@@ -585,7 +609,6 @@ docker compose -f docker-compose.production.yml up -d
 
 Required `.env` values for that production compose file:
 
-- `DOMAIN`
 - `ADMIN_PASSWORD_HASH`
 - `S3_ACCESS_KEY`
 - `S3_SECRET_KEY`
@@ -593,11 +616,18 @@ Required `.env` values for that production compose file:
 - `S3_STORAGE_ENDPOINT`
 - `S3_STORAGE_REGION`
 
-First DNS step:
+Public hostnames are listed directly in the Caddyfile, not in `.env`.
 
-- point the domain `A` record at the server IP
-- DNS for this setup is managed in Netlify
-- wait for DNS to resolve before bringing up Caddy for the first time
+First DNS step (when adding a new public hostname):
+
+- point the new domain's `A` record at the server IP (`91.98.32.151`)
+- DNS for `*.openbesluitvorming.nl` is managed in Netlify; other zones
+  (e.g. `openraadsinformatie.nl`) are managed elsewhere — confirm with
+  the zone owner before assuming Netlify
+- wait for DNS to resolve, *then* commit the new hostname into the
+  Caddyfile and run `pnpm run deploy:beta:infra` — adding it before DNS
+  is live causes Caddy's ACME HTTP-01 challenge to fail and Let's Encrypt
+  may rate-limit further attempts
 
 ## Admin Protection
 
