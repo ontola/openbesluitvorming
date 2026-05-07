@@ -117,11 +117,50 @@ export interface DocumentEntity {
   raw: unknown;
 }
 
-export type WooziEntity = MeetingEntity | DocumentEntity;
+export interface CommitteeEntity {
+  id: string;
+  type: "Committee";
+  name: string;
+  classification: string[];
+  description?: string;
+  subOrganizationOf?: string;
+  homepage?: string;
+  email?: string;
+  source_info: SourceInfo;
+  raw: unknown;
+}
+
+export interface PartyEntity {
+  id: string;
+  type: "Party";
+  name: string;
+  classification: string[];
+  subOrganizationOf?: string;
+  source_info: SourceInfo;
+  raw: unknown;
+}
+
+export interface PersonEntity {
+  id: string;
+  type: "Person";
+  name: string;
+  classification?: string[];
+  gender?: string;
+  member_of?: string[];
+  organization?: string;
+  party?: string;
+  source_info: SourceInfo;
+  raw: unknown;
+}
+
+export type WooziEntity = MeetingEntity | DocumentEntity | CommitteeEntity | PartyEntity | PersonEntity;
 
 export interface ExtractionBundle {
   meetings: MeetingEntity[];
   documents: DocumentEntity[];
+  committees?: CommitteeEntity[];
+  parties?: PartyEntity[];
+  persons?: PersonEntity[];
   stats: ExtractionStats;
   issues: ExtractionIssue[];
 }
@@ -149,7 +188,7 @@ export interface ExtractionIssue {
 }
 
 export type OrganizationType = "gemeente" | "provincie" | "waterschap";
-export type Supplier = "notubiz" | "ibabs" | "gemeenteoplossingen" | "parlaeus";
+export type Supplier = "notubiz" | "ibabs" | "gemeenteoplossingen" | "parlaeus" | "allmanak";
 
 export interface SourceDefinitionBase {
   key: string;
@@ -174,7 +213,16 @@ export interface IbabsSourceDefinition extends SourceDefinitionBase {
   ibabsSitename: string;
 }
 
-export type SourceDefinition = NotubizSourceDefinition | IbabsSourceDefinition;
+export interface GemeenteOplossingenSourceDefinition extends SourceDefinitionBase {
+  supplier: "gemeenteoplossingen";
+  baseUrl: string;
+  apiVersion?: "v1" | "v2";
+}
+
+export type SourceDefinition =
+  | NotubizSourceDefinition
+  | IbabsSourceDefinition
+  | GemeenteOplossingenSourceDefinition;
 
 export interface SourceCatalogEntry extends SourceDefinitionBase {
   sourceRef: string;

@@ -1,4 +1,5 @@
 import { buildEntityCommitEvent } from "./events/entity_commit.ts";
+import { GemeenteOplossingenExtractor } from "./gemeenteoplossingen/extractor.ts";
 import { IbabsMeetingExtractor } from "./ibabs/extractor.ts";
 import { NotubizMeetingExtractor } from "./notubiz/extractor.ts";
 import type { QuickwitSearchDocument } from "./quickwit/project.ts";
@@ -72,9 +73,15 @@ function enqueueJob(job: QueuedIngestJob): void {
   pendingJobs.push(job);
 }
 
-function getExtractor(source: SourceDefinition): NotubizMeetingExtractor | IbabsMeetingExtractor {
+function getExtractor(
+  source: SourceDefinition,
+): NotubizMeetingExtractor | IbabsMeetingExtractor | GemeenteOplossingenExtractor {
   if (source.supplier === "notubiz") {
     return new NotubizMeetingExtractor();
+  }
+
+  if (source.supplier === "gemeenteoplossingen") {
+    return new GemeenteOplossingenExtractor();
   }
 
   return new IbabsMeetingExtractor();

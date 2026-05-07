@@ -335,7 +335,7 @@ export async function reconcileInterruptedRuns(): Promise<IngestRunRecord[]> {
        WHERE status = 'running'
        ORDER BY started_at ASC`,
     )
-    .all() as RunRow[];
+    .all() as unknown as RunRow[];
 
   if (interruptedRuns.length === 0) {
     return [];
@@ -430,7 +430,7 @@ export async function listQueuedRuns(): Promise<IngestRunRecord[]> {
        FROM ingest_run
        WHERE status = 'queued'
        ORDER BY started_at ASC`,
-    ).all() as IngestRunRecord[]
+    ).all() as unknown as IngestRunRecord[]
   ).map(normalizeRunRecord);
 }
 
@@ -472,7 +472,7 @@ export async function listRuns(
        LIMIT @limit
        OFFSET @offset`,
       )
-      .all(params) as IngestRunRecord[]
+      .all(params) as unknown as IngestRunRecord[]
   ).map(normalizeRunRecord);
 }
 
@@ -602,7 +602,7 @@ export async function getRunCoverage(options: {
        AND date_from >= @first_month
        ${sourceClause}
      ORDER BY started_at DESC`,
-  ).all(params) as RunRow[];
+  ).all(params) as unknown as RunRow[];
 
   const rowsBySource = new Map<string, Map<string, AdminCoverageCell>>();
   for (const sourceKey of options.sourceKeys ?? []) {
@@ -657,6 +657,7 @@ export async function getRunCoverage(options: {
         sourceKey,
         label: labelInfo?.label ?? sourceKey,
         supplier: labelInfo?.supplier ?? "onbekend",
+        organizationType: "onbekend",
         months: monthCells,
         totalDocumentCount,
         coveredMonthCount,
@@ -701,7 +702,7 @@ export async function getRunDetails(runId: string): Promise<RunDetails | null> {
        WHERE run_id = ?
        ORDER BY rowid ASC`,
     )
-    .all(runId) as ExtractionIssue[];
+    .all(runId) as unknown as ExtractionIssue[];
 
   return { run: normalizeRunRecord(run), issues };
 }

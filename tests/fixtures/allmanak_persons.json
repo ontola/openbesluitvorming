@@ -1,0 +1,17 @@
+[
+  {
+    "naam": "Gemeente Test",
+    "functies": [
+      {
+        "functie": {
+          "naam": "Raadslid",
+          "medewerkers": [
+            { "persoon": { "systemid": "p1", "naam": "Dhr. Jan Jansen", "partij": "Partij A" } },
+            { "persoon": { "systemid": "p2", "naam": "Mw. Pietje Pieters", "partij": "Partij B" } }
+          ]
+        }
+      }
+    ]
+  }
+]
+

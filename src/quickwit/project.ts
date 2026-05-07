@@ -1,4 +1,12 @@
-import type { DocumentEntity, EntityCommitEvent, MeetingEntity, WooziEntity } from "../types.ts";
+import type {
+  CommitteeEntity,
+  DocumentEntity,
+  EntityCommitEvent,
+  MeetingEntity,
+  PartyEntity,
+  PersonEntity,
+  WooziEntity,
+} from "../types.ts";
 import { currentProjectionVersion } from "../pipeline/versioning.ts";
 
 export interface QuickwitSearchDocument {
@@ -102,6 +110,24 @@ function projectDocumentContent(payload?: DocumentEntity): string | undefined {
   return content || undefined;
 }
 
+function projectGenericEntityContent(
+  payload?: CommitteeEntity | PartyEntity | PersonEntity,
+): string | undefined {
+  if (!payload) {
+    return undefined;
+  }
+
+  const content = [
+    payload.name,
+    ...((payload as { classification?: string[] }).classification ?? []),
+    (payload as { description?: string }).description,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  return content || undefined;
+}
+
 function compactPayload(payload?: WooziEntity): unknown {
   if (!payload) {
     return undefined;
@@ -121,6 +147,39 @@ function compactPayload(payload?: WooziEntity): unknown {
       organization: payload.organization,
       derived_content: payload.derived_content,
       media_urls: payload.media_urls,
+    };
+  }
+
+  if (payload.type === "Person") {
+    return {
+      type: payload.type,
+      name: payload.name,
+      classification: payload.classification,
+      gender: payload.gender,
+      member_of: payload.member_of,
+      organization: payload.organization,
+      party: payload.party,
+    };
+  }
+
+  if (payload.type === "Party") {
+    return {
+      type: payload.type,
+      name: payload.name,
+      classification: payload.classification,
+      subOrganizationOf: payload.subOrganizationOf,
+    };
+  }
+
+  if (payload.type === "Committee") {
+    return {
+      type: payload.type,
+      name: payload.name,
+      classification: payload.classification,
+      description: payload.description,
+      subOrganizationOf: payload.subOrganizationOf,
+      homepage: payload.homepage,
+      email: payload.email,
     };
   }
 
@@ -181,8 +240,11 @@ export function projectEntityCommitToQuickwitDocuments(
 ): QuickwitSearchDocument[] {
   const payload = event.data.payload;
   const projectionVersion = currentProjectionVersion();
-  const content =
-    payload?.type === "Document" ? projectDocumentContent(payload) : projectMeetingContent(payload);
+  const content = payload?.type === "Document"
+    ? projectDocumentContent(payload)
+    : payload?.type === "Meeting"
+    ? projectMeetingContent(payload)
+    : projectGenericEntityContent(payload);
 
   const primaryDocument: QuickwitSearchDocument = {
     time: event.time,
@@ -204,11 +266,15 @@ export function projectEntityCommitToQuickwitDocuments(
       ? toDocumentMonth(documentReferenceDate(payload))
       : undefined,
     name: payload?.name,
-    classification: payload?.classification,
+    classification: (payload as { classification?: string[] } | undefined)?.classification,
     file_name: payload?.type === "Document" ? payload.file_name : undefined,
-    start_date: payload?.type === "Meeting" ? payload.start_date : documentReferenceDate(payload),
+    start_date: payload?.type === "Meeting"
+      ? payload.start_date
+      : payload?.type === "Document"
+      ? documentReferenceDate(payload)
+      : undefined,
     end_date: payload?.type === "Meeting" ? payload.end_date : undefined,
-    organization: payload?.organization,
+    organization: (payload as { organization?: string } | undefined)?.organization,
     committee: payload?.type === "Meeting" ? payload.committee : undefined,
     content,
     projection_version: projectionVersion,

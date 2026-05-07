@@ -1,0 +1,22 @@
+[
+  {
+    "id": 123,
+    "date": "2025-01-14",
+    "startTime": "19:30",
+    "description": "Raadsvergadering",
+    "location": "Raadzaal",
+    "dmu": { "id": 10, "name": "Gemeenteraad" },
+    "items": [
+      {
+        "id": 7,
+        "number": "1",
+        "title": "Opening",
+        "description": "Opening van de vergadering",
+        "sortorder": 1,
+        "documents": [{ "id": 501, "filename": "agenda.pdf" }]
+      }
+    ],
+    "documents": [{ "id": 500, "filename": "stukken.pdf" }]
+  }
+]
+

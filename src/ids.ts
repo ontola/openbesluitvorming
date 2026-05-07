@@ -1,6 +1,12 @@
 import type { SourceDefinitionBase } from "./types.ts";
 
-export type ScopedEntityType = "meeting" | "document" | "committee" | "agenda_item";
+export type ScopedEntityType =
+  | "meeting"
+  | "document"
+  | "committee"
+  | "agenda_item"
+  | "person"
+  | "party";
 
 export function canonicalOrganizationId(source: SourceDefinitionBase): string {
   return `organization:nl:${source.organizationType}:${source.key}`;
@@ -40,4 +46,18 @@ export function canonicalAgendaItemId(
   nativeId: number | string,
 ): string {
   return scopedEntityId("agenda_item", source, nativeId);
+}
+
+export function canonicalPersonId(
+  source: SourceDefinitionBase,
+  nativeId: number | string,
+): string {
+  return scopedEntityId("person", source, nativeId);
+}
+
+export function canonicalPartyId(
+  source: SourceDefinitionBase,
+  nativeId: number | string,
+): string {
+  return scopedEntityId("party", source, nativeId);
 }

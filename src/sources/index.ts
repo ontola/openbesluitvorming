@@ -1,6 +1,7 @@
 import { getCatalogSourceByKey, getCatalogSourceByRef, listCatalogSources } from "./catalog.ts";
 import type {
   AdminSourceOption,
+  GemeenteOplossingenSourceDefinition,
   IbabsSourceDefinition,
   NotubizSourceDefinition,
   Supplier,
@@ -21,15 +22,28 @@ function toRuntimeSourceDefinition(source: SourceCatalogEntry): SourceDefinition
     } satisfies NotubizSourceDefinition;
   }
 
+  if (source.supplier === "ibabs") {
+    return {
+      key: source.key,
+      label: source.label,
+      supplier: "ibabs",
+      organizationType: source.organizationType,
+      allmanakId: source.allmanakId,
+      cbsId: source.cbsId,
+      ibabsSitename: source.ibabsSitename!,
+    } satisfies IbabsSourceDefinition;
+  }
+
   return {
     key: source.key,
     label: source.label,
-    supplier: "ibabs",
+    supplier: "gemeenteoplossingen",
     organizationType: source.organizationType,
     allmanakId: source.allmanakId,
     cbsId: source.cbsId,
-    ibabsSitename: source.ibabsSitename!,
-  } satisfies IbabsSourceDefinition;
+    baseUrl: source.baseUrl!,
+    apiVersion: "v1",
+  } satisfies GemeenteOplossingenSourceDefinition;
 }
 
 function getImplementedCatalogSources(): SourceCatalogEntry[] {
@@ -38,7 +52,10 @@ function getImplementedCatalogSources(): SourceCatalogEntry[] {
 
 export function listRunnableCatalogSources(): SourceCatalogEntry[] {
   return getImplementedCatalogSources().filter(
-    (source) => source.supplier === "notubiz" || source.supplier === "ibabs",
+    (source) =>
+      source.supplier === "notubiz" ||
+      source.supplier === "ibabs" ||
+      source.supplier === "gemeenteoplossingen",
   );
 }
 
@@ -58,6 +75,7 @@ export function listAggregateAdminSourceOptions(): AdminSourceOption[] {
     ibabs: "iBabs",
     gemeenteoplossingen: "GemeenteOplossingen",
     parlaeus: "Parlaeus",
+    allmanak: "Allmanak",
   };
 
   return [...new Set(listRunnableCatalogSources().map((source) => source.supplier))]
@@ -82,7 +100,11 @@ export function getSource(sourceKeyOrRef: string): SourceDefinition {
     throw new Error(`Unknown or unsupported source "${sourceKeyOrRef}"`);
   }
 
-  if (catalogSource.supplier !== "notubiz" && catalogSource.supplier !== "ibabs") {
+  if (
+    catalogSource.supplier !== "notubiz" &&
+    catalogSource.supplier !== "ibabs" &&
+    catalogSource.supplier !== "gemeenteoplossingen"
+  ) {
     throw new Error(
       `Source "${sourceKeyOrRef}" is present in the ORI catalog but not yet implemented in Woozi.`,
     );
