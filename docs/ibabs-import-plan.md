@@ -194,12 +194,32 @@ These are identifiers for iBabs's hosted webcast platform. **No transcripts, spo
 
 ### Lists (Registries)
 
-Amstelveen has 14 registries:
-- Amendementen, Moties, Toezeggingen, Schriftelijke vragen
-- Besluitenlijsten van de raad/college
-- Woo verzoeken, Klachten, etc.
+Amstelveen has 14 registries; Utrecht has 29. Across municipalities the consistently interesting lists are:
+- Moties, Amendementen, Toezeggingen, Schriftelijke vragen
+- Besluitenlijsten raad/college
+- Per-municipality extras (Utrecht has a dedicated "Stemming" list with 102 entries in the last 6 months)
 
-These are accessible via `GetLists` but entries require `GetListEntries` (authenticated) or `GetListEntry` to fetch individually. The `ListEntries` field on `iBabsMeetingItem` could link agenda items to registry entries, but it's empty in tested responses.
+Re-tested through the SSH SOCKS proxy on 2026-04-28:
+
+- `GetLists(Sitename)` — **public**, returns `(ListId, ListName)` pairs.
+- `GetListsEntriesByFilterRequest({Sitename, ListId, SinceDate})` — **public** (the earlier "requires username/password" claim was wrong). Returns `iBabsListEntryBase` per entry: `EntryId`, `EntryMasterId`, `EntryTitle`, `ListCanVote`, `ListId`, `ListName`, `MutationDate`. For Utrecht in the last 6 months: 132 amendementen, 552 moties, 102 stemming entries, 266 toezeggingen.
+- `GetListEntry({Sitename, ListId, EntryId})` — **public**, returns `iBabsListEntryResponse2` with `Documents` and `Values` (a free-form `KeyValueOfstringstring` array). The `Values` content is per-list-template; for Utrecht moties we observed `ID`, `Kenmerk`, `Datum`, `Onderwerp`, `Status` (`Motie aangenomen` / `Motie ingetrokken` / `Verworpen`), `Indiener(s)`, `Mede-indieners`, `Portefeuillehouder`, `Agendapunt` (a free-text "Gemeenteraad 13-11-2025\n5 Programmabegroting 2026" string that links back to a meeting + agenda position). Toezeggingen carry `Toezegging`, `Beleidsveld`, `Deadline`.
+- `GetListEntryVotes({Sitename, EntryId})` — **denied** even from the whitelisted IP. Amstelveen returns `Status=ERR Message="Access denied!"`; Utrecht returns an empty result. Per-user vote breakdown requires authenticated access.
+- `GetMeeting` / `GetMeetingWithOptions` — **denied** from the whitelisted IP (`Status=ERR Message="Attempted to perform an unauthorized operation."`). The richer per-meeting endpoints are not available to us; we must rely on `GetMeetingsByDateRange` for meeting data.
+
+`MeetingItem.ListEntries` (the agenda-item-to-list-entry link) is empty in every Amstelveen and Utrecht meeting we tested, so we cannot rely on it for cross-linking. The reverse direction (`ListEntry.Values["Agendapunt"]`) is populated and is currently the only practical way to attach a motie/amendement to its meeting and agenda item.
+
+### Plan: import votes via list entries
+
+Public-API path to vote data (no credentials):
+
+1. New entity type for list entries (motie / amendement / toezegging / stemming) with fields drawn from `Values`. Treat `Status` (Aangenomen / Verworpen / Ingetrokken / Aangehouden / etc.) as the outcome.
+2. Per iBabs source, after `GetMeetingsByDateRange`: call `GetLists(Sitename)`, filter to vote-relevant lists, then `GetListsEntriesByFilterRequest` with the run's `SinceDate`.
+3. For each new/changed entry, `GetListEntry(Sitename, ListId, EntryId)` → store `Values`, download `Documents` through the existing `materializeDocument` path.
+4. Link entries to meetings by parsing the `Values["Agendapunt"]` string (`"Gemeenteraad 13-11-2025\n5 Programmabegroting 2026"` → meeting date + agenda item heading) and resolving against the meetings we just imported.
+5. Render in the meeting detail view: a section per agenda item showing attached moties/amendementen with their Status as a colored chip, indiener/group, and a link to the document. No per-member breakdown until we have credentialed access.
+
+Cost note: a 6-month window for Utrecht is ~1050 entries × 1 `GetListEntry` SOAP call = ~1000 calls. Run with the same chunked/concurrency-limited pattern as document downloads. The `MutationDate` field on `iBabsListEntryBase` lets us avoid re-fetching detail for entries that haven't changed.
 
 ### IPv4 Requirement
 
@@ -223,7 +243,7 @@ A test extraction of Utrecht (2024-06-01 to 2024-06-15) returned:
 ## Open Questions
 
 - Do all 165 iBabs sitenames work with our single IP whitelist, or do some require separate approval?
-- Can we negotiate authenticated API access with iBabs for vote data (`GetListEntryVotes`, `GetListEntries`)?
+- Can we negotiate authenticated API access with iBabs for **per-user** vote data (`GetListEntryVotes`)? Outcome-level votes are reachable without auth via `GetListEntry.Values["Status"]`; per-member breakdowns are not.
 - Is there a public URL pattern for iBabs webcasts (to embed or link to videos)?
 - How does iBabs handle document versioning — can documents change after initial publication?
 - Should we use `GetMeetingsChangedSince` for incremental sync instead of re-fetching full date ranges?

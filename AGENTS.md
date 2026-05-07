@@ -100,9 +100,26 @@ Current implemented slices:
 
 ### iBabs specifics
 
-- iBabs is IPv4-whitelisted. `src/ibabs/client.ts` calls `dns.setDefaultResultOrder("ipv4first")` at module load so calls to `wcf.ibabs.eu` resolve to the whitelisted IPv4 address. Do not break this.
+- iBabs is IPv4-whitelisted. Only the production server (`91.98.32.151`) can reach `wcf.ibabs.eu`. Local machines and Hetzner extraction workers cannot. `src/ibabs/client.ts` calls `dns.setDefaultResultOrder("ipv4first")` at module load so calls to `wcf.ibabs.eu` resolve to the whitelisted IPv4 address. Do not break this.
 - iBabs returns all meetings for a date range in a single SOAP response. Large multi-year ranges are chunked into 6-month windows (`WOOZI_IBABS_DATE_CHUNK_MONTHS`) before each SOAP call. Don't widen chunks without testing — the XML blob can grow enough to time out server-side or OOM the parser.
 - iBabs ingest uses the same `WOOZI_DOCUMENT_CONCURRENCY` as Notubiz.
+
+#### Reaching iBabs from local for exploration
+
+The client supports routing through an HTTP/SOCKS proxy via `IBABS_PROXY_URL` (applies to both SOAP calls and `downloadDocument`). To exercise the live API from a local machine without waiting for a deploy:
+
+```sh
+ssh -i ~/.ssh/woozi_beta_deploy_ed25519 -D 1080 -N -f root@91.98.32.151
+export IBABS_PROXY_URL=socks5://localhost:1080
+```
+
+The WSDL is reachable through the proxy at `https://wcf.ibabs.eu/api/Public.svc?wsdl`; input/output shapes are split across `?xsd=xsd0` … `?xsd=xsd13`. Use this when adding a new SOAP operation — don't guess parameter names from a previous test report.
+
+Do not commit production code that depends on the proxy being set; production runs on the whitelisted worker without it.
+
+#### Public API operations actually wired up
+
+`src/ibabs/client.ts` currently implements only `GetMeetingtypes`, `GetMeetingsByDateRange`, and `downloadDocument`. The WSDL exposes ~28 operations including `GetMeetingsChangedSince` (delta sync), `GetLists` / `GetListEntry` / `GetListEntryVotes` (registries + votes), `GetUsers` / `GetUserVotes`, and `Search`. Several reportedly require authenticated (username/password) access on top of the IP whitelist — verify behavior through the SOCKS proxy before adding a method.
 
 ### Worker CPU ceiling
 
