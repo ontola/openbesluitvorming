@@ -5,7 +5,11 @@ DEPLOY_HOST="${DEPLOY_HOST:-root@91.98.32.151}"
 DEPLOY_DIR="${DEPLOY_DIR:-/opt/woozi}"
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.production.yml}"
 
-rsync -azR \
+# --inplace is required because Caddyfile and quickwit.yaml are bind-mounted
+# as single files into their containers. Without it rsync atomic-renames into
+# a new inode, leaving the in-container mount pointing at the old (stale)
+# file, and a `caddy reload` then no-ops on the unchanged in-container view.
+rsync -azR --inplace \
   ./Caddyfile \
   ./docker-compose.production.yml \
   ./quickwit/quickwit.yaml \
