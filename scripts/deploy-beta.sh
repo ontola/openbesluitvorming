@@ -5,7 +5,6 @@ DEPLOY_HOST="${DEPLOY_HOST:-root@91.98.32.151}"
 DEPLOY_DIR="${DEPLOY_DIR:-/opt/woozi}"
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.production.yml}"
 COMPOSE_PROJECT_NAME_VALUE="${COMPOSE_PROJECT_NAME_VALUE:-woozi}"
-FORCE_DEPLOY="${FORCE:-0}"
 DEPLOY_TARGET_EXPLICIT="${DEPLOY_REF:-${DEPLOY_IMAGE:-}}"
 
 derive_image_repository() {
@@ -34,32 +33,12 @@ if [ -z "${DEPLOY_TARGET_EXPLICIT:-}" ] && (! git diff --quiet || ! git diff --c
   exit 1
 fi
 
-if [ "$FORCE_DEPLOY" != "1" ]; then
-  # Port 8787 is exposed on the docker network only, so we probe the admin
-  # endpoint from inside the openbesluitvorming container instead of the host.
-  running_count="$(
-    ssh "$DEPLOY_HOST" 'docker exec woozi-openbesluitvorming-1 deno eval "try { const r = await fetch(\"http://127.0.0.1:8787/api/admin/summary\", { signal: AbortSignal.timeout(5000) }); const p = await r.json(); console.log((p.summary ?? {}).runningCount ?? 0); } catch { console.log(\"unknown\"); }" 2>/dev/null || echo unknown'
-  )"
-
-  case "$running_count" in
-    unknown)
-      echo "Could not determine deploy readiness from the running server."
-      echo "Use FORCE=1 pnpm run deploy:beta if you really want to deploy anyway."
-      exit 1
-      ;;
-    ''|*[!0-9]*)
-      echo "Unexpected deploy readiness response: $running_count"
-      echo "Use FORCE=1 pnpm run deploy:beta if you really want to deploy anyway."
-      exit 1
-      ;;
-  esac
-
-  if [ "$running_count" -gt 0 ]; then
-    echo "Refusing to deploy: $running_count import(s) are still running on the server."
-    echo "Wait for imports to finish, or use FORCE=1 pnpm run deploy:beta to override."
-    exit 1
-  fi
-fi
+# We deliberately do not block on imports-in-progress: the daily scheduler
+# enqueues ~290 runs every night and there are usually a handful still in
+# flight for most of the working day. Reconcile-on-startup marks any
+# `running` rows as failed when the worker restarts, and tomorrow's tick
+# picks them back up; cache hits make the rerun cheap. If you genuinely
+# need to wait for idle, watch /api/admin/summary manually before deploying.
 
 ssh "$DEPLOY_HOST" "
   set -e

@@ -159,13 +159,13 @@ That script:
 
 - resolves the current local Git commit SHA in the same short form GHCR publishes
 - derives the GHCR image repository from the local `origin` remote by default
-- checks deploy readiness on the server via `docker exec woozi-openbesluitvorming-1 deno eval ...` (port 8787 is only on the docker network, not the host)
-- refuses to restart the app if imports are still `running` — use `FORCE=1` to override
 - SSHes into the server
 - runs `docker compose pull openbesluitvorming worker`
 - restarts `openbesluitvorming`, `worker`, and `caddy`
 
 Both `openbesluitvorming` and `worker` must be recreated on every deploy — they share the image and a code change to either process means both need the new image.
+
+The script does **not** block on imports-in-progress. The daily scheduler enqueues ~290 runs every night and a handful are still in flight for most of the working day; making the deploy wait for idle would mean almost never being able to deploy. Reconcile-on-startup marks any `running` rows as `failed` on worker restart, the next scheduler tick re-enqueues them, and cache hits make the rerun cheap.
 
 The script is:
 
@@ -173,8 +173,6 @@ The script is:
 
 Useful overrides:
 
-- `FORCE=1`
-  bypass the running-import safety check
 - `DEPLOY_REF=<short-sha>`
   deploy a specific already-published commit image, even if the local tree is dirty
 - `DEPLOY_IMAGE=ghcr.io/<owner>/openbesluitvorming:<tag>`
