@@ -711,15 +711,26 @@ export async function getEntityContent(entityId: string): Promise<EntityContentR
 
 export async function getIndexStats(): Promise<{ documentCount: number; organizationCount: number }> {
   const quickwit = new QuickwitClient();
-  const response = await quickwit.searchRequest({
-    query: `projection_version:${escapeTerm(currentProjectionVersion())}`,
-    max_hits: 0,
-    aggs: {
-      organizations: {
-        terms: { field: "organization", size: 1000 },
+  let response: Awaited<ReturnType<QuickwitClient["searchRequest"]>>;
+  try {
+    response = await quickwit.searchRequest({
+      query: `projection_version:${escapeTerm(currentProjectionVersion())}`,
+      max_hits: 0,
+      aggs: {
+        organizations: {
+          terms: { field: "organization", size: 1000 },
+        },
       },
-    },
-  });
+    });
+  } catch (error) {
+    // On a fresh local stack Quickwit may not have the index yet.
+    // Treat missing index as empty stats instead of failing the landing page.
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes("could not find indexes matching")) {
+      return { documentCount: 0, organizationCount: 0 };
+    }
+    throw error;
+  }
 
   const orgBuckets = (response.aggregations?.organizations as { buckets?: unknown[] })?.buckets ?? [];
 

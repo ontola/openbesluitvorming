@@ -2,6 +2,7 @@ import { buildEntityCommitEvent } from "./events/entity_commit.ts";
 import { GemeenteOplossingenExtractor } from "./gemeenteoplossingen/extractor.ts";
 import { IbabsMeetingExtractor } from "./ibabs/extractor.ts";
 import { NotubizMeetingExtractor } from "./notubiz/extractor.ts";
+import { ParlaeusExtractor } from "./parlaeus/extractor.ts";
 import type { QuickwitSearchDocument } from "./quickwit/project.ts";
 import { projectEntityCommitToQuickwitDocuments } from "./quickwit/project.ts";
 import {
@@ -73,18 +74,37 @@ function enqueueJob(job: QueuedIngestJob): void {
   pendingJobs.push(job);
 }
 
-function getExtractor(
+// Use the widest extractor's option type. GemeenteOplossingen and Parlaeus emit
+// Committee/Party/Person on top of Meeting/Document, so their onEntity signature
+// is a superset of the legacy Notubiz/iBabs ones — TS is happy passing the
+// narrower handler into a place expecting the wider one because of param
+// contravariance.
+type ExtractorOptions = Parameters<GemeenteOplossingenExtractor["extractForDateRange"]>[3];
+
+function runExtractor(
   source: SourceDefinition,
-): NotubizMeetingExtractor | IbabsMeetingExtractor | GemeenteOplossingenExtractor {
+  dateFrom: string,
+  dateTo: string,
+  options: ExtractorOptions,
+) {
   if (source.supplier === "notubiz") {
-    return new NotubizMeetingExtractor();
+    return new NotubizMeetingExtractor().extractForDateRange(source, dateFrom, dateTo, options);
   }
 
   if (source.supplier === "gemeenteoplossingen") {
-    return new GemeenteOplossingenExtractor();
+    return new GemeenteOplossingenExtractor().extractForDateRange(
+      source,
+      dateFrom,
+      dateTo,
+      options,
+    );
   }
 
-  return new IbabsMeetingExtractor();
+  if (source.supplier === "parlaeus") {
+    return new ParlaeusExtractor().extractForDateRange(source, dateFrom, dateTo, options);
+  }
+
+  return new IbabsMeetingExtractor().extractForDateRange(source, dateFrom, dateTo, options);
 }
 
 export async function executeIngest(
@@ -111,7 +131,6 @@ export async function executeIngest(
 
   try {
     const source = getSource(sourceKey);
-    const extractor = getExtractor(source);
     let currentRun = run;
     let quickwit: QuickwitClient | null = null;
     let quickwitIndexId: string | undefined;
@@ -133,7 +152,7 @@ export async function executeIngest(
       quickwitIndexId = Deno.env.get("QUICKWIT_INDEX_ID") ?? "woozi-events";
     }
 
-    const extraction = await extractor.extractForDateRange(source, dateFrom, dateTo, {
+    const extraction = await runExtractor(source, dateFrom, dateTo, {
       executionMode: options.executionMode,
       retainEntities: false,
       retainIssues: false,
@@ -160,9 +179,17 @@ export async function executeIngest(
         const mem = Deno.memoryUsage();
         const rss = Math.round(mem.rss / 1024 / 1024);
         const heap = Math.round(mem.heapUsed / 1024 / 1024);
-        const mdSize = entity.type === "Document" && entity.md_text ? entity.md_text.reduce((a, b) => a + b.length, 0) : 0;
-        const chunksSize = entity.type === "Document" && entity.page_chunks ? JSON.stringify(entity.page_chunks).length : 0;
-        console.log(`[mem] ${sourceKey} entity=${entity.type} rss=${rss}MB heap=${heap}MB pending=${pendingDocuments.length} md=${Math.round(mdSize/1024)}KB chunks=${Math.round(chunksSize/1024)}KB`);
+        const mdSize =
+          entity.type === "Document" && entity.md_text
+            ? entity.md_text.reduce((a, b) => a + b.length, 0)
+            : 0;
+        const chunksSize =
+          entity.type === "Document" && entity.page_chunks
+            ? JSON.stringify(entity.page_chunks).length
+            : 0;
+        console.log(
+          `[mem] ${sourceKey} entity=${entity.type} rss=${rss}MB heap=${heap}MB pending=${pendingDocuments.length} md=${Math.round(mdSize / 1024)}KB chunks=${Math.round(chunksSize / 1024)}KB`,
+        );
         if (!quickwit) {
           return;
         }

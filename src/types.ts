@@ -153,7 +153,12 @@ export interface PersonEntity {
   raw: unknown;
 }
 
-export type WooziEntity = MeetingEntity | DocumentEntity | CommitteeEntity | PartyEntity | PersonEntity;
+export type WooziEntity =
+  | MeetingEntity
+  | DocumentEntity
+  | CommitteeEntity
+  | PartyEntity
+  | PersonEntity;
 
 export interface ExtractionBundle {
   meetings: MeetingEntity[];
@@ -219,10 +224,17 @@ export interface GemeenteOplossingenSourceDefinition extends SourceDefinitionBas
   apiVersion?: "v1" | "v2";
 }
 
+export interface ParlaeusSourceDefinition extends SourceDefinitionBase {
+  supplier: "parlaeus";
+  baseUrl: string;
+  sessionId: string;
+}
+
 export type SourceDefinition =
   | NotubizSourceDefinition
   | IbabsSourceDefinition
-  | GemeenteOplossingenSourceDefinition;
+  | GemeenteOplossingenSourceDefinition
+  | ParlaeusSourceDefinition;
 
 export interface SourceCatalogEntry extends SourceDefinitionBase {
   sourceRef: string;

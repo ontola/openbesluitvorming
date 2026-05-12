@@ -4,10 +4,27 @@ import type {
   GemeenteOplossingenSourceDefinition,
   IbabsSourceDefinition,
   NotubizSourceDefinition,
+  ParlaeusSourceDefinition,
   Supplier,
   SourceCatalogEntry,
   SourceDefinition,
 } from "../types.ts";
+
+// Suppliers whose catalog entries we treat as runnable even when the legacy-derived
+// `implemented` flag in the catalog hasn't been flipped on. These have a complete
+// end-to-end Woozi implementation.
+const ALWAYS_RUNNABLE_SUPPLIERS = new Set<Supplier>(["gemeenteoplossingen", "parlaeus"]);
+
+const RUNNABLE_SUPPLIERS = new Set<Supplier>([
+  "notubiz",
+  "ibabs",
+  "gemeenteoplossingen",
+  "parlaeus",
+]);
+
+function isCatalogSourceRunnable(source: SourceCatalogEntry): boolean {
+  return source.implemented || ALWAYS_RUNNABLE_SUPPLIERS.has(source.supplier);
+}
 
 function toRuntimeSourceDefinition(source: SourceCatalogEntry): SourceDefinition {
   if (source.supplier === "notubiz") {
@@ -34,6 +51,19 @@ function toRuntimeSourceDefinition(source: SourceCatalogEntry): SourceDefinition
     } satisfies IbabsSourceDefinition;
   }
 
+  if (source.supplier === "parlaeus") {
+    return {
+      key: source.key,
+      label: source.label,
+      supplier: "parlaeus",
+      organizationType: source.organizationType,
+      allmanakId: source.allmanakId,
+      cbsId: source.cbsId,
+      baseUrl: source.baseUrl!,
+      sessionId: source.sessionId!,
+    } satisfies ParlaeusSourceDefinition;
+  }
+
   return {
     key: source.key,
     label: source.label,
@@ -47,16 +77,11 @@ function toRuntimeSourceDefinition(source: SourceCatalogEntry): SourceDefinition
 }
 
 function getImplementedCatalogSources(): SourceCatalogEntry[] {
-  return listCatalogSources().filter((source) => source.implemented);
+  return listCatalogSources().filter(isCatalogSourceRunnable);
 }
 
 export function listRunnableCatalogSources(): SourceCatalogEntry[] {
-  return getImplementedCatalogSources().filter(
-    (source) =>
-      source.supplier === "notubiz" ||
-      source.supplier === "ibabs" ||
-      source.supplier === "gemeenteoplossingen",
-  );
+  return getImplementedCatalogSources().filter((source) => RUNNABLE_SUPPLIERS.has(source.supplier));
 }
 
 export function listRunnableSourceRefs(): string[] {
@@ -65,7 +90,7 @@ export function listRunnableSourceRefs(): string[] {
 
 export function listAggregateRunnableSourceRefs(supplier?: Supplier): string[] {
   return listRunnableCatalogSources()
-    .filter((source) => supplier ? source.supplier === supplier : true)
+    .filter((source) => (supplier ? source.supplier === supplier : true))
     .map((source) => source.sourceRef);
 }
 
@@ -78,7 +103,10 @@ export function listAggregateAdminSourceOptions(): AdminSourceOption[] {
     allmanak: "Allmanak",
   };
 
-  return [...new Set(listRunnableCatalogSources().map((source) => source.supplier))]
+  const catalog = listCatalogSources();
+  const suppliers = [...new Set(catalog.map((source) => source.supplier))];
+
+  return suppliers
     .sort((left, right) => left.localeCompare(right, "nl"))
     .map((supplier) => ({
       key: `all_${supplier}`,
@@ -86,7 +114,9 @@ export function listAggregateAdminSourceOptions(): AdminSourceOption[] {
       label: `Alle ${supplierLabels[supplier]}-bronnen`,
       supplier,
       organizationType: "verzameling",
-      implemented: true,
+      implemented:
+        ALWAYS_RUNNABLE_SUPPLIERS.has(supplier) ||
+        catalog.some((source) => source.supplier === supplier && source.implemented),
       isAggregate: true,
     }));
 }
@@ -96,15 +126,11 @@ export function getSource(sourceKeyOrRef: string): SourceDefinition {
     ? getCatalogSourceByRef(sourceKeyOrRef)
     : getCatalogSourceByKey(sourceKeyOrRef);
 
-  if (!catalogSource.implemented) {
+  if (!isCatalogSourceRunnable(catalogSource)) {
     throw new Error(`Unknown or unsupported source "${sourceKeyOrRef}"`);
   }
 
-  if (
-    catalogSource.supplier !== "notubiz" &&
-    catalogSource.supplier !== "ibabs" &&
-    catalogSource.supplier !== "gemeenteoplossingen"
-  ) {
+  if (!RUNNABLE_SUPPLIERS.has(catalogSource.supplier)) {
     throw new Error(
       `Source "${sourceKeyOrRef}" is present in the ORI catalog but not yet implemented in Woozi.`,
     );
@@ -124,20 +150,16 @@ export function listAdminSourceOptions(): AdminSourceOption[] {
     label: source.label ?? source.key.replaceAll("_", " "),
     supplier: source.supplier,
     organizationType: source.organizationType,
-    implemented: source.implemented,
+    implemented: isCatalogSourceRunnable(source),
   }));
 
-  return [
-    ...listAggregateAdminSourceOptions(),
-    ...sourceOptions,
-  ]
-    .sort((left, right) => {
-      if (!!left.isAggregate !== !!right.isAggregate) {
-        return left.isAggregate ? -1 : 1;
-      }
-      if (left.implemented !== right.implemented) {
-        return left.implemented ? -1 : 1;
-      }
-      return left.label.localeCompare(right.label, "nl");
-    });
+  return [...listAggregateAdminSourceOptions(), ...sourceOptions].sort((left, right) => {
+    if (!!left.isAggregate !== !!right.isAggregate) {
+      return left.isAggregate ? -1 : 1;
+    }
+    if (left.implemented !== right.implemented) {
+      return left.implemented ? -1 : 1;
+    }
+    return left.label.localeCompare(right.label, "nl");
+  });
 }

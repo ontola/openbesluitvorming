@@ -261,8 +261,18 @@ Deno.serve({ port }, async (request) => {
         headers: { "cache-control": "public, max-age=3600" },
       });
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (
+        message.includes("could not find indexes matching") ||
+        message.includes("Quickwit request failed 404")
+      ) {
+        return Response.json(
+          { documentCount: 0, organizationCount: 0 },
+          { headers: { "cache-control": "public, max-age=60" } },
+        );
+      }
       return Response.json(
-        { error: error instanceof Error ? error.message : "Statistieken ophalen mislukt" },
+        { error: message || "Statistieken ophalen mislukt" },
         { status: 500 },
       );
     }
