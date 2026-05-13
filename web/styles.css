@@ -637,6 +637,49 @@ select {
   padding-top: 1.2rem;
 }
 
+.home-about {
+  max-width: 48rem;
+  margin-inline: auto;
+}
+
+.home-about__title {
+  margin: 0 0 1.25rem;
+  font-size: clamp(1.55rem, 3.2vw, 2.2rem);
+  font-weight: 700;
+  line-height: 1.18;
+  letter-spacing: -0.035em;
+  color: var(--text);
+}
+
+.home-about__prose.prose-detail {
+  margin-top: 0;
+  color: var(--muted);
+  font-size: 1.05rem;
+  line-height: 1.82;
+}
+
+.home-about__prose.prose-detail h2 {
+  color: var(--text);
+}
+
+.home-about__prose.prose-detail h2:first-of-type {
+  margin-top: 0.5rem;
+}
+
+.home-about__prose.prose-detail strong {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.home-about__prose.prose-detail a {
+  color: var(--accent-deep);
+  text-underline-offset: 2px;
+}
+
+.home-about__prose.prose-detail a:hover {
+  color: var(--accent);
+}
+
 .content--search {
   max-width: 64rem;
   padding-top: 1.2rem;

@@ -1156,10 +1156,7 @@
               <span class="brand__dark">Open</span><span class="brand__light">Besluitvorming</span>
             </a>
           </h1>
-          <p class="hero__intro">
-            Vind vergaderingen, documenten en besluiten van Nederlandse overheden in een rustige,
-            snelle zoekomgeving.
-          </p>
+
           <ul class="hero__meta">
             <li on:dblclick={() => { window.location.href = "/admin.html"; }}><strong>{indexDocumentCount !== null ? indexDocumentCount.toLocaleString("nl-NL") : "..."}</strong> vergaderstukken</li>
             <li>
@@ -1227,7 +1224,7 @@
               bind:value={query}
               name="query"
               type="search"
-              placeholder="Zoeken naar documenten, vergaderingen, agenda's, besluiten..."
+              placeholder="Zoeken in documenten, vergaderingen, agenda's, besluiten..."
               autocomplete="off"
               on:input={onQueryInput}
               on:search={() => {
@@ -1412,59 +1409,146 @@
     </main>
   {:else}
     <main class="content content--home" transition:fade={{ duration: 220 }}>
-      <section class="section section--intro">
-        <div class="section__heading">
-          <p class="section__label">Over dit project</p>
-          <h2>Open infrastructuur voor publieke besluitvorming</h2>
-        </div>
-        <div class="prose">
-          <p>
-            OpenBesluitvorming brengt agenda&apos;s, vergaderingen, documenten en besluiten van
-            gemeenten, provincies en waterschappen samen in één zoekomgeving. Niet als gesloten
-            loket, maar als open infrastructuur die herbruikbaar is voor publieke verantwoording,
-            journalistiek en lokaal bestuur.
-          </p>
-          <p>
-            Zowel deze zoekmachine als de server zijn open source. Alle data — moties, vergaderingen,
-            documenten, agendapunten — is vrij te gebruiken via de zoekindex.
-          </p>
-        </div>
-      </section>
+      <div class="home-about">
+        <h1 class="home-about__title">
+          Doorzoek vergaderstukken
+          van gemeenten, provincies en waterschappen
+        </h1>
 
-      <section class="section section--cards">
-        <div class="section__heading">
-          <p class="section__label">Voor wie</p>
-          <h2>Eén dataset, veel toepassingen</h2>
+        <div class="home-about__prose prose-detail">
+          <p>
+            OpenBesluitvorming is een initiatief om de besluitvorming van decentrale overheden transparanter te maken
+            en een bijdrage te leveren aan de lokale democratie. Dit doen we door de vergaderdata samen te brengen in
+            één zoekomgeving. Dit wordt gedaan door automatisch uit de bestaande vergadersoftware
+            (raadsinformatiesystemen) de vergaderingen en documenten te halen en deze vervolgens middels een
+            <button type="button" class="inline-link" on:click={() => void openApiDocs()}>API</button>
+            en deze zoekmachine te ontsluiten.
+          </p>
+          <p>
+            Met deze toepassing zoek je door de openbare vergaderingen, agendapunten, moties en documenten van meer
+            dan 300 deelnemende gemeenten, 7 provincies en 5 waterschappen. Naast documenten zijn ook rijkere data
+            beschikbaar over onder andere stemgedrag.
+          </p>
+
+          <h2>Door wie</h2>
+          <p>
+            Vanuit het
+            <a href="https://www.open-overheid.nl/over-open-overheid/actieplan-open-overheid" rel="noopener noreferrer"
+              target="_blank">actieplan open overheid</a>
+            werkt
+            <a href="https://www.vngrealisatie.nl/" rel="noopener noreferrer" target="_blank">VNG Realisatie</a>
+            aan het openstellen van besluitvorming van gemeenten en provincies als open data. Inmiddels is de Wet Open
+            Overheid van kracht en heeft VNG het informatiemodel mede in dat licht verder aangescherpt en verrijkt in
+            samenwerking met IPO en UvW en daarmee ook toepasbaar gemaakt voor provincies en waterschappen.
+          </p>
+          <p>
+            De techniek is gemaakt door
+            <a href="https://ontola.io/nl" rel="noopener noreferrer" target="_blank">Ontola</a>.
+            <a
+              href="https://github.com/ontola/openbesluitvorming"
+              rel="noopener noreferrer"
+              target="_blank">GitHub</a>,
+            samen met de
+            <button type="button" class="inline-link" on:click={() => void openApiDocs()}>API-documentatie</button>
+            voor hergebruikers.
+          </p>
+          <p>OpenBesluitvorming komt voort uit het project OpenRaadsinformatie en OpenStateninformatie, welke waren gestart door de Open State Foundation.</p>
+
+          <h2>Toekomst</h2>
+          <p>
+            Momenteel wordt in samenwerking met IPO, UvW, BZK, KOOP en leveranciers gewerkt aan de ORI API die zorgt
+            voor verbinding met de Woo-index en zoekfunctie. Door het gebruik van deze ORI API zullen de
+            bestuursorganen in staat zijn deze rijke informatiestroom geautomatiseerd actief openbaar te maken in het
+            kader van de Wet Open Overheid. Heel concreet betreft het de informatiecategorieën 3.3 2a (ingekomen
+            stukken) en 3.3 2c (vergaderstukken en verslagen) die hiermee vindbaar worden in de Woo-index en
+            zoekfunctie.
+          </p>
+          <p>
+            Daarbovenop kan elke partij, net als de Woo-index, zich door deze API gedragen als hergebruiker en gebruik
+            maken van deze rijke collectie.
+          </p>
+          <p>
+            Het uiteindelijke doel is dat de Woo-index en zoekfunctie conform de Common Ground principes de data bij de
+            bron zal ophalen. Dit stelt de Woo-index en zoekfunctie in staat de raadpleegfunctie over te nemen van deze
+            huidige raadpleegomgeving die als overbrugging geldt tot dat moment.
+          </p>
+          <p>
+            Documentatie over deze ontwikkeling is op
+            <a href="https://vng-realisatie.github.io/ODS-Open-Raadsinformatie/" rel="noopener noreferrer" target="_blank">GitHub</a>
+            na te lezen. Specifiek voor de Woo-index en zoekfunctie is dit op de
+            <a href="https://gitlab.com/koop/woo" rel="noopener noreferrer" target="_blank">GitLab</a>
+            terug te lezen.
+          </p>
+
+          <h2>Voor wie is deze app?</h2>
+          <ul>
+            <li><strong>Ambtenaren</strong> zoeken naar hoe andere overheden bepaalde problemen oplossen.</li>
+            <li><strong>Ontwikkelaars</strong> gaan aan de slag met deze data om eigen apps te maken.</li>
+            <li><strong>Betrokken burgers</strong> zoeken wat overheden hebben gezegd over een bepaald onderwerp.</li>
+            <li><strong>Belangenbehartigers</strong> kunnen volgen waar beslissingen over (gaan) worden gemaakt.</li>
+            <li><strong>Journalisten</strong> zien hoe besluitvorming zich heeft ontwikkeld over tijd.</li>
+          </ul>
+
+          <h2>Jouw gemeente, provincie of waterschap toevoegen</h2>
+          <p>
+            Als je wil dat ook jouw organisatie aangesloten wordt op OpenBesluitvorming, vraag dan de griffie van je
+            gemeenteraad om
+            <a href="https://formulieren.vngrealisatie.nl/deelname_openraadsinformatie" rel="noopener noreferrer"
+              target="_blank">dit formulier</a>
+            in te vullen.
+          </p>
+
+          <h2>Andere apps gemaakt met deze data</h2>
+          <p>
+            Alle data (moties, vergaderingen, documenten, agendapunten, stukken…) is gratis te gebruiken. Deze
+            zoekmachine is dan ook maar één van de apps die is gemaakt met de data:
+          </p>
+          <ul>
+            <li>
+              <a href="https://1848.nl" rel="noopener noreferrer" target="_blank">1848.nl</a>: volg thema&apos;s die
+              worden besproken en ontvang meldingen.
+            </li>
+            <li>
+              Jouw app hier? Mail
+              <a href="mailto:sander.bakker@vng.nl">Sander Bakker</a>.
+            </li>
+          </ul>
+
+          <h2>Contact</h2>
+          <p>
+            Technische vragen, klachten of suggesties over deze zoekmachine en de zoek API kunnen op de
+            <a href="https://github.com/ontola/openbesluitvorming/issues" rel="noopener noreferrer" target="_blank"
+              >issue tracker van het project</a>
+            geplaatst worden.
+          </p>
+          <p>
+            Voor informatie over de nieuwe ORI-API standaard voor leveranciers kun je kijken op
+            <a href="https://github.com/VNG-Realisatie/ODS-Open-Raadsinformatie" rel="noopener noreferrer" target="_blank"
+              >deze repository</a>.
+          </p>
+          <p>
+            Voor algemene vragen kunt u mailen naar
+            <a href="mailto:sander.bakker@vng.nl">Sander Bakker</a>.
+          </p>
+
+          <h2>Privacy</h2>
+          <p>
+            We gebruiken Swetrix (een privacy-vriendelijk alternatief voor Google Analytics) om bezoekersstatistieken te
+            verzamelen. We gebruiken deze gegevens alleen om anonieme rapportages te maken van bezoekers, en verkopen
+            deze data aan niemand door. We slaan de laatste zes cijfers van IP-adressen niet op om jouw privacy te
+            beschermen.
+          </p>
+
+          <h2>Disclaimer</h2>
+          <p>
+            De data in deze zoekmachine komt uit vergadersystemen gekoppeld aan OpenBesluitvorming. Deze data is met
+            toestemming van de deelnemende gemeenten, provincies en waterschappen geïmporteerd uit diverse
+            vergadersystemen. De data kan door het importeren incompleet, onjuist of niet up-to-date zijn. Het
+            eigenaarschap van de data ligt bij de organisaties die de data hebben aangemaakt, of de respectievelijke
+            auteurs van de documenten.
+          </p>
         </div>
-        <div class="feature-grid">
-          <article class="surface-card feature-card">
-            <h3>Burgers &amp; journalisten</h3>
-            <p>
-              Zoek wat overheden hebben gezegd over een onderwerp, of volg hoe besluitvorming zich
-              heeft ontwikkeld over tijd.
-            </p>
-          </article>
-          <article class="surface-card feature-card">
-            <h3>Ambtenaren</h3>
-            <p>
-              Zoek hoe andere overheden vergelijkbare vraagstukken hebben aangepakt. Meer dan 330
-              organisaties, doorzoekbaar in één zoekveld.
-            </p>
-          </article>
-          <article class="surface-card feature-card">
-            <h3>Ontwikkelaars</h3>
-            <p>
-              Bouw eigen applicaties op de zoekindex. De volledige Quickwit search API is publiek
-              beschikbaar.
-              <button
-                type="button"
-                class="inline-link"
-                on:click={() => void openApiDocs()}
-              >Bekijk de API-documentatie →</button>
-            </p>
-          </article>
-        </div>
-      </section>
+      </div>
     </main>
   {/if}
 </div>
