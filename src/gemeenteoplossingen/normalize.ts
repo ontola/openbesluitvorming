@@ -34,7 +34,8 @@ export function normalizeGoCommittee(
 }
 
 function documentUrlFor(source: SourceDefinitionBase, meetingId: string, documentId: string): string {
-  const baseUrl = (source as unknown as { baseUrl?: string }).baseUrl;
+  const rawBaseUrl = (source as unknown as { baseUrl?: string }).baseUrl;
+  const baseUrl = rawBaseUrl?.trim();
   if (!baseUrl) {
     return "";
   }

@@ -108,7 +108,8 @@ export class GemeenteOplossingenClient {
   ) {}
 
   private url(path: string): string {
-    const trimmed = this.baseUrl.endsWith("/") ? this.baseUrl : `${this.baseUrl}/`;
+    const base = this.baseUrl.trim();
+    const trimmed = base.endsWith("/") ? base : `${base}/`;
     return `${trimmed}${this.apiVersion}/${path.replace(/^\//, "")}`;
   }
 
