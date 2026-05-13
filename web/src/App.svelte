@@ -47,6 +47,11 @@
   let dateTo = "";
   let view = "";
 
+  let homeOrgPickerOpen = false;
+  let homeOrgPickerValue = "";
+  /** Hero org picker instance while mounted; used to focus its input after opening. */
+  let homeOrgPickerRef: SourcePicker | undefined;
+
   let sources: AdminSourceOption[] = [];
   let results: SearchResult[] = [];
   let indexDocumentCount: number | null = null;
@@ -256,6 +261,11 @@
 
   function entityPdfProxyUrl(entityId: string): string {
     return `/api/entities/${encodeURIComponent(entityId)}/pdf`;
+  }
+
+  /** Public UI: dropdown line under org name (no supplier — internal detail). */
+  function publicSourcePickerSubtitle(source: AdminSourceOption): string {
+    return source.organizationType;
   }
 
   function previewLoadKey(item: SearchResult): string {
@@ -1152,8 +1162,50 @@
           </p>
           <ul class="hero__meta">
             <li on:dblclick={() => { window.location.href = "/admin.html"; }}><strong>{indexDocumentCount !== null ? indexDocumentCount.toLocaleString("nl-NL") : "..."}</strong> vergaderstukken</li>
-            <li><strong>{indexOrganizationCount !== null ? `${indexOrganizationCount}+` : "..."}</strong> organisaties</li>
+            <li>
+              <button
+                type="button"
+                class="hero__meta-trigger"
+                aria-expanded={homeOrgPickerOpen}
+                aria-haspopup="listbox"
+                aria-controls={homeOrgPickerOpen ? "home-org-picker" : undefined}
+                on:click={async () => {
+                  const opening = !homeOrgPickerOpen;
+                  homeOrgPickerOpen = opening;
+                  if (opening) {
+                    await tick();
+                    homeOrgPickerRef?.focusInput();
+                  }
+                }}
+              >
+                <span class="hero__meta-trigger__label">
+                  <strong>{indexOrganizationCount !== null ? `${indexOrganizationCount}+` : "..."}</strong>
+                  organisaties
+                </span>
+                <span class="hero__meta-trigger__chevron" aria-hidden="true"></span>
+              </button>
+            </li>
           </ul>
+          {#if homeOrgPickerOpen && !searched}
+            <div id="home-org-picker" class="hero__org-picker" transition:fade={{ duration: 140 }}>
+              <SourcePicker
+                bind:this={homeOrgPickerRef}
+                options={sources}
+                bind:value={homeOrgPickerValue}
+                placeholder="Zoek een organisatie..."
+                subtitle={publicSourcePickerSubtitle}
+                valueSelector={(source) => source.key}
+                on:change={(event) => {
+                  const next = event.detail.value;
+                  if (!next) return;
+                  organization = next;
+                  homeOrgPickerOpen = false;
+                  homeOrgPickerValue = "";
+                  onFilterChange();
+                }}
+              />
+            </div>
+          {/if}
         </div>
       </div>
 
@@ -1204,7 +1256,7 @@
             }}
           >
             <span class="search-panel__toggle-icon" aria-hidden="true">⚙</span>
-            <span class="search-panel__toggle-label">Meer instellingen</span>
+            <span class="search-panel__toggle-label">Filters</span>
           </button>
         </div>
 
@@ -1214,7 +1266,8 @@
               <SourcePicker
                 options={sources}
                 bind:value={organization}
-                placeholder="Alle organisaties"
+                placeholder="Zoek organisatie"
+                subtitle={publicSourcePickerSubtitle}
                 valueSelector={(source) => source.key}
                 on:change={onSourceChange}
               />
@@ -1222,7 +1275,7 @@
               <label class="select-field select-field--subtle select-field--compact">
                 <span class="sr-only">Type resultaat</span>
                 <select bind:value={entityType} name="entityType" on:change={onFilterChange}>
-                  <option value="">Alles</option>
+                  <option value="">Type</option>
                   <option value="Document">Documenten</option>
                   <option value="Meeting">Vergaderingen</option>
                 </select>

@@ -4,7 +4,7 @@
 
   export let options: AdminSourceOption[] = [];
   export let value = "";
-  export let placeholder = "Alle organisaties";
+  export let placeholder = "Zoek organisatie";
   export let valueSelector: (source: AdminSourceOption) => string = (source) => source.key;
   export let subtitle: (source: AdminSourceOption) => string = (source) =>
     `${source.supplier} · ${source.organizationType}`;
@@ -17,6 +17,11 @@
   let query = "";
   let open = false;
   let inputEl: HTMLInputElement | null = null;
+
+  /** Focus the search input (e.g. after revealing the picker from the hero). */
+  export function focusInput(): void {
+    inputEl?.focus();
+  }
 
   $: selected = options.find((source) => valueSelector(source) === value) ?? null;
   $: if (selected && query !== selected.label) {
@@ -106,6 +111,7 @@
         <div class="source-picker__empty">{emptyMessage}</div>
       {:else}
         {#each filtered as source}
+          {@const previewLine = subtitle(source).trim()}
           <button
             type="button"
             class="source-picker__option"
@@ -116,7 +122,9 @@
             }}
           >
             <strong>{source.label}</strong>
-            <span>{subtitle(source)}</span>
+            {#if previewLine}
+              <span>{previewLine}</span>
+            {/if}
           </button>
         {/each}
       {/if}
