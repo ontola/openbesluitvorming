@@ -1,4 +1,10 @@
-import { canonicalAgendaItemId, canonicalCommitteeId, canonicalDocumentId, canonicalMeetingId, canonicalOrganizationId } from "../ids.ts";
+import {
+  canonicalAgendaItemId,
+  canonicalCommitteeId,
+  canonicalDocumentId,
+  canonicalMeetingId,
+  canonicalOrganizationId,
+} from "../ids.ts";
 import type {
   CommitteeEntity,
   DocumentEntity,
@@ -33,7 +39,11 @@ export function normalizeGoCommittee(
   };
 }
 
-function documentUrlFor(source: SourceDefinitionBase, meetingId: string, documentId: string): string {
+function documentUrlFor(
+  source: SourceDefinitionBase,
+  meetingId: string,
+  documentId: string,
+): string {
   const rawBaseUrl = (source as unknown as { baseUrl?: string }).baseUrl;
   const baseUrl = rawBaseUrl?.trim();
   if (!baseUrl) {
@@ -110,17 +120,35 @@ function normalizeMeetingDocuments(
     });
 }
 
-export function normalizeGoMeeting(source: SourceDefinitionBase, meeting: GoMeeting): MeetingEntity {
+function buildMeetingStartDate(rawDate: string | undefined, startTime: string | undefined): string {
+  const date = (rawDate ?? "").trim();
+  if (!date) {
+    return "";
+  }
+  // GO sometimes returns `date` as a full datetime ("YYYY-MM-DD HH:MM:SS")
+  // and leaves `startTime` empty. Use the datetime directly in that case;
+  // otherwise compose date + startTime.
+  if (date.includes("T") || date.includes(" ")) {
+    return date.replace(" ", "T");
+  }
+  if (startTime && startTime.includes(":")) {
+    const time = startTime.length === 5 ? `${startTime}:00` : startTime;
+    return `${date}T${time}`;
+  }
+  return `${date}T00:00:00`;
+}
+
+export function normalizeGoMeeting(
+  source: SourceDefinitionBase,
+  meeting: GoMeeting,
+): MeetingEntity {
   const id = canonicalMeetingId(source, meeting.id);
   const meetingId = String(meeting.id);
 
-  const startDate = meeting.startTime && meeting.startTime.includes(":")
-    ? `${meeting.date}T${meeting.startTime}:00`
-    : `${meeting.date}T00:00:00`;
+  const startDate = buildMeetingStartDate(meeting.date, meeting.startTime);
 
-  const committeeId = meeting.dmu?.id !== undefined
-    ? canonicalCommitteeId(source, meeting.dmu.id)
-    : undefined;
+  const committeeId =
+    meeting.dmu?.id !== undefined ? canonicalCommitteeId(source, meeting.dmu.id) : undefined;
 
   let status = "confirmed";
   if (meeting.canceled) {
@@ -165,12 +193,15 @@ export function normalizeGoMeeting(source: SourceDefinitionBase, meeting: GoMeet
   };
 }
 
-export function normalizeGoDocuments(source: SourceDefinitionBase, meeting: MeetingEntity): DocumentEntity[] {
+export function normalizeGoDocuments(
+  source: SourceDefinitionBase,
+  meeting: MeetingEntity,
+): DocumentEntity[] {
   const rawMeeting = meeting.raw as GoMeeting;
   const meetingId = String(rawMeeting.id);
   const docs = [
     ...(rawMeeting.documents ?? []),
-    ...((rawMeeting.items ?? []).flatMap((item) => item.documents ?? [])),
+    ...(rawMeeting.items ?? []).flatMap((item) => item.documents ?? []),
   ];
   const dedup = new Map<string, GoDocumentRef>();
   for (const doc of docs) {
@@ -178,6 +209,10 @@ export function normalizeGoDocuments(source: SourceDefinitionBase, meeting: Meet
       dedup.set(String(doc.id), doc);
     }
   }
-  return normalizeMeetingDocuments(source, meetingId, [...dedup.values()], meeting.last_discussed_at);
+  return normalizeMeetingDocuments(
+    source,
+    meetingId,
+    [...dedup.values()],
+    meeting.last_discussed_at,
+  );
 }
-
