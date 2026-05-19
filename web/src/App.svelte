@@ -1176,7 +1176,7 @@
                 }}
               >
                 <span class="hero__meta-trigger__label">
-                  <strong>{indexOrganizationCount !== null ? `${indexOrganizationCount}+` : "..."}</strong>
+                  <strong>{indexOrganizationCount !== null ? indexOrganizationCount : "..."}</strong>
                   organisaties
                 </span>
                 <span class="hero__meta-trigger__chevron" aria-hidden="true"></span>
