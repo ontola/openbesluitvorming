@@ -709,7 +709,23 @@ export async function getEntityContent(entityId: string): Promise<EntityContentR
   };
 }
 
-export async function getIndexStats(): Promise<{ documentCount: number; organizationCount: number }> {
+export interface IndexStats {
+  documentCount: number;
+  organizationCount: number;
+  municipalityCount: number;
+  waterBoardCount: number;
+  provinceCount: number;
+}
+
+const EMPTY_INDEX_STATS: IndexStats = {
+  documentCount: 0,
+  organizationCount: 0,
+  municipalityCount: 0,
+  waterBoardCount: 0,
+  provinceCount: 0,
+};
+
+export async function getIndexStats(): Promise<IndexStats> {
   const quickwit = new QuickwitClient();
   let response: Awaited<ReturnType<QuickwitClient["searchRequest"]>>;
   try {
@@ -720,6 +736,9 @@ export async function getIndexStats(): Promise<{ documentCount: number; organiza
         organizations: {
           terms: { field: "organization", size: 1000 },
         },
+        source_keys: {
+          terms: { field: "source_key", size: 1000 },
+        },
       },
     });
   } catch (error) {
@@ -727,15 +746,40 @@ export async function getIndexStats(): Promise<{ documentCount: number; organiza
     // Treat missing index as empty stats instead of failing the landing page.
     const message = error instanceof Error ? error.message : String(error);
     if (message.includes("could not find indexes matching")) {
-      return { documentCount: 0, organizationCount: 0 };
+      return { ...EMPTY_INDEX_STATS };
     }
     throw error;
   }
 
   const orgBuckets = (response.aggregations?.organizations as { buckets?: unknown[] })?.buckets ?? [];
+  const sourceKeyBuckets =
+    (response.aggregations?.source_keys as { buckets?: { key?: unknown }[] })?.buckets ?? [];
+
+  const typeBySourceKey = new Map(
+    listSources().map((source) => [source.key, source.organizationType]),
+  );
+  let municipalityCount = 0;
+  let waterBoardCount = 0;
+  let provinceCount = 0;
+  for (const bucket of sourceKeyBuckets) {
+    switch (typeBySourceKey.get(String(bucket.key ?? ""))) {
+      case "gemeente":
+        municipalityCount += 1;
+        break;
+      case "waterschap":
+        waterBoardCount += 1;
+        break;
+      case "provincie":
+        provinceCount += 1;
+        break;
+    }
+  }
 
   return {
     documentCount: response.num_hits,
     organizationCount: orgBuckets.length,
+    municipalityCount,
+    waterBoardCount,
+    provinceCount,
   };
 }

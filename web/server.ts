@@ -267,7 +267,13 @@ Deno.serve({ port }, async (request) => {
         message.includes("Quickwit request failed 404")
       ) {
         return Response.json(
-          { documentCount: 0, organizationCount: 0 },
+          {
+            documentCount: 0,
+            organizationCount: 0,
+            municipalityCount: 0,
+            waterBoardCount: 0,
+            provinceCount: 0,
+          },
           { headers: { "cache-control": "public, max-age=60" } },
         );
       }

@@ -56,6 +56,9 @@
   let results: SearchResult[] = [];
   let indexDocumentCount: number | null = null;
   let indexOrganizationCount: number | null = null;
+  let indexMunicipalityCount: number | null = null;
+  let indexWaterBoardCount: number | null = null;
+  let indexProvinceCount: number | null = null;
   let totalCount: number | null = null;
   let totalIsApproximate = false;
   let hasMore = false;
@@ -1057,10 +1060,21 @@
     updateInitialLoadingCardCount();
     fetch("/api/stats")
       .then((r) => r.json())
-      .then((stats: { documentCount?: number; organizationCount?: number }) => {
-        indexDocumentCount = stats.documentCount ?? null;
-        indexOrganizationCount = stats.organizationCount ?? null;
-      })
+      .then(
+        (stats: {
+          documentCount?: number;
+          organizationCount?: number;
+          municipalityCount?: number;
+          waterBoardCount?: number;
+          provinceCount?: number;
+        }) => {
+          indexDocumentCount = stats.documentCount ?? null;
+          indexOrganizationCount = stats.organizationCount ?? null;
+          indexMunicipalityCount = stats.municipalityCount ?? null;
+          indexWaterBoardCount = stats.waterBoardCount ?? null;
+          indexProvinceCount = stats.provinceCount ?? null;
+        },
+      )
       .catch(() => {});
     await loadSources();
     await syncFromUrl(true);
@@ -1182,6 +1196,9 @@
                 <span class="hero__meta-trigger__chevron" aria-hidden="true"></span>
               </button>
             </li>
+            <li><strong>{indexMunicipalityCount !== null ? indexMunicipalityCount : "..."}</strong> gemeenten</li>
+            <li><strong>{indexWaterBoardCount !== null ? indexWaterBoardCount : "..."}</strong> waterschappen</li>
+            <li><strong>{indexProvinceCount !== null ? indexProvinceCount : "..."}</strong> provincies</li>
           </ul>
           {#if homeOrgPickerOpen && !searched}
             <div id="home-org-picker" class="hero__org-picker" transition:fade={{ duration: 140 }}>
