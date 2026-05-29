@@ -56,9 +56,11 @@
   let results: SearchResult[] = [];
   let indexDocumentCount: number | null = null;
   let indexOrganizationCount: number | null = null;
-  let indexMunicipalityCount: number | null = null;
-  let indexWaterBoardCount: number | null = null;
-  let indexProvinceCount: number | null = null;
+  // Defaults used as pre-load fallback so the descriptive paragraph below
+  // reads sensibly before /api/stats returns. Overwritten with live numbers.
+  let indexMunicipalityCount = 300;
+  let indexWaterBoardCount = 5;
+  let indexProvinceCount = 7;
   let totalCount: number | null = null;
   let totalIsApproximate = false;
   let hasMore = false;
@@ -1070,9 +1072,9 @@
         }) => {
           indexDocumentCount = stats.documentCount ?? null;
           indexOrganizationCount = stats.organizationCount ?? null;
-          indexMunicipalityCount = stats.municipalityCount ?? null;
-          indexWaterBoardCount = stats.waterBoardCount ?? null;
-          indexProvinceCount = stats.provinceCount ?? null;
+          indexMunicipalityCount = stats.municipalityCount ?? indexMunicipalityCount;
+          indexWaterBoardCount = stats.waterBoardCount ?? indexWaterBoardCount;
+          indexProvinceCount = stats.provinceCount ?? indexProvinceCount;
         },
       )
       .catch(() => {});
@@ -1196,9 +1198,6 @@
                 <span class="hero__meta-trigger__chevron" aria-hidden="true"></span>
               </button>
             </li>
-            <li><strong>{indexMunicipalityCount !== null ? indexMunicipalityCount : "..."}</strong> gemeenten</li>
-            <li><strong>{indexWaterBoardCount !== null ? indexWaterBoardCount : "..."}</strong> waterschappen</li>
-            <li><strong>{indexProvinceCount !== null ? indexProvinceCount : "..."}</strong> provincies</li>
           </ul>
           {#if homeOrgPickerOpen && !searched}
             <div id="home-org-picker" class="hero__org-picker" transition:fade={{ duration: 140 }}>
@@ -1446,7 +1445,7 @@
           </p>
           <p>
             Met deze toepassing zoek je door de openbare vergaderingen, agendapunten, moties en documenten van meer
-            dan 300 deelnemende gemeenten, 7 provincies en 5 waterschappen. Naast documenten zijn ook rijkere data
+            dan {indexMunicipalityCount} deelnemende gemeenten, {indexProvinceCount} provincies en {indexWaterBoardCount} waterschappen. Naast documenten zijn ook rijkere data
             beschikbaar over onder andere stemgedrag.
           </p>
 
