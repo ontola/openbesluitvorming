@@ -725,7 +725,35 @@ const EMPTY_INDEX_STATS: IndexStats = {
   provinceCount: 0,
 };
 
+// Process-local memo so the Quickwit aggregation doesn't run per-request.
+// Failures and the "empty index" fallback are not cached so they don't pin
+// a bad result; a fresh local stack will pick up real data on the next call
+// after its index appears.
+const STATS_CACHE_TTL_MS = 5 * 60 * 1000;
+let cachedStats: { value: IndexStats; expiresAt: number } | null = null;
+let statsInFlight: Promise<IndexStats> | null = null;
+
 export async function getIndexStats(): Promise<IndexStats> {
+  if (cachedStats && Date.now() < cachedStats.expiresAt) {
+    return cachedStats.value;
+  }
+  if (statsInFlight) {
+    return statsInFlight;
+  }
+  statsInFlight = computeIndexStats()
+    .then((result) => {
+      if (result.documentCount > 0) {
+        cachedStats = { value: result, expiresAt: Date.now() + STATS_CACHE_TTL_MS };
+      }
+      return result;
+    })
+    .finally(() => {
+      statsInFlight = null;
+    });
+  return statsInFlight;
+}
+
+async function computeIndexStats(): Promise<IndexStats> {
   const quickwit = new QuickwitClient();
   let response: Awaited<ReturnType<QuickwitClient["searchRequest"]>>;
   try {
