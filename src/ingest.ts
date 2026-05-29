@@ -117,6 +117,9 @@ export async function executeIngest(
     trigger?: IngestRunTrigger;
     executionMode?: IngestExecutionMode;
     parentRunId?: string;
+    /** Called on every sign of extraction progress, so a watchdog can tell a
+     * live-but-slow run apart from a wedged one. */
+    onHeartbeat?: () => void;
   } = {},
 ): Promise<{
   run: IngestRunRecord;
@@ -157,6 +160,7 @@ export async function executeIngest(
       retainEntities: false,
       retainIssues: false,
       onProgress: async (stats) => {
+        options.onHeartbeat?.();
         currentRun = await updateRun(run.id, {
           meeting_count: stats.meeting_count,
           document_count: stats.document_count,
@@ -166,6 +170,7 @@ export async function executeIngest(
         });
       },
       onIssue: async (issue, stats) => {
+        options.onHeartbeat?.();
         await appendRunIssue(run.id, issue);
         currentRun = await updateRun(run.id, {
           meeting_count: stats.meeting_count,
@@ -176,6 +181,7 @@ export async function executeIngest(
         });
       },
       onEntity: async (entity) => {
+        options.onHeartbeat?.();
         const mem = Deno.memoryUsage();
         const rss = Math.round(mem.rss / 1024 / 1024);
         const heap = Math.round(mem.heapUsed / 1024 / 1024);

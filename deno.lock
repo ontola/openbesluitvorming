@@ -5,6 +5,7 @@
     "npm:@sveltejs/vite-plugin-svelte@7": "7.0.0_svelte@5.55.1_vite@7.3.1",
     "npm:better-sqlite3@*": "12.8.0",
     "npm:concurrently@^9.2.1": "9.2.1",
+    "npm:fast-xml-parser@*": "5.8.0",
     "npm:fast-xml-parser@^5.7.0": "5.8.0",
     "npm:happy-dom@*": "20.8.9",
     "npm:happy-dom@^20.8.9": "20.8.9",
