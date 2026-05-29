@@ -1215,7 +1215,10 @@
                   organization = next;
                   homeOrgPickerOpen = false;
                   homeOrgPickerValue = "";
-                  onFilterChange();
+                  // From the home page `searched` is still false, so
+                  // onFilterChange() would short-circuit. onQuerySearch
+                  // runs the home→results transition then searches.
+                  void onQuerySearch();
                 }}
               />
             </div>
