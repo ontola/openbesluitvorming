@@ -1,20 +1,13 @@
-# Woozi
+# OpenBesluitvorming
 
-Woozi stands for Wet Open Overheid Zoek Index.
-It aims to index all public NL government documents.
-It also serves as a next-gen replacement of Open-Raadsinformatie.
+Zoek door meer dan 6 miljoen documenten van meer dan 300 organisaties.
 
-This folder contains new rewrite-oriented assets that are grounded in the
-existing ORI codebase.
+OpenBesluitvorming is de vervanger van [OpenRaadsinformatie](https://github.com/openstate/open-raadsinformatie/).
 
-The first step is a minimal schema package based on current model and
-transformer output, not a full redesign of the domain model.
-
-The current implementation is split into:
-
-- a Deno backend for extraction, search APIs, admin APIs, and production serving
-- a Vite + TypeScript frontend for the public UI and admin UI
-- shared TypeScript contracts in [`src/types.ts`](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/src/types.ts)
+<img width="1068" height="710" alt="Screenshot 2026-06-01 at 18 36 27" src="https://github.com/user-attachments/assets/13132c3a-392e-4d43-9eeb-8e378377a1d8" />
+<img width="1164" height="825" alt="Screenshot 2026-06-01 at 18 36 42" src="https://github.com/user-attachments/assets/73583056-48fc-4c9e-84b2-df693b33760b" />
+<img width="1176" height="911" alt="Screenshot 2026-06-01 at 18 36 50" src="https://github.com/user-attachments/assets/f81ca71f-a2b4-4c39-b88d-b4cd3518a9a3" />
+<img width="1161" height="917" alt="Screenshot 2026-06-01 at 18 37 01" src="https://github.com/user-attachments/assets/7f4f1007-7de1-452d-97e1-935f3aaa4288" />
 
 ## Use the API
 
