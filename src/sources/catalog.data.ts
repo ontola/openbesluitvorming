@@ -1340,7 +1340,7 @@ export const sourceCatalog = [
     organizationType: "gemeente",
     allmanakId: 24449,
     cbsId: "GM1911",
-    ibabsSitename: "Hollands",
+    ibabsSitename: "hollandskroon",
     legacyConfigFile: "ori.ibabs.yaml",
     legacyConfigRoot: "ori.ibabs",
     implemented: true,
