@@ -13,12 +13,42 @@ import type {
 } from "../types.ts";
 import { AllmanakClient } from "../allmanak/client.ts";
 import { normalizeAllmanakParties, normalizeAllmanakPersons } from "../allmanak/normalize.ts";
-import { GemeenteOplossingenClient } from "./client.ts";
+import { GemeenteOplossingenClient, type GoMeeting } from "./client.ts";
 import { normalizeGoCommittee, normalizeGoDocuments, normalizeGoMeeting } from "./normalize.ts";
 import { mapLimit } from "../util/map_limit.ts";
 
 const DEFAULT_MEETING_CONCURRENCY = 6;
 const DEFAULT_DOCUMENT_CONCURRENCY = 3;
+// GO sources are public-facing council websites with varying capacity.
+// Some (observed: alblasserdam) return HTTP 500 / drop the connection when
+// asked for a multi-year range in one call. Chunk before hitting them.
+const DEFAULT_DATE_CHUNK_MONTHS = 6;
+
+export function splitDateRange(
+  dateFrom: string,
+  dateTo: string,
+  chunkMonths: number,
+): Array<[string, string]> {
+  if (chunkMonths <= 0) {
+    return [[dateFrom, dateTo]];
+  }
+
+  const chunks: Array<[string, string]> = [];
+  const end = new Date(`${dateTo}T00:00:00Z`);
+  let cursor = new Date(`${dateFrom}T00:00:00Z`);
+
+  while (cursor <= end) {
+    const nextCursor = new Date(cursor);
+    nextCursor.setUTCMonth(nextCursor.getUTCMonth() + chunkMonths);
+
+    const chunkEnd = nextCursor > end ? end : new Date(nextCursor.getTime() - 86_400_000);
+    chunks.push([cursor.toISOString().slice(0, 10), chunkEnd.toISOString().slice(0, 10)]);
+
+    cursor = nextCursor;
+  }
+
+  return chunks;
+}
 
 function issueStepForDocumentError(error: unknown): ExtractionIssue["step"] {
   if (!(error instanceof Error)) {
@@ -39,8 +69,10 @@ function issueStepForDocumentError(error: unknown): ExtractionIssue["step"] {
 
 export class GemeenteOplossingenExtractor {
   constructor(
-    private readonly clientFactory: (source: GemeenteOplossingenSourceDefinition) => GemeenteOplossingenClient =
-      (source) => new GemeenteOplossingenClient(source.baseUrl, source.apiVersion ?? "v1"),
+    private readonly clientFactory: (
+      source: GemeenteOplossingenSourceDefinition,
+    ) => GemeenteOplossingenClient = (source) =>
+      new GemeenteOplossingenClient(source.baseUrl, source.apiVersion ?? "v1"),
     private readonly allmanak = new AllmanakClient("v1"),
     private readonly storageProvider: () => Promise<ObjectStorageClient | undefined> = () =>
       ObjectStorageClient.fromEnvironment(),
@@ -157,7 +189,27 @@ export class GemeenteOplossingenExtractor {
     }
 
     // 3) Meetings + Documents (GO)
-    const rawMeetings = await client.listMeetingsByDateRange(dateFrom, dateTo);
+    // Chunk the requested range so a wide window doesn't blow up the upstream
+    // council site. Per-chunk failures are logged as issues and the run
+    // continues so one bad chunk doesn't lose the whole import.
+    const chunkMonths = Number(
+      Deno.env.get("WOOZI_GO_DATE_CHUNK_MONTHS") ?? `${DEFAULT_DATE_CHUNK_MONTHS}`,
+    );
+    const chunks = splitDateRange(dateFrom, dateTo, chunkMonths);
+
+    const rawMeetings: GoMeeting[] = [];
+    for (const [chunkFrom, chunkTo] of chunks) {
+      try {
+        const chunk = await client.listMeetingsByDateRange(chunkFrom, chunkTo);
+        rawMeetings.push(...chunk);
+      } catch (error) {
+        await registerIssue({
+          severity: "error",
+          step: "list_events",
+          message: `Failed to list GO meetings ${chunkFrom}..${chunkTo}: ${error instanceof Error ? error.message : String(error)}`,
+        });
+      }
+    }
     const normalizedMeetings = rawMeetings.map((meeting) => normalizeGoMeeting(source, meeting));
 
     const meetingDocs: DocumentEntity[] = [];
@@ -233,4 +285,3 @@ export class GemeenteOplossingenExtractor {
     };
   }
 }
-

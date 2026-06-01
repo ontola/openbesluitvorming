@@ -1,4 +1,7 @@
-import { GemeenteOplossingenExtractor } from "../src/gemeenteoplossingen/extractor.ts";
+import {
+  GemeenteOplossingenExtractor,
+  splitDateRange,
+} from "../src/gemeenteoplossingen/extractor.ts";
 import { normalizeAllmanakParties, normalizeAllmanakPersons } from "../src/allmanak/normalize.ts";
 import { normalizeGoDocuments, normalizeGoMeeting } from "../src/gemeenteoplossingen/normalize.ts";
 import type { DocumentEntity, GemeenteOplossingenSourceDefinition } from "../src/types.ts";
@@ -109,6 +112,37 @@ Deno.test("normalizeGoMeeting handles GO 'date' field with embedded time", () =>
   assert(
     documents[0].last_discussed_at === "2026-05-19T19:30:00",
     "document last_discussed_at propagates parseable datetime",
+  );
+});
+
+Deno.test("splitDateRange splits a multi-year window into N-month chunks", () => {
+  const chunks = splitDateRange("2021-06-01", "2026-08-31", 6);
+  // Jun 2021 → Aug 2026 ≈ 5 years 3 months → 11 chunks of 6 months
+  assert(chunks.length === 11, `expected 11 chunks, got ${chunks.length}`);
+  assert(
+    chunks[0][0] === "2021-06-01",
+    `first chunk should start at requested from-date, got ${chunks[0][0]}`,
+  );
+  assert(
+    chunks[chunks.length - 1][1] === "2026-08-31",
+    `last chunk should end at requested to-date, got ${chunks[chunks.length - 1][1]}`,
+  );
+  // Chunks must be contiguous and non-overlapping.
+  for (let i = 1; i < chunks.length; i += 1) {
+    const prevEnd = new Date(`${chunks[i - 1][1]}T00:00:00Z`).getTime();
+    const thisStart = new Date(`${chunks[i][0]}T00:00:00Z`).getTime();
+    assert(
+      thisStart - prevEnd === 86_400_000,
+      `chunk ${i} should start exactly one day after chunk ${i - 1} (${chunks[i - 1][1]} → ${chunks[i][0]})`,
+    );
+  }
+});
+
+Deno.test("splitDateRange returns the original range when chunkMonths<=0", () => {
+  const chunks = splitDateRange("2024-01-01", "2026-12-31", 0);
+  assert(
+    chunks.length === 1 && chunks[0][0] === "2024-01-01" && chunks[0][1] === "2026-12-31",
+    "expected pass-through",
   );
 });
 
