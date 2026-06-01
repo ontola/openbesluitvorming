@@ -1,6 +1,9 @@
 # OpenBesluitvorming
 
-Zoek door meer dan 6 miljoen documenten van meer dan 300 organisaties.
+- Zoek door **meer dan 6 miljoen documenten** van meer dan 300 organisaties.
+- PDF's worden weergegeven als afbeeldingen (laad zeer snel) of als markdown text (toegankelijk)
+- Vergaderingen zijn gekoppeld aan documenten voor context, losse agendapunten zichtbaar.
+- Importeert dagelijks uit verschillende vergadersoftware (Notubiz, Ibabs, GemeenteOplossingen, Parlaeus)
 
 OpenBesluitvorming is de vervanger van [OpenRaadsinformatie](https://github.com/openstate/open-raadsinformatie/).
 
