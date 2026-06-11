@@ -10,11 +10,6 @@ import type {
   SourceDefinition,
 } from "../types.ts";
 
-// Suppliers whose catalog entries we treat as runnable even when the legacy-derived
-// `implemented` flag in the catalog hasn't been flipped on. These have a complete
-// end-to-end Woozi implementation.
-const ALWAYS_RUNNABLE_SUPPLIERS = new Set<Supplier>(["gemeenteoplossingen", "parlaeus"]);
-
 const RUNNABLE_SUPPLIERS = new Set<Supplier>([
   "notubiz",
   "ibabs",
@@ -23,7 +18,7 @@ const RUNNABLE_SUPPLIERS = new Set<Supplier>([
 ]);
 
 function isCatalogSourceRunnable(source: SourceCatalogEntry): boolean {
-  return source.implemented || ALWAYS_RUNNABLE_SUPPLIERS.has(source.supplier);
+  return source.implemented;
 }
 
 function toRuntimeSourceDefinition(source: SourceCatalogEntry): SourceDefinition {
@@ -114,9 +109,7 @@ export function listAggregateAdminSourceOptions(): AdminSourceOption[] {
       label: `Alle ${supplierLabels[supplier]}-bronnen`,
       supplier,
       organizationType: "verzameling",
-      implemented:
-        ALWAYS_RUNNABLE_SUPPLIERS.has(supplier) ||
-        catalog.some((source) => source.supplier === supplier && source.implemented),
+      implemented: catalog.some((source) => source.supplier === supplier && source.implemented),
       isAggregate: true,
     }));
 }
