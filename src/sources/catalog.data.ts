@@ -15,7 +15,7 @@ export const sourceCatalog = [
     baseUrl: "https://raad.alblasserdam.nl/api",
     legacyConfigFile: "ori.go.yaml",
     legacyConfigRoot: "ori.go",
-    implemented: false,
+    implemented: true,
   },
   {
     sourceRef: "gemeenteoplossingen:gemeente:albrandswaard",
@@ -29,7 +29,7 @@ export const sourceCatalog = [
     baseUrl: "https://raad.albrandswaard.nl/api",
     legacyConfigFile: "ori.go.yaml",
     legacyConfigRoot: "ori.go",
-    implemented: false,
+    implemented: true,
   },
   {
     sourceRef: "gemeenteoplossingen:gemeente:beemster",
@@ -43,7 +43,7 @@ export const sourceCatalog = [
     baseUrl: "https://beemsterraadsinformatie.purmerend.nl/api",
     legacyConfigFile: "ori.go.yaml",
     legacyConfigRoot: "ori.go",
-    implemented: false,
+    implemented: true,
   },
   {
     sourceRef: "gemeenteoplossingen:gemeente:bergen_nh",
@@ -57,7 +57,7 @@ export const sourceCatalog = [
     baseUrl: "https://www.raadbergen-nh.nl/api",
     legacyConfigFile: "ori.go.yaml",
     legacyConfigRoot: "ori.go",
-    implemented: false,
+    implemented: true,
   },
   {
     sourceRef: "gemeenteoplossingen:gemeente:bloemendaal",
@@ -71,7 +71,7 @@ export const sourceCatalog = [
     baseUrl: "https://gemeenteraad.bloemendaal.nl/api",
     legacyConfigFile: "ori.go.yaml",
     legacyConfigRoot: "ori.go",
-    implemented: false,
+    implemented: true,
   },
   {
     sourceRef: "gemeenteoplossingen:gemeente:den_helder",
@@ -85,7 +85,7 @@ export const sourceCatalog = [
     baseUrl: "https://gemeenteraad.denhelder.nl/api",
     legacyConfigFile: "ori.go.yaml",
     legacyConfigRoot: "ori.go",
-    implemented: false,
+    implemented: true,
   },
   {
     sourceRef: "gemeenteoplossingen:gemeente:dinkelland",
@@ -99,7 +99,7 @@ export const sourceCatalog = [
     baseUrl: "https://gemeenteraad.dinkelland.nl/api",
     legacyConfigFile: "ori.go.yaml",
     legacyConfigRoot: "ori.go",
-    implemented: false,
+    implemented: true,
   },
   {
     sourceRef: "gemeenteoplossingen:gemeente:doetinchem",
@@ -113,7 +113,7 @@ export const sourceCatalog = [
     baseUrl: "https://besluitvorming.doetinchem.nl/api",
     legacyConfigFile: "ori.go.yaml",
     legacyConfigRoot: "ori.go",
-    implemented: false,
+    implemented: true,
   },
   {
     sourceRef: "gemeenteoplossingen:gemeente:dordrecht",
@@ -126,7 +126,7 @@ export const sourceCatalog = [
     baseUrl: "https://raad.dordrecht.nl/api",
     legacyConfigFile: "ori.go.yaml",
     legacyConfigRoot: "ori.go",
-    implemented: false,
+    implemented: true,
   },
   {
     sourceRef: "gemeenteoplossingen:gemeente:dronten",
@@ -140,7 +140,7 @@ export const sourceCatalog = [
     baseUrl: "https://gemeenteraad.dronten.nl/api",
     legacyConfigFile: "ori.go.yaml",
     legacyConfigRoot: "ori.go",
-    implemented: false,
+    implemented: true,
   },
   {
     sourceRef: "gemeenteoplossingen:gemeente:goirle",
@@ -154,7 +154,7 @@ export const sourceCatalog = [
     baseUrl: "https://raad.goirle.nl/api",
     legacyConfigFile: "ori.go.yaml",
     legacyConfigRoot: "ori.go",
-    implemented: false,
+    implemented: true,
   },
   {
     sourceRef: "gemeenteoplossingen:gemeente:groningen",
@@ -168,7 +168,7 @@ export const sourceCatalog = [
     baseUrl: "https://gemeenteraad.groningen.nl/api",
     legacyConfigFile: "ori.go.yaml",
     legacyConfigRoot: "ori.go",
-    implemented: false,
+    implemented: true,
   },
   {
     sourceRef: "gemeenteoplossingen:gemeente:halderberge",
@@ -182,7 +182,7 @@ export const sourceCatalog = [
     baseUrl: "https://gemeenteraad.halderberge.nl/api",
     legacyConfigFile: "ori.go.yaml",
     legacyConfigRoot: "ori.go",
-    implemented: false,
+    implemented: true,
   },
   {
     sourceRef: "gemeenteoplossingen:gemeente:hardinxveld-giessendam",
@@ -196,7 +196,7 @@ export const sourceCatalog = [
     baseUrl: "http://raad.hardinxveld-giessendam.nl/api",
     legacyConfigFile: "ori.go.yaml",
     legacyConfigRoot: "ori.go",
-    implemented: false,
+    implemented: true,
   },
   {
     sourceRef: "gemeenteoplossingen:gemeente:heemstede",
@@ -210,7 +210,7 @@ export const sourceCatalog = [
     baseUrl: "https://gemeentebestuur.heemstede.nl/api",
     legacyConfigFile: "ori.go.yaml",
     legacyConfigRoot: "ori.go",
-    implemented: false,
+    implemented: true,
   },
   {
     sourceRef: "gemeenteoplossingen:gemeente:hillegom",
@@ -224,7 +224,7 @@ export const sourceCatalog = [
     baseUrl: "https://gemeenteraad.hillegom.nl/api",
     legacyConfigFile: "ori.go.yaml",
     legacyConfigRoot: "ori.go",
-    implemented: false,
+    implemented: true,
   },
   {
     sourceRef: "gemeenteoplossingen:gemeente:hofvantwente",
@@ -238,7 +238,7 @@ export const sourceCatalog = [
     baseUrl: "https://gemeenteraad.hofvantwente.nl/api",
     legacyConfigFile: "ori.go.yaml",
     legacyConfigRoot: "ori.go",
-    implemented: false,
+    implemented: true,
   },
   {
     sourceRef: "gemeenteoplossingen:gemeente:huizen",
@@ -252,7 +252,7 @@ export const sourceCatalog = [
     baseUrl: "https://ris.gemeenteraadhuizen.nl/api",
     legacyConfigFile: "ori.go.yaml",
     legacyConfigRoot: "ori.go",
-    implemented: false,
+    implemented: true,
   },
   {
     sourceRef: "gemeenteoplossingen:gemeente:leiderdorp",
@@ -266,7 +266,7 @@ export const sourceCatalog = [
     baseUrl: "https://www.raadleiderdorp.nl/api",
     legacyConfigFile: "ori.go.yaml",
     legacyConfigRoot: "ori.go",
-    implemented: false,
+    implemented: true,
   },
   {
     sourceRef: "gemeenteoplossingen:gemeente:leusden",
@@ -280,7 +280,7 @@ export const sourceCatalog = [
     baseUrl: "https://gemeentebestuur.leusden.nl/api",
     legacyConfigFile: "ori.go.yaml",
     legacyConfigRoot: "ori.go",
-    implemented: false,
+    implemented: true,
   },
   {
     sourceRef: "gemeenteoplossingen:gemeente:noordoostpolder",
@@ -294,7 +294,7 @@ export const sourceCatalog = [
     baseUrl: "https://raad.noordoostpolder.nl/api",
     legacyConfigFile: "ori.go.yaml",
     legacyConfigRoot: "ori.go",
-    implemented: false,
+    implemented: true,
   },
   {
     sourceRef: "gemeenteoplossingen:gemeente:oude_ijsselstreek",
@@ -308,7 +308,7 @@ export const sourceCatalog = [
     baseUrl: "https://raad.oude-ijsselstreek.nl/api",
     legacyConfigFile: "ori.go.yaml",
     legacyConfigRoot: "ori.go",
-    implemented: false,
+    implemented: true,
   },
   {
     sourceRef: "gemeenteoplossingen:gemeente:oudewater",
@@ -322,7 +322,7 @@ export const sourceCatalog = [
     baseUrl: "https://gemeenteraad.oudewater.nl/api",
     legacyConfigFile: "ori.go.yaml",
     legacyConfigRoot: "ori.go",
-    implemented: false,
+    implemented: true,
   },
   {
     sourceRef: "gemeenteoplossingen:gemeente:papendrecht",
@@ -336,7 +336,7 @@ export const sourceCatalog = [
     baseUrl: "https://raad.papendrecht.nl/api",
     legacyConfigFile: "ori.go.yaml",
     legacyConfigRoot: "ori.go",
-    implemented: false,
+    implemented: true,
   },
   {
     sourceRef: "ibabs:gemeente:renkum",
@@ -364,7 +364,7 @@ export const sourceCatalog = [
     baseUrl: "https://raad.ridderkerk.nl/api",
     legacyConfigFile: "ori.go.yaml",
     legacyConfigRoot: "ori.go",
-    implemented: false,
+    implemented: true,
   },
   {
     sourceRef: "gemeenteoplossingen:gemeente:roosendaal",
@@ -378,7 +378,7 @@ export const sourceCatalog = [
     baseUrl: "https://raad.roosendaal.nl/api",
     legacyConfigFile: "ori.go.yaml",
     legacyConfigRoot: "ori.go",
-    implemented: false,
+    implemented: true,
   },
   {
     sourceRef: "gemeenteoplossingen:gemeente:sliedrecht",
@@ -392,7 +392,7 @@ export const sourceCatalog = [
     baseUrl: "https://raad.sliedrecht.nl/api",
     legacyConfigFile: "ori.go.yaml",
     legacyConfigRoot: "ori.go",
-    implemented: false,
+    implemented: true,
   },
   {
     sourceRef: "gemeenteoplossingen:gemeente:steenbergen",
@@ -406,7 +406,7 @@ export const sourceCatalog = [
     baseUrl: "https://raad.gemeente-steenbergen.nl/api",
     legacyConfigFile: "ori.go.yaml",
     legacyConfigRoot: "ori.go",
-    implemented: false,
+    implemented: true,
   },
   {
     sourceRef: "gemeenteoplossingen:gemeente:stichtse_vecht",
@@ -420,7 +420,7 @@ export const sourceCatalog = [
     baseUrl: "https://raadsinformatie.stichtsevecht.nl/api",
     legacyConfigFile: "ori.go.yaml",
     legacyConfigRoot: "ori.go",
-    implemented: false,
+    implemented: true,
   },
   {
     sourceRef: "gemeenteoplossingen:gemeente:tubbergen",
@@ -434,7 +434,7 @@ export const sourceCatalog = [
     baseUrl: "https://bestuur.tubbergen.nl/api",
     legacyConfigFile: "ori.go.yaml",
     legacyConfigRoot: "ori.go",
-    implemented: false,
+    implemented: true,
   },
   {
     sourceRef: "gemeenteoplossingen:gemeente:venlo",
@@ -448,7 +448,7 @@ export const sourceCatalog = [
     baseUrl: "https://gemeenteraad.venlo.nl/api",
     legacyConfigFile: "ori.go.yaml",
     legacyConfigRoot: "ori.go",
-    implemented: false,
+    implemented: true,
   },
   {
     sourceRef: "notubiz:gemeente:west_betuwe",
@@ -476,7 +476,7 @@ export const sourceCatalog = [
     baseUrl: "https://gemeentebestuur.woudenberg.nl/api",
     legacyConfigFile: "ori.go.yaml",
     legacyConfigRoot: "ori.go",
-    implemented: false,
+    implemented: true,
   },
   {
     sourceRef: "gemeenteoplossingen:provincie:provincie-utrecht",
@@ -489,7 +489,7 @@ export const sourceCatalog = [
     baseUrl: "https://www.stateninformatie.provincie-utrecht.nl/api",
     legacyConfigFile: "osi.go.yaml",
     legacyConfigRoot: "osi.go",
-    implemented: false,
+    implemented: true,
   },
   {
     sourceRef: "ibabs:gemeente:aalsmeer",
@@ -4581,7 +4581,7 @@ export const sourceCatalog = [
     sessionId: "0e714fff-182d-497d-8874-c9a512eb4914",
     legacyConfigFile: "ori.parlaeus.yaml",
     legacyConfigRoot: "ori.parlaeus",
-    implemented: false,
+    implemented: true,
   },
   {
     sourceRef: "parlaeus:gemeente:bodegravenreeuwijk",
@@ -4596,7 +4596,7 @@ export const sourceCatalog = [
     sessionId: "97636d2c-7ac2-4f1f-8a27-8f458cbc3097",
     legacyConfigFile: "ori.parlaeus.yaml",
     legacyConfigRoot: "ori.parlaeus",
-    implemented: false,
+    implemented: true,
   },
   {
     sourceRef: "parlaeus:gemeente:maastricht",
@@ -4611,7 +4611,7 @@ export const sourceCatalog = [
     sessionId: "9feb742b-67b4-4c07-9f8c-de90dd460973",
     legacyConfigFile: "ori.parlaeus.yaml",
     legacyConfigRoot: "ori.parlaeus",
-    implemented: false,
+    implemented: true,
   },
 ] satisfies SourceCatalogEntry[];
 

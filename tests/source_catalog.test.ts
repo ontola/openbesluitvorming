@@ -4,7 +4,10 @@ import {
   listCatalogSources,
   listImplementedCatalogSources,
 } from "../src/sources/catalog.ts";
-import { listAggregateAdminSourceOptions, listAggregateRunnableSourceRefs } from "../src/sources/index.ts";
+import {
+  listAggregateAdminSourceOptions,
+  listAggregateRunnableSourceRefs,
+} from "../src/sources/index.ts";
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) {
@@ -42,15 +45,20 @@ Deno.test("source catalog includes the full ORI inventory with unique source ref
   );
 });
 
-Deno.test("implemented catalog sources are limited to Woozi-supported suppliers for now", () => {
+Deno.test("implemented catalog sources only use Woozi-supported suppliers", () => {
   const sources = listImplementedCatalogSources();
-  const suppliers = new Set(sources.map((source) => source.supplier));
+  const supported = new Set(["notubiz", "ibabs", "gemeenteoplossingen", "parlaeus"]);
 
-  assert(sources.length === 292, "expected current implemented supplier inventory");
   assert(
-    suppliers.size === 2 && suppliers.has("notubiz") && suppliers.has("ibabs"),
-    "only notubiz and ibabs should be marked implemented for now",
+    sources.length === listCatalogSources().length,
+    "every catalog source should be marked implemented after the supplier-flag migration",
   );
+  for (const source of sources) {
+    assert(
+      supported.has(source.supplier),
+      `unexpected supplier ${source.supplier} in the implemented set`,
+    );
+  }
 });
 
 Deno.test("aggregate runnable sources include all implemented sources for a supplier", () => {
