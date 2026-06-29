@@ -54,6 +54,13 @@ type IndexedHit = {
   snippet?: SearchSnippet;
 };
 
+type SearchTimingMetric = {
+  name: string;
+  durationMs: number;
+};
+
+type SearchTimingRecorder = (metric: SearchTimingMetric) => void;
+
 type CoverageBucket = {
   key?: string;
   doc_count?: number;
@@ -298,7 +305,10 @@ function hasStructuredAgenda(agenda: MeetingAgendaItem[] | undefined): boolean {
     return false;
   }
 
-  return agenda.some((item) => typeof item === "object" && item !== null && Boolean(item.title || item.documents?.length));
+  return agenda.some(
+    (item) =>
+      typeof item === "object" && item !== null && Boolean(item.title || item.documents?.length),
+  );
 }
 
 function dedupeLatestIndexedHits(items: IndexedHit[]): IndexedHit[] {
@@ -377,7 +387,11 @@ function groupIndexedHits(items: IndexedHit[]): IndexedHit[] {
   return [...grouped.values()];
 }
 
-function searchSamplingOptions(query: string, offset: number, limit: number): {
+function searchSamplingOptions(
+  query: string,
+  offset: number,
+  limit: number,
+): {
   maxHits: number;
   snippetFields: string[];
 } {
@@ -414,6 +428,7 @@ async function collectSearchWindow(
     limit: number;
     dateFrom: string;
     dateTo: string;
+    recordTiming?: SearchTimingRecorder;
   },
 ): Promise<{
   results: SearchResult[];
@@ -427,15 +442,23 @@ async function collectSearchWindow(
   let rawOffset = 0;
   let totalCount = 0;
   let exhausted = false;
+  let quickwitMs = 0;
+  let shapeMs = 0;
 
   while (!exhausted && collected.size < targetCount) {
-    const { maxHits, snippetFields } = searchSamplingOptions(options.query, rawOffset, options.limit);
+    const { maxHits, snippetFields } = searchSamplingOptions(
+      options.query,
+      rawOffset,
+      options.limit,
+    );
+    const quickwitStart = performance.now();
     const response = await quickwit.searchRequest({
       query: queryString,
       max_hits: maxHits,
       start_offset: rawOffset,
       ...(snippetFields.length > 0 ? { snippet_fields: snippetFields.join(",") } : {}),
     });
+    quickwitMs += performance.now() - quickwitStart;
 
     totalCount = response.num_hits;
     const hits = response.hits as SearchHit[];
@@ -444,6 +467,7 @@ async function collectSearchWindow(
       break;
     }
 
+    const shapeStart = performance.now();
     const indexedHits = hits.map((hit, index) => ({
       hit,
       snippet: response.snippets?.[index] as SearchSnippet | undefined,
@@ -472,16 +496,19 @@ async function collectSearchWindow(
         downloadUrl: document.payload?.media_urls?.[0]?.url ?? document.payload?.original_url,
         matchedPage: document.entity_type === "DocumentPage" ? document.page_number : undefined,
         pageCount: document.payload?.derived_content?.page_count,
-        previewImageUrl: normalizedEntityType === "Document" &&
-            looksLikePdf({
-              contentType: document.content_type ?? document.payload?.media_urls?.[0]?.content_type,
-              fileName: document.file_name,
-              url: document.payload?.media_urls?.[0]?.url ?? document.payload?.original_url,
-            })
-          ? `/api/entities/${encodeURIComponent(searchResultEntityId(document))}/pdf/page/${
-            document.entity_type === "DocumentPage" && document.page_number ? document.page_number : 1
-          }`
-          : undefined,
+        previewImageUrl:
+          normalizedEntityType === "Document" &&
+          looksLikePdf({
+            contentType: document.content_type ?? document.payload?.media_urls?.[0]?.content_type,
+            fileName: document.file_name,
+            url: document.payload?.media_urls?.[0]?.url ?? document.payload?.original_url,
+          })
+            ? `/api/entities/${encodeURIComponent(searchResultEntityId(document))}/pdf/page/${
+                document.entity_type === "DocumentPage" && document.page_number
+                  ? document.page_number
+                  : 1
+              }`
+            : undefined,
       };
 
       const existing = collected.get(result.entityId);
@@ -492,13 +519,20 @@ async function collectSearchWindow(
 
     rawOffset += hits.length;
     exhausted = rawOffset >= response.num_hits || hits.length < maxHits;
+    shapeMs += performance.now() - shapeStart;
   }
 
+  const filterSortStart = performance.now();
   const filteredResults = filterResultsByDateRange([...collected.values()], {
     dateFrom: options.dateFrom,
     dateTo: options.dateTo,
   });
   const sortedResults = sortResults(filteredResults, options.sort);
+  const filterSortMs = performance.now() - filterSortStart;
+
+  options.recordTiming?.({ name: "quickwit", durationMs: quickwitMs });
+  options.recordTiming?.({ name: "shape", durationMs: shapeMs });
+  options.recordTiming?.({ name: "filter_sort", durationMs: filterSortMs });
 
   return {
     results: sortedResults.slice(options.offset, options.offset + options.limit),
@@ -551,8 +585,8 @@ export async function getDocumentCoverage(monthCount = 12): Promise<AdminCoverag
     },
   });
 
-  const sourceBuckets = ((response.aggregations?.by_source as { buckets?: CoverageBucket[] })?.buckets ??
-    []) as CoverageBucket[];
+  const sourceBuckets = ((response.aggregations?.by_source as { buckets?: CoverageBucket[] })
+    ?.buckets ?? []) as CoverageBucket[];
   const bySource = new Map(sourceBuckets.map((bucket) => [bucket.key ?? "", bucket]));
   let maxDocumentCount = 0;
 
@@ -560,10 +594,10 @@ export async function getDocumentCoverage(monthCount = 12): Promise<AdminCoverag
     .map((source) => {
       const sourceBucket = bySource.get(source.key);
       const byMonth = new Map(
-        ((sourceBucket?.by_month?.buckets ?? []).map((bucket) => [
+        (sourceBucket?.by_month?.buckets ?? []).map((bucket) => [
           String(bucket.key ?? ""),
           Number(bucket.doc_count ?? 0),
-        ])),
+        ]),
       );
       const monthCells: AdminCoverageCell[] = months.map((month) => ({
         month,
@@ -607,6 +641,7 @@ export async function searchMeetings(
     dateTo?: string;
     offset?: number;
     limit?: number;
+    recordTiming?: SearchTimingRecorder;
   } = {},
 ): Promise<SearchResponse> {
   const query = options.query?.trim() ?? "";
@@ -627,6 +662,7 @@ export async function searchMeetings(
     dateTo,
     offset,
     limit,
+    recordTiming: options.recordTiming,
   });
 }
 
@@ -662,11 +698,7 @@ export async function getEntityContent(entityId: string): Promise<EntityContentR
   }
 
   let agenda = hit.payload?.agenda;
-  if (
-    hit.entity_type === "Meeting" &&
-    !hasStructuredAgenda(agenda) &&
-    hit.source_key
-  ) {
+  if (hit.entity_type === "Meeting" && !hasStructuredAgenda(agenda) && hit.source_key) {
     const source = getSource(hit.source_key);
     if (source.supplier === "notubiz") {
       const meetingId = entityId.split(":").at(-1);
@@ -706,6 +738,38 @@ export async function getEntityContent(entityId: string): Promise<EntityContentR
     pdfUrl,
     meetingId: hit.payload?.is_referenced_by,
     agenda,
+  };
+}
+
+export async function getEntityPdfInfo(entityId: string): Promise<{
+  pdfUrl?: string;
+  contentType?: string;
+} | null> {
+  const quickwit = new QuickwitClient();
+  const response = await quickwit.search(
+    `projection_version:${escapeTerm(currentProjectionVersion())} AND entity_id:${escapeTerm(entityId)}`,
+    8,
+  );
+  const hit = dedupeLatestHits(response.hits as SearchHit[])[0];
+
+  if (!hit) {
+    return null;
+  }
+
+  const mediaUrl = hit.payload?.media_urls?.[0];
+  const downloadUrl = mediaUrl?.url ?? hit.payload?.original_url;
+  const contentType = mediaUrl?.content_type ?? hit.content_type;
+  const pdfUrl = looksLikePdf({
+    contentType,
+    fileName: hit.file_name,
+    url: downloadUrl,
+  })
+    ? downloadUrl
+    : undefined;
+
+  return {
+    pdfUrl,
+    contentType,
   };
 }
 
@@ -779,7 +843,8 @@ async function computeIndexStats(): Promise<IndexStats> {
     throw error;
   }
 
-  const orgBuckets = (response.aggregations?.organizations as { buckets?: unknown[] })?.buckets ?? [];
+  const orgBuckets =
+    (response.aggregations?.organizations as { buckets?: unknown[] })?.buckets ?? [];
   const sourceKeyBuckets =
     (response.aggregations?.source_keys as { buckets?: { key?: unknown }[] })?.buckets ?? [];
 

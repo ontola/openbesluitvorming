@@ -16,7 +16,13 @@ import {
 import { startScheduler } from "../src/scheduler.ts";
 import { listAdminSourceOptions, listAggregateRunnableSourceRefs } from "../src/sources/index.ts";
 import type { Supplier } from "../src/types.ts";
-import { getDocumentCoverage, getEntityContent, getIndexStats, searchMeetings } from "./search_api.ts";
+import {
+  getDocumentCoverage,
+  getEntityContent,
+  getEntityPdfInfo,
+  getIndexStats,
+  searchMeetings,
+} from "./search_api.ts";
 import { ObjectStorageClient } from "../src/storage/s3.ts";
 
 const root = new URL("./", import.meta.url);
@@ -40,6 +46,46 @@ function pdfPageMetaKey(entityId: string): string {
 
 function toResponseBuffer(bytes: Uint8Array): ArrayBuffer {
   return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+}
+
+type ServerTimingMetric = {
+  name: string;
+  durationMs: number;
+};
+
+function formatDurationMs(durationMs: number): string {
+  return Math.max(0, durationMs).toFixed(1);
+}
+
+function withServerTiming(
+  response: Response,
+  requestStart: number,
+  metrics: ServerTimingMetric[] = [],
+): Response {
+  const headers = new Headers(response.headers);
+  const entries = [...metrics, { name: "total", durationMs: performance.now() - requestStart }].map(
+    (metric) => `${metric.name};dur=${formatDurationMs(metric.durationMs)}`,
+  );
+  headers.set("server-timing", entries.join(", "));
+
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
+async function measureTiming<T>(
+  metrics: ServerTimingMetric[],
+  name: string,
+  operation: () => Promise<T>,
+): Promise<T> {
+  const startedAt = performance.now();
+  try {
+    return await operation();
+  } finally {
+    metrics.push({ name, durationMs: performance.now() - startedAt });
+  }
 }
 
 function cachedFetchPdf(pdfUrl: string): Promise<Uint8Array> {
@@ -100,6 +146,7 @@ async function readStaticFile(pathname: string): Promise<Uint8Array | null> {
 }
 
 Deno.serve({ port }, async (request) => {
+  const requestStart = performance.now();
   const url = new URL(request.url);
 
   if (url.pathname === "/API.md") {
@@ -110,15 +157,15 @@ Deno.serve({ port }, async (request) => {
   const schemaMatch = url.pathname.match(/^\/schemas\/([\w.-]+\.schema\.json)$/);
   if (schemaMatch) {
     const file = await Deno.readFile(new URL(`./schemas/${schemaMatch[1]}`, projectRoot));
-    return new Response(file, { headers: { "content-type": "application/schema+json; charset=utf-8" } });
+    return new Response(file, {
+      headers: { "content-type": "application/schema+json; charset=utf-8" },
+    });
   }
 
   if (url.pathname === "/api/admin/sources") {
-    return Response.json<AdminSourcesResponse>({
-      sources: [
-        ...listAdminSourceOptions(),
-      ],
-    });
+    return Response.json({
+      sources: [...listAdminSourceOptions()],
+    } satisfies AdminSourcesResponse);
   }
 
   if (url.pathname === "/api/sources") {
@@ -126,7 +173,7 @@ Deno.serve({ port }, async (request) => {
     const sources = listAdminSourceOptions().filter((source) =>
       implementedOnly ? source.implemented : true,
     );
-    return Response.json<AdminSourcesResponse>({ sources });
+    return Response.json({ sources } satisfies AdminSourcesResponse);
   }
 
   if (url.pathname === "/api/admin/runs" && request.method === "GET") {
@@ -154,7 +201,7 @@ Deno.serve({ port }, async (request) => {
   if (url.pathname === "/api/admin/summary" && request.method === "GET") {
     try {
       const summary = await getRunSummary();
-      return Response.json<AdminRunSummaryResponse>({ summary });
+      return Response.json({ summary } satisfies AdminRunSummaryResponse);
     } catch (error) {
       return Response.json(
         { error: error instanceof Error ? error.message : "Importsamenvatting ophalen mislukt" },
@@ -165,7 +212,12 @@ Deno.serve({ port }, async (request) => {
 
   if (url.pathname === "/api/admin/extractors" && request.method === "GET") {
     const raw = Deno.env.get("WOOZI_EXTRACTION_SERVICE_URL")?.trim() ?? "";
-    const urls = raw ? raw.split(",").map((u) => u.trim()).filter(Boolean) : [];
+    const urls = raw
+      ? raw
+          .split(",")
+          .map((u) => u.trim())
+          .filter(Boolean)
+      : [];
     const workers = await Promise.all(
       urls.map(async (workerUrl) => {
         try {
@@ -191,7 +243,7 @@ Deno.serve({ port }, async (request) => {
     try {
       const monthCount = Number(url.searchParams.get("months") ?? "12");
       const coverage = await getDocumentCoverage(monthCount);
-      return Response.json<AdminCoverageResponse>(coverage);
+      return Response.json(coverage satisfies AdminCoverageResponse);
     } catch (error) {
       return Response.json(
         { error: error instanceof Error ? error.message : "Importdekking ophalen mislukt" },
@@ -228,7 +280,10 @@ Deno.serve({ port }, async (request) => {
       const executionMode = payload.executionMode ?? "full";
       if (sourceSelector.startsWith("__supplier__:") && executionMode !== "full") {
         return Response.json(
-          { error: "Deze uitvoermodus is nog niet beschikbaar voor alle bronnen van een leverancier tegelijk." },
+          {
+            error:
+              "Deze uitvoermodus is nog niet beschikbaar voor alle bronnen van een leverancier tegelijk.",
+          },
           { status: 400 },
         );
       }
@@ -255,76 +310,101 @@ Deno.serve({ port }, async (request) => {
   }
 
   if (url.pathname === "/api/stats") {
+    const metrics: ServerTimingMetric[] = [];
     try {
-      const stats = await getIndexStats();
-      return Response.json(stats, {
-        headers: { "cache-control": "public, max-age=3600" },
-      });
+      const stats = await measureTiming(metrics, "stats", () => getIndexStats());
+      return withServerTiming(
+        Response.json(stats, {
+          headers: { "cache-control": "public, max-age=3600" },
+        }),
+        requestStart,
+        metrics,
+      );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (
         message.includes("could not find indexes matching") ||
         message.includes("Quickwit request failed 404")
       ) {
-        return Response.json(
-          {
-            documentCount: 0,
-            organizationCount: 0,
-            municipalityCount: 0,
-            waterBoardCount: 0,
-            provinceCount: 0,
-          },
-          { headers: { "cache-control": "public, max-age=60" } },
+        return withServerTiming(
+          Response.json(
+            {
+              documentCount: 0,
+              organizationCount: 0,
+              municipalityCount: 0,
+              waterBoardCount: 0,
+              provinceCount: 0,
+            },
+            { headers: { "cache-control": "public, max-age=60" } },
+          ),
+          requestStart,
+          metrics,
         );
       }
-      return Response.json(
-        { error: message || "Statistieken ophalen mislukt" },
-        { status: 500 },
+      return withServerTiming(
+        Response.json({ error: message || "Statistieken ophalen mislukt" }, { status: 500 }),
+        requestStart,
+        metrics,
       );
     }
   }
 
   if (url.pathname === "/api/search") {
+    const metrics: ServerTimingMetric[] = [];
     try {
-      const results = await searchMeetings({
-        query: url.searchParams.get("query") ?? "",
-        organization: url.searchParams.get("organization") ?? "",
-        entityType: url.searchParams.get("entityType") ?? "",
-        sort: url.searchParams.get("sort") ?? "date_desc",
-        dateFrom: url.searchParams.get("dateFrom") ?? "",
-        dateTo: url.searchParams.get("dateTo") ?? "",
-        offset: Number(url.searchParams.get("offset") ?? "0"),
-        limit: Number(url.searchParams.get("limit") ?? "24"),
-      });
+      const results = await measureTiming(metrics, "search", () =>
+        searchMeetings({
+          query: url.searchParams.get("query") ?? "",
+          organization: url.searchParams.get("organization") ?? "",
+          entityType: url.searchParams.get("entityType") ?? "",
+          sort: url.searchParams.get("sort") ?? "date_desc",
+          dateFrom: url.searchParams.get("dateFrom") ?? "",
+          dateTo: url.searchParams.get("dateTo") ?? "",
+          offset: Number(url.searchParams.get("offset") ?? "0"),
+          limit: Number(url.searchParams.get("limit") ?? "24"),
+          recordTiming: (metric) => metrics.push(metric),
+        }),
+      );
 
-      return Response.json<SearchResponse>(results);
+      return withServerTiming(Response.json(results), requestStart, metrics);
     } catch (error) {
-      return Response.json(
-        {
-          error: error instanceof Error ? error.message : "Zoeken mislukt",
-        },
-        { status: 500 },
+      return withServerTiming(
+        Response.json(
+          {
+            error: error instanceof Error ? error.message : "Zoeken mislukt",
+          },
+          { status: 500 },
+        ),
+        requestStart,
+        metrics,
       );
     }
   }
 
   const pageRenderMatch = url.pathname.match(/^\/api\/entities\/([^/]+)\/pdf\/page\/(\d+)$/);
   if (pageRenderMatch && request.method === "GET") {
+    const metrics: ServerTimingMetric[] = [];
     const entityId = decodeURIComponent(pageRenderMatch[1]);
     const pageNumber = parseInt(pageRenderMatch[2], 10);
 
     if (isNaN(pageNumber) || pageNumber < 1) {
-      return Response.json({ error: "Ongeldig paginanummer" }, { status: 400 });
+      return withServerTiming(
+        Response.json({ error: "Ongeldig paginanummer" }, { status: 400 }),
+        requestStart,
+        metrics,
+      );
     }
 
     const cacheKey = pdfPageCacheKey(entityId, pageNumber);
-    const cached = await storage.getObjectBytes(cacheKey);
+    const cached = await measureTiming(metrics, "cache", () => storage.getObjectBytes(cacheKey));
     if (cached) {
       const headers = new Headers({
         "content-type": "image/jpeg",
         "cache-control": "public, max-age=31536000, immutable",
       });
-      const metadataText = await storage.getObjectText(pdfPageMetaKey(entityId)).catch(() => "");
+      const metadataText = await measureTiming(metrics, "meta", () =>
+        storage.getObjectText(pdfPageMetaKey(entityId)).catch(() => ""),
+      );
       if (metadataText) {
         try {
           const metadata = JSON.parse(metadataText) as { page_count?: number };
@@ -335,46 +415,63 @@ Deno.serve({ port }, async (request) => {
           // Ignore malformed cache metadata and serve the image bytes anyway.
         }
       }
-      return new Response(toResponseBuffer(cached), {
-        headers,
-      });
+      return withServerTiming(
+        new Response(toResponseBuffer(cached), {
+          headers,
+        }),
+        requestStart,
+        metrics,
+      );
     }
 
     try {
-      const content = await getEntityContent(entityId);
-      if (!content?.pdfUrl) {
-        return Response.json({ error: "PDF niet gevonden" }, { status: 404 });
+      const pdfInfo = await measureTiming(metrics, "pdf_lookup", () => getEntityPdfInfo(entityId));
+      if (!pdfInfo?.pdfUrl) {
+        return withServerTiming(
+          Response.json({ error: "PDF niet gevonden" }, { status: 404 }),
+          requestStart,
+          metrics,
+        );
       }
 
-      const pdfBytes = await cachedFetchPdf(content.pdfUrl);
+      const pdfBytes = await measureTiming(metrics, "pdf_fetch", () =>
+        cachedFetchPdf(pdfInfo.pdfUrl!),
+      );
 
-      const command = new Deno.Command("sh", {
-        args: [renderScriptPath, String(pageNumber)],
-        stdin: "piped",
-        stdout: "piped",
-        stderr: "piped",
+      const result = await measureTiming(metrics, "render", async () => {
+        const command = new Deno.Command("sh", {
+          args: [renderScriptPath, String(pageNumber)],
+          stdin: "piped",
+          stdout: "piped",
+          stderr: "piped",
+        });
+        const process = command.spawn();
+        const writer = process.stdin.getWriter();
+        await writer.write(pdfBytes);
+        await writer.close();
+        return await process.output();
       });
-      const process = command.spawn();
-      const writer = process.stdin.getWriter();
-      await writer.write(pdfBytes);
-      await writer.close();
-      const result = await process.output();
 
       if (!result.success) {
         const status = result.code === 1 ? 404 : 500;
-        const msg = status === 404 ? "Pagina niet gevonden" : "PDF-pagina kon niet worden weergegeven";
-        return Response.json({ error: msg }, { status });
+        const msg =
+          status === 404 ? "Pagina niet gevonden" : "PDF-pagina kon niet worden weergegeven";
+        return withServerTiming(Response.json({ error: msg }, { status }), requestStart, metrics);
       }
 
       const pageCount = parseInt(new TextDecoder().decode(result.stderr).trim(), 10);
       const imageBytes = result.stdout;
 
-      await storage.putObject(cacheKey, imageBytes, { contentType: "image/jpeg" });
+      await measureTiming(metrics, "cache_put", () =>
+        storage.putObject(cacheKey, imageBytes, { contentType: "image/jpeg" }),
+      );
       if (!isNaN(pageCount) && pageCount > 0) {
-        await storage.putObject(
-          pdfPageMetaKey(entityId),
-          new TextEncoder().encode(JSON.stringify({ page_count: pageCount })),
-          { contentType: "application/json; charset=utf-8" },
+        await measureTiming(metrics, "meta_put", () =>
+          storage.putObject(
+            pdfPageMetaKey(entityId),
+            new TextEncoder().encode(JSON.stringify({ page_count: pageCount })),
+            { contentType: "application/json; charset=utf-8" },
+          ),
         );
       }
 
@@ -385,11 +482,18 @@ Deno.serve({ port }, async (request) => {
       if (!isNaN(pageCount)) {
         headers.set("x-pdf-page-count", String(pageCount));
       }
-      return new Response(imageBytes, { headers });
+      return withServerTiming(new Response(imageBytes, { headers }), requestStart, metrics);
     } catch (error) {
-      return Response.json(
-        { error: error instanceof Error ? error.message : "PDF-pagina kon niet worden weergegeven" },
-        { status: 500 },
+      return withServerTiming(
+        Response.json(
+          {
+            error:
+              error instanceof Error ? error.message : "PDF-pagina kon niet worden weergegeven",
+          },
+          { status: 500 },
+        ),
+        requestStart,
+        metrics,
       );
     }
   }
@@ -399,14 +503,19 @@ Deno.serve({ port }, async (request) => {
     url.pathname.endsWith("/pdf") &&
     request.method === "GET"
   ) {
+    const metrics: ServerTimingMetric[] = [];
     const entityId = decodeURIComponent(
       url.pathname.slice("/api/entities/".length, -"/pdf".length),
     );
 
     try {
-      const content = await getEntityContent(entityId);
+      const content = await measureTiming(metrics, "content", () => getEntityContent(entityId));
       if (!content?.pdfUrl) {
-        return Response.json({ error: "PDF niet gevonden" }, { status: 404 });
+        return withServerTiming(
+          Response.json({ error: "PDF niet gevonden" }, { status: 404 }),
+          requestStart,
+          metrics,
+        );
       }
 
       const upstreamHeaders = new Headers();
@@ -415,15 +524,18 @@ Deno.serve({ port }, async (request) => {
         upstreamHeaders.set("range", range);
       }
 
-      const upstream = await fetch(content.pdfUrl, {
-        headers: upstreamHeaders,
-        redirect: "follow",
-      });
+      const upstream = await measureTiming(metrics, "pdf_fetch", () =>
+        fetch(content.pdfUrl!, {
+          headers: upstreamHeaders,
+          redirect: "follow",
+        }),
+      );
 
       if (!upstream.ok && upstream.status !== 206) {
-        return Response.json(
-          { error: `PDF ophalen mislukt (${upstream.status})` },
-          { status: 502 },
+        return withServerTiming(
+          Response.json({ error: `PDF ophalen mislukt (${upstream.status})` }, { status: 502 }),
+          requestStart,
+          metrics,
         );
       }
 
@@ -445,35 +557,52 @@ Deno.serve({ port }, async (request) => {
       headers.set("accept-ranges", acceptRanges ?? "bytes");
       headers.set("cache-control", "private, max-age=60");
 
-      return new Response(upstream.body, {
-        status: upstream.status,
-        headers,
-      });
+      return withServerTiming(
+        new Response(upstream.body, {
+          status: upstream.status,
+          headers,
+        }),
+        requestStart,
+        metrics,
+      );
     } catch (error) {
-      return Response.json(
-        {
-          error: error instanceof Error ? error.message : "PDF ophalen mislukt",
-        },
-        { status: 500 },
+      return withServerTiming(
+        Response.json(
+          {
+            error: error instanceof Error ? error.message : "PDF ophalen mislukt",
+          },
+          { status: 500 },
+        ),
+        requestStart,
+        metrics,
       );
     }
   }
 
   if (url.pathname.startsWith("/api/entities/") && request.method === "GET") {
+    const metrics: ServerTimingMetric[] = [];
     const entityId = decodeURIComponent(url.pathname.replace("/api/entities/", ""));
 
     try {
-      const content = await getEntityContent(entityId);
+      const content = await measureTiming(metrics, "content", () => getEntityContent(entityId));
       if (!content) {
-        return Response.json({ error: "Resultaat niet gevonden" }, { status: 404 });
+        return withServerTiming(
+          Response.json({ error: "Resultaat niet gevonden" }, { status: 404 }),
+          requestStart,
+          metrics,
+        );
       }
-      return Response.json<EntityContentResponse>(content);
+      return withServerTiming(Response.json(content), requestStart, metrics);
     } catch (error) {
-      return Response.json(
-        {
-          error: error instanceof Error ? error.message : "Documentinhoud ophalen mislukt",
-        },
-        { status: 500 },
+      return withServerTiming(
+        Response.json(
+          {
+            error: error instanceof Error ? error.message : "Documentinhoud ophalen mislukt",
+          },
+          { status: 500 },
+        ),
+        requestStart,
+        metrics,
       );
     }
   }
@@ -483,14 +612,17 @@ Deno.serve({ port }, async (request) => {
   const file = await readStaticFile(pathname);
 
   if (file) {
-    return new Response(toResponseBuffer(file), {
-      headers: {
-        "content-type": contentType(pathname),
-      },
-    });
+    return withServerTiming(
+      new Response(toResponseBuffer(file), {
+        headers: {
+          "content-type": contentType(pathname),
+        },
+      }),
+      requestStart,
+    );
   }
 
-  return new Response("Niet gevonden", { status: 404 });
+  return withServerTiming(new Response("Niet gevonden", { status: 404 }), requestStart);
 });
 
 console.log(`OpenBesluitvorming draait op http://127.0.0.1:${port}`);
