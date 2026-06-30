@@ -13,6 +13,7 @@ import { currentProjectionVersion } from "../src/pipeline/versioning.ts";
 import { QuickwitClient } from "../src/quickwit/client.ts";
 import { getSource, listSources } from "../src/sources/index.ts";
 import { ObjectStorageClient } from "../src/storage/s3.ts";
+import { pdfPageCacheKey } from "../src/documents/thumbnails.ts";
 
 type SearchHit = {
   time?: string;
@@ -428,6 +429,7 @@ async function collectSearchWindow(
     limit: number;
     dateFrom: string;
     dateTo: string;
+    previewUrlForKey?: (key: string) => Promise<string | undefined>;
     recordTiming?: SearchTimingRecorder;
   },
 ): Promise<{
@@ -439,6 +441,7 @@ async function collectSearchWindow(
   const queryString = buildQuickwitQuery(options.query, options.organization, options.entityType);
   const targetCount = options.offset + options.limit + 1;
   const collected = new Map<string, SearchResult>();
+  const previewKeys = new Map<string, string>();
   let rawOffset = 0;
   let totalCount = 0;
   let exhausted = false;
@@ -477,8 +480,16 @@ async function collectSearchWindow(
     for (const { hit: document, snippet: snippets } of dedupedHits) {
       const snippetHtml = sanitizeSnippet(snippets?.content?.[0] ?? snippets?.name?.[0]);
       const normalizedEntityType = searchResultEntityType(document);
+      const resultEntityId = searchResultEntityId(document);
+      const canPreviewPdf =
+        normalizedEntityType === "Document" &&
+        looksLikePdf({
+          contentType: document.content_type ?? document.payload?.media_urls?.[0]?.content_type,
+          fileName: document.file_name,
+          url: document.payload?.media_urls?.[0]?.url ?? document.payload?.original_url,
+        });
       const result: SearchResult = {
-        entityId: searchResultEntityId(document),
+        entityId: resultEntityId,
         organization: displayOrganization(document),
         entityType: normalizedEntityType,
         entityTypeLabel: entityTypeLabel(normalizedEntityType),
@@ -496,20 +507,10 @@ async function collectSearchWindow(
         downloadUrl: document.payload?.media_urls?.[0]?.url ?? document.payload?.original_url,
         matchedPage: document.entity_type === "DocumentPage" ? document.page_number : undefined,
         pageCount: document.payload?.derived_content?.page_count,
-        previewImageUrl:
-          normalizedEntityType === "Document" &&
-          looksLikePdf({
-            contentType: document.content_type ?? document.payload?.media_urls?.[0]?.content_type,
-            fileName: document.file_name,
-            url: document.payload?.media_urls?.[0]?.url ?? document.payload?.original_url,
-          })
-            ? `/api/entities/${encodeURIComponent(searchResultEntityId(document))}/pdf/page/${
-                document.entity_type === "DocumentPage" && document.page_number
-                  ? document.page_number
-                  : 1
-              }`
-            : undefined,
       };
+      if (canPreviewPdf) {
+        previewKeys.set(resultEntityId, pdfPageCacheKey(resultEntityId, 1));
+      }
 
       const existing = collected.get(result.entityId);
       if (!existing) {
@@ -530,12 +531,28 @@ async function collectSearchWindow(
   const sortedResults = sortResults(filteredResults, options.sort);
   const filterSortMs = performance.now() - filterSortStart;
 
+  const pageResults = sortedResults.slice(options.offset, options.offset + options.limit);
+  const previewStart = performance.now();
+  if (options.previewUrlForKey) {
+    await Promise.all(
+      pageResults.map(async (result) => {
+        const key = previewKeys.get(result.entityId);
+        if (!key) {
+          return;
+        }
+        result.previewImageUrl = await options.previewUrlForKey!(key);
+      }),
+    );
+  }
+  const previewMs = performance.now() - previewStart;
+
   options.recordTiming?.({ name: "quickwit", durationMs: quickwitMs });
   options.recordTiming?.({ name: "shape", durationMs: shapeMs });
   options.recordTiming?.({ name: "filter_sort", durationMs: filterSortMs });
+  options.recordTiming?.({ name: "preview", durationMs: previewMs });
 
   return {
-    results: sortedResults.slice(options.offset, options.offset + options.limit),
+    results: pageResults,
     totalCount,
     totalIsApproximate: true,
     hasMore: sortedResults.length > options.offset + options.limit || !exhausted,
@@ -653,6 +670,27 @@ export async function searchMeetings(
   const offset = Math.max(0, options.offset ?? 0);
   const limit = Math.max(1, Math.min(options.limit ?? 24, 100));
   const quickwit = new QuickwitClient();
+  let previewUrlForKey: ((key: string) => Promise<string | undefined>) | undefined;
+  try {
+    const storage = await ObjectStorageClient.fromEnvironment();
+    const sampleUrl = await ObjectStorageClient.publicUrlForKey("__woozi_preview_base__");
+    const baseUrl = sampleUrl.slice(0, -"__woozi_preview_base__".length);
+    const previewUrlCache = new Map<string, Promise<string | undefined>>();
+    previewUrlForKey = (key) => {
+      if (!previewUrlCache.has(key)) {
+        previewUrlCache.set(
+          key,
+          storage
+            .hasObject(key)
+            .then((exists) => (exists ? `${baseUrl}${key}` : undefined))
+            .catch(() => undefined),
+        );
+      }
+      return previewUrlCache.get(key)!;
+    };
+  } catch {
+    previewUrlForKey = undefined;
+  }
   return await collectSearchWindow(quickwit, {
     query,
     organization,
@@ -662,6 +700,7 @@ export async function searchMeetings(
     dateTo,
     offset,
     limit,
+    previewUrlForKey,
     recordTiming: options.recordTiming,
   });
 }

@@ -24,6 +24,7 @@ import {
   searchMeetings,
 } from "./search_api.ts";
 import { ObjectStorageClient } from "../src/storage/s3.ts";
+import { pdfPageCacheKey, pdfPageMetaKey, renderPdfPageJpeg } from "../src/documents/thumbnails.ts";
 
 const root = new URL("./", import.meta.url);
 const distRoot = new URL("./dist/", import.meta.url);
@@ -31,18 +32,9 @@ const projectRoot = new URL("../", import.meta.url);
 const port = Number(Deno.env.get("PORT") ?? "8787");
 
 const storage = await ObjectStorageClient.fromEnvironment();
-const renderScriptPath = new URL("../scripts/pdf_render_page.sh", import.meta.url).pathname;
 
 // Short-lived cache to deduplicate concurrent PDF downloads for the same document.
 const pdfFetchCache = new Map<string, Promise<Uint8Array>>();
-
-function pdfPageCacheKey(entityId: string, pageNumber: number): string {
-  return `pdf-pages-v4/${entityId}/${pageNumber}.jpg`;
-}
-
-function pdfPageMetaKey(entityId: string): string {
-  return `pdf-pages-v2/${entityId}/meta.json`;
-}
 
 function toResponseBuffer(bytes: Uint8Array): ArrayBuffer {
   return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
@@ -438,34 +430,25 @@ Deno.serve({ port }, async (request) => {
         cachedFetchPdf(pdfInfo.pdfUrl!),
       );
 
-      const result = await measureTiming(metrics, "render", async () => {
-        const command = new Deno.Command("sh", {
-          args: [renderScriptPath, String(pageNumber)],
-          stdin: "piped",
-          stdout: "piped",
-          stderr: "piped",
-        });
-        const process = command.spawn();
-        const writer = process.stdin.getWriter();
-        await writer.write(pdfBytes);
-        await writer.close();
-        return await process.output();
-      });
-
-      if (!result.success) {
-        const status = result.code === 1 ? 404 : 500;
-        const msg =
-          status === 404 ? "Pagina niet gevonden" : "PDF-pagina kon niet worden weergegeven";
+      let renderedPage: Awaited<ReturnType<typeof renderPdfPageJpeg>>;
+      try {
+        renderedPage = await measureTiming(metrics, "render", () =>
+          renderPdfPageJpeg(pdfBytes, pageNumber),
+        );
+      } catch (error) {
+        const notFound = error instanceof Error && error.message === "PDF page not found";
+        const status = notFound ? 404 : 500;
+        const msg = notFound ? "Pagina niet gevonden" : "PDF-pagina kon niet worden weergegeven";
         return withServerTiming(Response.json({ error: msg }, { status }), requestStart, metrics);
       }
 
-      const pageCount = parseInt(new TextDecoder().decode(result.stderr).trim(), 10);
-      const imageBytes = result.stdout;
+      const pageCount = renderedPage.pageCount;
+      const imageBytes = renderedPage.imageBytes;
 
       await measureTiming(metrics, "cache_put", () =>
         storage.putObject(cacheKey, imageBytes, { contentType: "image/jpeg" }),
       );
-      if (!isNaN(pageCount) && pageCount > 0) {
+      if (pageCount !== null && pageCount > 0) {
         await measureTiming(metrics, "meta_put", () =>
           storage.putObject(
             pdfPageMetaKey(entityId),
@@ -479,10 +462,14 @@ Deno.serve({ port }, async (request) => {
         "content-type": "image/jpeg",
         "cache-control": "public, max-age=31536000, immutable",
       });
-      if (!isNaN(pageCount)) {
+      if (pageCount !== null) {
         headers.set("x-pdf-page-count", String(pageCount));
       }
-      return withServerTiming(new Response(imageBytes, { headers }), requestStart, metrics);
+      return withServerTiming(
+        new Response(toResponseBuffer(imageBytes), { headers }),
+        requestStart,
+        metrics,
+      );
     } catch (error) {
       return withServerTiming(
         Response.json(

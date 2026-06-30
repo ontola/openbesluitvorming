@@ -3,6 +3,7 @@ import { extractDocumentMarkdown, MAX_PDF_PAGES } from "./text.ts";
 import type { IngestExecutionMode } from "../types.ts";
 import { assessMarkdownQuality } from "./quality.ts";
 import { currentDerivationVersion } from "../pipeline/versioning.ts";
+import { pdfPageCacheKey, pdfPageMetaKey, renderPdfPageJpeg } from "./thumbnails.ts";
 
 let extractionServiceUrls: string[] | null = null;
 let extractionRoundRobin = 0;
@@ -11,7 +12,10 @@ function nextExtractionServiceUrl(): string | null {
   if (extractionServiceUrls === null) {
     const raw = Deno.env.get("WOOZI_EXTRACTION_SERVICE_URL")?.trim();
     extractionServiceUrls = raw
-      ? raw.split(",").map((u) => u.trim()).filter(Boolean)
+      ? raw
+          .split(",")
+          .map((u) => u.trim())
+          .filter(Boolean)
       : [];
   }
   if (extractionServiceUrls.length === 0) return null;
@@ -38,8 +42,19 @@ function isPdf(document: DocumentEntity): boolean {
 // the failed S3 write retry storm — Hilversum's "Geluidsbestand agendapunt"
 // MP3s alone generated ~6k failures in a week.
 const UNSEARCHABLE_MEDIA_EXTENSIONS = [
-  ".mp3", ".m4a", ".wav", ".ogg", ".opus", ".aac", ".flac",
-  ".mp4", ".m4v", ".mov", ".avi", ".mkv", ".webm",
+  ".mp3",
+  ".m4a",
+  ".wav",
+  ".ogg",
+  ".opus",
+  ".aac",
+  ".flac",
+  ".mp4",
+  ".m4v",
+  ".mov",
+  ".avi",
+  ".mkv",
+  ".webm",
 ];
 
 function isUnsearchableMedia(document: DocumentEntity): boolean {
@@ -62,6 +77,58 @@ interface CachedStorage {
   getObjectText(key: string): Promise<string>;
   getObjectBytes(key: string): Promise<Uint8Array | null>;
   urlForKey(key: string): string;
+}
+
+async function prewarmFirstPageThumbnail(
+  document: DocumentEntity,
+  storage: CachedStorage,
+  pdfBytes: Uint8Array,
+): Promise<void> {
+  if (!isPdf(document)) {
+    return;
+  }
+
+  const startedAt = performance.now();
+  const thumbnailKey = pdfPageCacheKey(document.id, 1);
+  if (await storage.hasObject(thumbnailKey)) {
+    return;
+  }
+
+  try {
+    const rendered = await renderPdfPageJpeg(pdfBytes, 1);
+    await storage.putObject(thumbnailKey, rendered.imageBytes, {
+      contentType: "image/jpeg",
+      metadata: {
+        entity_id: document.id,
+        source: document.source_info.source,
+        kind: "pdf_page_thumbnail",
+        page_number: "1",
+      },
+    });
+    if (rendered.pageCount !== null && rendered.pageCount > 0) {
+      await storage.putObject(
+        pdfPageMetaKey(document.id),
+        new TextEncoder().encode(JSON.stringify({ page_count: rendered.pageCount })),
+        {
+          contentType: "application/json; charset=utf-8",
+          metadata: {
+            entity_id: document.id,
+            source: document.source_info.source,
+            kind: "pdf_page_metadata",
+          },
+        },
+      );
+    }
+    console.log(
+      `[timing] ${document.id} path=thumbnail_prewarm ${Math.round(performance.now() - startedAt)}ms`,
+    );
+  } catch (error) {
+    console.warn(
+      `[warning] ${document.id} thumbnail_prewarm_failed ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+  }
 }
 
 type StoredPageChunks = {
@@ -249,6 +316,8 @@ async function rederiveFromStoredFile(
     );
   }
 
+  await prewarmFirstPageThumbnail(document, storage, storedBytes);
+
   const quality = mdText ? assessMarkdownQuality(mdText) : null;
 
   return {
@@ -290,7 +359,9 @@ export async function materializeDocument(
   }
 
   if (isUnsearchableMedia(document)) {
-    console.log(`[timing] ${docId} path=skip_media ${Math.round(performance.now() - t0)}ms file=${document.file_name ?? ""}`);
+    console.log(
+      `[timing] ${docId} path=skip_media ${Math.round(performance.now() - t0)}ms file=${document.file_name ?? ""}`,
+    );
     return { document, cacheHit: false, issues: [] };
   }
 
@@ -354,6 +425,8 @@ export async function materializeDocument(
             source_url: document.original_url,
             s3_pdf_key: pdfKey,
             s3_markdown_key: mdKey,
+            s3_thumbnail_key: pdfPageCacheKey(document.id, 1),
+            s3_thumbnail_meta_key: pdfPageMetaKey(document.id),
             max_pages: MAX_PDF_PAGES,
           }),
         });
@@ -385,7 +458,9 @@ export async function materializeDocument(
         );
 
         const quality = payload.markdown ? assessMarkdownQuality(payload.markdown) : null;
-        console.log(`[timing] ${docId} path=extraction_service ${Math.round(performance.now() - t0)}ms pages=${payload.page_count} md=${Math.round(payload.markdown.length / 1024)}KB`);
+        console.log(
+          `[timing] ${docId} path=extraction_service ${Math.round(performance.now() - t0)}ms pages=${payload.page_count} md=${Math.round(payload.markdown.length / 1024)}KB`,
+        );
 
         return {
           cacheHit: false,
@@ -425,7 +500,9 @@ export async function materializeDocument(
       details: issueDetailsFromError(lastError),
     });
 
-    console.log(`[timing] ${docId} path=extraction_service_failed ${Math.round(performance.now() - t0)}ms`);
+    console.log(
+      `[timing] ${docId} path=extraction_service_failed ${Math.round(performance.now() - t0)}ms`,
+    );
     return { document, cacheHit: false, issues };
   }
 
@@ -500,6 +577,7 @@ export async function materializeDocument(
         },
       );
     }
+    await prewarmFirstPageThumbnail(document, options.storage, bytes);
     mediaUrls = [
       {
         url: stored.url,
@@ -510,7 +588,9 @@ export async function materializeDocument(
   }
 
   const quality = mdText ? assessMarkdownQuality(mdText) : null;
-  console.log(`[timing] ${docId} path=local_fallback total=${Math.round(performance.now() - t0)}ms dl=${dlMs}ms bytes=${Math.round(bytes.length / 1024)}KB md=${Math.round(mdText.length / 1024)}KB`);
+  console.log(
+    `[timing] ${docId} path=local_fallback total=${Math.round(performance.now() - t0)}ms dl=${dlMs}ms bytes=${Math.round(bytes.length / 1024)}KB md=${Math.round(mdText.length / 1024)}KB`,
+  );
 
   return {
     cacheHit: false,

@@ -1,6 +1,7 @@
 """PDF extraction service: downloads PDF, extracts markdown, uploads to S3."""
 
 import os
+import json
 import tempfile
 import time
 from pathlib import Path
@@ -51,6 +52,15 @@ def fallback_markdown_with_pymupdf(input_path: Path, max_pages: int) -> str:
     return "\n\n".join(parts).strip()
 
 
+def render_first_page_jpeg(input_path: Path) -> bytes:
+    with pymupdf.open(str(input_path)) as document:
+        if document.page_count < 1:
+            raise ValueError("PDF has no pages")
+        page = document.load_page(0)
+        pixmap = page.get_pixmap(matrix=pymupdf.Matrix(96 / 72, 96 / 72), alpha=False)
+        return pixmap.tobytes("jpeg", jpg_quality=85)
+
+
 def get_s3_client():
     return boto3.client(
         "s3",
@@ -66,6 +76,8 @@ class ExtractRequest(BaseModel):
     s3_pdf_key: str
     s3_markdown_key: str | None = None
     s3_page_chunks_key: str | None = None
+    s3_thumbnail_key: str | None = None
+    s3_thumbnail_meta_key: str | None = None
     max_pages: int = MAX_PAGES_DEFAULT
 
 
@@ -113,6 +125,13 @@ async def extract(req: ExtractRequest):
                 )
                 markdown = fallback_markdown_with_pymupdf(pdf_path, req.max_pages)
 
+            thumbnail_bytes: bytes | None = None
+            if req.s3_thumbnail_key:
+                try:
+                    thumbnail_bytes = render_first_page_jpeg(pdf_path)
+                except Exception as error:
+                    warnings.append(f"PDF thumbnail prewarm failed: {error}")
+
         t_extract = time.monotonic()
 
         # Upload PDF to S3
@@ -124,6 +143,20 @@ async def extract(req: ExtractRequest):
             s3.put_object(Bucket=bucket, Key=req.s3_markdown_key,
                           Body=markdown.encode("utf-8"),
                           ContentType="text/markdown; charset=utf-8")
+
+        if req.s3_thumbnail_key and thumbnail_bytes:
+            s3.put_object(Bucket=bucket, Key=req.s3_thumbnail_key,
+                          Body=thumbnail_bytes,
+                          ContentType="image/jpeg",
+                          Metadata={
+                              "kind": "pdf_page_thumbnail",
+                              "page_number": "1",
+                          })
+
+        if req.s3_thumbnail_meta_key:
+            s3.put_object(Bucket=bucket, Key=req.s3_thumbnail_meta_key,
+                          Body=json.dumps({"page_count": page_count}).encode("utf-8"),
+                          ContentType="application/json; charset=utf-8")
 
         t_upload = time.monotonic()
 

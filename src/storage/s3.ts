@@ -16,6 +16,13 @@ function trimTrailingSlash(value: string): string {
   return value.endsWith("/") ? value.slice(0, -1) : value;
 }
 
+function defaultPublicEndpoint(endpoint: string): string {
+  if (endpoint === "http://minio:9000") {
+    return "http://127.0.0.1:9000";
+  }
+  return endpoint;
+}
+
 function describeStorageError(action: string, key: string, error: unknown): Error {
   if (error instanceof Error) {
     const name = error.name?.trim() || "Error";
@@ -95,6 +102,16 @@ export class ObjectStorageClient {
 
   urlForKey(key: string): string {
     return `${this.endpoint}/${this.bucket}/${key}`;
+  }
+
+  static async publicUrlForKey(key: string): Promise<string> {
+    const bucket = await getConfigValue("S3_STORAGE_BUCKET_NAME", DEFAULT_BUCKET);
+    const storageEndpoint = await getConfigValue("S3_STORAGE_ENDPOINT", DEFAULT_ENDPOINT);
+    const endpoint = await getConfigValue(
+      "S3_PUBLIC_ENDPOINT",
+      defaultPublicEndpoint(storageEndpoint),
+    );
+    return `${trimTrailingSlash(endpoint)}/${bucket}/${key}`;
   }
 
   async hasObject(key: string): Promise<boolean> {

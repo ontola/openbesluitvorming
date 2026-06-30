@@ -71,6 +71,8 @@
   let searchRequestId = 0;
   let searchAbortController: AbortController | null = null;
 
+  const highPriorityPreviewCount = 3;
+
   let showApiDocs = false;
   let apiDocsHtml = "";
 
@@ -275,6 +277,14 @@
 
   function previewLoadKey(item: SearchResult): string {
     return `${item.entityId}:${item.previewImageUrl ?? ""}`;
+  }
+
+  function previewImageLoading(index: number): "eager" | "lazy" {
+    return index < highPriorityPreviewCount ? "eager" : "lazy";
+  }
+
+  function previewImageFetchPriority(index: number): "high" | "low" {
+    return index < highPriorityPreviewCount ? "high" : "low";
   }
 
   function markPreviewLoaded(item: SearchResult): void {
@@ -1366,7 +1376,9 @@
                       <img
                         alt=""
                         class="result-card__preview-image"
-                        loading="lazy"
+                        decoding="async"
+                        fetchpriority={previewImageFetchPriority(index)}
+                        loading={previewImageLoading(index)}
                         on:load={() => markPreviewLoaded(item)}
                         src={item.previewImageUrl}
                       />
