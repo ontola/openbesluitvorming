@@ -54,6 +54,8 @@
 
   let sources: AdminSourceOption[] = [];
   let results: SearchResult[] = [];
+  const fallbackDocumentCount = 7_058_862;
+  const fallbackOrganizationCount = 321;
   let indexDocumentCount: number | null = null;
   let indexOrganizationCount: number | null = null;
   // Defaults used as pre-load fallback so the descriptive paragraph below
@@ -1184,7 +1186,7 @@
           </h1>
 
           <ul class="hero__meta">
-            <li on:dblclick={() => { window.location.href = "/admin.html"; }}><strong>{indexDocumentCount !== null ? indexDocumentCount.toLocaleString("nl-NL") : "..."}</strong> vergaderstukken</li>
+            <li on:dblclick={() => { window.location.href = "/admin.html"; }}><strong>{(indexDocumentCount ?? fallbackDocumentCount).toLocaleString("nl-NL")}</strong> vergaderstukken</li>
             <li>
               <button
                 type="button"
@@ -1202,7 +1204,7 @@
                 }}
               >
                 <span class="hero__meta-trigger__label">
-                  <strong>{indexOrganizationCount !== null ? indexOrganizationCount : "..."}</strong>
+                  <strong>{indexOrganizationCount ?? fallbackOrganizationCount}</strong>
                   organisaties
                 </span>
                 <span class="hero__meta-trigger__chevron" aria-hidden="true"></span>
