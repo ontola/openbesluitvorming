@@ -512,6 +512,7 @@ async function collectSearchWindow(
       query: queryString,
       max_hits: requestMaxHits,
       start_offset: rawOffset,
+      count_all: false,
       ...(snippetFields.length > 0 ? { snippet_fields: snippetFields.join(",") } : {}),
     });
     quickwitMs += performance.now() - quickwitStart;

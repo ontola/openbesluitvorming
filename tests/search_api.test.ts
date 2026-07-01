@@ -17,6 +17,7 @@ Deno.test("searchMeetings dedupes to the latest hit and keeps the newest snippet
 
     const body = JSON.parse(String((init as { body?: string } | undefined)?.body ?? "{}"));
     assert(body.max_hits === 25, "search should fetch one bounded first-page window");
+    assert(body.count_all === false, "public search should skip full Quickwit hit counting");
 
     return new Response(
       JSON.stringify({

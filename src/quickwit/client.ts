@@ -75,6 +75,7 @@ type QuickwitSearchRequest = {
   max_hits?: number;
   start_offset?: number;
   snippet_fields?: string;
+  count_all?: boolean;
   aggs?: Record<string, unknown>;
 };
 
