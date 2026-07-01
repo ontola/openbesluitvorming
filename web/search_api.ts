@@ -434,7 +434,7 @@ function searchSamplingOptions(
 
   if (queryLength >= 4) {
     return {
-      maxHits: Math.min(Math.max((offset + limit) * 3, 72), 240),
+      maxHits: Math.min(Math.max(offset + limit + 1, 25), 96),
       snippetFields: ["content", "name"],
     };
   }
@@ -453,14 +453,14 @@ function searchSamplingOptions(
 }
 
 function maxRawSearchHits(query: string, offset: number, limit: number): number {
-  const targetCount = offset + limit + 1;
   const { maxHits } = searchSamplingOptions(query, offset, limit);
 
   if (!query.trim()) {
+    const targetCount = offset + limit + 1;
     return Math.max(maxHits, targetCount + limit);
   }
 
-  return Math.max(maxHits * 3, targetCount * 6);
+  return maxHits;
 }
 
 async function collectSearchWindow(

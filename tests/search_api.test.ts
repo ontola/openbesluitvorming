@@ -16,7 +16,7 @@ Deno.test("searchMeetings dedupes to the latest hit and keeps the newest snippet
     }
 
     const body = JSON.parse(String((init as { body?: string } | undefined)?.body ?? "{}"));
-    assert(body.max_hits === 72, "search should still over-fetch before deduping");
+    assert(body.max_hits === 25, "search should fetch one bounded first-page window");
 
     return new Response(
       JSON.stringify({
@@ -201,7 +201,7 @@ Deno.test("searchMeetings supports offset paging and signals more results approx
 
   globalThis.fetch = async (_input, init) => {
     const body = JSON.parse(String((init as { body?: string } | undefined)?.body ?? "{}"));
-    assert(body.max_hits === 144, "search should still increase over-fetch for deeper pages");
+    assert(body.max_hits === 49, "search should fetch enough hits to cover the requested page");
 
     const hits = Array.from({ length: 30 }, (_, index) => ({
       time: `2026-03-31T${String(index).padStart(2, "0")}:00:00Z`,
@@ -240,7 +240,7 @@ Deno.test("searchMeetings supports offset paging and signals more results approx
   }
 });
 
-Deno.test("searchMeetings keeps follow-up first-page batches bounded after grouping", async () => {
+Deno.test("searchMeetings avoids follow-up first-page batches after grouping", async () => {
   const originalFetch = globalThis.fetch;
   const maxHitsByRequest: number[] = [];
 
@@ -281,9 +281,8 @@ Deno.test("searchMeetings keeps follow-up first-page batches bounded after group
       limit: 24,
     });
 
-    assert(maxHitsByRequest.length === 2, "grouped first page should fetch one follow-up batch");
-    assert(maxHitsByRequest[0] === 72, "initial first-page batch should fetch 72 hits");
-    assert(maxHitsByRequest[1] === 72, "follow-up first-page batch should stay bounded at 72 hits");
+    assert(maxHitsByRequest.length === 1, "grouped first page should not fetch follow-up batches");
+    assert(maxHitsByRequest[0] === 25, "initial first-page batch should fetch one page window");
   } finally {
     globalThis.fetch = originalFetch;
   }
