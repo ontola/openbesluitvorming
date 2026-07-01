@@ -322,6 +322,7 @@ Deno.test("searchMeetings caps broad document scans after grouping", async () =>
 
   try {
     const response = await searchMeetings({
+      organization: "haarlem",
       entityType: "Document",
       offset: 0,
       limit: 24,
@@ -333,6 +334,30 @@ Deno.test("searchMeetings caps broad document scans after grouping", async () =>
       startOffsets.every((offset) => offset < 49),
       "broad document scans should not continue into deep Quickwit offsets",
     );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+Deno.test("searchMeetings does not scan Quickwit for type-only filters", async () => {
+  const originalFetch = globalThis.fetch;
+  let fetched = false;
+
+  globalThis.fetch = async () => {
+    fetched = true;
+    throw new Error("Quickwit should not be queried for type-only searches");
+  };
+
+  try {
+    const response = await searchMeetings({
+      entityType: "Document",
+      offset: 0,
+      limit: 24,
+    });
+
+    assert(fetched === false, "type-only searches should return without a Quickwit request");
+    assert(response.results.length === 0, "type-only searches should return no results");
+    assert(response.hasMore === false, "type-only searches should not advertise more results");
   } finally {
     globalThis.fetch = originalFetch;
   }

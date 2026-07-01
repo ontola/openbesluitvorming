@@ -729,6 +729,16 @@ export async function searchMeetings(
   const dateTo = options.dateTo?.trim() ?? "";
   const offset = Math.max(0, options.offset ?? 0);
   const limit = Math.max(1, Math.min(options.limit ?? 24, 100));
+
+  if (!query && !organization) {
+    return {
+      results: [],
+      totalCount: 0,
+      totalIsApproximate: false,
+      hasMore: false,
+    };
+  }
+
   const quickwit = new QuickwitClient();
   let previewUrlForKey: ((key: string) => Promise<string | undefined>) | undefined;
   try {
