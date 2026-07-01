@@ -21,7 +21,7 @@ const POLL_INTERVAL_MS = 5000;
 const workerId =
   Deno.env.get("WORKER_ID") ?? `${Deno.hostname()}.${crypto.randomUUID().slice(0, 8)}`;
 
-const ingestConcurrencyCap = Math.max(1, Number(Deno.env.get("INGEST_CONCURRENCY") ?? "4"));
+const ingestConcurrencyCap = Math.max(1, Number(Deno.env.get("INGEST_CONCURRENCY") ?? "1"));
 const ingestMemoryPerJobMb = Math.max(
   256,
   Number(Deno.env.get("INGEST_MEMORY_PER_JOB_MB") ?? "1400"),

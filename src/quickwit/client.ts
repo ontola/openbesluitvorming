@@ -5,6 +5,7 @@ import type { EntityCommitEvent, WooziEntity } from "../types.ts";
 const DEFAULT_INDEX_ID = "woozi-events";
 const DEFAULT_QUICKWIT_URL = "http://127.0.0.1:7280";
 const MAX_INGEST_PAYLOAD_BYTES = 8_000_000;
+const DEFAULT_SEARCH_TIMEOUT_MS = 8_000;
 
 type QuickwitSearchResponse = {
   num_hits: number;
@@ -30,7 +31,7 @@ function isRetryableIngestError(error: unknown): boolean {
   }
 
   return (
-    error.message.includes("index `") && error.message.includes("` not found") ||
+    (error.message.includes("index `") && error.message.includes("` not found")) ||
     error.message.includes("Quickwit ingest failed 404")
   );
 }
@@ -45,6 +46,11 @@ function getBaseUrl(): string {
 
 function getIndexId(): string {
   return Deno.env.get("QUICKWIT_INDEX_ID") ?? DEFAULT_INDEX_ID;
+}
+
+function getSearchTimeoutMs(): number {
+  const value = Number(Deno.env.get("QUICKWIT_SEARCH_TIMEOUT_MS") ?? DEFAULT_SEARCH_TIMEOUT_MS);
+  return Number.isFinite(value) && value > 0 ? value : DEFAULT_SEARCH_TIMEOUT_MS;
 }
 
 async function fetchJson<T>(input: string, init?: RequestInit): Promise<T> {
@@ -192,13 +198,17 @@ export class QuickwitClient {
   }
 
   async searchRequest(body: QuickwitSearchRequest): Promise<QuickwitSearchResponse> {
-    return await fetchJson<QuickwitSearchResponse>(`${this.baseUrl}/api/v1/${this.indexId}/search`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
+    return await fetchJson<QuickwitSearchResponse>(
+      `${this.baseUrl}/api/v1/${this.indexId}/search`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        signal: AbortSignal.timeout(getSearchTimeoutMs()),
+        body: JSON.stringify(body),
       },
-      body: JSON.stringify(body),
-    });
+    );
   }
 
   async searchEventually(

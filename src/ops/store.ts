@@ -322,6 +322,20 @@ export async function findActiveRun(options: {
   return run ? normalizeRunRecord(run) : null;
 }
 
+export async function countActiveScheduledRuns(): Promise<number> {
+  const db = await getDatabase();
+  const row = db
+    .prepare(
+      `SELECT COUNT(*) as count
+       FROM ingest_run
+       WHERE trigger_mode = 'scheduled'
+         AND execution_mode = 'full'
+         AND status IN ('queued', 'running')`,
+    )
+    .get() as { count?: number } | undefined;
+  return row?.count ?? 0;
+}
+
 export async function reconcileInterruptedRuns(): Promise<IngestRunRecord[]> {
   const db = await getDatabase();
   const interruptedRuns = db

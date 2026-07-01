@@ -240,6 +240,55 @@ Deno.test("searchMeetings supports offset paging and signals more results approx
   }
 });
 
+Deno.test("searchMeetings keeps follow-up first-page batches bounded after grouping", async () => {
+  const originalFetch = globalThis.fetch;
+  const maxHitsByRequest: number[] = [];
+
+  globalThis.fetch = async (_input, init) => {
+    const body = JSON.parse(String((init as { body?: string } | undefined)?.body ?? "{}"));
+    maxHitsByRequest.push(Number(body.max_hits));
+
+    const startOffset = Number(body.start_offset ?? 0);
+    const hits =
+      startOffset === 0
+        ? Array.from({ length: 72 }, (_, index) => ({
+            time: `2026-03-31T${String(index % 24).padStart(2, "0")}:00:00Z`,
+            entity_id: "meeting:notubiz:gemeente:haarlem:duplicate",
+            entity_type: "Meeting",
+            name: `Vergadering duplicate ${index}`,
+            start_date: "2025-01-14T17:00:00Z",
+            source_key: "haarlem",
+            content: `Agenda duplicate ${index}`,
+          }))
+        : [];
+
+    return new Response(
+      JSON.stringify({
+        num_hits: 144,
+        hits,
+      }),
+      {
+        headers: { "content-type": "application/json" },
+      },
+    );
+  };
+
+  try {
+    await searchMeetings({
+      query: "vergadering",
+      organization: "haarlem",
+      offset: 0,
+      limit: 24,
+    });
+
+    assert(maxHitsByRequest.length === 2, "grouped first page should fetch one follow-up batch");
+    assert(maxHitsByRequest[0] === 72, "initial first-page batch should fetch 72 hits");
+    assert(maxHitsByRequest[1] === 72, "follow-up first-page batch should stay bounded at 72 hits");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 Deno.test("searchMeetings uses cheaper search settings for short queries", async () => {
   const originalFetch = globalThis.fetch;
 

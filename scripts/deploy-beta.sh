@@ -22,10 +22,9 @@ derive_image_repository() {
 IMAGE_REPOSITORY="${IMAGE_REPOSITORY:-$(derive_image_repository)}"
 DEPLOY_REF="${DEPLOY_REF:-$(git rev-parse --short=7 HEAD)}"
 DEPLOY_IMAGE="${DEPLOY_IMAGE:-${IMAGE_REPOSITORY}:sha-${DEPLOY_REF}}"
-# How many worker replicas to run. Each is a Deno process pinned to one vCPU,
-# so scale to match available cores. Workers share the SQLite queue and claim
-# runs atomically.
-WORKER_REPLICAS="${WORKER_REPLICAS:-3}"
+# Keep public search responsive: workers share CPU, SQLite, S3 and Quickwit
+# with the public app. Scale this up only during an intentional catch-up window.
+WORKER_REPLICAS="${WORKER_REPLICAS:-1}"
 
 if [ -z "${DEPLOY_TARGET_EXPLICIT:-}" ] && (! git diff --quiet || ! git diff --cached --quiet); then
   echo "Refusing to deploy with uncommitted changes."

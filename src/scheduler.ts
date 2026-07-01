@@ -7,17 +7,15 @@
  * writes queued rows; no coordination needed with the worker containers.
  */
 
-import { createRun, findActiveRun } from "./ops/store.ts";
+import { countActiveScheduledRuns, createRun, findActiveRun } from "./ops/store.ts";
 import { listRunnableCatalogSources } from "./sources/index.ts";
-import {
-  currentDerivationVersion,
-  currentProjectionVersion,
-} from "./pipeline/versioning.ts";
+import { currentDerivationVersion, currentProjectionVersion } from "./pipeline/versioning.ts";
 
 const WINDOW_DAYS_BEFORE = 7;
 const WINDOW_DAYS_AFTER = 7;
 const SCHEDULE_HOUR_AMSTERDAM = 2;
 const DAY_MS = 86_400_000;
+const DEFAULT_MAX_ACTIVE_SCHEDULED_RUNS = 0;
 
 function amsterdamOffsetHours(date: Date): number {
   const tz = new Intl.DateTimeFormat("en-US", {
@@ -47,10 +45,26 @@ function isoDate(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
+function schedulerMaxActiveRuns(): number {
+  const value = Number(
+    Deno.env.get("WOOZI_SCHEDULER_MAX_ACTIVE_RUNS") ?? DEFAULT_MAX_ACTIVE_SCHEDULED_RUNS,
+  );
+  return Number.isFinite(value) && value >= 0 ? value : DEFAULT_MAX_ACTIVE_SCHEDULED_RUNS;
+}
+
 async function enqueueDailyScheduledRuns(): Promise<void> {
   const now = new Date();
   const dateFrom = isoDate(new Date(now.getTime() - WINDOW_DAYS_BEFORE * DAY_MS));
   const dateTo = isoDate(new Date(now.getTime() + WINDOW_DAYS_AFTER * DAY_MS));
+  const maxActiveScheduledRuns = schedulerMaxActiveRuns();
+  const activeScheduledRuns = await countActiveScheduledRuns();
+  if (activeScheduledRuns > maxActiveScheduledRuns) {
+    console.warn(
+      `[scheduler] skipped daily enqueue because ${activeScheduledRuns} scheduled run(s) are still queued/running ` +
+        `(max ${maxActiveScheduledRuns}).`,
+    );
+    return;
+  }
 
   const sources = listRunnableCatalogSources();
   let enqueued = 0;

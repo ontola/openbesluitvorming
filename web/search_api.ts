@@ -485,7 +485,7 @@ async function collectSearchWindow(
   while (!exhausted && collected.size < targetCount) {
     const { maxHits, snippetFields } = searchSamplingOptions(
       options.query,
-      rawOffset,
+      options.offset,
       options.limit,
     );
     const quickwitStart = performance.now();
