@@ -25,6 +25,8 @@ DEPLOY_IMAGE="${DEPLOY_IMAGE:-${IMAGE_REPOSITORY}:sha-${DEPLOY_REF}}"
 # Keep public search responsive: workers share CPU, SQLite, S3 and Quickwit
 # with the public app. Scale this up only during an intentional catch-up window.
 WORKER_REPLICAS="${WORKER_REPLICAS:-1}"
+INGEST_CONCURRENCY="${INGEST_CONCURRENCY:-1}"
+WOOZI_DOCUMENT_CONCURRENCY="${WOOZI_DOCUMENT_CONCURRENCY:-3}"
 
 if [ -z "${DEPLOY_TARGET_EXPLICIT:-}" ] && (! git diff --quiet || ! git diff --cached --quiet); then
   echo "Refusing to deploy with uncommitted changes."
@@ -44,6 +46,8 @@ ssh "$DEPLOY_HOST" "
   cd \"$DEPLOY_DIR\"
   export OPENBESLUITVORMING_IMAGE=\"$DEPLOY_IMAGE\"
   export COMPOSE_PROJECT_NAME=\"$COMPOSE_PROJECT_NAME_VALUE\"
+  export INGEST_CONCURRENCY=\"$INGEST_CONCURRENCY\"
+  export WOOZI_DOCUMENT_CONCURRENCY=\"$WOOZI_DOCUMENT_CONCURRENCY\"
   docker compose -f \"$COMPOSE_FILE\" pull openbesluitvorming worker
   docker compose -f \"$COMPOSE_FILE\" up -d --scale worker=${WORKER_REPLICAS} openbesluitvorming worker caddy
   docker compose -f \"$COMPOSE_FILE\" ps openbesluitvorming worker caddy

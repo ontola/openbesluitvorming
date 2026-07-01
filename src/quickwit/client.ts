@@ -6,6 +6,7 @@ const DEFAULT_INDEX_ID = "woozi-events";
 const DEFAULT_QUICKWIT_URL = "http://127.0.0.1:7280";
 const MAX_INGEST_PAYLOAD_BYTES = 8_000_000;
 const DEFAULT_SEARCH_TIMEOUT_MS = 8_000;
+const DEFAULT_SEARCH_ATTEMPTS = 2;
 
 type QuickwitSearchResponse = {
   num_hits: number;
@@ -20,6 +21,8 @@ function isRetryableSearchError(error: unknown): boolean {
   }
 
   return (
+    error.name === "TimeoutError" ||
+    error.name === "AbortError" ||
     error.message.includes("Quickwit request failed 500") ||
     error.message.includes("No such file or directory")
   );
@@ -51,6 +54,11 @@ function getIndexId(): string {
 function getSearchTimeoutMs(): number {
   const value = Number(Deno.env.get("QUICKWIT_SEARCH_TIMEOUT_MS") ?? DEFAULT_SEARCH_TIMEOUT_MS);
   return Number.isFinite(value) && value > 0 ? value : DEFAULT_SEARCH_TIMEOUT_MS;
+}
+
+function getSearchAttempts(): number {
+  const value = Number(Deno.env.get("QUICKWIT_SEARCH_ATTEMPTS") ?? DEFAULT_SEARCH_ATTEMPTS);
+  return Number.isFinite(value) && value > 0 ? Math.floor(value) : DEFAULT_SEARCH_ATTEMPTS;
 }
 
 async function fetchJson<T>(input: string, init?: RequestInit): Promise<T> {
@@ -198,17 +206,32 @@ export class QuickwitClient {
   }
 
   async searchRequest(body: QuickwitSearchRequest): Promise<QuickwitSearchResponse> {
-    return await fetchJson<QuickwitSearchResponse>(
-      `${this.baseUrl}/api/v1/${this.indexId}/search`,
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-        },
-        signal: AbortSignal.timeout(getSearchTimeoutMs()),
-        body: JSON.stringify(body),
-      },
-    );
+    const attempts = getSearchAttempts();
+    let lastError: unknown;
+
+    for (let attempt = 1; attempt <= attempts; attempt += 1) {
+      try {
+        return await fetchJson<QuickwitSearchResponse>(
+          `${this.baseUrl}/api/v1/${this.indexId}/search`,
+          {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+            },
+            signal: AbortSignal.timeout(getSearchTimeoutMs()),
+            body: JSON.stringify(body),
+          },
+        );
+      } catch (error) {
+        lastError = error;
+        if (attempt === attempts || !isRetryableSearchError(error)) {
+          throw error;
+        }
+        await sleep(100 * attempt);
+      }
+    }
+
+    throw lastError;
   }
 
   async searchEventually(
