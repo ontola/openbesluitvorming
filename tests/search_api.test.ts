@@ -164,6 +164,51 @@ Deno.test("searchMeetings groups page hits back to one document result with matc
   }
 });
 
+Deno.test("searchMeetings strips markdown syntax from result snippets", async () => {
+  const originalFetch = globalThis.fetch;
+
+  globalThis.fetch = async () =>
+    new Response(
+      JSON.stringify({
+        num_hits: 1,
+        hits: [
+          {
+            time: "2026-03-31T10:00:00Z",
+            entity_id: "document:notubiz:gemeente:westervoort:42",
+            entity_type: "Document",
+            name: "Bijlage",
+            start_date: "2026-06-22T17:00:00Z",
+            source_key: "westervoort",
+            content: "**Algemene regels** en **anti** worteldoek",
+          },
+        ],
+        snippets: [
+          {
+            content: ["**Algemene regels** **85** Artikel 12 **<b>anti</b>** worteldoek `code`"],
+          },
+        ],
+      }),
+      {
+        headers: { "content-type": "application/json" },
+      },
+    );
+
+  try {
+    const response = await searchMeetings({ query: "anti" });
+    assert(
+      response.results[0].summaryHtml ===
+        "Algemene regels 85 Artikel 12 <b>anti</b> worteldoek code",
+      "snippet preview should strip markdown markers while preserving highlights",
+    );
+    assert(
+      response.results[0].summary === "Algemene regels 85 Artikel 12 anti worteldoek code",
+      "plain summary should also be free of markdown markers",
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 Deno.test("searchMeetings avoids phrase queries for multi-word input", async () => {
   const originalFetch = globalThis.fetch;
 

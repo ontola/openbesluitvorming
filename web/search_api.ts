@@ -276,12 +276,26 @@ function escapeHtml(value: string): string {
     .replaceAll("'", "&#39;");
 }
 
+function stripMarkdownPreviewSyntax(value: string): string {
+  return value
+    .replaceAll(/!\[([^\]]*)\]\([^)]+\)/g, "$1")
+    .replaceAll(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replaceAll(/(^|\s)#{1,6}\s+/g, "$1")
+    .replaceAll(/(^|\s)>+\s*/g, "$1")
+    .replaceAll(/(^|\s)[*-]\s+/g, "$1")
+    .replaceAll(/[*_~`]+/g, "")
+    .replaceAll(/\s+/g, " ")
+    .trim();
+}
+
 function sanitizeSnippet(snippet?: string): string | undefined {
   if (!snippet) {
     return undefined;
   }
 
-  return escapeHtml(snippet).replaceAll("&lt;b&gt;", "<b>").replaceAll("&lt;/b&gt;", "</b>");
+  return escapeHtml(stripMarkdownPreviewSyntax(snippet))
+    .replaceAll("&lt;b&gt;", "<b>")
+    .replaceAll("&lt;/b&gt;", "</b>");
 }
 
 function formatDate(dateValue?: string): string {
