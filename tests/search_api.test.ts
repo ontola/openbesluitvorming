@@ -289,6 +289,55 @@ Deno.test("searchMeetings keeps follow-up first-page batches bounded after group
   }
 });
 
+Deno.test("searchMeetings caps broad document scans after grouping", async () => {
+  const originalFetch = globalThis.fetch;
+  const startOffsets: number[] = [];
+
+  globalThis.fetch = async (_input, init) => {
+    const body = JSON.parse(String((init as { body?: string } | undefined)?.body ?? "{}"));
+    const startOffset = Number(body.start_offset ?? 0);
+    const maxHits = Number(body.max_hits ?? 0);
+    startOffsets.push(startOffset);
+
+    const hits = Array.from({ length: maxHits }, (_, index) => ({
+      time: `2026-03-31T${String(index % 24).padStart(2, "0")}:00:00Z`,
+      entity_id: "document:notubiz:gemeente:haarlem:duplicate",
+      entity_type: "Document",
+      name: `Document duplicate ${startOffset + index}`,
+      start_date: "2025-01-14T17:00:00Z",
+      source_key: "haarlem",
+      content: `Document duplicate ${startOffset + index}`,
+    }));
+
+    return new Response(
+      JSON.stringify({
+        num_hits: 10_000,
+        hits,
+      }),
+      {
+        headers: { "content-type": "application/json" },
+      },
+    );
+  };
+
+  try {
+    const response = await searchMeetings({
+      entityType: "Document",
+      offset: 0,
+      limit: 24,
+    });
+
+    assert(response.results.length === 1, "duplicate documents should still collapse");
+    assert(response.hasMore === true, "capped broad scans should still advertise more results");
+    assert(
+      startOffsets.every((offset) => offset < 49),
+      "broad document scans should not continue into deep Quickwit offsets",
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 Deno.test("searchMeetings uses cheaper search settings for short queries", async () => {
   const originalFetch = globalThis.fetch;
 

@@ -452,6 +452,17 @@ function searchSamplingOptions(
   };
 }
 
+function maxRawSearchHits(query: string, offset: number, limit: number): number {
+  const targetCount = offset + limit + 1;
+  const { maxHits } = searchSamplingOptions(query, offset, limit);
+
+  if (!query.trim()) {
+    return Math.max(maxHits, targetCount + limit);
+  }
+
+  return Math.max(maxHits * 3, targetCount * 6);
+}
+
 async function collectSearchWindow(
   quickwit: QuickwitClient,
   options: {
@@ -474,24 +485,27 @@ async function collectSearchWindow(
 }> {
   const queryString = buildQuickwitQuery(options.query, options.organization, options.entityType);
   const targetCount = options.offset + options.limit + 1;
+  const maxRawHits = maxRawSearchHits(options.query, options.offset, options.limit);
   const collected = new Map<string, SearchResult>();
   const previewKeys = new Map<string, string>();
   let rawOffset = 0;
   let totalCount = 0;
   let exhausted = false;
+  let scanLimitReached = false;
   let quickwitMs = 0;
   let shapeMs = 0;
 
-  while (!exhausted && collected.size < targetCount) {
+  while (!exhausted && collected.size < targetCount && rawOffset < maxRawHits) {
     const { maxHits, snippetFields } = searchSamplingOptions(
       options.query,
       options.offset,
       options.limit,
     );
+    const requestMaxHits = Math.min(maxHits, maxRawHits - rawOffset);
     const quickwitStart = performance.now();
     const response = await quickwit.searchRequest({
       query: queryString,
-      max_hits: maxHits,
+      max_hits: requestMaxHits,
       start_offset: rawOffset,
       ...(snippetFields.length > 0 ? { snippet_fields: snippetFields.join(",") } : {}),
     });
@@ -553,7 +567,8 @@ async function collectSearchWindow(
     }
 
     rawOffset += hits.length;
-    exhausted = rawOffset >= response.num_hits || hits.length < maxHits;
+    scanLimitReached = rawOffset >= maxRawHits && rawOffset < response.num_hits;
+    exhausted = scanLimitReached || rawOffset >= response.num_hits || hits.length < requestMaxHits;
     shapeMs += performance.now() - shapeStart;
   }
 
@@ -589,7 +604,8 @@ async function collectSearchWindow(
     results: pageResults,
     totalCount,
     totalIsApproximate: true,
-    hasMore: sortedResults.length > options.offset + options.limit || !exhausted,
+    hasMore:
+      sortedResults.length > options.offset + options.limit || !exhausted || scanLimitReached,
   };
 }
 
