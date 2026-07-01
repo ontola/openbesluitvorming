@@ -23,8 +23,8 @@ IMAGE_REPOSITORY="${IMAGE_REPOSITORY:-$(derive_image_repository)}"
 DEPLOY_REF="${DEPLOY_REF:-$(git rev-parse --short=7 HEAD)}"
 DEPLOY_IMAGE="${DEPLOY_IMAGE:-${IMAGE_REPOSITORY}:sha-${DEPLOY_REF}}"
 # Keep public search responsive: workers share CPU, SQLite, S3 and Quickwit
-# with the public app. Scale this up only during an intentional catch-up window.
-WORKER_REPLICAS="${WORKER_REPLICAS:-1}"
+# with the public app. Run workers only during an intentional catch-up window.
+WORKER_REPLICAS="${WORKER_REPLICAS:-0}"
 INGEST_CONCURRENCY="${INGEST_CONCURRENCY:-1}"
 WOOZI_DOCUMENT_CONCURRENCY="${WOOZI_DOCUMENT_CONCURRENCY:-3}"
 
