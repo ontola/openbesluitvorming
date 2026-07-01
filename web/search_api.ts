@@ -62,6 +62,16 @@ type SearchTimingMetric = {
 
 type SearchTimingRecorder = (metric: SearchTimingMetric) => void;
 
+const PREVIEW_HEAD_TIMEOUT_MS = 300;
+const PREVIEW_URL_CACHE_TTL_MS = 10 * 60_000;
+
+type PreviewUrlCacheEntry = {
+  expiresAt: number;
+  promise: Promise<string | undefined>;
+};
+
+const previewUrlCache = new Map<string, PreviewUrlCacheEntry>();
+
 type CoverageBucket = {
   key?: string;
   doc_count?: number;
@@ -90,6 +100,30 @@ function looksLikePdf(options: { contentType?: string; fileName?: string; url?: 
   }
 
   return url.includes(".pdf") || url.includes("content-type=application/pdf");
+}
+
+function cachedPublicPreviewUrl(url: string): Promise<string | undefined> {
+  const now = Date.now();
+  const cached = previewUrlCache.get(url);
+  if (cached && cached.expiresAt > now) {
+    return cached.promise;
+  }
+
+  const promise = fetch(url, {
+    method: "HEAD",
+    signal: AbortSignal.timeout(PREVIEW_HEAD_TIMEOUT_MS),
+  })
+    .then((response) => {
+      const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
+      return response.ok && contentType.includes("image/jpeg") ? url : undefined;
+    })
+    .catch(() => undefined);
+
+  previewUrlCache.set(url, {
+    expiresAt: now + PREVIEW_URL_CACHE_TTL_MS,
+    promise,
+  });
+  return promise;
 }
 
 function escapeTerm(term: string): string {
@@ -672,22 +706,9 @@ export async function searchMeetings(
   const quickwit = new QuickwitClient();
   let previewUrlForKey: ((key: string) => Promise<string | undefined>) | undefined;
   try {
-    const storage = await ObjectStorageClient.fromEnvironment();
     const sampleUrl = await ObjectStorageClient.publicUrlForKey("__woozi_preview_base__");
     const baseUrl = sampleUrl.slice(0, -"__woozi_preview_base__".length);
-    const previewUrlCache = new Map<string, Promise<string | undefined>>();
-    previewUrlForKey = (key) => {
-      if (!previewUrlCache.has(key)) {
-        previewUrlCache.set(
-          key,
-          storage
-            .hasObject(key)
-            .then((exists) => (exists ? `${baseUrl}${key}` : undefined))
-            .catch(() => undefined),
-        );
-      }
-      return previewUrlCache.get(key)!;
-    };
+    previewUrlForKey = (key) => cachedPublicPreviewUrl(`${baseUrl}${key}`);
   } catch {
     previewUrlForKey = undefined;
   }
