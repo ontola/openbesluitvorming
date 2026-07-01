@@ -484,11 +484,14 @@ async function collectSearchWindow(
   hasMore: boolean;
 }> {
   const queryString = buildQuickwitQuery(options.query, options.organization, options.entityType);
-  const targetCount = options.offset + options.limit + 1;
-  const maxRawHits = maxRawSearchHits(options.query, options.offset, options.limit);
+  const isDirectWindow = !options.query.trim();
+  const targetCount = isDirectWindow ? options.limit + 1 : options.offset + options.limit + 1;
+  const maxRawHits = isDirectWindow
+    ? options.offset + options.limit + 1
+    : maxRawSearchHits(options.query, options.offset, options.limit);
   const collected = new Map<string, SearchResult>();
   const previewKeys = new Map<string, string>();
-  let rawOffset = 0;
+  let rawOffset = isDirectWindow ? options.offset : 0;
   let totalCount = 0;
   let exhausted = false;
   let scanLimitReached = false;
@@ -501,7 +504,9 @@ async function collectSearchWindow(
       options.offset,
       options.limit,
     );
-    const requestMaxHits = Math.min(maxHits, maxRawHits - rawOffset);
+    const requestMaxHits = isDirectWindow
+      ? Math.min(options.limit + 1, maxRawHits - rawOffset)
+      : Math.min(maxHits, maxRawHits - rawOffset);
     const quickwitStart = performance.now();
     const response = await quickwit.searchRequest({
       query: queryString,
@@ -581,10 +586,11 @@ async function collectSearchWindow(
   const filterSortMs = performance.now() - filterSortStart;
 
   const pageResults = sortedResults.slice(options.offset, options.offset + options.limit);
+  const pageWindowResults = isDirectWindow ? sortedResults.slice(0, options.limit) : pageResults;
   const previewStart = performance.now();
   if (options.previewUrlForKey) {
     await Promise.all(
-      pageResults.map(async (result) => {
+      pageWindowResults.map(async (result) => {
         const key = previewKeys.get(result.entityId);
         if (!key) {
           return;
@@ -601,11 +607,15 @@ async function collectSearchWindow(
   options.recordTiming?.({ name: "preview", durationMs: previewMs });
 
   return {
-    results: pageResults,
+    results: pageWindowResults,
     totalCount,
     totalIsApproximate: true,
     hasMore:
-      sortedResults.length > options.offset + options.limit || !exhausted || scanLimitReached,
+      (isDirectWindow
+        ? sortedResults.length > options.limit
+        : sortedResults.length > options.offset + options.limit) ||
+      !exhausted ||
+      scanLimitReached,
   };
 }
 
