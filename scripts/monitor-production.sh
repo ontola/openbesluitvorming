@@ -175,6 +175,7 @@ mark_alert_sent() {
 
 send_webhook() {
   local webhook="${WOOZI_ALERT_WEBHOOK_URL:-}"
+  local format="${WOOZI_ALERT_WEBHOOK_FORMAT:-auto}"
   local unsuppressed=()
   local item severity key title details critical_count=0 text=""
 
@@ -202,7 +203,17 @@ send_webhook() {
 - ${title}: ${details}"
   done
 
-  curl -sS -X POST -H "content-type: text/plain; charset=utf-8" --data-binary "$text" "$webhook" >/dev/null
+  if [ "$format" = "auto" ] && [[ "$webhook" == https://discord.com/api/webhooks/* ]]; then
+    format="discord"
+  fi
+
+  if [ "$format" = "discord" ]; then
+    local escaped
+    escaped="$(python3 -c 'import json, sys; print(json.dumps(sys.stdin.read()))' <<< "$text")"
+    curl -sS -X POST -H "content-type: application/json" --data-binary "{\"content\":${escaped}}" "$webhook" >/dev/null
+  else
+    curl -sS -X POST -H "content-type: text/plain; charset=utf-8" --data-binary "$text" "$webhook" >/dev/null
+  fi
 
   for item in "${unsuppressed[@]}"; do
     IFS='|' read -r severity key title details <<< "$item"

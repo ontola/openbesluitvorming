@@ -345,7 +345,8 @@ It runs every two minutes through `woozi-monitor.timer` and checks:
 - Quickwit split-cache file count and approximate cache size.
 
 Set `WOOZI_ALERT_WEBHOOK_URL` in `/opt/woozi/.env` to receive notifications. The
-script sends plain-text webhook payloads and suppresses repeated alerts with
+script auto-detects Discord webhook URLs and otherwise sends plain-text webhook
+payloads. Repeated alerts are suppressed with
 `WOOZI_MONITOR_ALERT_COOLDOWN_SECONDS` (default 900 seconds).
 
 Useful operational commands:

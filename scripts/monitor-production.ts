@@ -343,7 +343,11 @@ async function sendWebhook(alerts: Alert[]): Promise<void> {
     ...unsuppressed.map((item) => `- ${item.title}: ${JSON.stringify(item.details)}`),
   ].join("\n");
 
-  const format = Deno.env.get("WOOZI_ALERT_WEBHOOK_FORMAT") ?? "json";
+  const configuredFormat = Deno.env.get("WOOZI_ALERT_WEBHOOK_FORMAT") ?? "auto";
+  const format =
+    configuredFormat === "auto" && webhookUrl.startsWith("https://discord.com/api/webhooks/")
+      ? "discord"
+      : configuredFormat;
   const response = await fetch(webhookUrl, {
     method: "POST",
     headers: {
@@ -352,10 +356,12 @@ async function sendWebhook(alerts: Alert[]): Promise<void> {
     body:
       format === "text"
         ? text
-        : JSON.stringify({
-            text,
-            alerts: unsuppressed,
-          }),
+        : format === "discord"
+          ? JSON.stringify({ content: text })
+          : JSON.stringify({
+              text,
+              alerts: unsuppressed,
+            }),
   });
 
   if (!response.ok) {
