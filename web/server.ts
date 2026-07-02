@@ -45,8 +45,90 @@ type ServerTimingMetric = {
   durationMs: number;
 };
 
+type ParsedServerTiming = Record<string, number>;
+
+const perfLogSlowMs = Number(Deno.env.get("WOOZI_PERF_LOG_SLOW_MS") ?? "1000");
+const perfLogAll = Deno.env.get("WOOZI_PERF_LOG_ALL") === "1";
+
 function formatDurationMs(durationMs: number): string {
   return Math.max(0, durationMs).toFixed(1);
+}
+
+function hashForLog(value: string): string {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
+}
+
+function parseServerTiming(value: string | null): ParsedServerTiming {
+  if (!value) {
+    return {};
+  }
+
+  const parsed: ParsedServerTiming = {};
+  for (const entry of value.split(",")) {
+    const [namePart, ...params] = entry.trim().split(";");
+    const name = namePart.trim();
+    if (!name) {
+      continue;
+    }
+    const durationParam = params.find((param) => param.trim().startsWith("dur="));
+    if (!durationParam) {
+      continue;
+    }
+    const durationMs = Number(durationParam.trim().slice("dur=".length));
+    if (Number.isFinite(durationMs)) {
+      parsed[name] = durationMs;
+    }
+  }
+  return parsed;
+}
+
+function searchRequestMetadata(url: URL): Record<string, unknown> {
+  const query = url.searchParams.get("query") ?? "";
+  return {
+    query_len: query.length,
+    query_hash: query ? hashForLog(query.trim().toLowerCase()) : undefined,
+    has_organization: Boolean(url.searchParams.get("organization")?.trim()),
+    entity_type: url.searchParams.get("entityType") || undefined,
+    sort: url.searchParams.get("sort") || "date_desc",
+    offset: Number(url.searchParams.get("offset") ?? "0"),
+    limit: Number(url.searchParams.get("limit") ?? "24"),
+  };
+}
+
+function logRequestPerformance(request: Request, response: Response): void {
+  const url = new URL(request.url);
+  if (!url.pathname.startsWith("/api/")) {
+    return;
+  }
+
+  const timings = parseServerTiming(response.headers.get("server-timing"));
+  const totalMs = timings.total ?? 0;
+  const slowThresholdMs =
+    Number.isFinite(perfLogSlowMs) && perfLogSlowMs > 0 ? perfLogSlowMs : 1000;
+  const isError = response.status >= 500;
+  const isSlow = totalMs >= slowThresholdMs;
+  if (!perfLogAll && !isError && !isSlow) {
+    return;
+  }
+
+  const metadata = url.pathname === "/api/search" ? searchRequestMetadata(url) : {};
+  console.log(
+    JSON.stringify({
+      level: isError ? "error" : isSlow ? "warn" : "info",
+      event: "http_request_perf",
+      method: request.method,
+      path: url.pathname,
+      status: response.status,
+      total_ms: totalMs,
+      timings,
+      ...metadata,
+    }),
+  );
 }
 
 function withServerTiming(
@@ -137,7 +219,7 @@ async function readStaticFile(pathname: string): Promise<Uint8Array | null> {
   return null;
 }
 
-Deno.serve({ port }, async (request) => {
+async function handleRequest(request: Request): Promise<Response> {
   const requestStart = performance.now();
   const url = new URL(request.url);
 
@@ -610,6 +692,12 @@ Deno.serve({ port }, async (request) => {
   }
 
   return withServerTiming(new Response("Niet gevonden", { status: 404 }), requestStart);
+}
+
+Deno.serve({ port }, async (request) => {
+  const response = await handleRequest(request);
+  logRequestPerformance(request, response);
+  return response;
 });
 
 console.log(`OpenBesluitvorming draait op http://127.0.0.1:${port}`);

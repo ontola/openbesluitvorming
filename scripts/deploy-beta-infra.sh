@@ -13,6 +13,7 @@ rsync -azR --inplace \
   ./Caddyfile \
   ./docker-compose.production.yml \
   ./quickwit/quickwit.yaml \
+  ./scripts/monitor-production.sh \
   "$DEPLOY_HOST:$DEPLOY_DIR/"
 
 echo "Synced production infra files to $DEPLOY_HOST:$DEPLOY_DIR"

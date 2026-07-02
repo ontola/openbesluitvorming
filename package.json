@@ -15,6 +15,7 @@
     "dev:down": "sh scripts/docker-compose.sh down",
     "deploy:beta": "bash scripts/deploy-beta.sh",
     "deploy:beta:infra": "bash scripts/deploy-beta-infra.sh",
+    "monitor:prod": "deno run --allow-net --allow-env --allow-run --allow-read=/tmp --allow-write=/tmp scripts/monitor-production.ts",
     "build:web": "vite build",
     "test": "deno test -A",
     "test:e2e": "deno test -A tests/notubiz.test.ts",
