@@ -35,6 +35,12 @@
     );
   }
 
+  const PAGE_SIZE = 24;
+  const DETAIL_MODE_STORAGE_KEY = "woozi.detailMode";
+  const INITIAL_LOADING_CARD_MIN = 6;
+  const INITIAL_LOADING_CARD_MAX = 12;
+  const INITIAL_LOADING_CARD_HEIGHT = 210;
+
   const initialRouteState = typeof window === "undefined"
     ? null
     : routeStateFromUrl(new URL(window.location.href));
@@ -113,14 +119,9 @@
   let debounceTimer: number | undefined;
   let loadMoreObserver: IntersectionObserver | null = null;
   let activeSearchSignature = "";
+  let nextSearchOffset = PAGE_SIZE;
   let initialLoadingCardCount = 6;
   let loadedPreviewImages = new Set<string>();
-
-  const PAGE_SIZE = 24;
-  const DETAIL_MODE_STORAGE_KEY = "woozi.detailMode";
-  const INITIAL_LOADING_CARD_MIN = 6;
-  const INITIAL_LOADING_CARD_MAX = 12;
-  const INITIAL_LOADING_CARD_HEIGHT = 210;
 
   function routeStateFromUrl(url: URL): SearchRouteState {
     return {
@@ -262,6 +263,7 @@
       filtersOpen = false;
       searched = false;
       results = [];
+      nextSearchOffset = PAGE_SIZE;
       closeDetail(false);
       writeRouteState(mode);
     });
@@ -827,6 +829,7 @@
       totalIsApproximate = false;
       hasMore = false;
       activeSearchSignature = "";
+      nextSearchOffset = PAGE_SIZE;
       closeDetail(false);
       if (mode) writeRouteState(mode);
       return;
@@ -849,6 +852,7 @@
       totalCount = payload.totalCount ?? null;
       totalIsApproximate = payload.totalIsApproximate ?? false;
       hasMore = payload.hasMore ?? false;
+      nextSearchOffset = PAGE_SIZE;
 
       if (view) {
         const selected = results.find((item) => item.entityId === view);
@@ -869,6 +873,7 @@
         totalCount = null;
         totalIsApproximate = false;
         hasMore = false;
+        nextSearchOffset = PAGE_SIZE;
       }
     } finally {
       if (requestId === searchRequestId) {
@@ -894,17 +899,20 @@
     const requestId = searchRequestId;
 
     try {
-      const payload = await fetchSearchPage(results.length);
+      const requestedOffset = nextSearchOffset;
+      const payload = await fetchSearchPage(requestedOffset);
       if (requestId !== searchRequestId || signature !== activeSearchSignature) {
         return;
       }
 
       const nextResults = payload.results ?? [];
       const seen = new Set(results.map((item) => item.entityId));
-      results = [...results, ...nextResults.filter((item) => !seen.has(item.entityId))];
+      const newResults = nextResults.filter((item) => !seen.has(item.entityId));
+      results = [...results, ...newResults];
+      nextSearchOffset = requestedOffset + PAGE_SIZE;
       totalCount = payload.totalCount ?? totalCount;
       totalIsApproximate = payload.totalIsApproximate ?? totalIsApproximate;
-      hasMore = payload.hasMore ?? false;
+      hasMore = newResults.length > 0 && (payload.hasMore ?? false);
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") {
         return;
@@ -945,6 +953,7 @@
       loading = false;
       loadingMore = false;
       activeSearchSignature = "";
+      nextSearchOffset = PAGE_SIZE;
       return;
     }
 
@@ -1025,6 +1034,7 @@
       totalIsApproximate = false;
       hasMore = false;
       activeSearchSignature = "";
+      nextSearchOffset = PAGE_SIZE;
       closeDetail(false);
       focusQuery();
       return;

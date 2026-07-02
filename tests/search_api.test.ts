@@ -286,6 +286,48 @@ Deno.test("searchMeetings supports offset paging and signals more results approx
   }
 });
 
+Deno.test("searchMeetings does not advertise more pages for empty grouped windows", async () => {
+  const originalFetch = globalThis.fetch;
+
+  globalThis.fetch = async (_input, init) => {
+    const body = JSON.parse(String((init as { body?: string } | undefined)?.body ?? "{}"));
+    const maxHits = Number(body.max_hits ?? 0);
+
+    const hits = Array.from({ length: maxHits }, (_, index) => ({
+      time: `2026-03-31T${String(index % 24).padStart(2, "0")}:00:00Z`,
+      entity_id: "document:notubiz:gemeente:haarlem:duplicate",
+      entity_type: "Document",
+      name: `Duplicate document ${index}`,
+      start_date: "2025-01-14T17:00:00Z",
+      source_key: "haarlem",
+      content: `Duplicate content ${index}`,
+    }));
+
+    return new Response(
+      JSON.stringify({
+        num_hits: 10_000,
+        hits,
+      }),
+      {
+        headers: { "content-type": "application/json" },
+      },
+    );
+  };
+
+  try {
+    const response = await searchMeetings({
+      query: "honden",
+      offset: 24,
+      limit: 24,
+    });
+
+    assert(response.results.length === 0, "grouped offset window should be empty");
+    assert(response.hasMore === false, "empty grouped windows should stop pagination");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 Deno.test("searchMeetings avoids follow-up first-page batches after grouping", async () => {
   const originalFetch = globalThis.fetch;
   const maxHitsByRequest: number[] = [];

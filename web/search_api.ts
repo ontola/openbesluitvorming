@@ -602,6 +602,7 @@ async function collectSearchWindow(
 
   const pageResults = sortedResults.slice(options.offset, options.offset + options.limit);
   const pageWindowResults = isDirectWindow ? sortedResults.slice(0, options.limit) : pageResults;
+  const pageHasResults = pageWindowResults.length > 0;
   const previewStart = performance.now();
   if (options.previewUrlForKey) {
     await Promise.all(
@@ -626,11 +627,12 @@ async function collectSearchWindow(
     totalCount,
     totalIsApproximate: true,
     hasMore:
-      (isDirectWindow
+      pageHasResults &&
+      ((isDirectWindow
         ? sortedResults.length > options.limit
         : sortedResults.length > options.offset + options.limit) ||
-      !exhausted ||
-      scanLimitReached,
+        !exhausted ||
+        scanLimitReached),
   };
 }
 
