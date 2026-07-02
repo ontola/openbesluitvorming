@@ -13,6 +13,7 @@ CONTAINER_RESTART_WARN="${WOOZI_MONITOR_CONTAINER_RESTART_WARN:-0}"
 STATE_DIR="${WOOZI_MONITOR_STATE_DIR:-/tmp/woozi-monitor-alerts}"
 ALERT_COOLDOWN_SECONDS="${WOOZI_MONITOR_ALERT_COOLDOWN_SECONDS:-900}"
 CURL_IP_VERSION="${WOOZI_MONITOR_CURL_IP_VERSION:-4}"
+SEARCH_ALERT_AFTER_CONSECUTIVE="${WOOZI_MONITOR_SEARCH_ALERT_AFTER_CONSECUTIVE:-3}"
 
 DEFAULT_TERMS=(
   woningbouw wateroverlast fietsbrug dorpshuis groenbeheer laadinfra subsidieplafond
@@ -35,6 +36,34 @@ alert() {
   local title="$3"
   local details="$4"
   ALERTS+=("${severity}|${key}|${title}|${details}")
+}
+
+record_search_ok() {
+  mkdir -p "$STATE_DIR"
+  printf '0\n' > "$STATE_DIR/search_degraded_streak"
+}
+
+record_search_degraded() {
+  local severity="$1"
+  local key="$2"
+  local title="$3"
+  local details="$4"
+  local state_file="$STATE_DIR/search_degraded_streak"
+  local previous streak
+  mkdir -p "$STATE_DIR"
+  previous="$(cat "$state_file" 2>/dev/null || echo 0)"
+  if ! [[ "$previous" =~ ^[0-9]+$ ]]; then
+    previous=0
+  fi
+  streak=$((previous + 1))
+  printf '%s\n' "$streak" > "$state_file"
+
+  if [ "$streak" -ge "$SEARCH_ALERT_AFTER_CONSECUTIVE" ]; then
+    alert "$severity" "$key" "$title" "${details} degraded_streak=${streak}"
+  else
+    printf '{"event":"monitor_search_degraded_pending","key":"%s","streak":%s,"alert_after":%s}\n' \
+      "$key" "$streak" "$SEARCH_ALERT_AFTER_CONSECUTIVE"
+  fi
 }
 
 pick_term() {
@@ -96,7 +125,7 @@ check_search() {
     -o "$body" \
     -w "%{http_code} %{time_total}" \
     "$url" 2>&1)"; then
-    alert critical search_unreachable "Search endpoint unreachable" "term=${term} error=${curl_meta}"
+    record_search_degraded critical search_unreachable "Search endpoint unreachable" "term=${term} error=${curl_meta}"
     rm -rf "$tmpdir"
     return
   fi
@@ -111,11 +140,13 @@ check_search() {
   quickwit_ms="${quickwit_ms:-0}"
 
   if [ "$status" -lt 200 ] || [ "$status" -ge 300 ]; then
-    alert critical search_http_error "Search endpoint returned an error" "status=${status} total_ms=${total_ms} term=${term}"
+    record_search_degraded critical search_http_error "Search endpoint returned an error" "status=${status} total_ms=${total_ms} term=${term}"
   elif [ "$total_ms" -ge "$SEARCH_CRITICAL_MS" ]; then
-    alert critical search_critical_slow "Search is critically slow" "total_ms=${total_ms} quickwit_ms=${quickwit_ms} term=${term}"
+    record_search_degraded critical search_critical_slow "Search is critically slow" "total_ms=${total_ms} quickwit_ms=${quickwit_ms} term=${term}"
   elif [ "$total_ms" -ge "$SEARCH_WARN_MS" ] || [ "$quickwit_ms" -ge "$QUICKWIT_WARN_MS" ]; then
-    alert warning search_slow "Search is slow" "total_ms=${total_ms} quickwit_ms=${quickwit_ms} term=${term}"
+    record_search_degraded warning search_slow "Search is slow" "total_ms=${total_ms} quickwit_ms=${quickwit_ms} term=${term}"
+  else
+    record_search_ok
   fi
 
   rm -rf "$tmpdir"
