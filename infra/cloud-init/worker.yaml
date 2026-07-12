@@ -2,6 +2,20 @@
 
 package_update: true
 
+# The extraction service uploads extracted markdown to S3-compatible storage;
+# without these credentials every /extract request fails with
+# "Unable to locate credentials". (Bitten in production July 2026: workers
+# provisioned without S3 env silently broke all document extraction.)
+write_files:
+  - path: /root/extraction-s3.env
+    permissions: "0600"
+    content: |
+      S3_STORAGE_ENDPOINT=${s3_storage_endpoint}
+      S3_STORAGE_REGION=${s3_storage_region}
+      S3_STORAGE_BUCKET_NAME=${s3_storage_bucket_name}
+      S3_ACCESS_KEY=${s3_access_key}
+      S3_SECRET_KEY=${s3_secret_key}
+
 runcmd:
   # Log in to GHCR (public images don't need auth, but private ones do)
   # - echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
@@ -13,5 +27,6 @@ runcmd:
       --name woozi-extraction \
       --restart unless-stopped \
       -p 8000:8000 \
+      --env-file /root/extraction-s3.env \
       ${extraction_service_image} \
       uvicorn main:app --host 0.0.0.0 --port 8000 --workers ${uvicorn_workers}

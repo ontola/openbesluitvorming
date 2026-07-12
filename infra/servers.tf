@@ -17,5 +17,10 @@ resource "hcloud_server" "extraction" {
   user_data = templatefile("${path.module}/cloud-init/worker.yaml", {
     extraction_service_image = var.extraction_service_image
     uvicorn_workers          = var.extraction_uvicorn_workers
+    s3_storage_endpoint      = var.s3_storage_endpoint
+    s3_storage_region        = var.s3_storage_region
+    s3_storage_bucket_name   = var.s3_storage_bucket_name
+    s3_access_key            = var.s3_access_key
+    s3_secret_key            = var.s3_secret_key
   })
 }
