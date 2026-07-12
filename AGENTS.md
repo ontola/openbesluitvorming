@@ -1,6 +1,7 @@
 # AGENTS.md
 
-`woozi/` is the active rewrite prototype for Open Raadsinformatie and should be treated as its own repo.
+This repo (working name "woozi") is the active rewrite of Open Raadsinformatie,
+served at https://openbesluitvorming.nl.
 
 ## Stack
 
@@ -12,13 +13,13 @@
 
 Key directories:
 
-- [`src/`](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/src)
-- [`web/`](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/web)
-- [`tests/`](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/tests)
-- [`quickwit/`](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/quickwit)
-- [`schemas/`](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/schemas)
-- [`services/extraction/`](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/services/extraction) — stateless PDF extraction microservice (FastAPI + pymupdf4llm)
-- [`infra/`](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/infra) — OpenTofu infrastructure definitions for Hetzner Cloud
+- [`src/`](src)
+- [`web/`](web)
+- [`tests/`](tests)
+- [`quickwit/`](quickwit)
+- [`schemas/`](schemas)
+- [`services/extraction/`](services/extraction) — stateless PDF extraction microservice (FastAPI + pymupdf4llm)
+- [`infra/`](infra) — OpenTofu infrastructure definitions for Hetzner Cloud
 
 ## Architecture
 
@@ -29,8 +30,10 @@ source system
   -> extractor / poller
   -> canonical entity
   -> entity.commit event
-  -> projection
-  -> Quickwit
+  -> projections:
+       - Quickwit (search)
+       - export changes log (SQLite buffer + NDJSON segments in S3,
+         served via /api/export/snapshot and /api/export/changes)
 ```
 
 Important rules:
@@ -38,18 +41,29 @@ Important rules:
 - Quickwit is a projection, not the source of truth.
 - Original files are stored in S3-compatible object storage.
 - Derived document markdown is stored in object storage.
+- The export changes log (`src/exports/log.ts`) deduplicates commits on
+  `content_hash` and assigns per-source monotonic sequence numbers **via a
+  single shared SQLite file**. Workers on a second host would silently corrupt
+  the sequence — scale workers on one host only until that is redesigned.
+- Blocklisted documents (`document_blocklist` in the ops store, e.g. BSN
+  takedowns) are checked before the S3 cache shortcut and centrally in
+  `executeIngest.onEntity`; no ingest path may bypass those checks. See the
+  internal takedown runbook in `docs_internal/` (gitignored).
 - The HTTP surface (search, admin API, document preview, admin UI) is served by the `openbesluitvorming` container (`web/server.ts`). Import execution runs in a separate `worker` container (`src/worker.ts`) so long-running ingests don't compete with search for the single-threaded Deno event loop.
 - PDF extraction is offloaded to remote extraction workers. The ingest worker never holds PDF bytes in memory when `WOOZI_EXTRACTION_SERVICE_URL` is set.
-- Shared browser/backend types belong in [`src/types.ts`](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/src/types.ts).
+- Shared browser/backend types belong in [`src/types.ts`](src/types.ts).
 
 Current implemented slices:
 
-- Notubiz meetings and documents (production)
-- iBabs meetings and documents (production; 165 sources in catalog, date-range chunked)
+- Notubiz, iBabs (165 sources, date-range chunked), GemeenteOplossingen, and
+  Parlaeus meetings and documents (production)
 - document download and caching
 - markdown extraction with `transmutation` + remote extraction workers
 - PDF page-chunk derivation
 - Quickwit indexing
+- export API for bulk harvesting/sync (snapshot + changes feed, see API.md)
+- BSN detection during ingest (detect-only by default) + document blocklist
+  with a takedown script (`scripts/delete_document.ts`)
 - public search UI
 - admin UI for imports and reruns
 
@@ -63,14 +77,14 @@ Current implemented slices:
 
 ### Frontend
 
-- Use Svelte + TypeScript in [`web/src/`](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/web/src).
+- Use Svelte + TypeScript in [`web/src/`](web/src).
 - Keep the public UI and admin UI visually consistent.
 - Shared UI patterns should use generic primitives rather than one-off page-local button classes.
 - Result detail uses a full-screen overlay reader rather than a separate page.
 
 ### Search
 
-- Search result shaping belongs in [`web/search_api.ts`](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/web/search_api.ts), not in the browser.
+- Search result shaping belongs in [`web/search_api.ts`](web/search_api.ts), not in the browser.
 - Prefer grouped document-level results even when the underlying search unit is a PDF page chunk.
 - Keep projection versioning explicit so rebuilds do not leak duplicate results into search.
 
@@ -82,6 +96,7 @@ Current implemented slices:
 - PDF extraction is limited to 40 pages per document (`MAX_PDF_PAGES` in `src/documents/text.ts`).
 - PDF extraction can be offloaded to remote workers via `WOOZI_EXTRACTION_SERVICE_URL` (comma-separated list of URLs). The ingest worker round-robins requests across workers and falls back to local pymupdf4llm subprocess when no URL is configured.
 - The extraction service (`services/extraction/`) is a stateless FastAPI wrapper around pymupdf4llm. It accepts a source URL via `POST /extract` and returns markdown; the extractor itself downloads the PDF so the ingest worker never holds PDF bytes.
+- The extraction service **requires S3 credentials** (it uploads extracted markdown itself). Without them every `/extract` returns 422 "Unable to locate credentials" — this silently broke all extraction in July 2026. Provisioning via `infra/` injects them into `/root/extraction-s3.env` on the worker hosts; keep that in sync with the `S3_*` values in `/opt/woozi/.env`.
 - Cache invalidation is still partly source-specific; preserve comments where behavior is Notubiz-specific and needs later generalization.
 
 ### Outbound HTTP from the ingest worker
@@ -95,7 +110,24 @@ Current implemented slices:
 - Current admin/run state is SQLite-backed for the prototype.
 - Treat SQLite as pragmatic prototype state, not the final metadata-store design.
 - Store enough run metadata to distinguish user-triggered, scheduled, full, cache-rederived, and later reindex-only executions.
-- Beware of queued imports resuming on restart: reconciliation marks previously `running` imports as `failed` on startup, but `queued` imports all resume simultaneously. High concurrency settings (`INGEST_CONCURRENCY` > 8 combined with `WOOZI_DOCUMENT_CONCURRENCY` > 10) can saturate the event loop with outbound HTTP connections.
+- Startup reconciliation requeues previously `running` imports (interrupted by
+  a restart, usually a deploy) instead of failing them, capped at two requeues
+  per run via `interrupted_count`. Queued imports all resume simultaneously.
+  High concurrency settings (`INGEST_CONCURRENCY` > 8 combined with
+  `WOOZI_DOCUMENT_CONCURRENCY` > 10) can saturate the event loop with outbound
+  HTTP connections.
+- The import worker is expected to run permanently: `deploy-beta.sh` defaults
+  `WORKER_REPLICAS` to 1 and the production monitor alerts when it is missing.
+  (It used to default to 0, which silently froze all imports for 11 days in
+  July 2026.)
+- Production monitoring (`scripts/monitor-production.sh`, the deployed bash
+  variant — the .ts variant is a local tool) checks search latency, disk,
+  containers, import health (stalled pipeline, stuck queue, extraction failure
+  surges), and backup freshness. Runs every 2 min via `woozi-monitor.timer`.
+- The SQLite state (ops + export log) is backed up daily to S3 via
+  `woozi-backup.timer` running `scripts/backup_state.ts` inside the web
+  container (14-day retention, `backups/sqlite/` prefix). Install with
+  `scripts/install-production-backup.sh`.
 - The admin dashboard polls every 5s. Any per-run work it does (e.g. fetching run detail) multiplies by the number of visible runs — keep the dashboard cheap so it doesn't starve the single-threaded `openbesluitvorming` process and slow down user searches.
 
 ### iBabs specifics
@@ -123,11 +155,11 @@ Do not commit production code that depends on the proxy being set; production ru
 
 ### Worker CPU ceiling
 
-- The worker is a single Deno process = one vCPU. On a 4-vCPU host that's a 25% utilization ceiling. Path forward when this bites: run multiple `worker` containers against the same SQLite queue, which requires atomic claim (`UPDATE ... WHERE status='queued' RETURNING *`) in `src/ops/store.ts` to avoid two workers executing the same run. Until that lands, `INGEST_CONCURRENCY` above 8 doesn't help — it just contends for the same core.
+- The worker is a single Deno process = one vCPU. On a 4-vCPU host that's a 25% utilization ceiling. Atomic run claiming (`claimQueuedRun` in `src/ops/store.ts`, `UPDATE ... WHERE status='queued' RETURNING`) already exists, so multiple `worker` containers **on the same host** can safely share the queue: `docker compose up -d --scale worker=N worker`. Do not put workers on a second host — the export changes log and blocklist assume one shared SQLite file (see Architecture). `INGEST_CONCURRENCY` above 8 within one worker doesn't help — it just contends for the same core.
 
 ## Development Commands
 
-Run these from [`woozi/`](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi).
+Run these from the repo root.
 
 ### Install
 
@@ -222,8 +254,13 @@ If you change search shaping, result rendering, or snippet behavior, `test:quick
 
 If architecture, workflow, or product direction changes, update:
 
-- [`README.md`](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/README.md)
-- [`../scratchpad/2026-03-31-WISHES.md`](/Users/joep/dev/github/openstate/open-raadsinformatie/scratchpad/2026-03-31-WISHES.md)
-- [`../scratchpad/2026-03-31-REWRITE_PLAN.md`](/Users/joep/dev/github/openstate/open-raadsinformatie/scratchpad/2026-03-31-REWRITE_PLAN.md)
+- [`README.md`](README.md)
+- [`API.md`](API.md) — the public API contract
+- [`deployment.md`](deployment.md) — production deploy and operations
+- [`docs/migration-guide.md`](docs/migration-guide.md) — when public API changes affect ORI Classic migrators
+
+`docs_internal/` (gitignored) holds sensitive working notes — takedown
+runbooks, usage research containing personal data. Never move its contents
+into tracked docs.
 
 Keep these aligned with the actual working prototype, not just the target architecture.

@@ -88,8 +88,8 @@ WOOZI_WEB_PORT=4401 pnpm run dev
 
 The repo includes a production-oriented compose file and Caddy config:
 
-- [docker-compose.production.yml](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/docker-compose.production.yml)
-- [Caddyfile](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/Caddyfile)
+- [docker-compose.production.yml](docker-compose.production.yml)
+- [Caddyfile](Caddyfile)
 
 That setup is intended for:
 
@@ -105,7 +105,7 @@ Preferred beta deploy flow:
 git push origin main
 ```
 
-That triggers the GitHub Actions workflow in [.github/workflows/publish-openbesluitvorming.yml](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/.github/workflows/publish-openbesluitvorming.yml), which builds and publishes:
+That triggers the GitHub Actions workflow in [.github/workflows/publish-openbesluitvorming.yml](.github/workflows/publish-openbesluitvorming.yml), which builds and publishes:
 
 - `ghcr.io/ontola/openbesluitvorming:main`
 - `ghcr.io/ontola/openbesluitvorming:sha-<git-sha>`
@@ -141,9 +141,9 @@ pnpm run deploy:beta:infra
 
 That is only for runtime config such as:
 
-- [docker-compose.production.yml](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/docker-compose.production.yml)
-- [Caddyfile](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/Caddyfile)
-- [quickwit/quickwit.yaml](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/quickwit/quickwit.yaml)
+- [docker-compose.production.yml](docker-compose.production.yml)
+- [Caddyfile](Caddyfile)
+- [quickwit/quickwit.yaml](quickwit/quickwit.yaml)
 
 Required production env includes:
 
@@ -240,7 +240,7 @@ Instead, each source payload is transformed into a canonical entity such as:
 - `Committee`
 - `Vote`
 
-The schemas in [`schemas/`](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/schemas) are the first version of those contracts.
+The schemas in [`schemas/`](schemas) are the first version of those contracts.
 
 ### 3. Change Detection
 
@@ -356,7 +356,7 @@ This folder currently contains:
 
 ## Commands
 
-From [`woozi/`](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi):
+From [`woozi/`](.):
 
 - `pnpm run dev`
 - `pnpm run dev:infra`
@@ -376,9 +376,9 @@ From [`woozi/`](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi):
 - `pnpm run format`
 - `pnpm run check-format`
 
-Quickwit helpers live in [`quickwit/`](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/quickwit).
+Quickwit helpers live in [`quickwit/`](quickwit).
 
-For real S3-compatible storage, put these values in [`.env.example`](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/.env.example) copied to `.env`:
+For real S3-compatible storage, put these values in [`.env.example`](.env.example) copied to `.env`:
 
 - `S3_ACCESS_KEY`
 - `S3_SECRET_KEY`

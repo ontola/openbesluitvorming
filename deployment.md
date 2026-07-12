@@ -46,7 +46,7 @@ Important:
 
 ## Required Environment
 
-The backend reads configuration from `.env` via [`src/config.ts`](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/src/config.ts).
+The backend reads configuration from `.env` via [`src/config.ts`](src/config.ts).
 
 Required S3-compatible storage values:
 
@@ -78,7 +78,7 @@ Common app/runtime values:
 
 ## Docker Runtime
 
-The production image is built from [Dockerfile.web](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/Dockerfile.web).
+The production image is built from [Dockerfile.web](Dockerfile.web).
 
 It:
 
@@ -113,8 +113,8 @@ The current flow is:
 
 The workflow lives in:
 
-- [publish-openbesluitvorming.yml](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/.github/workflows/publish-openbesluitvorming.yml)
-- [deploy-beta.yml](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/.github/workflows/deploy-beta.yml)
+- [publish-openbesluitvorming.yml](.github/workflows/publish-openbesluitvorming.yml)
+- [deploy-beta.yml](.github/workflows/deploy-beta.yml)
 
 The published image repository currently follows the GitHub repo owner. In the current setup that means:
 
@@ -133,8 +133,14 @@ The `deploy-beta.yml` workflow:
 - waits for `Publish OpenBesluitvorming Image` to finish successfully
 - checks out the exact published commit
 - connects to the beta server over SSH
-- deploys the exact `sha-<short-git-sha>` image that was just published
-- reuses the same safety logic as the local deploy script, so it will refuse to restart the app if imports are still `running`
+- syncs the runtime config files (compose, Caddyfile, quickwit.yaml, monitor
+  script) and reloads Caddy — `/opt/woozi` is a plain copy, not a checkout,
+  so this step is what makes config changes in git actually land
+- deploys the exact `sha-<short-git-sha>` image that was just published with
+  `WORKER_REPLICAS` worker replicas (default 1 — imports must keep running
+  across deploys; a 0-default once silently froze imports for 11 days)
+- does not wait for imports: runs interrupted by the restart are requeued on
+  startup (see reconciliation below)
 
 That means the normal CD path is now:
 
@@ -165,11 +171,11 @@ That script:
 
 Both `openbesluitvorming` and `worker` must be recreated on every deploy — they share the image and a code change to either process means both need the new image.
 
-The script does **not** block on imports-in-progress. The daily scheduler enqueues ~290 runs every night and a handful are still in flight for most of the working day; making the deploy wait for idle would mean almost never being able to deploy. Reconcile-on-startup marks any `running` rows as `failed` on worker restart, the next scheduler tick re-enqueues them, and cache hits make the rerun cheap.
+The script does **not** block on imports-in-progress. The daily scheduler enqueues ~290 runs every night and a handful are still in flight for most of the working day; making the deploy wait for idle would mean almost never being able to deploy. Reconcile-on-startup puts interrupted `running` rows back in the queue (capped at two requeues per run via `interrupted_count`, so a run that reliably kills the process can't crash-loop), and cache hits make the rerun cheap.
 
 The script is:
 
-- [scripts/deploy-beta.sh](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/scripts/deploy-beta.sh)
+- [scripts/deploy-beta.sh](scripts/deploy-beta.sh)
 
 Useful overrides:
 
@@ -184,11 +190,12 @@ Useful overrides:
 
 Production still depends on a small set of repo-managed runtime files on the server:
 
-- [docker-compose.production.yml](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/docker-compose.production.yml)
-- [Caddyfile](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/Caddyfile)
-- [quickwit/quickwit.yaml](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/quickwit/quickwit.yaml)
+- [docker-compose.production.yml](docker-compose.production.yml)
+- [Caddyfile](Caddyfile)
+- [quickwit/quickwit.yaml](quickwit/quickwit.yaml)
 
-When those files change, sync them explicitly:
+`deploy-beta.sh` runs this sync automatically at the start of every deploy.
+To push a config-only change without a code deploy, run it directly:
 
 ```sh
 pnpm run deploy:beta:infra
@@ -196,7 +203,7 @@ pnpm run deploy:beta:infra
 
 That helper is:
 
-- [scripts/deploy-beta-infra.sh](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/scripts/deploy-beta-infra.sh)
+- [scripts/deploy-beta-infra.sh](scripts/deploy-beta-infra.sh)
 
 It rsyncs the three files, then runs `caddy validate` and `caddy reload`
 inside the running Caddy container so a Caddyfile change takes effect
@@ -214,8 +221,8 @@ ssh root@91.98.32.151 'cd /opt/woozi && docker compose -f docker-compose.product
 
 So the operational split is:
 
-- code changes: publish image, then `deploy:beta`
-- infra/config file changes: `deploy:beta:infra`
+- code changes: publish image, then `deploy:beta` (which also syncs config)
+- config-only changes without a new image: `deploy:beta:infra`
 
 Operational rule:
 
@@ -276,7 +283,7 @@ Relevant env:
 
 ## Quickwit
 
-Quickwit config lives in [quickwit/quickwit.yaml](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/quickwit/quickwit.yaml).
+Quickwit config lives in [quickwit/quickwit.yaml](quickwit/quickwit.yaml).
 
 Important current behavior:
 
@@ -566,8 +573,8 @@ That implies Caddy joins the same Docker network as the app container.
 
 The repo now includes:
 
-- [Caddyfile](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/Caddyfile)
-- [docker-compose.production.yml](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/docker-compose.production.yml)
+- [Caddyfile](Caddyfile)
+- [docker-compose.production.yml](docker-compose.production.yml)
 
 That production compose file:
 
@@ -655,18 +662,46 @@ Example `.env` value:
 ADMIN_PASSWORD_HASH=$$2a$$14$$exampleexampleexampleexampleexampleexampleexampleexample
 ```
 
+## Monitoring and Backups
+
+Two systemd timers run on the production host:
+
+- `woozi-monitor.timer` (every 2 min) runs
+  [scripts/monitor-production.sh](scripts/monitor-production.sh) — the bash
+  variant is the deployed one; it is synced by every deploy. Checks: search
+  latency/errors, disk, container state, **import health** (no completed run
+  in 26h, queued work with nothing running for 30 min, extraction-failure
+  surges — all read straight from the ops SQLite on the host so they fire even
+  when the worker container is gone entirely), and backup freshness. Alerts go
+  to the Discord webhook in `/opt/woozi/.env` (`WOOZI_ALERT_WEBHOOK_URL`),
+  with a 15-min cooldown per alert key. During an intentional worker
+  scale-down, set `WOOZI_MONITOR_EXPECT_WORKER=0`.
+  Install/refresh with [scripts/install-production-monitor.sh](scripts/install-production-monitor.sh).
+- `woozi-backup.timer` (daily 03:30) runs
+  [scripts/backup_state.ts](scripts/backup_state.ts) inside the web container:
+  consistent `VACUUM INTO` snapshots of `woozi-ops.sqlite3` (run admin +
+  document blocklist) and `woozi-export-log.sqlite3` (export seq/dedup state),
+  gzipped to `backups/sqlite/{name}/{date}.sqlite3.gz` in S3 with 14-day
+  retention. Losing these databases without a backup resurrects taken-down
+  documents and corrupts export cursors. Install with
+  [scripts/install-production-backup.sh](scripts/install-production-backup.sh).
+
+To restore: download the newest `backups/sqlite/...` object, gunzip, stop the
+`openbesluitvorming` and `worker` containers, replace the file on the
+`woozi-state` volume (remove stale `-wal`/`-shm` siblings), start containers.
+
 ## Known Operational Notes
 
 - interrupted imports can leave stale run-state unless reconciled on startup
-- startup reconciliation for interrupted runs is now implemented in [src/ops/store.ts](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/src/ops/store.ts)
-- duplicate active imports for the same source/date/execution mode are blocked in [src/ingest.ts](/Users/joep/dev/github/openstate/open-raadsinformatie/woozi/src/ingest.ts)
+- startup reconciliation for interrupted runs is now implemented in [src/ops/store.ts](src/ops/store.ts)
+- duplicate active imports for the same source/date/execution mode are blocked in [src/ingest.ts](src/ingest.ts)
 - background imports are now queued in SQLite and executed by the `worker` container (`src/worker.ts`), separate from the HTTP-serving `openbesluitvorming` container
 - the current production behavior is memory-aware concurrency, not a fixed `1`
 - large aggregate imports should therefore mostly appear as many `queued` runs plus a bounded number of `running` runs
 - admin now has a queue/status summary backed by `/api/admin/summary`
-- startup marks previously `running` imports as `failed` (not resumed) and starts `queued` imports from scratch
+- startup requeues previously `running` imports (interrupted by a restart), capped at two requeues per run; a run that keeps dying then fails for good
 - aggregate imports are now supplier-specific, such as `__supplier__:notubiz` and `__supplier__:ibabs`
-- the deploy helper now refuses to restart the app while imports are still running, unless forced
+- the deploy helper does not wait for running imports; interrupted runs are requeued on startup
 - browser-side fetch helpers now handle empty/non-JSON 500 responses more safely
 - resuming many queued imports on startup with high concurrency can make the server unresponsive (event loop saturated with HTTP connections). If this happens: stop the container, reset queued/running rows in SQLite to `failed`, restart with lower concurrency
 - **every outbound fetch on the ingest path has an explicit timeout.** Observed failure mode: iBabs/Notubiz/Quickwit/extraction workers occasionally hold a TCP connection open without responding, and a slot hangs for hours — in one incident 7 of 8 slots were wedged for 10+ hours. All fetches now cap at 90-180s with retries on `TimeoutError`/`AbortError`. Any new `fetch()` call in the ingest path must keep this pattern.

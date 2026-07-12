@@ -22,15 +22,28 @@ derive_image_repository() {
 IMAGE_REPOSITORY="${IMAGE_REPOSITORY:-$(derive_image_repository)}"
 DEPLOY_REF="${DEPLOY_REF:-$(git rev-parse --short=7 HEAD)}"
 DEPLOY_IMAGE="${DEPLOY_IMAGE:-${IMAGE_REPOSITORY}:sha-${DEPLOY_REF}}"
-# One worker by default so imports keep running across deploys. (The old
-# default of 0 silently disabled all imports after every deploy — the queue
-# grew unattended for 11 days in July 2026 before anyone noticed.) Workers
-# share CPU, SQLite, S3 and Quickwit with the public app: keep
-# INGEST_CONCURRENCY modest, and scale WORKER_REPLICAS up only during an
-# intentional catch-up window.
+# Worker scale and concurrency are server state, not deploy parameters: a
+# deploy must never silently rescale the import pipeline. (The old defaults —
+# 0 replicas, concurrency 1 — disabled or crippled imports after every deploy;
+# the queue grew unattended for 11 days in July 2026 before anyone noticed.)
+# Precedence:
+#   1. caller env (WORKER_REPLICAS=... pnpm run deploy:beta)
+#   2. WOOZI_WORKER_REPLICAS in /opt/woozi/.env on the server
+#   3. default: 1 replica
+# INGEST_CONCURRENCY / WOOZI_DOCUMENT_CONCURRENCY are only forwarded when the
+# caller sets them; otherwise the server's .env / compose defaults apply.
+if [ -z "${WORKER_REPLICAS:-}" ]; then
+  WORKER_REPLICAS="$(ssh "$DEPLOY_HOST" "grep -E '^WOOZI_WORKER_REPLICAS=' '$DEPLOY_DIR/.env' 2>/dev/null | head -n1 | cut -d= -f2" || true)"
+fi
 WORKER_REPLICAS="${WORKER_REPLICAS:-1}"
-INGEST_CONCURRENCY="${INGEST_CONCURRENCY:-1}"
-WOOZI_DOCUMENT_CONCURRENCY="${WOOZI_DOCUMENT_CONCURRENCY:-3}"
+
+CONCURRENCY_EXPORTS=""
+if [ -n "${INGEST_CONCURRENCY:-}" ]; then
+  CONCURRENCY_EXPORTS="export INGEST_CONCURRENCY=\"$INGEST_CONCURRENCY\";"
+fi
+if [ -n "${WOOZI_DOCUMENT_CONCURRENCY:-}" ]; then
+  CONCURRENCY_EXPORTS="$CONCURRENCY_EXPORTS export WOOZI_DOCUMENT_CONCURRENCY=\"$WOOZI_DOCUMENT_CONCURRENCY\";"
+fi
 
 if [ -z "${DEPLOY_TARGET_EXPLICIT:-}" ] && (! git diff --quiet || ! git diff --cached --quiet); then
   echo "Refusing to deploy with uncommitted changes."
@@ -40,10 +53,10 @@ fi
 
 # We deliberately do not block on imports-in-progress: the daily scheduler
 # enqueues ~290 runs every night and there are usually a handful still in
-# flight for most of the working day. Reconcile-on-startup marks any
-# `running` rows as failed when the worker restarts, and tomorrow's tick
-# picks them back up; cache hits make the rerun cheap. If you genuinely
-# need to wait for idle, watch /api/admin/summary manually before deploying.
+# flight for most of the working day. Reconcile-on-startup requeues any
+# `running` rows interrupted by the restart (capped at two requeues per run),
+# and cache hits make the rerun cheap. If you genuinely need to wait for
+# idle, watch /api/admin/summary manually before deploying.
 
 # Sync runtime config alongside the image. $DEPLOY_DIR is a plain copy, not a
 # checkout: without this step, compose/Caddyfile changes in git silently never
@@ -58,8 +71,7 @@ ssh "$DEPLOY_HOST" "
   cd \"$DEPLOY_DIR\"
   export OPENBESLUITVORMING_IMAGE=\"$DEPLOY_IMAGE\"
   export COMPOSE_PROJECT_NAME=\"$COMPOSE_PROJECT_NAME_VALUE\"
-  export INGEST_CONCURRENCY=\"$INGEST_CONCURRENCY\"
-  export WOOZI_DOCUMENT_CONCURRENCY=\"$WOOZI_DOCUMENT_CONCURRENCY\"
+  $CONCURRENCY_EXPORTS
   docker compose -f \"$COMPOSE_FILE\" pull openbesluitvorming worker
   docker compose -f \"$COMPOSE_FILE\" up -d --scale worker=${WORKER_REPLICAS} openbesluitvorming worker caddy
   docker compose -f \"$COMPOSE_FILE\" ps openbesluitvorming worker caddy
