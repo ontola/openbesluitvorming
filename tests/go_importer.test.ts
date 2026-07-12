@@ -1,3 +1,10 @@
+// Isolate from the local .env (loaded as a side effect of the blocklist
+// lookup in materializeDocument): keep ops-DB writes in a temp file and make
+// sure a configured extraction service cannot reroute the local test paths.
+Deno.env.set("WOOZI_KV_PATH", await Deno.makeTempFile({ suffix: ".sqlite3" }));
+// A single space: loadLocalEnv only fills unset/empty vars, and the URL is trimmed before use.
+Deno.env.set("WOOZI_EXTRACTION_SERVICE_URL", " ");
+
 import {
   GemeenteOplossingenExtractor,
   splitDateRange,

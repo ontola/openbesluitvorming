@@ -9,11 +9,12 @@ beta.openbesluitvorming.nl, openbesluitvorming.nl {
 
   encode gzip zstd
 
-  # Expose Quickwit search API publicly (read-only paths only)
+  # Expose only Quickwit's search endpoint publicly. Everything else under
+  # /api/v1 (ingest, delete-tasks, index management) stays internal — the old
+  # exclusion list missed /api/v1/*/delete-tasks.
   @quickwit {
-    path /api/v1/*
+    path /api/v1/*/search /api/v1/*/search/*
     method GET POST
-    not path /api/v1/*/ingest /api/v1/*/delete /api/v1/indexes
   }
   reverse_proxy @quickwit quickwit:7280
 

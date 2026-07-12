@@ -14,3 +14,6 @@ infra/.terraform/
 infra/*.tfstate
 infra/*.tfstate.backup
 infra/.terraform.lock.hcl
+
+# Interne, niet-publieke documentatie (bevat gevoelige takedown-informatie)
+docs_internal/

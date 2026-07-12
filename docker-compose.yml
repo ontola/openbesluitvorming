@@ -80,6 +80,7 @@ services:
       QUICKWIT_URL: http://quickwit:7280
       QUICKWIT_INDEX_ID: ${QUICKWIT_INDEX_ID:-woozi-events-dev}
       WOOZI_KV_PATH: /data/woozi-ops.sqlite3
+      WOOZI_EXPORT_LOG_PATH: /data/woozi-export-log.sqlite3
       AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY:-woozi}
       AWS_SECRET_ACCESS_KEY: ${S3_SECRET_KEY:-woozi-dev-secret}
       S3_ACCESS_KEY: ${S3_ACCESS_KEY:-woozi}
@@ -106,6 +107,7 @@ services:
       QUICKWIT_INDEX_ID: ${QUICKWIT_INDEX_ID:-woozi-events-dev}
       QUICKWIT_BATCH_SIZE: ${QUICKWIT_BATCH_SIZE:-64}
       WOOZI_KV_PATH: /data/woozi-ops.sqlite3
+      WOOZI_EXPORT_LOG_PATH: /data/woozi-export-log.sqlite3
       AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY:-woozi}
       AWS_SECRET_ACCESS_KEY: ${S3_SECRET_KEY:-woozi-dev-secret}
       S3_ACCESS_KEY: ${S3_ACCESS_KEY:-woozi}

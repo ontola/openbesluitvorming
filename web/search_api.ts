@@ -17,6 +17,7 @@ import { pdfPageCacheKey } from "../src/documents/thumbnails.ts";
 
 type SearchHit = {
   time?: string;
+  op?: string;
   entity_id?: string;
   entity_type?: string;
   parent_entity_id?: string;
@@ -346,7 +347,11 @@ function dedupeLatestHits(hits: SearchHit[]): SearchHit[] {
     }
   }
 
-  return [...byEntityId.values()];
+  // A takedown ingests a newer op:"delete" marker per entity_id. It wins the
+  // recency dedupe (shadowing older copies) and is then dropped here, so the
+  // entity disappears immediately — before the Quickwit janitor physically
+  // applies the delete task.
+  return [...byEntityId.values()].filter((hit) => hit.op !== "delete");
 }
 
 function hasStructuredAgenda(agenda: MeetingAgendaItem[] | undefined): boolean {
@@ -375,7 +380,9 @@ function dedupeLatestIndexedHits(items: IndexedHit[]): IndexedHit[] {
     }
   }
 
-  return [...byEntityId.values()];
+  // See dedupeLatestHits: newer op:"delete" markers shadow older copies and
+  // are then dropped, hiding taken-down documents immediately.
+  return [...byEntityId.values()].filter((item) => item.hit.op !== "delete");
 }
 
 function searchResultEntityId(hit: SearchHit): string {

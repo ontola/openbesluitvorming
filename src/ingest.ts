@@ -1,4 +1,5 @@
 import { buildEntityCommitEvent } from "./events/entity_commit.ts";
+import { getExportLog } from "./exports/log.ts";
 import { GemeenteOplossingenExtractor } from "./gemeenteoplossingen/extractor.ts";
 import { IbabsMeetingExtractor } from "./ibabs/extractor.ts";
 import { NotubizMeetingExtractor } from "./notubiz/extractor.ts";
@@ -10,6 +11,7 @@ import {
   createRun,
   findActiveRun,
   getRunIssueCount,
+  isDocumentBlocklisted,
   listQueuedRuns,
   updateRun,
 } from "./ops/store.ts";
@@ -155,6 +157,8 @@ export async function executeIngest(
       quickwitIndexId = Deno.env.get("QUICKWIT_INDEX_ID") ?? "woozi-events";
     }
 
+    const exportLog = options.ingestToQuickwit ? await getExportLog() : null;
+
     const extraction = await runExtractor(source, dateFrom, dateTo, {
       executionMode: options.executionMode,
       retainEntities: false,
@@ -182,6 +186,13 @@ export async function executeIngest(
       },
       onEntity: async (entity) => {
         options.onHeartbeat?.();
+        // Blocklisted documents (taken down, e.g. BSN) are neither indexed nor
+        // exported. materializeDocument also refuses to re-materialize them,
+        // but this guard covers every extractor path centrally.
+        if (entity.type === "Document" && (await isDocumentBlocklisted(entity.id))) {
+          console.log(`[blocklist] ${sourceKey} skipped ${entity.id}`);
+          return;
+        }
         const mem = Deno.memoryUsage();
         const rss = Math.round(mem.rss / 1024 / 1024);
         const heap = Math.round(mem.heapUsed / 1024 / 1024);
@@ -203,6 +214,7 @@ export async function executeIngest(
         // large entity (md_text, page_chunks, raw) right away. Only the small
         // projected documents are buffered until the next flush.
         const event = await buildEntityCommitEvent(entity);
+        exportLog?.recordCommit(event);
         const projected = projectEntityCommitToQuickwitDocuments(event);
         pendingDocuments.push(...projected);
         if (pendingDocuments.length >= quickwitBatchSize) {
@@ -211,6 +223,21 @@ export async function executeIngest(
       },
     });
     await flushQuickwitBatch();
+
+    if (exportLog) {
+      try {
+        await exportLog.flush(source.key);
+      } catch (error) {
+        // Segment publishing is retried implicitly: unflushed records stay in
+        // the pending table, remain readable via the changes endpoint, and are
+        // included in the next successful flush.
+        await appendRunIssue(run.id, {
+          severity: "warning",
+          step: "export_log_flush",
+          message: error instanceof Error ? error.message : "Export log flush failed",
+        });
+      }
+    }
 
     const status = extraction.stats.issue_count > 0 ? "partial" : "succeeded";
     const updated = await updateRun(run.id, {

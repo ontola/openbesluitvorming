@@ -58,6 +58,12 @@ async function getDatabase(): Promise<DatabaseSync> {
           details TEXT,
           FOREIGN KEY(run_id) REFERENCES ingest_run(id)
         );
+        CREATE TABLE IF NOT EXISTS document_blocklist (
+          entity_id TEXT PRIMARY KEY,
+          reason TEXT NOT NULL,
+          details TEXT,
+          created_at TEXT NOT NULL
+        );
       `);
       try {
         db.exec("ALTER TABLE ingest_run_issue ADD COLUMN details TEXT");
@@ -96,13 +102,58 @@ export interface RunDetails {
   issues: ExtractionIssue[];
 }
 
+export interface DocumentBlocklistEntry {
+  entity_id: string;
+  reason: string;
+  details?: string;
+  created_at: string;
+}
+
+/** Blocks a document from (re-)ingestion. Checked in materializeDocument
+ * (before the S3 cache short-circuit) and in the ingest onEntity handler
+ * (before Quickwit projection and the export log). */
+export async function addDocumentToBlocklist(
+  entityId: string,
+  reason: string,
+  details?: string,
+): Promise<void> {
+  const db = await getDatabase();
+  db.prepare(
+    `INSERT INTO document_blocklist (entity_id, reason, details, created_at)
+     VALUES (?, ?, ?, ?)
+     ON CONFLICT(entity_id) DO UPDATE SET reason = excluded.reason, details = excluded.details`,
+  ).run(entityId, reason, details ?? null, new Date().toISOString());
+}
+
+export async function isDocumentBlocklisted(entityId: string): Promise<boolean> {
+  const db = await getDatabase();
+  const row = db
+    .prepare("SELECT 1 as present FROM document_blocklist WHERE entity_id = ?")
+    .get(entityId);
+  return Boolean(row);
+}
+
+export async function removeDocumentFromBlocklist(entityId: string): Promise<void> {
+  const db = await getDatabase();
+  db.prepare("DELETE FROM document_blocklist WHERE entity_id = ?").run(entityId);
+}
+
+export async function listDocumentBlocklist(): Promise<DocumentBlocklistEntry[]> {
+  const db = await getDatabase();
+  return db
+    .prepare(
+      "SELECT entity_id, reason, details, created_at FROM document_blocklist ORDER BY created_at",
+    )
+    .all() as unknown as DocumentBlocklistEntry[];
+}
+
 type RunRow = IngestRunRecord;
 
 export async function getRunIssueCount(runId: string): Promise<number> {
   const db = await getDatabase();
-  const row = db.prepare("SELECT COUNT(*) as count FROM ingest_run_issue WHERE run_id = ?").get(runId) as
-    | { count?: number }
-    | undefined;
+  const row = db
+    .prepare("SELECT COUNT(*) as count FROM ingest_run_issue WHERE run_id = ?")
+    .get(runId) as { count?: number } | undefined;
   return row?.count ?? 0;
 }
 
@@ -389,7 +440,8 @@ export async function reconcileInterruptedRuns(): Promise<IngestRunRecord[]> {
         step: "ingest_quickwit",
         entity_id: null,
         message,
-        details: "Automatically reconciled on startup after the previous process exited unexpectedly.",
+        details:
+          "Automatically reconciled on startup after the previous process exited unexpectedly.",
       });
     }
     db.exec("COMMIT");
@@ -409,7 +461,7 @@ export async function reconcileInterruptedRuns(): Promise<IngestRunRecord[]> {
       finished_at: finishedAt,
       issue_count: run.issue_count + 1,
       error_message: run.error_message ?? message,
-    })
+    }),
   );
 }
 
@@ -435,8 +487,9 @@ export async function claimQueuedRun(runId: string): Promise<IngestRunRecord | n
 export async function listQueuedRuns(): Promise<IngestRunRecord[]> {
   const db = await getDatabase();
   return (
-    db.prepare(
-      `SELECT
+    db
+      .prepare(
+        `SELECT
         id, source_key, supplier, date_from, date_to, trigger_mode as trigger,
         execution_mode, parent_run_id, projection_version, derivation_version, status,
         started_at, finished_at, meeting_count, document_count, cache_hits, downloaded_count,
@@ -444,7 +497,8 @@ export async function listQueuedRuns(): Promise<IngestRunRecord[]> {
        FROM ingest_run
        WHERE status = 'queued'
        ORDER BY started_at ASC`,
-    ).all() as unknown as IngestRunRecord[]
+      )
+      .all() as unknown as IngestRunRecord[]
   ).map(normalizeRunRecord);
 }
 
@@ -583,12 +637,14 @@ function buildCoverageMonths(monthCount: number): string[] {
   return months;
 }
 
-export async function getRunCoverage(options: {
-  monthCount?: number;
-  sourceKeys?: string[];
-  executionMode?: IngestExecutionMode;
-  labelsBySourceKey?: Record<string, { label: string; supplier: string }>;
-} = {}): Promise<AdminCoverageResponse> {
+export async function getRunCoverage(
+  options: {
+    monthCount?: number;
+    sourceKeys?: string[];
+    executionMode?: IngestExecutionMode;
+    labelsBySourceKey?: Record<string, { label: string; supplier: string }>;
+  } = {},
+): Promise<AdminCoverageResponse> {
   const db = await getDatabase();
   const monthCount = Math.max(3, Math.min(options.monthCount ?? 12, 36));
   const months = buildCoverageMonths(monthCount);
@@ -597,16 +653,18 @@ export async function getRunCoverage(options: {
     first_month: firstMonth,
     execution_mode: options.executionMode ?? "full",
   };
-  const sourceClause = options.sourceKeys && options.sourceKeys.length > 0
-    ? `AND source_key IN (${options.sourceKeys.map((_, index) => `@source_key_${index}`).join(", ")})`
-    : "";
+  const sourceClause =
+    options.sourceKeys && options.sourceKeys.length > 0
+      ? `AND source_key IN (${options.sourceKeys.map((_, index) => `@source_key_${index}`).join(", ")})`
+      : "";
 
   for (const [index, sourceKey] of (options.sourceKeys ?? []).entries()) {
     params[`source_key_${index}`] = sourceKey;
   }
 
-  const rows = db.prepare(
-    `SELECT
+  const rows = db
+    .prepare(
+      `SELECT
       id, source_key, supplier, date_from, date_to, trigger_mode as trigger,
       execution_mode, parent_run_id, projection_version, derivation_version, status,
       started_at, finished_at, meeting_count, document_count, cache_hits, downloaded_count,
@@ -616,7 +674,8 @@ export async function getRunCoverage(options: {
        AND date_from >= @first_month
        ${sourceClause}
      ORDER BY started_at DESC`,
-  ).all(params) as unknown as RunRow[];
+    )
+    .all(params) as unknown as RunRow[];
 
   const rowsBySource = new Map<string, Map<string, AdminCoverageCell>>();
   for (const sourceKey of options.sourceKeys ?? []) {
@@ -654,13 +713,14 @@ export async function getRunCoverage(options: {
   const coverageRows: AdminCoverageRow[] = [...rowsBySource.entries()]
     .map(([sourceKey, sourceMonths]) => {
       const labelInfo = options.labelsBySourceKey?.[sourceKey];
-      const monthCells = months.map((month) =>
-        sourceMonths.get(month) ?? {
-          month,
-          documentCount: 0,
-          meetingCount: 0,
-          issueCount: 0,
-        }
+      const monthCells = months.map(
+        (month) =>
+          sourceMonths.get(month) ?? {
+            month,
+            documentCount: 0,
+            meetingCount: 0,
+            issueCount: 0,
+          },
       );
       const totalDocumentCount = monthCells.reduce((sum, cell) => sum + cell.documentCount, 0);
       const coveredMonthCount = monthCells.filter((cell) => Boolean(cell.status)).length;
@@ -677,10 +737,11 @@ export async function getRunCoverage(options: {
         coveredMonthCount,
       };
     })
-    .sort((left, right) =>
-      right.totalDocumentCount - left.totalDocumentCount ||
-      right.coveredMonthCount - left.coveredMonthCount ||
-      left.label.localeCompare(right.label, "nl")
+    .sort(
+      (left, right) =>
+        right.totalDocumentCount - left.totalDocumentCount ||
+        right.coveredMonthCount - left.coveredMonthCount ||
+        left.label.localeCompare(right.label, "nl"),
     );
 
   return {

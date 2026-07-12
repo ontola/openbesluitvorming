@@ -14,7 +14,12 @@ import {
   reconcileInterruptedRuns,
 } from "../src/ops/store.ts";
 import { startScheduler } from "../src/scheduler.ts";
-import { listAdminSourceOptions, listAggregateRunnableSourceRefs } from "../src/sources/index.ts";
+import { getExportLog, parseChangesCursor } from "../src/exports/log.ts";
+import {
+  getSource,
+  listAdminSourceOptions,
+  listAggregateRunnableSourceRefs,
+} from "../src/sources/index.ts";
 import type { Supplier } from "../src/types.ts";
 import {
   getDocumentCoverage,
@@ -85,6 +90,40 @@ function parseServerTiming(value: string | null): ParsedServerTiming {
     }
   }
   return parsed;
+}
+
+function validateExportSource(sourceKey: string): Response | null {
+  if (!sourceKey) {
+    return Response.json(
+      { error: "Parameter source is verplicht; zie /api/sources voor geldige keys." },
+      { status: 400 },
+    );
+  }
+  try {
+    getSource(sourceKey);
+    return null;
+  } catch {
+    return Response.json(
+      { error: `Onbekende source "${sourceKey}"; zie /api/sources voor geldige keys.` },
+      { status: 400 },
+    );
+  }
+}
+
+function exportLimitParam(url: URL): number | undefined {
+  const raw = url.searchParams.get("limit");
+  return raw === null ? undefined : Number(raw);
+}
+
+function ndjsonResponse(records: unknown[], headers: Record<string, string>): Response {
+  const body =
+    records.length > 0 ? records.map((record) => JSON.stringify(record)).join("\n") + "\n" : "";
+  return new Response(body, {
+    headers: {
+      "content-type": "application/x-ndjson; charset=utf-8",
+      ...headers,
+    },
+  });
 }
 
 function searchRequestMetadata(url: URL): Record<string, unknown> {
@@ -248,6 +287,65 @@ async function handleRequest(request: Request): Promise<Response> {
       implementedOnly ? source.implemented : true,
     );
     return Response.json({ sources } satisfies AdminSourcesResponse);
+  }
+
+  if (url.pathname === "/api/export/changes" && request.method === "GET") {
+    const sourceKey = url.searchParams.get("source")?.trim() ?? "";
+    const invalidSource = validateExportSource(sourceKey);
+    if (invalidSource) {
+      return invalidSource;
+    }
+    let cursor: string | null;
+    try {
+      cursor = url.searchParams.get("cursor");
+      parseChangesCursor(cursor);
+    } catch {
+      return Response.json(
+        { error: "Ongeldige cursor; gebruik de nextCursor uit een eerdere response." },
+        { status: 400 },
+      );
+    }
+    try {
+      const log = await getExportLog();
+      const page = await log.readChanges(sourceKey, {
+        cursor,
+        limit: exportLimitParam(url),
+      });
+      return ndjsonResponse(page.records, {
+        "x-next-cursor": page.nextCursor,
+        "x-has-more": String(page.hasMore),
+      });
+    } catch (error) {
+      return Response.json(
+        { error: error instanceof Error ? error.message : "Export changes ophalen mislukt" },
+        { status: 500 },
+      );
+    }
+  }
+
+  if (url.pathname === "/api/export/snapshot" && request.method === "GET") {
+    const sourceKey = url.searchParams.get("source")?.trim() ?? "";
+    const invalidSource = validateExportSource(sourceKey);
+    if (invalidSource) {
+      return invalidSource;
+    }
+    try {
+      const log = await getExportLog();
+      const page = log.readSnapshot(sourceKey, {
+        cursor: url.searchParams.get("cursor"),
+        limit: exportLimitParam(url),
+      });
+      return ndjsonResponse(page.records, {
+        "x-next-cursor": page.nextCursor,
+        "x-has-more": String(page.hasMore),
+        "x-changes-cursor": page.changesCursor,
+      });
+    } catch (error) {
+      return Response.json(
+        { error: error instanceof Error ? error.message : "Export snapshot ophalen mislukt" },
+        { status: 500 },
+      );
+    }
   }
 
   if (url.pathname === "/api/admin/runs" && request.method === "GET") {

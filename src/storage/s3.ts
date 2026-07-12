@@ -1,6 +1,8 @@
 import {
+  DeleteObjectsCommand,
   GetObjectCommand,
   HeadObjectCommand,
+  ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
 } from "npm:@aws-sdk/client-s3";
@@ -135,6 +137,83 @@ export class ObjectStorageClient {
     }
 
     return new TextDecoder().decode(bytes);
+  }
+
+  async listObjects(
+    options: {
+      prefix?: string;
+      startAfter?: string;
+      maxKeys?: number;
+    } = {},
+  ): Promise<{ keys: string[]; isTruncated: boolean }> {
+    let response;
+    try {
+      response = await this.client.send(
+        new ListObjectsV2Command({
+          Bucket: this.bucket,
+          Prefix: options.prefix,
+          StartAfter: options.startAfter,
+          MaxKeys: options.maxKeys,
+        }),
+      );
+    } catch (error) {
+      throw describeStorageError("list", options.prefix ?? "", error);
+    }
+
+    return {
+      keys: (response.Contents ?? [])
+        .map((object) => object.Key)
+        .filter((key): key is string => Boolean(key)),
+      isTruncated: response.IsTruncated ?? false,
+    };
+  }
+
+  async deleteObjects(keys: string[]): Promise<void> {
+    for (let offset = 0; offset < keys.length; offset += 1000) {
+      const batch = keys.slice(offset, offset + 1000);
+      try {
+        const response = await this.client.send(
+          new DeleteObjectsCommand({
+            Bucket: this.bucket,
+            Delete: {
+              Objects: batch.map((key) => ({ Key: key })),
+              Quiet: true,
+            },
+          }),
+        );
+        const errors = response.Errors ?? [];
+        if (errors.length > 0) {
+          const first = errors[0];
+          throw new Error(
+            `${errors.length} objects failed, first: ${first.Key} (${first.Code}: ${first.Message})`,
+          );
+        }
+      } catch (error) {
+        throw describeStorageError("delete", batch[0] ?? "", error);
+      }
+    }
+  }
+
+  /** Deletes every object under the prefix. Returns the deleted keys. */
+  async deleteByPrefix(prefix: string): Promise<string[]> {
+    if (!prefix || prefix === "/") {
+      throw new Error(`Refusing to delete by empty prefix`);
+    }
+    const deleted: string[] = [];
+    let startAfter: string | undefined;
+    while (true) {
+      const { keys, isTruncated } = await this.listObjects({ prefix, startAfter });
+      if (keys.length === 0) {
+        break;
+      }
+      await this.deleteObjects(keys);
+      deleted.push(...keys);
+      if (!isTruncated) {
+        break;
+      }
+      startAfter = keys[keys.length - 1];
+    }
+    return deleted;
   }
 
   async getObjectBytes(key: string): Promise<Uint8Array | null> {

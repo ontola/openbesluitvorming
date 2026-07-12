@@ -186,7 +186,9 @@ export interface ExtractionIssue {
     | "download_document"
     | "extract_text"
     | "upload_s3"
-    | "ingest_quickwit";
+    | "ingest_quickwit"
+    | "export_log_flush"
+    | "bsn_quarantine";
   entity_id?: string;
   message: string;
   details?: string;
@@ -450,4 +452,27 @@ export interface EntityContentResponse {
   pdfUrl?: string;
   meetingId?: string;
   agenda?: MeetingAgendaItem[];
+}
+
+/** One line in the per-source export changes log. Compact by design: full
+ * markdown/PDF content is reachable via the payload's derived_content and
+ * media_urls references, never inlined. */
+export interface ExportChangeRecord {
+  seq: number;
+  op: "upsert" | "delete";
+  time: string;
+  entity_id: string;
+  entity_type: string;
+  source_key: string;
+  supplier: string;
+  commit_id?: string;
+  content_hash?: string;
+  schema_version?: string;
+  payload?: unknown;
+}
+
+export interface ExportPage {
+  records: ExportChangeRecord[];
+  nextCursor: string;
+  hasMore: boolean;
 }

@@ -190,6 +190,20 @@ export class QuickwitClient {
     return;
   }
 
+  /** Creates a Quickwit delete task (delete-by-query). Deletes are applied
+   * asynchronously by the janitor during merges — matching documents keep
+   * showing up in searches until then, so callers that need immediate
+   * invisibility must also ingest a newer op:"delete" marker document. */
+  async createDeleteTask(query: string): Promise<void> {
+    await fetchJson(`${this.baseUrl}/api/v1/${this.indexId}/delete-tasks`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ query }),
+    });
+  }
+
   async search(
     query: string,
     maxHits = 10,

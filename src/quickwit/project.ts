@@ -128,7 +128,7 @@ function projectGenericEntityContent(
   return content || undefined;
 }
 
-function compactPayload(payload?: WooziEntity): unknown {
+export function compactEntityPayload(payload?: WooziEntity): unknown {
   if (!payload) {
     return undefined;
   }
@@ -231,7 +231,7 @@ function projectDocumentPageDocuments(
     parent_entity_id: event.data.entity_id,
     page_number: page.page_number,
     projection_version: projectionVersion,
-    payload: compactPayload(payload),
+    payload: compactEntityPayload(payload),
   }));
 }
 
@@ -240,11 +240,12 @@ export function projectEntityCommitToQuickwitDocuments(
 ): QuickwitSearchDocument[] {
   const payload = event.data.payload;
   const projectionVersion = currentProjectionVersion();
-  const content = payload?.type === "Document"
-    ? projectDocumentContent(payload)
-    : payload?.type === "Meeting"
-    ? projectMeetingContent(payload)
-    : projectGenericEntityContent(payload);
+  const content =
+    payload?.type === "Document"
+      ? projectDocumentContent(payload)
+      : payload?.type === "Meeting"
+        ? projectMeetingContent(payload)
+        : projectGenericEntityContent(payload);
 
   const primaryDocument: QuickwitSearchDocument = {
     time: event.time,
@@ -262,23 +263,23 @@ export function projectEntityCommitToQuickwitDocuments(
     content_hash: event.data.content_hash,
     supplier: event.data.source.supplier,
     source_key: event.data.source.source,
-    document_month: payload?.type === "Document"
-      ? toDocumentMonth(documentReferenceDate(payload))
-      : undefined,
+    document_month:
+      payload?.type === "Document" ? toDocumentMonth(documentReferenceDate(payload)) : undefined,
     name: payload?.name,
     classification: (payload as { classification?: string[] } | undefined)?.classification,
     file_name: payload?.type === "Document" ? payload.file_name : undefined,
-    start_date: payload?.type === "Meeting"
-      ? payload.start_date
-      : payload?.type === "Document"
-      ? documentReferenceDate(payload)
-      : undefined,
+    start_date:
+      payload?.type === "Meeting"
+        ? payload.start_date
+        : payload?.type === "Document"
+          ? documentReferenceDate(payload)
+          : undefined,
     end_date: payload?.type === "Meeting" ? payload.end_date : undefined,
     organization: (payload as { organization?: string } | undefined)?.organization,
     committee: payload?.type === "Meeting" ? payload.committee : undefined,
     content,
     projection_version: projectionVersion,
-    payload: compactPayload(payload),
+    payload: compactEntityPayload(payload),
   };
 
   if (payload?.type === "Document" && payload.page_chunks?.length) {

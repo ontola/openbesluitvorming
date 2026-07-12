@@ -2,6 +2,8 @@ import type { DocumentEntity, ExtractionIssue } from "../types.ts";
 import { extractDocumentMarkdown, MAX_PDF_PAGES } from "./text.ts";
 import type { IngestExecutionMode } from "../types.ts";
 import { assessMarkdownQuality } from "./quality.ts";
+import { scanForBsn } from "./bsn.ts";
+import { addDocumentToBlocklist, isDocumentBlocklisted } from "../ops/store.ts";
 import { currentDerivationVersion } from "../pipeline/versioning.ts";
 import { pdfPageCacheKey, pdfPageMetaKey, renderPdfPageJpeg } from "./thumbnails.ts";
 
@@ -77,6 +79,7 @@ interface CachedStorage {
   getObjectText(key: string): Promise<string>;
   getObjectBytes(key: string): Promise<Uint8Array | null>;
   urlForKey(key: string): string;
+  deleteObjects?(keys: string[]): Promise<void>;
 }
 
 async function prewarmFirstPageThumbnail(
@@ -142,6 +145,78 @@ export interface MaterializedDocumentResult {
   document: DocumentEntity;
   cacheHit: boolean;
   issues: ExtractionIssue[];
+  /** True when the document is blocklisted or quarantined (e.g. it contains a
+   * BSN). The ingest onEntity handler skips indexing/export for these. */
+  blocked?: boolean;
+}
+
+/** Auto-quarantine is opt-in (decision after consulting VNG, July 2026):
+ * detection currently only reports, it never blocks or deletes on its own.
+ * Documents are only ever blocked via the explicit blocklist (delete script).
+ * Set WOOZI_BSN_AUTO_QUARANTINE=1 to make high-confidence hits preventive. */
+function bsnAutoQuarantineEnabled(): boolean {
+  return Deno.env.get("WOOZI_BSN_AUTO_QUARANTINE")?.trim() === "1";
+}
+
+/** Scans extracted markdown for BSNs. By default every hit only adds a review
+ * issue (detect-only). With WOOZI_BSN_AUTO_QUARANTINE=1, high-confidence hits
+ * are blocklisted and quarantined: already-written S3 artifacts are removed
+ * and a blocked result is returned so the document is never indexed. Returns
+ * null when ingestion should continue. */
+async function quarantineBsnDocument(
+  document: DocumentEntity,
+  markdown: string,
+  storage: CachedStorage | undefined,
+  writtenKeys: string[],
+  issues: ExtractionIssue[],
+): Promise<MaterializedDocumentResult | null> {
+  if (!markdown) {
+    return null;
+  }
+  const scan = scanForBsn(markdown);
+  if (!scan.found) {
+    return null;
+  }
+
+  const details = JSON.stringify(scan.matches.slice(0, 10));
+  if (scan.confidence !== "high" || !bsnAutoQuarantineEnabled()) {
+    issues.push({
+      severity: "warning",
+      step: "bsn_quarantine",
+      entity_id: document.id,
+      message: `${documentIssueContext(document)}: possible BSN detected (${scan.matches.length} match(es), ${scan.confidence} confidence); manual review needed`,
+      details,
+    });
+    return null;
+  }
+
+  await addDocumentToBlocklist(document.id, "bsn-auto", details);
+  if (storage?.deleteObjects && writtenKeys.length > 0) {
+    try {
+      await storage.deleteObjects(writtenKeys);
+    } catch (error) {
+      issues.push({
+        severity: "warning",
+        step: "bsn_quarantine",
+        entity_id: document.id,
+        message: `${documentIssueContext(document)}: failed to remove S3 objects after BSN quarantine: ${error instanceof Error ? error.message : String(error)}`,
+      });
+    }
+  }
+  issues.push({
+    severity: "error",
+    step: "bsn_quarantine",
+    entity_id: document.id,
+    message: `${documentIssueContext(document)}: BSN detected (${scan.matches.length} match(es)); document blocklisted and not indexed`,
+    details,
+  });
+  console.warn(`[bsn] ${document.id} quarantined (${scan.matches.length} matches)`);
+  return {
+    blocked: true,
+    cacheHit: false,
+    issues,
+    document,
+  };
 }
 
 function documentIssueContext(document: DocumentEntity): string {
@@ -290,6 +365,17 @@ async function rederiveFromStoredFile(
     });
   }
 
+  const quarantined = await quarantineBsnDocument(
+    document,
+    mdText,
+    storage,
+    [fileKey, extractedMarkdownKey(document), extractedPageChunksKey(document)],
+    issues,
+  );
+  if (quarantined) {
+    return quarantined;
+  }
+
   if (mdText) {
     await storage.putObject(extractedMarkdownKey(document), new TextEncoder().encode(mdText), {
       contentType: "text/markdown; charset=utf-8",
@@ -363,6 +449,14 @@ export async function materializeDocument(
       `[timing] ${docId} path=skip_media ${Math.round(performance.now() - t0)}ms file=${document.file_name ?? ""}`,
     );
     return { document, cacheHit: false, issues: [] };
+  }
+
+  // Blocklisted documents (taken down, e.g. for containing a BSN) must never
+  // be re-downloaded or re-materialized. This check runs before the S3
+  // cache-hit short-circuit on purpose.
+  if (await isDocumentBlocklisted(docId)) {
+    console.log(`[timing] ${docId} path=blocklist_skip ${Math.round(performance.now() - t0)}ms`);
+    return { document, cacheHit: true, issues: [], blocked: true };
   }
 
   if (options.storage) {
@@ -457,6 +551,17 @@ export async function materializeDocument(
           })),
         );
 
+        const quarantined = await quarantineBsnDocument(
+          document,
+          payload.markdown,
+          options.storage,
+          [pdfKey, mdKey, pdfPageCacheKey(document.id, 1), pdfPageMetaKey(document.id)],
+          issues,
+        );
+        if (quarantined) {
+          return quarantined;
+        }
+
         const quality = payload.markdown ? assessMarkdownQuality(payload.markdown) : null;
         console.log(
           `[timing] ${docId} path=extraction_service ${Math.round(performance.now() - t0)}ms pages=${payload.page_count} md=${Math.round(payload.markdown.length / 1024)}KB`,
@@ -538,6 +643,11 @@ export async function materializeDocument(
       message: `${documentIssueContext(document)}: ${error instanceof Error ? error.message : "Document extraction failed"}`,
       details: issueDetailsFromError(error),
     });
+  }
+
+  const quarantined = await quarantineBsnDocument(document, mdText, options.storage, [], issues);
+  if (quarantined) {
+    return quarantined;
   }
 
   let mediaUrls = document.media_urls;
