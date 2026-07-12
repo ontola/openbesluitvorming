@@ -16,4 +16,11 @@
 #   tofu apply -var=extraction_server_count=8
 # After scaling, update WOOZI_EXTRACTION_SERVICE_URL in /opt/woozi/.env with
 # the new worker IPs (tofu output) and recreate the worker containers.
-extraction_server_count = 2
+# Temporarily at 8 for the July 2026 full-history backfill (extraction hosts
+# were CPU-saturated at 2). Scale back to 2 when the backfill queue drains.
+extraction_server_count = 8
+
+# 4 uvicorn workers on 2-vCPU hosts: the service downloads the PDF (I/O-bound)
+# before the CPU-bound extraction, so 2x oversubscription overlaps downloads
+# with extraction.
+extraction_uvicorn_workers = 4
