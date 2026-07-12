@@ -15,8 +15,9 @@ ALERT_COOLDOWN_SECONDS="${WOOZI_MONITOR_ALERT_COOLDOWN_SECONDS:-900}"
 OPS_DB="${WOOZI_MONITOR_OPS_DB:-/var/lib/docker/volumes/woozi_woozi-state/_data/woozi-ops.sqlite3}"
 IMPORT_STALL_HOURS="${WOOZI_MONITOR_IMPORT_STALL_HOURS:-26}"
 QUEUE_STUCK_MINUTES="${WOOZI_MONITOR_QUEUE_STUCK_MINUTES:-30}"
-EXTRACT_FAIL_WARN="${WOOZI_MONITOR_EXTRACT_FAIL_WARN:-200}"
-EXTRACT_FAIL_CRITICAL="${WOOZI_MONITOR_EXTRACT_FAIL_CRITICAL:-2000}"
+# New extract/download failures per monitor interval (default: per 2 min).
+EXTRACT_FAIL_WARN="${WOOZI_MONITOR_EXTRACT_FAIL_WARN:-50}"
+EXTRACT_FAIL_CRITICAL="${WOOZI_MONITOR_EXTRACT_FAIL_CRITICAL:-300}"
 # The import worker is expected to run at all times since deploy-beta.sh
 # defaults WORKER_REPLICAS to 1. Set to 0 during an intentional scale-down.
 EXPECT_WORKER="${WOOZI_MONITOR_EXPECT_WORKER:-1}"
@@ -246,14 +247,25 @@ check_imports() {
     fi
   fi
 
-  # 3. Extraction failure surge in recently started/running runs. Catches a
-  # broken extraction service (e.g. missing S3 credentials, July 2026) while
-  # runs still complete as "partial".
-  extract_failures="$(ops_query "SELECT COUNT(*) FROM ingest_run_issue i JOIN ingest_run r ON r.id = i.run_id WHERE i.step IN ('extract_text', 'download_document') AND (r.status = 'running' OR r.started_at >= datetime('now', '-6 hours'))")"
+  # 3. Extraction failure *rate*: new extract/download issues since the
+  # previous monitor tick, tracked via a rowid high-water mark. A cumulative
+  # 6h window kept paging CRITICAL for hours after an incident was already
+  # fixed (July 2026); a per-tick delta starts and stops with the problem.
+  # Page-limit notices ("only the first 40 pages") are informational, not
+  # failures, and are excluded.
+  local max_rowid prev_rowid extract_failures
+  max_rowid="$(ops_query "SELECT COALESCE(MAX(rowid), 0) FROM ingest_run_issue")"
+  prev_rowid="$(cat "$STATE_DIR/extract_issue_rowid" 2>/dev/null || echo "")"
+  mkdir -p "$STATE_DIR"
+  printf '%s\n' "$max_rowid" > "$STATE_DIR/extract_issue_rowid"
+  if [ -z "$prev_rowid" ] || ! [[ "$prev_rowid" =~ ^[0-9]+$ ]] || [ "$max_rowid" -le "$prev_rowid" ]; then
+    return
+  fi
+  extract_failures="$(ops_query "SELECT COUNT(*) FROM ingest_run_issue WHERE rowid > $prev_rowid AND step IN ('extract_text', 'download_document') AND message NOT LIKE '%only the first%'")"
   if [ "${extract_failures:-0}" -ge "$EXTRACT_FAIL_CRITICAL" ]; then
-    alert critical extract_failures "Document extraction is failing at scale" "failures_recent_runs=${extract_failures} threshold=${EXTRACT_FAIL_CRITICAL}"
+    alert critical extract_failures "Document extraction is failing at scale" "new_failures_this_interval=${extract_failures} threshold=${EXTRACT_FAIL_CRITICAL}"
   elif [ "${extract_failures:-0}" -ge "$EXTRACT_FAIL_WARN" ]; then
-    alert warning extract_failures "Document extraction failure rate is elevated" "failures_recent_runs=${extract_failures} threshold=${EXTRACT_FAIL_WARN}"
+    alert warning extract_failures "Document extraction failure rate is elevated" "new_failures_this_interval=${extract_failures} threshold=${EXTRACT_FAIL_WARN}"
   fi
 }
 
