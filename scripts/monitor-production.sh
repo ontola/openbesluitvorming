@@ -12,6 +12,16 @@ QUICKWIT_MIN_CACHE_SPLITS="${WOOZI_MONITOR_QUICKWIT_MIN_CACHE_SPLITS:-60}"
 CONTAINER_RESTART_WARN="${WOOZI_MONITOR_CONTAINER_RESTART_WARN:-0}"
 STATE_DIR="${WOOZI_MONITOR_STATE_DIR:-/tmp/woozi-monitor-alerts}"
 ALERT_COOLDOWN_SECONDS="${WOOZI_MONITOR_ALERT_COOLDOWN_SECONDS:-900}"
+OPS_DB="${WOOZI_MONITOR_OPS_DB:-/var/lib/docker/volumes/woozi_woozi-state/_data/woozi-ops.sqlite3}"
+IMPORT_STALL_HOURS="${WOOZI_MONITOR_IMPORT_STALL_HOURS:-26}"
+QUEUE_STUCK_MINUTES="${WOOZI_MONITOR_QUEUE_STUCK_MINUTES:-30}"
+EXTRACT_FAIL_WARN="${WOOZI_MONITOR_EXTRACT_FAIL_WARN:-200}"
+EXTRACT_FAIL_CRITICAL="${WOOZI_MONITOR_EXTRACT_FAIL_CRITICAL:-2000}"
+# The import worker is expected to run at all times since deploy-beta.sh
+# defaults WORKER_REPLICAS to 1. Set to 0 during an intentional scale-down.
+EXPECT_WORKER="${WOOZI_MONITOR_EXPECT_WORKER:-1}"
+# Alert when the last successful state backup is older than this; 0 disables.
+BACKUP_STALE_HOURS="${WOOZI_MONITOR_BACKUP_STALE_HOURS:-50}"
 CURL_IP_VERSION="${WOOZI_MONITOR_CURL_IP_VERSION:-4}"
 SEARCH_ALERT_AFTER_CONSECUTIVE="${WOOZI_MONITOR_SEARCH_ALERT_AFTER_CONSECUTIVE:-3}"
 
@@ -175,9 +185,12 @@ check_containers() {
     fi
   done < <(docker inspect -f '{{.Name}} {{.RestartCount}} {{.State.Status}}' woozi-quickwit-1 woozi-openbesluitvorming-1 | sed 's#^/##')
 
-  worker="$(docker ps --filter name=woozi-worker --format '{{.Names}} {{.Status}}' || true)"
-  if [ -n "$worker" ]; then
-    alert warning worker_running "Worker container is running" "worker=${worker}"
+  # The worker used to run only during catch-up windows; since July 2026 it is
+  # expected to run permanently (a missing worker silently freezes all imports
+  # — bitten for 11 days when a deploy scaled it to 0).
+  worker="$(docker ps --filter name=woozi-worker --filter status=running --format '{{.Names}}' || true)"
+  if [ "$EXPECT_WORKER" = "1" ] && [ -z "$worker" ]; then
+    alert critical worker_not_running "Import worker is not running" "expected>=1 replica; scale with: docker compose up -d --scale worker=1 worker (set WOOZI_MONITOR_EXPECT_WORKER=0 to silence during intentional scale-down)"
   fi
 
   cache_output="$(docker exec woozi-quickwit-1 sh -lc 'du -sk /quickwit/qwdata/searcher-split-cache 2>/dev/null; find /quickwit/qwdata/searcher-split-cache -maxdepth 1 -type f 2>/dev/null | wc -l')"
@@ -186,6 +199,72 @@ check_containers() {
   if [ -n "$split_count" ] && [ "$split_count" -lt "$QUICKWIT_MIN_CACHE_SPLITS" ]; then
     cache_gb="$(awk -v kb="${cache_kb:-0}" 'BEGIN { print int((kb / 1024 / 1024) + 0.5) }')"
     alert warning quickwit_cache_cold "Quickwit split cache looks cold" "split_count=${split_count} cache_gb=${cache_gb}"
+  fi
+}
+
+ops_query() {
+  sqlite3 -readonly "$OPS_DB" "$1" 2>/dev/null
+}
+
+check_imports() {
+  local last_finished hours_since queued running stuck_minutes extract_failures
+
+  if ! command -v sqlite3 >/dev/null 2>&1; then
+    alert warning import_check_failed "Import check failed" "sqlite3 not installed on host"
+    return
+  fi
+  if [ ! -f "$OPS_DB" ]; then
+    alert warning import_check_failed "Import check failed" "ops db not found at ${OPS_DB}"
+    return
+  fi
+
+  # 1. No completed run in IMPORT_STALL_HOURS: the pipeline is dead. The daily
+  # scheduler enqueues every night and backfills run continuously, so >26h of
+  # silence is never normal.
+  last_finished="$(ops_query "SELECT COALESCE(MAX(finished_at), '') FROM ingest_run WHERE status IN ('succeeded', 'partial')")"
+  if [ -n "$last_finished" ]; then
+    hours_since="$(ops_query "SELECT CAST((julianday('now') - julianday('$last_finished')) * 24 AS INTEGER)")"
+    if [ -n "$hours_since" ] && [ "$hours_since" -ge "$IMPORT_STALL_HOURS" ]; then
+      alert critical import_stalled "No completed import in ${hours_since}h" "last_finished=${last_finished} threshold_hours=${IMPORT_STALL_HOURS}"
+    fi
+  fi
+
+  # 2. Queue has work but nothing is running: the worker is gone or wedged.
+  # Catches a missing worker within QUEUE_STUCK_MINUTES instead of after 26h.
+  queued="$(ops_query "SELECT COUNT(*) FROM ingest_run WHERE status = 'queued'")"
+  running="$(ops_query "SELECT COUNT(*) FROM ingest_run WHERE status = 'running'")"
+  if [ "${queued:-0}" -gt 0 ] && [ "${running:-0}" -eq 0 ]; then
+    stuck_minutes="$(ops_query "SELECT CAST((julianday('now') - julianday(MIN(started_at))) * 1440 AS INTEGER) FROM ingest_run WHERE status = 'queued'")"
+    if [ -n "$stuck_minutes" ] && [ "$stuck_minutes" -ge "$QUEUE_STUCK_MINUTES" ]; then
+      alert critical import_queue_stuck "Import queue has work but nothing is running" "queued=${queued} oldest_queued_minutes=${stuck_minutes}"
+    fi
+  fi
+
+  # 3. Extraction failure surge in recently started/running runs. Catches a
+  # broken extraction service (e.g. missing S3 credentials, July 2026) while
+  # runs still complete as "partial".
+  extract_failures="$(ops_query "SELECT COUNT(*) FROM ingest_run_issue i JOIN ingest_run r ON r.id = i.run_id WHERE i.step IN ('extract_text', 'download_document') AND (r.status = 'running' OR r.started_at >= datetime('now', '-6 hours'))")"
+  if [ "${extract_failures:-0}" -ge "$EXTRACT_FAIL_CRITICAL" ]; then
+    alert critical extract_failures "Document extraction is failing at scale" "failures_recent_runs=${extract_failures} threshold=${EXTRACT_FAIL_CRITICAL}"
+  elif [ "${extract_failures:-0}" -ge "$EXTRACT_FAIL_WARN" ]; then
+    alert warning extract_failures "Document extraction failure rate is elevated" "failures_recent_runs=${extract_failures} threshold=${EXTRACT_FAIL_WARN}"
+  fi
+}
+
+check_backups() {
+  # scripts/backup_state.ts touches this stamp after each successful backup.
+  local stamp_file stamp_age_hours
+  stamp_file="$(dirname "$OPS_DB")/.woozi-backup-stamp"
+  if [ "$BACKUP_STALE_HOURS" -le 0 ]; then
+    return
+  fi
+  if [ ! -f "$stamp_file" ]; then
+    alert warning backup_missing "No state backup has ever completed" "expected_stamp=${stamp_file} (install scripts/install-production-backup.sh)"
+    return
+  fi
+  stamp_age_hours=$((($(date +%s) - $(stat -c %Y "$stamp_file" 2>/dev/null || echo 0)) / 3600))
+  if [ "$stamp_age_hours" -ge "$BACKUP_STALE_HOURS" ]; then
+    alert warning backup_stale "State backup is stale" "age_hours=${stamp_age_hours} threshold_hours=${BACKUP_STALE_HOURS}"
   fi
 }
 
@@ -256,6 +335,8 @@ main() {
   check_search
   check_disk
   check_containers
+  check_imports
+  check_backups
 
   if [ "${#ALERTS[@]}" -eq 0 ]; then
     printf '{"event":"monitor_run","ok":true,"alert_count":0}\n'
