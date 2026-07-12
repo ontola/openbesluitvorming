@@ -45,6 +45,14 @@ fi
 # picks them back up; cache hits make the rerun cheap. If you genuinely
 # need to wait for idle, watch /api/admin/summary manually before deploying.
 
+# Sync runtime config alongside the image. $DEPLOY_DIR is a plain copy, not a
+# checkout: without this step, compose/Caddyfile changes in git silently never
+# reach production (bitten July 2026: a Caddy security fix and a new compose
+# env var were "deployed" but inactive until synced by hand). The infra script
+# rsyncs Caddyfile/compose/quickwit.yaml/monitor and reloads Caddy in place.
+DEPLOY_HOST="$DEPLOY_HOST" DEPLOY_DIR="$DEPLOY_DIR" COMPOSE_FILE="$COMPOSE_FILE" \
+  bash "$(dirname "$0")/deploy-beta-infra.sh"
+
 ssh "$DEPLOY_HOST" "
   set -e
   cd \"$DEPLOY_DIR\"
