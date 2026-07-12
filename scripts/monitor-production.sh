@@ -22,6 +22,12 @@ EXTRACT_FAIL_CRITICAL="${WOOZI_MONITOR_EXTRACT_FAIL_CRITICAL:-2000}"
 EXPECT_WORKER="${WOOZI_MONITOR_EXPECT_WORKER:-1}"
 # Alert when the last successful state backup is older than this; 0 disables.
 BACKUP_STALE_HOURS="${WOOZI_MONITOR_BACKUP_STALE_HOURS:-50}"
+# Remind (daily) to scale the extraction fleet back down once the import
+# queue has drained and more hosts than the steady-state baseline are
+# configured. See infra/terraform.tfvars for the scale-down procedure.
+SCALE_DOWN_BASELINE_HOSTS="${WOOZI_MONITOR_SCALE_DOWN_BASELINE_HOSTS:-2}"
+SCALE_DOWN_QUEUE_THRESHOLD="${WOOZI_MONITOR_SCALE_DOWN_QUEUE_THRESHOLD:-10}"
+SCALE_DOWN_REMIND_SECONDS="${WOOZI_MONITOR_SCALE_DOWN_REMIND_SECONDS:-86400}"
 CURL_IP_VERSION="${WOOZI_MONITOR_CURL_IP_VERSION:-4}"
 SEARCH_ALERT_AFTER_CONSECUTIVE="${WOOZI_MONITOR_SEARCH_ALERT_AFTER_CONSECUTIVE:-3}"
 
@@ -251,6 +257,33 @@ check_imports() {
   fi
 }
 
+check_scale_down() {
+  # Event-driven reminder: fires only when the backfill/queue has actually
+  # drained while an enlarged extraction fleet is still configured (and
+  # costing money). At most one alert per SCALE_DOWN_REMIND_SECONDS.
+  local hosts active state_file now previous
+  hosts="$(tr ',' '\n' <<< "${WOOZI_EXTRACTION_SERVICE_URL:-}" | grep -c . || true)"
+  if [ "${hosts:-0}" -le "$SCALE_DOWN_BASELINE_HOSTS" ]; then
+    return
+  fi
+  [ -f "$OPS_DB" ] || return
+  command -v sqlite3 >/dev/null 2>&1 || return
+  active="$(ops_query "SELECT COUNT(*) FROM ingest_run WHERE status IN ('queued', 'running')")"
+  if [ -z "$active" ] || [ "$active" -gt "$SCALE_DOWN_QUEUE_THRESHOLD" ]; then
+    return
+  fi
+
+  state_file="$STATE_DIR/extraction_scale_down_reminder"
+  now="$(date +%s)"
+  previous="$(cat "$state_file" 2>/dev/null || echo 0)"
+  if [ $((now - previous)) -lt "$SCALE_DOWN_REMIND_SECONDS" ]; then
+    return
+  fi
+  mkdir -p "$STATE_DIR"
+  printf '%s\n' "$now" > "$state_file"
+  alert warning extraction_scale_down "Import queue drained: scale the extraction fleet back down" "active_runs=${active} extraction_hosts=${hosts} baseline=${SCALE_DOWN_BASELINE_HOSTS}; set extraction_server_count in infra/terraform.tfvars, tofu apply, then update WOOZI_EXTRACTION_SERVICE_URL in /opt/woozi/.env and recreate the workers"
+}
+
 check_backups() {
   # scripts/backup_state.ts touches this stamp after each successful backup.
   local stamp_file stamp_age_hours
@@ -337,6 +370,7 @@ main() {
   check_containers
   check_imports
   check_backups
+  check_scale_down
 
   if [ "${#ALERTS[@]}" -eq 0 ]; then
     printf '{"event":"monitor_run","ok":true,"alert_count":0}\n'
