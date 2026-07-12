@@ -90,6 +90,11 @@ async function getDatabase(): Promise<DatabaseSync> {
       } catch {
         // Column already exists on initialized databases.
       }
+      try {
+        db.exec("ALTER TABLE ingest_run ADD COLUMN interrupted_count INTEGER NOT NULL DEFAULT 0");
+      } catch {
+        // Column already exists on initialized databases.
+      }
       return db;
     })();
   }
@@ -387,6 +392,12 @@ export async function countActiveScheduledRuns(): Promise<number> {
   return row?.count ?? 0;
 }
 
+/** How often a run may be requeued after a process restart before it is
+ * declared failed. Restarts are almost always deploys, not run-specific
+ * crashes; the cap prevents a run that reliably kills the process (e.g. OOM)
+ * from crash-looping across restarts forever. */
+const MAX_INTERRUPTED_REQUEUES = 2;
+
 export async function reconcileInterruptedRuns(): Promise<IngestRunRecord[]> {
   const db = await getDatabase();
   const interruptedRuns = db
@@ -395,12 +406,12 @@ export async function reconcileInterruptedRuns(): Promise<IngestRunRecord[]> {
         id, source_key, supplier, date_from, date_to, trigger_mode as trigger,
         execution_mode, parent_run_id, projection_version, derivation_version, status,
         started_at, finished_at, meeting_count, document_count, cache_hits, downloaded_count,
-        issue_count, quickwit_index_id, error_message
+        issue_count, quickwit_index_id, error_message, interrupted_count
        FROM ingest_run
        WHERE status = 'running'
        ORDER BY started_at ASC`,
     )
-    .all() as unknown as RunRow[];
+    .all() as unknown as (RunRow & { interrupted_count: number | null })[];
 
   if (interruptedRuns.length === 0) {
     return [];
@@ -408,7 +419,15 @@ export async function reconcileInterruptedRuns(): Promise<IngestRunRecord[]> {
 
   const finishedAt = new Date().toISOString();
   const message = "Process terminated before completion.";
-  const updateStatement = db.prepare(
+  const requeueStatement = db.prepare(
+    `UPDATE ingest_run SET
+      status = 'queued',
+      finished_at = NULL,
+      error_message = NULL,
+      interrupted_count = COALESCE(interrupted_count, 0) + 1
+    WHERE id = @id`,
+  );
+  const failStatement = db.prepare(
     `UPDATE ingest_run SET
       status = 'failed',
       finished_at = @finished_at,
@@ -425,10 +444,38 @@ export async function reconcileInterruptedRuns(): Promise<IngestRunRecord[]> {
      VALUES (@id, @run_id, @severity, @step, @entity_id, @message, @details)`,
   );
 
+  const reconciled: IngestRunRecord[] = [];
   try {
     db.exec("BEGIN");
     for (const run of interruptedRuns) {
-      updateStatement.run({
+      const interruptedCount = run.interrupted_count ?? 0;
+      // A restart (usually a deploy) interrupted this run through no fault of
+      // its own: put it back in the queue instead of dropping it as failed —
+      // backfill chunks are never re-enqueued by the daily scheduler, so a
+      // failed drop would silently leave a hole in the history.
+      if (interruptedCount < MAX_INTERRUPTED_REQUEUES) {
+        requeueStatement.run({ id: run.id });
+        insertIssueStatement.run({
+          id: crypto.randomUUID(),
+          run_id: run.id,
+          severity: "warning",
+          step: "ingest_quickwit",
+          entity_id: null,
+          message: `Interrupted by a process restart; requeued (attempt ${interruptedCount + 1}/${MAX_INTERRUPTED_REQUEUES}).`,
+          details: "Automatically reconciled on startup after the previous process exited.",
+        });
+        reconciled.push(
+          normalizeRunRecord({
+            ...run,
+            status: "queued",
+            finished_at: undefined,
+            error_message: undefined,
+          }),
+        );
+        continue;
+      }
+
+      failStatement.run({
         id: run.id,
         finished_at: finishedAt,
         error_message: message,
@@ -439,10 +486,19 @@ export async function reconcileInterruptedRuns(): Promise<IngestRunRecord[]> {
         severity: "error",
         step: "ingest_quickwit",
         entity_id: null,
-        message,
+        message: `${message} Not requeued: already interrupted ${interruptedCount} times.`,
         details:
           "Automatically reconciled on startup after the previous process exited unexpectedly.",
       });
+      reconciled.push(
+        normalizeRunRecord({
+          ...run,
+          status: "failed",
+          finished_at: finishedAt,
+          issue_count: run.issue_count + 1,
+          error_message: run.error_message ?? message,
+        }),
+      );
     }
     db.exec("COMMIT");
   } catch (error) {
@@ -454,15 +510,7 @@ export async function reconcileInterruptedRuns(): Promise<IngestRunRecord[]> {
     throw error;
   }
 
-  return interruptedRuns.map((run) =>
-    normalizeRunRecord({
-      ...run,
-      status: "failed",
-      finished_at: finishedAt,
-      issue_count: run.issue_count + 1,
-      error_message: run.error_message ?? message,
-    }),
-  );
+  return reconciled;
 }
 
 // Atomically move a queued run to "running". Multiple workers can race on
