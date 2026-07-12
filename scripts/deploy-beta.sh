@@ -22,9 +22,13 @@ derive_image_repository() {
 IMAGE_REPOSITORY="${IMAGE_REPOSITORY:-$(derive_image_repository)}"
 DEPLOY_REF="${DEPLOY_REF:-$(git rev-parse --short=7 HEAD)}"
 DEPLOY_IMAGE="${DEPLOY_IMAGE:-${IMAGE_REPOSITORY}:sha-${DEPLOY_REF}}"
-# Keep public search responsive: workers share CPU, SQLite, S3 and Quickwit
-# with the public app. Run workers only during an intentional catch-up window.
-WORKER_REPLICAS="${WORKER_REPLICAS:-0}"
+# One worker by default so imports keep running across deploys. (The old
+# default of 0 silently disabled all imports after every deploy — the queue
+# grew unattended for 11 days in July 2026 before anyone noticed.) Workers
+# share CPU, SQLite, S3 and Quickwit with the public app: keep
+# INGEST_CONCURRENCY modest, and scale WORKER_REPLICAS up only during an
+# intentional catch-up window.
+WORKER_REPLICAS="${WORKER_REPLICAS:-1}"
 INGEST_CONCURRENCY="${INGEST_CONCURRENCY:-1}"
 WOOZI_DOCUMENT_CONCURRENCY="${WOOZI_DOCUMENT_CONCURRENCY:-3}"
 
