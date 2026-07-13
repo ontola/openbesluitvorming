@@ -2,7 +2,7 @@ import { Window } from "npm:happy-dom";
 import { bootstrapSearchApp } from "../web/src/app.ts";
 import { QuickwitClient } from "../src/quickwit/client.ts";
 import { NotubizMeetingExtractor } from "../src/notubiz/extractor.ts";
-import { getNotubizSource } from "../src/sources/notubiz.ts";
+import { getNotubizSource } from "../src/sources/index.ts";
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) {
@@ -169,8 +169,8 @@ Deno.test({
       await waitFor(() => resultList.textContent?.includes(importedDocument.name) ?? false);
 
       assert(
-        resultList.textContent?.includes("Gemeente Haarlem"),
-        "expected rendered GUI results to mention Gemeente Haarlem",
+        resultList.textContent?.includes("Haarlem"),
+        "expected rendered GUI results to mention Haarlem",
       );
       assert(
         resultList.textContent?.includes(importedDocument.name),

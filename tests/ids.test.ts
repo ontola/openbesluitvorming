@@ -5,7 +5,7 @@ import {
   canonicalMeetingId,
   canonicalOrganizationId,
 } from "../src/ids.ts";
-import { getNotubizSource } from "../src/sources/notubiz.ts";
+import { getNotubizSource } from "../src/sources/index.ts";
 
 function assertEquals(actual: unknown, expected: unknown, message: string): void {
   if (actual !== expected) {

@@ -1,6 +1,6 @@
 import { QuickwitClient } from "../src/quickwit/client.ts";
 import { NotubizMeetingExtractor } from "../src/notubiz/extractor.ts";
-import { getNotubizSource } from "../src/sources/notubiz.ts";
+import { getNotubizSource } from "../src/sources/index.ts";
 import { ObjectStorageClient } from "../src/storage/s3.ts";
 
 function assert(condition: unknown, message: string): asserts condition {

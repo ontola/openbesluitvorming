@@ -1,5 +1,5 @@
 import { normalizeNotubizDocuments, normalizeNotubizMeeting } from "../src/notubiz/normalize.ts";
-import { getNotubizSource } from "../src/sources/notubiz.ts";
+import { getNotubizSource } from "../src/sources/index.ts";
 import type { NotubizOrganizationAttributes } from "../src/types.ts";
 
 function assert(condition: unknown, message: string): asserts condition {

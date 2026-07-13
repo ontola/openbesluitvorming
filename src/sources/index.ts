@@ -132,6 +132,16 @@ export function getSource(sourceKeyOrRef: string): SourceDefinition {
   return toRuntimeSourceDefinition(catalogSource);
 }
 
+/** getSource narrowed to Notubiz, for callers (mostly tests) that need the
+ * supplier-specific definition. The catalog is the single source of truth. */
+export function getNotubizSource(key: string): NotubizSourceDefinition {
+  const source = getSource(key);
+  if (source.supplier !== "notubiz") {
+    throw new Error(`Source "${key}" is not a Notubiz source`);
+  }
+  return source;
+}
+
 export function listSources(): SourceDefinition[] {
   return listRunnableCatalogSources().map((source) => toRuntimeSourceDefinition(source));
 }

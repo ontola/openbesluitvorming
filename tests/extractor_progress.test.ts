@@ -1,5 +1,5 @@
 import { NotubizMeetingExtractor } from "../src/notubiz/extractor.ts";
-import { getNotubizSource } from "../src/sources/notubiz.ts";
+import { getNotubizSource } from "../src/sources/index.ts";
 import type { ExtractionBundle, NotubizOrganizationAttributes } from "../src/types.ts";
 
 function assert(condition: unknown, message: string): asserts condition {

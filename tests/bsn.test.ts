@@ -135,6 +135,19 @@ Deno.test("scanForBsn ignores an empty BSN column in a gemeentebrief letterhead"
   );
 });
 
+Deno.test("scanForBsn ignores an empty Burgerservicenummer field next to a zaaknummer", () => {
+  // Confirmed real-world case (Katwijk correspondence letterhead): the
+  // "Burgerservicenummer" field is left blank, and "Zaaknummer"'s own value
+  // lands right after the keyword once the empty cell collapses.
+  const result = scanForBsn(
+    "Burgerservicenummer Zaaknummer Katwijk, 17 september 2013-014515 Uw referentie Verzenddatum",
+  );
+  assert(
+    !result.found || result.confidence !== "high",
+    "zaaknummer next to an empty Burgerservicenummer field must not be high confidence",
+  );
+});
+
 Deno.test("scanForBsn does not treat Kadaster persoonsnummer as a BSN keyword", () => {
   // kadaster-on-line.kadaster.nl "persoonsnummer" is the land registry's own,
   // unrelated subject-registry id (assigned to companies too) -- not a BSN.
