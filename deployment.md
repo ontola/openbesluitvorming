@@ -690,6 +690,18 @@ To restore: download the newest `backups/sqlite/...` object, gunzip, stop the
 `openbesluitvorming` and `worker` containers, replace the file on the
 `woozi-state` volume (remove stale `-wal`/`-shm` siblings), start containers.
 
+### Telemetry (SigNoz Cloud)
+
+The monitor script is the *paging* layer; diagnosis and trends live in SigNoz
+Cloud (eu2). An `otel-collector` container ([otel/collector.yaml](otel/collector.yaml),
+synced by every deploy) receives OTLP from the Deno containers — `OTEL_DENO=1`
+exports traces, metrics and console logs natively, no code changes — and
+scrapes host metrics, including per-process open fd counts (the July 2026
+worker socket-leak signal). It ships everything to
+`ingest.eu2.signoz.cloud:443` using `SIGNOZ_INGESTION_KEY` from
+`/opt/woozi/.env`. Disable app telemetry with `OTEL_DENO=0` in that `.env`.
+Losing the collector never pages: it is not in the monitor's critical path.
+
 ## Known Operational Notes
 
 - interrupted imports can leave stale run-state unless reconciled on startup

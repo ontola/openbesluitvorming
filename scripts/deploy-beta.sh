@@ -73,8 +73,8 @@ ssh "$DEPLOY_HOST" "
   export COMPOSE_PROJECT_NAME=\"$COMPOSE_PROJECT_NAME_VALUE\"
   $CONCURRENCY_EXPORTS
   docker compose -f \"$COMPOSE_FILE\" pull openbesluitvorming worker
-  docker compose -f \"$COMPOSE_FILE\" up -d --scale worker=${WORKER_REPLICAS} openbesluitvorming worker caddy
-  docker compose -f \"$COMPOSE_FILE\" ps openbesluitvorming worker caddy
+  docker compose -f \"$COMPOSE_FILE\" up -d --scale worker=${WORKER_REPLICAS} openbesluitvorming worker caddy otel-collector
+  docker compose -f \"$COMPOSE_FILE\" ps openbesluitvorming worker caddy otel-collector
 "
 
 echo "Deployed image $DEPLOY_IMAGE to $DEPLOY_HOST:$DEPLOY_DIR"

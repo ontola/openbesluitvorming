@@ -13,6 +13,7 @@ rsync -azR --inplace \
   ./Caddyfile \
   ./docker-compose.production.yml \
   ./quickwit/quickwit.yaml \
+  ./otel/collector.yaml \
   ./scripts/monitor-production.sh \
   "$DEPLOY_HOST:$DEPLOY_DIR/"
 

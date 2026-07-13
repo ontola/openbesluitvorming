@@ -1,0 +1,80 @@
+# OpenTelemetry collector for the production host. Receives OTLP from the
+# Deno containers (OTEL_DENO=1 exports traces, metrics and console logs) and
+# scrapes host metrics, then ships everything to SigNoz Cloud (eu2).
+#
+# The collector is the diagnosis/trend layer only; paging stays with
+# scripts/monitor-production.sh, which runs independently of the app stack.
+#
+# Requires: pid: host and /:/hostfs:ro (see docker-compose.production.yml) so
+# the process scraper can read /proc — process.open_file_descriptors is
+# enabled explicitly to trend the July 2026 worker socket leak.
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+  hostmetrics:
+    collection_interval: 60s
+    root_path: /hostfs
+    scrapers:
+      cpu: {}
+      memory: {}
+      load: {}
+      disk: {}
+      network: {}
+      filesystem:
+        include_mount_points:
+          match_type: strict
+          mount_points: ["/"]
+      process:
+        # Only the processes we run; scraping every host process explodes
+        # metric cardinality (and SigNoz Cloud bills per sample).
+        include:
+          match_type: regexp
+          names: ["deno.*", "quickwit.*", "caddy.*"]
+        mute_process_exe_error: true
+        mute_process_io_error: true
+        mute_process_user_error: true
+        metrics:
+          process.open_file_descriptors:
+            enabled: true
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 400
+    spike_limit_mib: 100
+  resourcedetection:
+    detectors: [system]
+    system:
+      hostname_sources: [os]
+  batch:
+    send_batch_size: 8192
+    timeout: 5s
+
+exporters:
+  otlp:
+    endpoint: ingest.eu2.signoz.cloud:443
+    headers:
+      signoz-ingestion-key: ${env:SIGNOZ_INGESTION_KEY}
+
+service:
+  telemetry:
+    logs:
+      level: warn
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, resourcedetection, batch]
+      exporters: [otlp]
+    metrics:
+      receivers: [otlp, hostmetrics]
+      processors: [memory_limiter, resourcedetection, batch]
+      exporters: [otlp]
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, resourcedetection, batch]
+      exporters: [otlp]
