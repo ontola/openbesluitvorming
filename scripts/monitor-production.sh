@@ -23,6 +23,12 @@ EXTRACT_FAIL_CRITICAL="${WOOZI_MONITOR_EXTRACT_FAIL_CRITICAL:-300}"
 EXPECT_WORKER="${WOOZI_MONITOR_EXPECT_WORKER:-1}"
 # Alert when the last successful state backup is older than this; 0 disables.
 BACKUP_STALE_HOURS="${WOOZI_MONITOR_BACKUP_STALE_HOURS:-50}"
+# Self-heal for the worker fd/socket leak (July 2026): Deno workers slowly
+# accumulate closed-but-unreleased sockets under heavy fetch churn; past
+# ~13k fds, outgoing connections start failing (S3 writes with
+# AggregateError). Restart the workers well before that point — reconcile
+# requeues any interrupted runs. 0 disables.
+WORKER_FD_MAX="${WOOZI_MONITOR_WORKER_FD_MAX:-10000}"
 # Remind (daily) to scale the extraction fleet back down once the import
 # queue has drained and more hosts than the steady-state baseline are
 # configured. See infra/terraform.tfvars for the scale-down procedure.
@@ -252,7 +258,10 @@ check_imports() {
   # 6h window kept paging CRITICAL for hours after an incident was already
   # fixed (July 2026); a per-tick delta starts and stops with the problem.
   # Page-limit notices ("only the first 40 pages") are informational, not
-  # failures, and are excluded.
+  # failures, and are excluded. So are 4xx responses from the *source* system
+  # (document deleted or restricted at e.g. Notubiz): those are data quality,
+  # not system health, and deep-history backfills hit them by the hundreds per
+  # hour. 5xx, timeouts and S3 errors still count.
   local max_rowid prev_rowid extract_failures
   max_rowid="$(ops_query "SELECT COALESCE(MAX(rowid), 0) FROM ingest_run_issue")"
   prev_rowid="$(cat "$STATE_DIR/extract_issue_rowid" 2>/dev/null || echo "")"
@@ -261,7 +270,7 @@ check_imports() {
   if [ -z "$prev_rowid" ] || ! [[ "$prev_rowid" =~ ^[0-9]+$ ]] || [ "$max_rowid" -le "$prev_rowid" ]; then
     return
   fi
-  extract_failures="$(ops_query "SELECT COUNT(*) FROM ingest_run_issue WHERE rowid > $prev_rowid AND step IN ('extract_text', 'download_document') AND message NOT LIKE '%only the first%'")"
+  extract_failures="$(ops_query "SELECT COUNT(*) FROM ingest_run_issue WHERE rowid > $prev_rowid AND step IN ('extract_text', 'download_document') AND message NOT LIKE '%only the first%' AND message NOT LIKE '%Source returned 40%' AND message NOT LIKE '%Request failed 404%'")"
   if [ "${extract_failures:-0}" -ge "$EXTRACT_FAIL_CRITICAL" ]; then
     alert critical extract_failures "Document extraction is failing at scale" "new_failures_this_interval=${extract_failures} threshold=${EXTRACT_FAIL_CRITICAL}"
   elif [ "${extract_failures:-0}" -ge "$EXTRACT_FAIL_WARN" ]; then
@@ -311,6 +320,25 @@ check_backups() {
   if [ "$stamp_age_hours" -ge "$BACKUP_STALE_HOURS" ]; then
     alert warning backup_stale "State backup is stale" "age_hours=${stamp_age_hours} threshold_hours=${BACKUP_STALE_HOURS}"
   fi
+}
+
+check_worker_fds() {
+  # See WORKER_FD_MAX above. Reads fd counts from /proc for the worker deno
+  # processes; when any exceeds the cap, restarts the worker containers
+  # (self-heal) and sends one warning so the event stays visible.
+  local pid fds max_fds=0
+  if [ "$WORKER_FD_MAX" -le 0 ] || ! command -v docker >/dev/null 2>&1; then
+    return
+  fi
+  for pid in $(pgrep -f 'deno run -A src/worker.ts' || true); do
+    fds="$(ls "/proc/$pid/fd" 2>/dev/null | wc -l)"
+    [ "$fds" -gt "$max_fds" ] && max_fds="$fds"
+  done
+  if [ "$max_fds" -le "$WORKER_FD_MAX" ]; then
+    return
+  fi
+  docker restart $(docker ps -q --filter 'name=woozi-worker') >/dev/null 2>&1 || true
+  alert warning worker_fd_leak "Worker fd leak: restarted the import workers" "max_fds=${max_fds} threshold=${WORKER_FD_MAX}; interrupted runs are requeued by reconcile"
 }
 
 alert_is_unsuppressed() {
@@ -383,6 +411,7 @@ main() {
   check_imports
   check_backups
   check_scale_down
+  check_worker_fds
 
   if [ "${#ALERTS[@]}" -eq 0 ]; then
     printf '{"event":"monitor_run","ok":true,"alert_count":0}\n'
