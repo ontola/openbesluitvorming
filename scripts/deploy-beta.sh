@@ -75,6 +75,11 @@ ssh "$DEPLOY_HOST" "
   docker compose -f \"$COMPOSE_FILE\" pull openbesluitvorming worker
   docker compose -f \"$COMPOSE_FILE\" up -d --scale worker=${WORKER_REPLICAS} openbesluitvorming worker caddy otel-collector
   docker compose -f \"$COMPOSE_FILE\" ps openbesluitvorming worker caddy otel-collector
+
+  # Every deploy leaves a ~2GB sha-tagged image behind; they filled 43GB and
+  # tripped the disk alert (July 2026). Keep 72h of images for quick rollback
+  # (they all remain re-pullable from GHCR), drop the rest.
+  docker image prune -af --filter 'until=72h' >/dev/null || true
 "
 
 echo "Deployed image $DEPLOY_IMAGE to $DEPLOY_HOST:$DEPLOY_DIR"
