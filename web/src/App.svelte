@@ -637,12 +637,15 @@
   }
 
   async function syncDetailText(): Promise<void> {
-    if (detailMode !== "text" || !detailTextEl) return;
+    if (detailMode !== "text") return;
+    // Don't check detailTextEl yet: when switching from the PDF view the text
+    // container only mounts after the next render, so the binding is still
+    // null here. Wait for the re-render (and one frame for layout) first.
     await tick();
     await new Promise<void>((resolve) => {
       requestAnimationFrame(() => resolve());
     });
-    if (!detailTextEl) return;
+    if (detailMode !== "text" || !detailTextEl) return;
     highlightElementText(detailTextEl, query);
     const firstMatch = detailTextEl.querySelector<HTMLElement>("mark");
     if (firstMatch) {
