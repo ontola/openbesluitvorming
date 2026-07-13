@@ -32,8 +32,12 @@ export interface BsnScanResult {
   matches: BsnMatch[];
 }
 
+// "persoonsnummer" is deliberately excluded: it's also Kadaster's own,
+// unrelated subject-registry identifier (kadaster-on-line persselprod.asp
+// lookups, assigned to companies as well as people), which routinely
+// produced false "high confidence" BSN hits.
 const KEYWORD_RE =
-  /bsn|burger\s{0,2}service\s{0,2}nummer|sofi[\s-]{0,2}nummer|burgerservicenr|persoonsnummer/gi;
+  /bsn|burger\s{0,2}service\s{0,2}nummer|sofi[\s-]{0,2}nummer|burgerservicenr/gi;
 // Separators cover regular space, dot, hyphen, and the non-breaking space that
 // PDF extraction frequently emits.
 const CANDIDATE_RE = /\d(?:[ .\u00A0-]?\d){6,11}/g;
@@ -43,6 +47,14 @@ const EXCLUSION_BEFORE_RE =
   /(?:btw|vat|rsin|omzetbelasting|fiscaal|kvk|kamer\s+van\s+koophandel|iban|rekeningnummer|bankrekening)[\s-]{0,3}(?:id|nr|no|nummer)?[^a-z]{0,20}(?:nl\s?)?$/i;
 const VAT_PREFIX_RE = /nl\s?$/i;
 const VAT_SUFFIX_RE = /^\s?b\s?\d{2}(?!\d)/i;
+// Standard gemeentebrief letterhead tables have a header row
+// "ons kenmerk | uw kenmerk | bijlage | behandeld door | BSN" where the BSN
+// column is routinely left empty. Extraction then collapses the missing
+// cell, so the *next* column's value (e.g. "ons kenmerk") ends up right
+// after the literal word "BSN" in the flattened text -- a false keyword
+// anchor, not an actual BSN entry.
+const LETTERHEAD_EXCLUSION_RE = /kenmerk|behandeld\s+door|uw\s+brief/i;
+const LETTERHEAD_WINDOW = 100;
 const KEYWORD_WINDOW = 120;
 const EXCLUSION_WINDOW = 45;
 const CONTEXT_RADIUS = 60;
@@ -84,21 +96,34 @@ function maskedContext(text: string, index: number, length: number): string {
     .trim();
 }
 
-/** Fraction of context tokens mixing letters and digits. Garbled OCR output
- * (old scanned PDFs) is full of tokens like "Sv3so3cjz0e2" and produces
- * accidental elfproef passes; real prose around a BSN has almost none. */
-function mixedTokenRatio(text: string, index: number, length: number): number {
+const VOWEL_RE = /[aeiouyàáâäèéêëìíîïòóôöùúûü]/i;
+
+/** Fraction of context tokens that look like extraction garbage. Garbled OCR
+ * of scanned PDFs produces letter-digit mixes ("ESGs6S5"), case-chaotic
+ * tokens ("TSEess", "zxT") and vowel-less letter runs; accidental elfproef
+ * passes inside such text are noise, not BSNs. Word-shaped tokens — TitleCase,
+ * ALL-CAPS, IJ-words — and markdown table syntax stay clean. Bare numbers and
+ * symbol-only tokens say nothing either way and are left out entirely. */
+function garbledTokenRatio(text: string, index: number, length: number): number {
   const start = Math.max(0, index - CONTEXT_RADIUS);
   const end = Math.min(text.length, index + length + CONTEXT_RADIUS);
-  const tokens = text
-    .slice(start, end)
-    .split(/\s+/)
-    .filter((token) => token.length >= 3);
-  if (tokens.length < 4) {
-    return 0;
+  let total = 0;
+  let junk = 0;
+  for (const token of text.slice(start, end).split(/\s+/)) {
+    const core = token.replace(/^[^\p{L}\d]+|[^\p{L}\d]+$/gu, "");
+    if (!core || /^\d+$/.test(core)) {
+      continue;
+    }
+    total += 1;
+    const mixed = /\p{L}/u.test(core) && /\d/.test(core);
+    const caseChaos = /\p{Ll}\p{Lu}/u.test(core) ||
+      (/\p{Lu}{2,}\p{Ll}/u.test(core) && !/^IJ/.test(core));
+    const vowelless = core.length >= 4 && !/\d/.test(core) && !VOWEL_RE.test(core);
+    if (mixed || caseChaos || vowelless) {
+      junk += 1;
+    }
   }
-  const mixed = tokens.filter((token) => /\p{L}/u.test(token) && /\d/.test(token)).length;
-  return mixed / tokens.length;
+  return total >= 5 ? junk / total : 0;
 }
 
 function alphaRatio(text: string, index: number, length: number): number {
@@ -120,7 +145,13 @@ function alphaRatio(text: string, index: number, length: number): number {
 function keywordPositions(text: string): number[] {
   const positions: number[] = [];
   for (const match of text.matchAll(KEYWORD_RE)) {
-    positions.push(match.index ?? 0);
+    const index = match.index ?? 0;
+    const start = Math.max(0, index - LETTERHEAD_WINDOW);
+    const end = Math.min(text.length, index + match[0].length + LETTERHEAD_WINDOW);
+    if (LETTERHEAD_EXCLUSION_RE.test(text.slice(start, end))) {
+      continue;
+    }
+    positions.push(index);
   }
   return positions;
 }
@@ -180,7 +211,9 @@ export function scanForBsn(text: string): BsnScanResult {
       continue;
     }
 
-    if (mixedTokenRatio(text, index, raw.length) > 0.3) {
+    // Real prose around a BSN sits near 0; garbled scans at 0.3+. The margin
+    // matters: clean tokens like a nearby keyword dilute the ratio.
+    if (garbledTokenRatio(text, index, raw.length) > 0.25) {
       continue;
     }
 

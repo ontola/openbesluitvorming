@@ -66,6 +66,30 @@ Deno.test("scanForBsn rejects letter-glued numbers and OCR gibberish", () => {
   assert(!scanForBsn(ocr).found, "OCR gibberish context should be rejected");
 });
 
+Deno.test("scanForBsn rejects case-chaotic scan garbage without digit mixes", () => {
+  // Vector-drawing/scan garbage as seen in real reports: mostly letter-only
+  // tokens with chaotic casing, few classic letter+digit mixes.
+  const scanNoise =
+    'x5 SS: TELXEST "ED BOLT EEEN > <5 SSÈEEL Eg 565 zxT Gespias 123456782 ESGs6S5 2 Sp3 iss Fl 25 TSEess., Zee EBSg5 DATSTEE 23';
+  assert(!scanForBsn(scanNoise).found, "case-chaotic scan noise should be rejected");
+
+  const withKeyword = scanNoise.replace("Gespias", "Gespias BSN");
+  assert(
+    !scanForBsn(withKeyword).found,
+    "even a keyword inside scan noise should not produce a match",
+  );
+});
+
+Deno.test("scanForBsn keeps matches in prose with camelCase and IJ-words", () => {
+  const prose = scanForBsn(
+    "Motie van GroenLinks over inwoner te IJsselstein, BSN 123456782, besproken in de raad.",
+  );
+  assert(prose.found && prose.confidence === "high", "camelCase/IJ words are not garbage");
+
+  const table = scanForBsn("| naam | BSN | | J. Jansen | 123456782 | besproken in de commissie");
+  assert(table.found && table.confidence === "high", "markdown table syntax is not garbage");
+});
+
 Deno.test("scanForBsn ignores common false positives", () => {
   assert(!scanForBsn("totaal 123.456.782 euro subsidie").found, "grouped money amount");
   assert(!scanForBsn("bel 0612345678 voor vragen").found, "10-digit phone number");
@@ -91,6 +115,33 @@ Deno.test("scanForBsn excludes digit-dense numeric tables", () => {
     "0,80 0,80 0,80 76 111222333 17 6,00 0,97 110,94 0 dB 0,80 0,80 152 48,10 0 dB 0,80";
   assert(!scanForBsn(table).found, "bare match inside a numeric table should be dropped");
   assert(!scanForBsn("meetwaarde -111222333 Kerkstraat").found, "negative table value");
+});
+
+Deno.test("scanForBsn ignores an empty BSN column in a gemeentebrief letterhead", () => {
+  // Standard letterhead table: "ons kenmerk | uw kenmerk | bijlage |
+  // behandeld door | BSN" with an empty BSN cell -- extraction collapses the
+  // missing cell so "ons kenmerk"'s value lands right after the word "BSN".
+  const result = scanForBsn(
+    "ons kenmerk uw kenm bijlage behandeld door BSN 16.048489 F.J. Meerhoff datum telefoon fax e-mail",
+  );
+  assert(!result.found || result.confidence !== "high", "letterhead BSN column must not be high confidence");
+
+  const variant = scanForBsn(
+    "bsn nummer Zuiderdiep 89 Uw email 9523 TB DROUWENERMOND 22001112 Ons kenmerk 12300117 Behandeld door G. Grooteboer",
+  );
+  assert(
+    !variant.found || variant.confidence !== "high",
+    "'uw brief/ons kenmerk' letterhead variant must not be high confidence",
+  );
+});
+
+Deno.test("scanForBsn does not treat Kadaster persoonsnummer as a BSN keyword", () => {
+  // kadaster-on-line.kadaster.nl "persoonsnummer" is the land registry's own,
+  // unrelated subject-registry id (assigned to companies too) -- not a BSN.
+  const result = scanForBsn(
+    "kadaster-on-line.kadaster.nl/persselprod.asp?persoonsnummer=123456782&subjectnummer=560012345&naam=Evides",
+  );
+  assert(!result.found || result.confidence !== "high", "persoonsnummer must not be high confidence");
 });
 
 Deno.test("scanForBsn reports multiple matches with positions", () => {
