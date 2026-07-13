@@ -65,6 +65,10 @@ service:
   telemetry:
     logs:
       level: warn
+    metrics:
+      # Expose the collector's own counters (accepted/sent/failed) on the
+      # compose network for debugging: curl http://otel-collector:8888/metrics
+      address: 0.0.0.0:8888
   pipelines:
     traces:
       receivers: [otlp]
