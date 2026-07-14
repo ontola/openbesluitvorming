@@ -17,3 +17,7 @@ infra/.terraform.lock.hcl
 
 # Interne, niet-publieke documentatie (bevat gevoelige takedown-informatie)
 docs_internal/
+
+# Lokale ops-scripts voor gevoelige-data-detectie (BSN, telefoonnummers, NAW,
+# vertrouwelijkheid, ...) -- bewust niet in de repo
+local_scripts/

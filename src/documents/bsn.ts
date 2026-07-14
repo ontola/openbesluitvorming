@@ -47,13 +47,15 @@ const EXCLUSION_BEFORE_RE =
   /(?:btw|vat|rsin|omzetbelasting|fiscaal|kvk|kamer\s+van\s+koophandel|iban|rekeningnummer|bankrekening)[\s-]{0,3}(?:id|nr|no|nummer)?[^a-z]{0,20}(?:nl\s?)?$/i;
 const VAT_PREFIX_RE = /nl\s?$/i;
 const VAT_SUFFIX_RE = /^\s?b\s?\d{2}(?!\d)/i;
-// Standard gemeentebrief letterhead tables have a header row
-// "ons kenmerk | uw kenmerk | bijlage | behandeld door | BSN" where the BSN
-// column is routinely left empty. Extraction then collapses the missing
-// cell, so the *next* column's value (e.g. "ons kenmerk") ends up right
-// after the literal word "BSN" in the flattened text -- a false keyword
+// Standard gemeentebrief letterhead tables have a header row of labels
+// (e.g. "Burgerservicenummer | Zaaknummer | Uw referentie | Verzenddatum",
+// or "ons kenmerk | uw kenmerk | bijlage | behandeld door | BSN") where the
+// BSN field is routinely left empty. Extraction then collapses the missing
+// cell, so a neighboring label's value (e.g. a zaaknummer) ends up right
+// after the literal word "BSN"/"Burgerservicenummer" -- a false keyword
 // anchor, not an actual BSN entry.
-const LETTERHEAD_EXCLUSION_RE = /kenmerk|behandeld\s+door|uw\s+brief/i;
+const LETTERHEAD_EXCLUSION_RE =
+  /kenmerk|behandeld\s+door|uw\s+brief|zaaknummer|(?:uw|onze)\s+referentie/i;
 const LETTERHEAD_WINDOW = 100;
 const KEYWORD_WINDOW = 120;
 const EXCLUSION_WINDOW = 45;
