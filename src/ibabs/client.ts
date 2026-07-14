@@ -243,6 +243,14 @@ function parseMeetingsXml(xml: string): IbabsMeeting[] {
     throw new Error("Invalid iBabs GetMeetingsByDateRange response");
   }
 
+  // iBabs reports an empty window as Status=ERR with this literal message.
+  // That's a normal outcome, not a failure — deep-history backfill chunks hit
+  // it constantly (sources digitized long after 2002) and each one was
+  // wrongly counted as a failed run.
+  if (textValue(result, "Message")?.includes("No public meetings")) {
+    return [];
+  }
+
   assertIbabsResultOk(result, "GetMeetingsByDateRange");
 
   const meetings = valueForLocalName(result, "Meetings");

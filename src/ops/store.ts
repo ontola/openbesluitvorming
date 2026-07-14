@@ -401,8 +401,17 @@ export async function countActiveScheduledRuns(): Promise<number> {
  * of restarts while still catching a genuine crash-looper. */
 const MAX_INTERRUPTED_REQUEUES = 5;
 
+/** Runs claimed more recently than this are left alone by reconcile: with
+ * two worker replicas restarting seconds apart (a deploy), the second one to
+ * boot would otherwise requeue rows its sibling just claimed, and the same
+ * run ends up executing twice concurrently (seen July 2026: duplicate
+ * failures and phantom stalls for the same run id). Genuinely interrupted
+ * rows carry a started_at from before the restart, well past this margin. */
+const RECONCILE_MIN_CLAIM_AGE_MS = 120_000;
+
 export async function reconcileInterruptedRuns(): Promise<IngestRunRecord[]> {
   const db = await getDatabase();
+  const claimedBefore = new Date(Date.now() - RECONCILE_MIN_CLAIM_AGE_MS).toISOString();
   const interruptedRuns = db
     .prepare(
       `SELECT
@@ -411,10 +420,10 @@ export async function reconcileInterruptedRuns(): Promise<IngestRunRecord[]> {
         started_at, finished_at, meeting_count, document_count, cache_hits, downloaded_count,
         issue_count, quickwit_index_id, error_message, interrupted_count
        FROM ingest_run
-       WHERE status = 'running'
+       WHERE status = 'running' AND started_at < ?
        ORDER BY started_at ASC`,
     )
-    .all() as unknown as (RunRow & { interrupted_count: number | null })[];
+    .all(claimedBefore) as unknown as (RunRow & { interrupted_count: number | null })[];
 
   if (interruptedRuns.length === 0) {
     return [];
