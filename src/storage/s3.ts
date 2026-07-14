@@ -6,6 +6,9 @@ import {
   PutObjectCommand,
   S3Client,
 } from "npm:@aws-sdk/client-s3";
+import { NodeHttpHandler } from "npm:@smithy/node-http-handler";
+import { Agent as HttpAgent } from "node:http";
+import { Agent as HttpsAgent } from "node:https";
 import { getConfigValue } from "../config.ts";
 
 const DEFAULT_BUCKET = "woozi";
@@ -67,6 +70,16 @@ export class ObjectStorageClient {
           accessKeyId,
           secretAccessKey,
         },
+        // No keep-alive: under Deno's node-compat layer, pooled sockets that
+        // the S3 server closes on its side are never released and pile up in
+        // CLOSE-WAIT at the S3 request rate (~250 fds/min during cache-heavy
+        // ingest; 8k+ leaked sockets eventually break all outgoing
+        // connections with AggregateError — July 2026 incident). A handshake
+        // per request costs ~ms at our request rates.
+        requestHandler: new NodeHttpHandler({
+          httpAgent: new HttpAgent({ keepAlive: false }),
+          httpsAgent: new HttpsAgent({ keepAlive: false }),
+        }),
       }),
       bucket,
       trimTrailingSlash(endpoint),
