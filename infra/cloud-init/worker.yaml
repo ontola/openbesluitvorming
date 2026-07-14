@@ -15,6 +15,56 @@ write_files:
       S3_STORAGE_BUCKET_NAME=${s3_storage_bucket_name}
       S3_ACCESS_KEY=${s3_access_key}
       S3_SECRET_KEY=${s3_secret_key}
+  - path: /root/signoz-key.txt
+    permissions: "0600"
+    content: |
+      ${signoz_ingestion_key}
+  # Host metrics to SigNoz Cloud so the node shows up in the Infrastructure
+  # view. Mirror of otel/node-collector.yaml in the repo; $${env:...} is
+  # escaped for templatefile, not a template variable.
+  - path: /root/otel-node.yaml
+    permissions: "0644"
+    content: |
+      receivers:
+        hostmetrics:
+          collection_interval: 60s
+          root_path: /hostfs
+          scrapers:
+            cpu: {}
+            memory: {}
+            load: {}
+            disk: {}
+            network: {}
+            filesystem:
+              include_mount_points:
+                match_type: strict
+                mount_points: ["/"]
+      processors:
+        memory_limiter:
+          check_interval: 1s
+          limit_mib: 200
+          spike_limit_mib: 50
+        resourcedetection:
+          detectors: [system]
+          system:
+            hostname_sources: [os]
+        batch:
+          send_batch_size: 8192
+          timeout: 10s
+      exporters:
+        otlp:
+          endpoint: ingest.eu2.signoz.cloud:443
+          headers:
+            signoz-ingestion-key: $${env:SIGNOZ_INGESTION_KEY}
+      service:
+        telemetry:
+          logs:
+            level: warn
+        pipelines:
+          metrics:
+            receivers: [hostmetrics]
+            processors: [memory_limiter, resourcedetection, batch]
+            exporters: [otlp]
 
 runcmd:
   # Log in to GHCR (public images don't need auth, but private ones do)
@@ -30,3 +80,18 @@ runcmd:
       --env-file /root/extraction-s3.env \
       ${extraction_service_image} \
       uvicorn main:app --host 0.0.0.0 --port 8000 --workers ${uvicorn_workers}
+
+  # Host metrics to SigNoz; skipped when no ingestion key was provided.
+  - |
+    if [ -s /root/signoz-key.txt ] && grep -q '[^[:space:]]' /root/signoz-key.txt; then
+      docker run -d \
+        --name otel-collector \
+        --restart unless-stopped \
+        --pid host \
+        --user 0 \
+        -v /:/hostfs:ro \
+        -v /root/otel-node.yaml:/etc/otelcol/config.yaml:ro \
+        -e SIGNOZ_INGESTION_KEY="$(tr -d '[:space:]' < /root/signoz-key.txt)" \
+        otel/opentelemetry-collector-contrib:0.111.0 \
+        --config=/etc/otelcol/config.yaml
+    fi

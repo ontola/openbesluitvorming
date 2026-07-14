@@ -1,0 +1,49 @@
+# Minimal host-metrics collector for satellite nodes (extraction workers,
+# ori3): CPU/memory/disk/network to SigNoz Cloud so every node shows up in
+# the Infrastructure view. No OTLP receivers — nothing pushes to these.
+# Deployed live via docker run and baked into infra/cloud-init/worker.yaml
+# for hosts provisioned after July 2026.
+
+receivers:
+  hostmetrics:
+    collection_interval: 60s
+    root_path: /hostfs
+    scrapers:
+      cpu: {}
+      memory: {}
+      load: {}
+      disk: {}
+      network: {}
+      filesystem:
+        include_mount_points:
+          match_type: strict
+          mount_points: ["/"]
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 200
+    spike_limit_mib: 50
+  resourcedetection:
+    detectors: [system]
+    system:
+      hostname_sources: [os]
+  batch:
+    send_batch_size: 8192
+    timeout: 10s
+
+exporters:
+  otlp:
+    endpoint: ingest.eu2.signoz.cloud:443
+    headers:
+      signoz-ingestion-key: ${env:SIGNOZ_INGESTION_KEY}
+
+service:
+  telemetry:
+    logs:
+      level: warn
+  pipelines:
+    metrics:
+      receivers: [hostmetrics]
+      processors: [memory_limiter, resourcedetection, batch]
+      exporters: [otlp]

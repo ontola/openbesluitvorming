@@ -22,5 +22,6 @@ resource "hcloud_server" "extraction" {
     s3_storage_bucket_name   = var.s3_storage_bucket_name
     s3_access_key            = var.s3_access_key
     s3_secret_key            = var.s3_secret_key
+    signoz_ingestion_key     = var.signoz_ingestion_key
   })
 }

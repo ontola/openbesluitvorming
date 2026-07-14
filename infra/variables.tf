@@ -71,3 +71,10 @@ variable "s3_secret_key" {
   sensitive   = true
   description = "S3 secret key for the extraction service"
 }
+
+variable "signoz_ingestion_key" {
+  type        = string
+  sensitive   = true
+  default     = ""
+  description = "SigNoz Cloud ingestion key for host metrics; empty disables the node collector"
+}

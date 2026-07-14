@@ -14,6 +14,11 @@
 #   export TF_VAR_s3_storage_endpoint=... TF_VAR_s3_storage_bucket_name=... \
 #          TF_VAR_s3_access_key=... TF_VAR_s3_secret_key=...
 #   tofu apply -var=extraction_server_count=8
+#
+# Also pass TF_VAR_signoz_ingestion_key (value: SIGNOZ_INGESTION_KEY in
+# /opt/woozi/.env) so new hosts report host metrics to SigNoz; without it the
+# node collector is skipped and the host is invisible in the Infrastructure
+# view. Existing hosts got the collector installed by hand (July 2026).
 # After scaling, update WOOZI_EXTRACTION_SERVICE_URL in /opt/woozi/.env with
 # the new worker IPs (tofu output) and recreate the worker containers.
 # Temporarily at 8 for the July 2026 full-history backfill (extraction hosts
