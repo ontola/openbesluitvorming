@@ -48,6 +48,11 @@ write_files:
           detectors: [system]
           system:
             hostname_sources: [os]
+        resource:
+          attributes:
+            - key: host.name
+              value: $${env:NODE_LABEL}
+              action: upsert
         batch:
           send_batch_size: 8192
           timeout: 10s
@@ -63,7 +68,7 @@ write_files:
         pipelines:
           metrics:
             receivers: [hostmetrics]
-            processors: [memory_limiter, resourcedetection, batch]
+            processors: [memory_limiter, resourcedetection, resource, batch]
             exporters: [otlp]
 
 runcmd:
@@ -92,6 +97,7 @@ runcmd:
         -v /:/hostfs:ro \
         -v /root/otel-node.yaml:/etc/otelcol/config.yaml:ro \
         -e SIGNOZ_INGESTION_KEY="$(tr -d '[:space:]' < /root/signoz-key.txt)" \
+        -e NODE_LABEL="pdf-extractie-$(hostname | grep -o '[0-9]*$')" \
         otel/opentelemetry-collector-contrib:0.111.0 \
         --config=/etc/otelcol/config.yaml
     fi

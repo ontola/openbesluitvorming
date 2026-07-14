@@ -10,6 +10,15 @@ on:
 permissions:
   contents: read
 
+# Two image builds finishing close together (rapid pushes) used to launch two
+# deploys that raced each other's `docker compose up` on the host: the loser
+# hit a container-name conflict and left the stack half-recreated with Caddy
+# down (July 2026 outage). Serialize; never cancel a deploy that is already
+# rewriting containers, and let the newest queued one supersede older waiters.
+concurrency:
+  group: deploy-beta
+  cancel-in-progress: false
+
 jobs:
   deploy:
     if: >-

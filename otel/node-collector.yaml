@@ -28,6 +28,14 @@ processors:
     detectors: [system]
     system:
       hostname_sources: [os]
+  # Machine hostnames (woozi-extraction-3, ori-octopus) are cryptic in the
+  # SigNoz Infrastructure view; NODE_LABEL carries the human-readable name
+  # (pdf-extractie-3, ori-classic) set at docker run time.
+  resource:
+    attributes:
+      - key: host.name
+        value: ${env:NODE_LABEL}
+        action: upsert
   batch:
     send_batch_size: 8192
     timeout: 10s
@@ -45,5 +53,5 @@ service:
   pipelines:
     metrics:
       receivers: [hostmetrics]
-      processors: [memory_limiter, resourcedetection, batch]
+      processors: [memory_limiter, resourcedetection, resource, batch]
       exporters: [otlp]

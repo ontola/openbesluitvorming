@@ -51,6 +51,14 @@ processors:
     detectors: [system]
     system:
       hostname_sources: [os]
+  # "woozi-1" is cryptic in the SigNoz Infrastructure view; give the host its
+  # public-facing name. Applies to app telemetry too so everything from this
+  # machine groups under one readable host.
+  resource:
+    attributes:
+      - key: host.name
+        value: openbesluitvorming-server
+        action: upsert
   batch:
     send_batch_size: 8192
     timeout: 5s
@@ -72,13 +80,13 @@ service:
   pipelines:
     traces:
       receivers: [otlp]
-      processors: [memory_limiter, resourcedetection, batch]
+      processors: [memory_limiter, resourcedetection, resource, batch]
       exporters: [otlp]
     metrics:
       receivers: [otlp, hostmetrics]
-      processors: [memory_limiter, resourcedetection, batch]
+      processors: [memory_limiter, resourcedetection, resource, batch]
       exporters: [otlp]
     logs:
       receivers: [otlp]
-      processors: [memory_limiter, resourcedetection, batch]
+      processors: [memory_limiter, resourcedetection, resource, batch]
       exporters: [otlp]
