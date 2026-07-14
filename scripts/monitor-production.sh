@@ -334,6 +334,19 @@ check_worker_fds() {
     fds="$(ls "/proc/$pid/fd" 2>/dev/null | wc -l)"
     [ "$fds" -gt "$max_fds" ] && max_fds="$fds"
   done
+
+  # Diagnostic breadcrumbs while the leak is building: the leaked fds are
+  # already-closed sockets whose peers can't be recovered afterwards, so
+  # sample the *live* connections per peer now. Whichever peer churns most
+  # across samples is creating the sockets. Root cause still open (July 2026).
+  if [ "$max_fds" -gt 2000 ]; then
+    {
+      printf '%s max_fds=%s\n' "$(date -u +%FT%TZ)" "$max_fds"
+      ss -tnp 2>/dev/null | grep deno | awk '{print $5}' | sed 's/:[0-9]*$//' |
+        sort | uniq -c | sort -rn | head -8
+    } >> "$STATE_DIR/fd_leak_peers.log" 2>/dev/null || true
+  fi
+
   if [ "$max_fds" -le "$WORKER_FD_MAX" ]; then
     return
   fi

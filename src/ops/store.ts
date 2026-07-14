@@ -393,10 +393,13 @@ export async function countActiveScheduledRuns(): Promise<number> {
 }
 
 /** How often a run may be requeued after a process restart before it is
- * declared failed. Restarts are almost always deploys, not run-specific
- * crashes; the cap prevents a run that reliably kills the process (e.g. OOM)
- * from crash-looping across restarts forever. */
-const MAX_INTERRUPTED_REQUEUES = 2;
+ * declared failed. The cap prevents a run that reliably kills the process
+ * (e.g. OOM) from crash-looping across restarts forever — but restarts are
+ * usually external (deploys, and since July 2026 the monitor's fd-leak
+ * self-heal, which fired hourly during backfill bursts and permanently
+ * failed 288 healthy runs at the old cap of 2). Five tolerates a bad night
+ * of restarts while still catching a genuine crash-looper. */
+const MAX_INTERRUPTED_REQUEUES = 5;
 
 export async function reconcileInterruptedRuns(): Promise<IngestRunRecord[]> {
   const db = await getDatabase();

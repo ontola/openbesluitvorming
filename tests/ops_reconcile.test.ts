@@ -49,17 +49,19 @@ Deno.test("interrupted runs are requeued instead of failed, up to the cap", asyn
   assert(target, "interrupted run is reconciled");
   assertEquals(target.status, "queued", "first interruption requeues the run");
 
-  // Second restart: requeued again.
-  assert(await claimQueuedRun(runId), "requeued run can be claimed again");
-  reconciled = await reconcileInterruptedRuns();
-  target = reconciled.find((run) => run.id === runId);
-  assertEquals(target?.status, "queued", "second interruption still requeues");
+  // Restarts two through five: requeued again.
+  for (let interruption = 2; interruption <= 5; interruption += 1) {
+    assert(await claimQueuedRun(runId), `requeued run can be claimed (interruption ${interruption})`);
+    reconciled = await reconcileInterruptedRuns();
+    target = reconciled.find((run) => run.id === runId);
+    assertEquals(target?.status, "queued", `interruption ${interruption} still requeues`);
+  }
 
-  // Third restart: the cap is reached; the run fails for good.
-  assert(await claimQueuedRun(runId), "run can be claimed a third time");
+  // Sixth restart: the cap is reached; the run fails for good.
+  assert(await claimQueuedRun(runId), "run can be claimed a final time");
   reconciled = await reconcileInterruptedRuns();
   target = reconciled.find((run) => run.id === runId);
-  assertEquals(target?.status, "failed", "third interruption fails the run");
+  assertEquals(target?.status, "failed", "interruption past the cap fails the run");
   assert(
     target?.error_message?.includes("Process terminated"),
     "failed run keeps the reconcile error message",
@@ -69,7 +71,7 @@ Deno.test("interrupted runs are requeued instead of failed, up to the cap", asyn
   const issues = details?.issues ?? [];
   assertEquals(
     issues.filter((issue) => issue.severity === "warning").length,
-    2,
+    5,
     "each requeue leaves a warning issue",
   );
   assertEquals(
