@@ -3,7 +3,7 @@ import {
   __test__ as ibabsExtractorTest,
 } from "../src/ibabs/extractor.ts";
 import { __test__ as ibabsClientTest } from "../src/ibabs/client.ts";
-import { getIbabsSource } from "../src/sources/ibabs.ts";
+import { getIbabsSource } from "../src/sources/index.ts";
 import { normalizeIbabsDocuments, normalizeIbabsMeeting } from "../src/ibabs/normalize.ts";
 import type { DocumentEntity } from "../src/types.ts";
 

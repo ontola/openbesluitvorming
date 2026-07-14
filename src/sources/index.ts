@@ -142,6 +142,15 @@ export function getNotubizSource(key: string): NotubizSourceDefinition {
   return source;
 }
 
+/** getSource narrowed to iBabs; see getNotubizSource. */
+export function getIbabsSource(key: string): IbabsSourceDefinition {
+  const source = getSource(key);
+  if (source.supplier !== "ibabs") {
+    throw new Error(`Source "${key}" is not an iBabs source`);
+  }
+  return source;
+}
+
 export function listSources(): SourceDefinition[] {
   return listRunnableCatalogSources().map((source) => toRuntimeSourceDefinition(source));
 }
