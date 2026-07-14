@@ -529,3 +529,24 @@ Deno.test("getEntityContent prefers stored markdown from the newest hit", async 
     globalThis.fetch = originalFetch;
   }
 });
+
+Deno.test("documentMonthTerms enumerates months and rejects unusable ranges", async () => {
+  const { documentMonthTerms } = await import("../web/search_api.ts");
+
+  assert(
+    JSON.stringify(documentMonthTerms("2024-01-15", "2024-03-02")) ===
+      JSON.stringify(["2024-01", "2024-02", "2024-03"]),
+    "range should cover the months of both bounds inclusive",
+  );
+  assert(
+    documentMonthTerms("2024-05-01", "2024-05-31")?.length === 1,
+    "single-month range yields one term",
+  );
+
+  const openEnded = documentMonthTerms("2026-01-01", "");
+  assert(openEnded !== null && openEnded[0] === "2026-01", "open-ended 'to' still pushes down");
+
+  assert(documentMonthTerms("2002-01-01", "2021-12-31") === null, "multi-decade range stays app-side");
+  assert(documentMonthTerms("2024-06-01", "2024-01-01") === null, "inverted range is rejected");
+  assert(documentMonthTerms("geen-datum", "2024-01-01") === null, "garbage input is rejected");
+});

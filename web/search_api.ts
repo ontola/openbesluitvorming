@@ -171,7 +171,51 @@ function expandDutchGovernanceTerms(query: string): string[] {
   return [...terms];
 }
 
-function buildQuickwitQuery(query: string, organization: string, entityType: string): string {
+/** Date ranges wider than this stay app-side: the OR-clause grows per month
+ * and a multi-year range barely narrows the candidate set anyway. */
+const MAX_PUSHDOWN_MONTHS = 60;
+
+/** Months ("YYYY-MM") covered by the date range, for pushing the date filter
+ * into Quickwit as exact document_month terms (raw-tokenized fast field —
+ * range syntax tokenizes the bounds and matches nonsense, so enumerate).
+ * Documents without document_month also lack start_date (same source,
+ * documentReferenceDate) and are dropped by the exact app-side date filter
+ * regardless, so excluding them here does not change results. Meetings carry
+ * no document_month; callers must OR this with entity_type:Meeting. Returns
+ * null when the range is unusable or too broad to be selective. */
+export function documentMonthTerms(dateFrom: string, dateTo: string): string[] | null {
+  const from = dateFrom.trim().slice(0, 7);
+  // Open-ended "from" ranges still push down: cap at a few months ahead
+  // (agenda documents can be future-dated).
+  const fallbackTo = new Date();
+  fallbackTo.setUTCMonth(fallbackTo.getUTCMonth() + 6);
+  const to = (dateTo.trim() || fallbackTo.toISOString()).slice(0, 7);
+  if (!/^\d{4}-\d{2}$/.test(from) || !/^\d{4}-\d{2}$/.test(to)) {
+    return null;
+  }
+  const cursor = new Date(`${from}-01T00:00:00Z`);
+  const end = new Date(`${to}-01T00:00:00Z`);
+  if (Number.isNaN(cursor.getTime()) || Number.isNaN(end.getTime()) || cursor > end) {
+    return null;
+  }
+  const months: string[] = [];
+  while (cursor <= end) {
+    if (months.length >= MAX_PUSHDOWN_MONTHS) {
+      return null;
+    }
+    months.push(cursor.toISOString().slice(0, 7));
+    cursor.setUTCMonth(cursor.getUTCMonth() + 1);
+  }
+  return months;
+}
+
+function buildQuickwitQuery(
+  query: string,
+  organization: string,
+  entityType: string,
+  dateFrom = "",
+  dateTo = "",
+): string {
   const typeQuery =
     entityType === "Meeting"
       ? "entity_type:Meeting"
@@ -194,6 +238,17 @@ function buildQuickwitQuery(query: string, organization: string, entityType: str
       parts.push(buildSearchClause(expandedTerms[0]));
     } else {
       parts.push(`(${expandedTerms.map(buildSearchClause).filter(Boolean).join(" OR ")})`);
+    }
+  }
+
+  // Push the date filter into Quickwit at month granularity; the exact
+  // day-level filter stays app-side. Without this, a narrow date range made
+  // the search loop page through (and discard) up to the full scan cap.
+  if (dateFrom.trim() && entityType !== "Meeting") {
+    const months = documentMonthTerms(dateFrom, dateTo);
+    if (months) {
+      const monthClause = months.map((month) => `document_month:${month}`).join(" OR ");
+      parts.push(`(entity_type:Meeting OR ${monthClause})`);
     }
   }
 
@@ -504,7 +559,13 @@ async function collectSearchWindow(
   totalIsApproximate: boolean;
   hasMore: boolean;
 }> {
-  const queryString = buildQuickwitQuery(options.query, options.organization, options.entityType);
+  const queryString = buildQuickwitQuery(
+    options.query,
+    options.organization,
+    options.entityType,
+    options.dateFrom,
+    options.dateTo,
+  );
   const isDirectWindow = !options.query.trim();
   const targetCount = isDirectWindow ? options.limit + 1 : options.offset + options.limit + 1;
   const maxRawHits = isDirectWindow
