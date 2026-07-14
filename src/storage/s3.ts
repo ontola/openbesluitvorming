@@ -1,14 +1,14 @@
-import {
-  DeleteObjectsCommand,
-  GetObjectCommand,
-  HeadObjectCommand,
-  ListObjectsV2Command,
-  PutObjectCommand,
-  S3Client,
-} from "npm:@aws-sdk/client-s3";
-import { NodeHttpHandler } from "npm:@smithy/node-http-handler";
-import { Agent as HttpAgent } from "node:http";
-import { Agent as HttpsAgent } from "node:https";
+// S3-compatible object storage over native fetch (SigV4 via aws4fetch).
+//
+// This deliberately does NOT use @aws-sdk/client-s3: under Deno's node-compat
+// layer the SDK's HTTP client never releases sockets once the server closes
+// its side — one CLOSE-WAIT fd per S3 request, ~250/min during cache-heavy
+// ingest, until outgoing connections start failing with AggregateError
+// (July 2026 incident; keepAlive:false didn't help, the leak is in the
+// compat socket close handling itself). Deno's native fetch pool handles
+// server-side closes correctly.
+
+import { AwsClient } from "npm:aws4fetch";
 import { getConfigValue } from "../config.ts";
 
 const DEFAULT_BUCKET = "woozi";
@@ -41,6 +41,28 @@ function describeStorageError(action: string, key: string, error: unknown): Erro
   return new Error(`S3 ${action} failed for ${key}: ${String(error)}`);
 }
 
+function encodeKeyPath(key: string): string {
+  return key.split("/").map(encodeURIComponent).join("/");
+}
+
+function decodeXmlEntities(value: string): string {
+  return value
+    .replaceAll("&lt;", "<")
+    .replaceAll("&gt;", ">")
+    .replaceAll("&quot;", '"')
+    .replaceAll("&#39;", "'")
+    .replaceAll("&apos;", "'")
+    .replaceAll("&amp;", "&");
+}
+
+async function errorSummary(response: Response): Promise<string> {
+  const body = await response.text().catch(() => "");
+  const code = body.match(/<Code>([^<]*)<\/Code>/)?.[1];
+  const message = body.match(/<Message>([^<]*)<\/Message>/)?.[1];
+  const detail = [code, message].filter(Boolean).join(": ");
+  return `HTTP ${response.status}${detail ? ` (${detail})` : ""}`;
+}
+
 export interface StoredObject {
   bucket: string;
   key: string;
@@ -49,7 +71,7 @@ export interface StoredObject {
 
 export class ObjectStorageClient {
   private constructor(
-    private readonly client: S3Client,
+    private readonly client: AwsClient,
     private readonly bucket: string,
     private readonly endpoint: string,
   ) {}
@@ -62,28 +84,20 @@ export class ObjectStorageClient {
     const secretAccessKey = await getConfigValue("S3_SECRET_KEY", DEFAULT_SECRET_KEY);
 
     return new ObjectStorageClient(
-      new S3Client({
+      new AwsClient({
+        accessKeyId,
+        secretAccessKey,
         region,
-        endpoint,
-        forcePathStyle: true,
-        credentials: {
-          accessKeyId,
-          secretAccessKey,
-        },
-        // No keep-alive: under Deno's node-compat layer, pooled sockets that
-        // the S3 server closes on its side are never released and pile up in
-        // CLOSE-WAIT at the S3 request rate (~250 fds/min during cache-heavy
-        // ingest; 8k+ leaked sockets eventually break all outgoing
-        // connections with AggregateError — July 2026 incident). A handshake
-        // per request costs ~ms at our request rates.
-        requestHandler: new NodeHttpHandler({
-          httpAgent: new HttpAgent({ keepAlive: false }),
-          httpsAgent: new HttpsAgent({ keepAlive: false }),
-        }),
+        service: "s3",
+        retries: 3,
       }),
       bucket,
       trimTrailingSlash(endpoint),
     );
+  }
+
+  private objectUrl(key: string): string {
+    return `${this.endpoint}/${this.bucket}/${encodeKeyPath(key)}`;
   }
 
   async putObject(
@@ -95,15 +109,23 @@ export class ObjectStorageClient {
     } = {},
   ): Promise<StoredObject> {
     try {
-      await this.client.send(
-        new PutObjectCommand({
-          Bucket: this.bucket,
-          Key: key,
-          Body: body,
-          ContentType: options.contentType,
-          Metadata: options.metadata,
-        }),
-      );
+      const headers: Record<string, string> = {};
+      if (options.contentType) {
+        headers["content-type"] = options.contentType;
+      }
+      for (const [name, value] of Object.entries(options.metadata ?? {})) {
+        headers[`x-amz-meta-${name.toLowerCase()}`] = value;
+      }
+      const response = await this.client.fetch(this.objectUrl(key), {
+        method: "PUT",
+        headers,
+        // aws4fetch's BodyInit typing predates Uint8Array<ArrayBufferLike>.
+        body: body as unknown as BodyInit,
+      });
+      if (!response.ok) {
+        throw new Error(await errorSummary(response));
+      }
+      await response.body?.cancel();
     } catch (error) {
       throw describeStorageError("write", key, error);
     }
@@ -131,13 +153,9 @@ export class ObjectStorageClient {
 
   async hasObject(key: string): Promise<boolean> {
     try {
-      await this.client.send(
-        new HeadObjectCommand({
-          Bucket: this.bucket,
-          Key: key,
-        }),
-      );
-      return true;
+      const response = await this.client.fetch(this.objectUrl(key), { method: "HEAD" });
+      await response.body?.cancel();
+      return response.ok;
     } catch {
       return false;
     }
@@ -159,50 +177,53 @@ export class ObjectStorageClient {
       maxKeys?: number;
     } = {},
   ): Promise<{ keys: string[]; isTruncated: boolean }> {
-    let response;
+    const params = new URLSearchParams({ "list-type": "2" });
+    if (options.prefix) {
+      params.set("prefix", options.prefix);
+    }
+    if (options.startAfter) {
+      params.set("start-after", options.startAfter);
+    }
+    if (options.maxKeys) {
+      params.set("max-keys", `${options.maxKeys}`);
+    }
+
+    let body: string;
     try {
-      response = await this.client.send(
-        new ListObjectsV2Command({
-          Bucket: this.bucket,
-          Prefix: options.prefix,
-          StartAfter: options.startAfter,
-          MaxKeys: options.maxKeys,
-        }),
+      const response = await this.client.fetch(
+        `${this.endpoint}/${this.bucket}?${params}`,
+        { method: "GET" },
       );
+      if (!response.ok) {
+        throw new Error(await errorSummary(response));
+      }
+      body = await response.text();
     } catch (error) {
       throw describeStorageError("list", options.prefix ?? "", error);
     }
 
+    const keys = [...body.matchAll(/<Key>([^<]*)<\/Key>/g)].map((match) =>
+      decodeXmlEntities(match[1])
+    );
     return {
-      keys: (response.Contents ?? [])
-        .map((object) => object.Key)
-        .filter((key): key is string => Boolean(key)),
-      isTruncated: response.IsTruncated ?? false,
+      keys,
+      isTruncated: /<IsTruncated>true<\/IsTruncated>/.test(body),
     };
   }
 
   async deleteObjects(keys: string[]): Promise<void> {
-    for (let offset = 0; offset < keys.length; offset += 1000) {
-      const batch = keys.slice(offset, offset + 1000);
+    // Per-key DELETE instead of the Multi-Object Delete API: our delete
+    // volumes are tiny (takedowns, test cleanup) and the batch API requires
+    // a Content-MD5 header, which WebCrypto cannot produce.
+    for (const key of keys) {
       try {
-        const response = await this.client.send(
-          new DeleteObjectsCommand({
-            Bucket: this.bucket,
-            Delete: {
-              Objects: batch.map((key) => ({ Key: key })),
-              Quiet: true,
-            },
-          }),
-        );
-        const errors = response.Errors ?? [];
-        if (errors.length > 0) {
-          const first = errors[0];
-          throw new Error(
-            `${errors.length} objects failed, first: ${first.Key} (${first.Code}: ${first.Message})`,
-          );
+        const response = await this.client.fetch(this.objectUrl(key), { method: "DELETE" });
+        await response.body?.cancel();
+        if (!response.ok && response.status !== 404) {
+          throw new Error(`HTTP ${response.status}`);
         }
       } catch (error) {
-        throw describeStorageError("delete", batch[0] ?? "", error);
+        throw describeStorageError("delete", key, error);
       }
     }
   }
@@ -230,29 +251,21 @@ export class ObjectStorageClient {
   }
 
   async getObjectBytes(key: string): Promise<Uint8Array | null> {
-    let response;
+    let response: Response;
     try {
-      response = await this.client.send(
-        new GetObjectCommand({
-          Bucket: this.bucket,
-          Key: key,
-        }),
-      );
+      response = await this.client.fetch(this.objectUrl(key), { method: "GET" });
     } catch (error) {
-      if (
-        error instanceof Error &&
-        (error.name === "NoSuchKey" || error.name === "NotFound" || error.name === "NoSuchBucket")
-      ) {
-        return null;
-      }
       throw describeStorageError("read", key, error);
     }
 
-    const bytes = await response.Body?.transformToByteArray();
-    if (!bytes) {
+    if (response.status === 404) {
+      await response.body?.cancel();
       return null;
     }
+    if (!response.ok) {
+      throw describeStorageError("read", key, new Error(await errorSummary(response)));
+    }
 
-    return bytes;
+    return new Uint8Array(await response.arrayBuffer());
   }
 }
