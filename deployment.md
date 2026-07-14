@@ -702,6 +702,11 @@ worker socket-leak signal). It ships everything to
 `/opt/woozi/.env`. Disable app telemetry with `OTEL_DENO=0` in that `.env`.
 Losing the collector never pages: it is not in the monitor's critical path.
 
+Satellite nodes (extraction workers, ori3) run a hostmetrics-only collector
+([otel/node-collector.yaml](otel/node-collector.yaml)) so the whole fleet is
+visible in SigNoz's Infrastructure view. New extraction hosts get it from
+cloud-init when `TF_VAR_signoz_ingestion_key` is set at apply time.
+
 ## Known Operational Notes
 
 - interrupted imports can leave stale run-state unless reconciled on startup
