@@ -7,6 +7,7 @@ import type {
   SearchResponse,
   SearchResult,
 } from "../src/types.ts";
+import { getExportLog } from "../src/exports/log.ts";
 import { NotubizClient } from "../src/notubiz/client.ts";
 import { normalizeNotubizAgendaItems } from "../src/notubiz/normalize.ts";
 import { currentProjectionVersion } from "../src/pipeline/versioning.ts";
@@ -1003,7 +1004,11 @@ async function computeIndexStats(): Promise<IndexStats> {
   let response: Awaited<ReturnType<QuickwitClient["searchRequest"]>>;
   try {
     response = await quickwit.searchRequest({
-      query: `projection_version:${escapeTerm(currentProjectionVersion())}`,
+      // The count is documents only: meetings and per-page rows are not
+      // "vergaderstukken". Quickwit's number is still per-commit (one row per
+      // re-commit); the deduplicated count from the export log below wins
+      // when available.
+      query: `projection_version:${escapeTerm(currentProjectionVersion())} AND entity_type:Document`,
       max_hits: 0,
       aggs: {
         organizations: {
@@ -1049,8 +1054,20 @@ async function computeIndexStats(): Promise<IndexStats> {
     }
   }
 
+  // Deduplicated document count from the export log (one row per entity);
+  // the Quickwit hit count is per-commit and overstates roughly 3.5x. Falls
+  // back to the Quickwit count while the export log is still catching up
+  // (fresh environments, and until the full-history backfill has touched
+  // every entity at least once).
+  let uniqueDocumentCount = 0;
+  try {
+    uniqueDocumentCount = (await getExportLog()).countLiveEntities("document:");
+  } catch {
+    // No export log (e.g. read-only local setup): keep the Quickwit count.
+  }
+
   return {
-    documentCount: response.num_hits,
+    documentCount: uniqueDocumentCount > 0 ? uniqueDocumentCount : response.num_hits,
     organizationCount: orgBuckets.length,
     municipalityCount,
     waterBoardCount,

@@ -346,3 +346,24 @@ Deno.test("limit is clamped to the documented maximum", async () => {
   const hugeLimit = await log.readChanges("soest", { limit: EXPORT_BATCH_LIMIT_MAX * 10 });
   assertEquals(hugeLimit.records.length, 3, "oversized limit still returns everything available");
 });
+
+Deno.test("countLiveEntities dedupes commits and excludes deletes", async () => {
+  const { log } = makeLog();
+
+  const doc = makeDocument({ nativeId: "1" });
+  await commit(log, doc);
+  await commit(log, makeDocument({ nativeId: "1", markdown: ["# Nieuwe inhoud"] })); // re-commit, zelfde entiteit
+  await commit(log, makeDocument({ nativeId: "2" }));
+  const deleted = makeDocument({ nativeId: "3" });
+  await commit(log, deleted);
+  log.recordDelete({
+    entityId: deleted.id,
+    sourceKey: "soest",
+    supplier: "notubiz",
+    entityType: "Document",
+    time: "2026-07-11T12:00:00.000Z",
+  });
+
+  assertEquals(log.countLiveEntities("document:"), 2, "unique live documents");
+  assertEquals(log.countLiveEntities("meeting:"), 0, "prefix scopes the count");
+});

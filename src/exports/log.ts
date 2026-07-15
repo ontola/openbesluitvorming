@@ -96,6 +96,21 @@ export class ExportChangesLog {
     `);
   }
 
+  /** Number of distinct live (non-deleted) entities whose id starts with the
+   * prefix, e.g. "document:". Unlike the Quickwit index — which holds one row
+   * per commit and re-commits the same entity on every run that touches it
+   * (measured 3.5x duplication, July 2026) — this table is keyed per entity,
+   * so the count is deduplicated by construction. */
+  countLiveEntities(idPrefix: string): number {
+    const row = this.db
+      .prepare(
+        `SELECT COUNT(*) AS count FROM export_entity_state
+         WHERE entity_id LIKE ? AND op != 'delete'`,
+      )
+      .get(`${idPrefix}%`) as { count?: number } | undefined;
+    return row?.count ?? 0;
+  }
+
   /** Record an entity commit. Returns the appended record, or null when the
    * commit is a no-op (content_hash unchanged since the previous record). */
   recordCommit(event: EntityCommitEvent<WooziEntity>): ExportChangeRecord | null {
