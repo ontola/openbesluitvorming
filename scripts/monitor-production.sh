@@ -270,7 +270,7 @@ check_imports() {
   if [ -z "$prev_rowid" ] || ! [[ "$prev_rowid" =~ ^[0-9]+$ ]] || [ "$max_rowid" -le "$prev_rowid" ]; then
     return
   fi
-  extract_failures="$(ops_query "SELECT COUNT(*) FROM ingest_run_issue WHERE rowid > $prev_rowid AND step IN ('extract_text', 'download_document') AND message NOT LIKE '%only the first%' AND message NOT LIKE '%Source returned 40%' AND message NOT LIKE '%Request failed 404%'")"
+  extract_failures="$(ops_query "SELECT COUNT(*) FROM ingest_run_issue WHERE rowid > $prev_rowid AND step IN ('extract_text', 'download_document') AND severity = 'error' AND message NOT LIKE '%Source returned 40%' AND message NOT LIKE '%Request failed 404%'")"
   if [ "${extract_failures:-0}" -ge "$EXTRACT_FAIL_CRITICAL" ]; then
     alert critical extract_failures "Document extraction is failing at scale" "new_failures_this_interval=${extract_failures} threshold=${EXTRACT_FAIL_CRITICAL}"
   elif [ "${extract_failures:-0}" -ge "$EXTRACT_FAIL_WARN" ]; then

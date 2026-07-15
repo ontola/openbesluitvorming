@@ -459,6 +459,11 @@ export async function materializeDocument(
     return { document, cacheHit: true, issues: [], blocked: true };
   }
 
+  // Where the extraction service should download the document. Normally the
+  // supplier's URL; for a page-chunks repair pass it is our own cached PDF.
+  let serviceSourceUrl = document.original_url;
+  let pageRepairFallback: MaterializedDocumentResult | null = null;
+
   if (options.storage) {
     if (options.executionMode === "rederive_cached" && !hasExtractionService()) {
       const rederived = await rederiveFromStoredFile(document, options.storage);
@@ -469,8 +474,22 @@ export async function materializeDocument(
     } else {
       const cached = await readCachedDocument(document, options.storage);
       if (cached) {
-        console.log(`[timing] ${docId} path=cache_hit ${Math.round(performance.now() - t0)}ms`);
-        return cached;
+        // Documents extracted through the service before July 2026 got no
+        // per-page chunks (no DocumentPage rows, no jump-to-matched-page).
+        // Repair them on touch: re-extract from our own cached PDF — never
+        // from the supplier, whose copy may be gone — and fall back to the
+        // plain cache hit if the service can't do it.
+        if (
+          !cached.document.derived_content?.page_chunks_key &&
+          hasExtractionService() &&
+          isPdf(document)
+        ) {
+          pageRepairFallback = cached;
+          serviceSourceUrl = options.storage.urlForKey(objectKey(document));
+        } else {
+          console.log(`[timing] ${docId} path=cache_hit ${Math.round(performance.now() - t0)}ms`);
+          return cached;
+        }
       }
 
       // Skip local rederivation when extraction service is configured —
@@ -516,7 +535,7 @@ export async function materializeDocument(
           headers: { "content-type": "application/json" },
           signal: AbortSignal.timeout(EXTRACTION_TIMEOUT_MS),
           body: JSON.stringify({
-            source_url: document.original_url,
+            source_url: serviceSourceUrl,
             s3_pdf_key: pdfKey,
             s3_markdown_key: mdKey,
             s3_page_chunks_key: extractedPageChunksKey(document),
@@ -575,7 +594,7 @@ export async function materializeDocument(
 
         const quality = payload.markdown ? assessMarkdownQuality(payload.markdown) : null;
         console.log(
-          `[timing] ${docId} path=extraction_service ${Math.round(performance.now() - t0)}ms pages=${payload.page_count} md=${Math.round(payload.markdown.length / 1024)}KB`,
+          `[timing] ${docId} path=${pageRepairFallback ? "page_repair" : "extraction_service"} ${Math.round(performance.now() - t0)}ms pages=${payload.page_count} md=${Math.round(payload.markdown.length / 1024)}KB`,
         );
 
         return {
@@ -609,7 +628,25 @@ export async function materializeDocument(
       }
     }
 
-    // Retries exhausted — record as issue and continue without extraction
+    // Retries exhausted. A failed page-chunks repair keeps the plain cache
+    // hit (the document stays searchable; only the page granularity is still
+    // missing) — a warning, not an error, so repair passes don't trip the
+    // extraction-failure monitor.
+    if (pageRepairFallback) {
+      issues.push({
+        severity: "warning",
+        step: "extract_text",
+        entity_id: document.id,
+        message: `${documentIssueContext(document)}: page-chunks repair failed, keeping cached markdown: ${lastError instanceof Error ? lastError.message : String(lastError)}`,
+        details: issueDetailsFromError(lastError),
+      });
+      console.log(
+        `[timing] ${docId} path=page_repair_failed ${Math.round(performance.now() - t0)}ms`,
+      );
+      return { ...pageRepairFallback, issues };
+    }
+
+    // Record as issue and continue without extraction
     issues.push({
       severity: "error",
       step: "extract_text",
