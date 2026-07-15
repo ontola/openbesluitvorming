@@ -37,19 +37,30 @@ def normalize_text(text: str) -> str:
     return "\n".join(cleaned).strip()
 
 
-def fallback_markdown_with_pymupdf(input_path: Path, max_pages: int) -> str:
-    parts: list[str] = []
+def fallback_chunks_with_pymupdf(input_path: Path, max_pages: int) -> list[dict]:
+    chunks: list[dict] = []
     with pymupdf.open(str(input_path)) as document:
         for index, page in enumerate(document):
             if index >= max_pages:
                 break
             text = normalize_text(page.get_text("text"))
             heading = f"## Pagina {index + 1}"
-            if text:
-                parts.append(f"{heading}\n\n{text}")
-            else:
-                parts.append(heading)
-    return "\n\n".join(parts).strip()
+            chunks.append({
+                "page_number": index + 1,
+                "markdown": f"{heading}\n\n{text}" if text else heading,
+            })
+    return chunks
+
+
+def markdown_chunks(pdf_path: Path, pages: list[int]) -> list[dict]:
+    """Per-page markdown chunks; the page-level DocumentPage index (and the
+    'jump to matched page' feature in the GUI) depends on these."""
+    page_results = pymupdf4llm.to_markdown(str(pdf_path), pages=pages, page_chunks=True)
+    chunks: list[dict] = []
+    for index, item in zip(pages, page_results):
+        text = (item.get("text") or "").strip()
+        chunks.append({"page_number": index + 1, "markdown": text})
+    return chunks
 
 
 def render_first_page_jpeg(input_path: Path) -> bytes:
@@ -118,12 +129,15 @@ async def extract(req: ExtractRequest):
                 )
 
             try:
-                markdown = pymupdf4llm.to_markdown(str(pdf_path), pages=pages)
+                page_chunks = markdown_chunks(pdf_path, pages)
             except Exception as error:
                 warnings.append(
                     f"pymupdf4llm failed, falling back to plain pymupdf extraction: {error}"
                 )
-                markdown = fallback_markdown_with_pymupdf(pdf_path, req.max_pages)
+                page_chunks = fallback_chunks_with_pymupdf(pdf_path, req.max_pages)
+            markdown = "\n\n".join(
+                chunk["markdown"] for chunk in page_chunks if chunk["markdown"]
+            ).strip()
 
             thumbnail_bytes: bytes | None = None
             if req.s3_thumbnail_key:
@@ -143,6 +157,14 @@ async def extract(req: ExtractRequest):
             s3.put_object(Bucket=bucket, Key=req.s3_markdown_key,
                           Body=markdown.encode("utf-8"),
                           ContentType="text/markdown; charset=utf-8")
+
+        # Upload per-page chunks; same JSON shape as the ingest server's own
+        # extracted-page-chunks cache objects ({"pages": [...]}).
+        if req.s3_page_chunks_key and page_chunks:
+            s3.put_object(Bucket=bucket, Key=req.s3_page_chunks_key,
+                          Body=json.dumps({"pages": page_chunks}).encode("utf-8"),
+                          ContentType="application/json; charset=utf-8",
+                          Metadata={"kind": "pdf_page_chunks"})
 
         if req.s3_thumbnail_key and thumbnail_bytes:
             s3.put_object(Bucket=bucket, Key=req.s3_thumbnail_key,
@@ -164,6 +186,7 @@ async def extract(req: ExtractRequest):
 
         return JSONResponse({
             "markdown": markdown,
+            "page_chunks": page_chunks,
             "page_count": page_count,
             "warnings": warnings,
             "s3_pdf_url": f"{os.environ.get('S3_STORAGE_ENDPOINT', '')}/{bucket}/{req.s3_pdf_key}",

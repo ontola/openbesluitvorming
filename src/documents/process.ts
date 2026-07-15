@@ -1,4 +1,4 @@
-import type { DocumentEntity, ExtractionIssue } from "../types.ts";
+import type { DocumentEntity, DocumentPageChunk, ExtractionIssue } from "../types.ts";
 import { extractDocumentMarkdown, MAX_PDF_PAGES } from "./text.ts";
 import type { IngestExecutionMode } from "../types.ts";
 import { assessMarkdownQuality } from "./quality.ts";
@@ -519,6 +519,7 @@ export async function materializeDocument(
             source_url: document.original_url,
             s3_pdf_key: pdfKey,
             s3_markdown_key: mdKey,
+            s3_page_chunks_key: extractedPageChunksKey(document),
             s3_thumbnail_key: pdfPageCacheKey(document.id, 1),
             s3_thumbnail_meta_key: pdfPageMetaKey(document.id),
             max_pages: MAX_PDF_PAGES,
@@ -537,10 +538,14 @@ export async function materializeDocument(
 
         const payload = (await response.json()) as {
           markdown: string;
+          page_chunks?: DocumentPageChunk[];
           page_count: number;
           warnings: string[];
           s3_pdf_url: string;
         };
+        const pageChunks = (payload.page_chunks ?? []).filter(
+          (page) => typeof page?.page_number === "number" && typeof page?.markdown === "string",
+        );
 
         issues.push(
           ...payload.warnings.map((message) => ({
@@ -555,7 +560,13 @@ export async function materializeDocument(
           document,
           payload.markdown,
           options.storage,
-          [pdfKey, mdKey, pdfPageCacheKey(document.id, 1), pdfPageMetaKey(document.id)],
+          [
+            pdfKey,
+            mdKey,
+            extractedPageChunksKey(document),
+            pdfPageCacheKey(document.id, 1),
+            pdfPageMetaKey(document.id),
+          ],
           issues,
         );
         if (quarantined) {
@@ -573,8 +584,10 @@ export async function materializeDocument(
           document: {
             ...document,
             md_text: payload.markdown ? [payload.markdown] : undefined,
+            page_chunks: pageChunks.length > 0 ? pageChunks : document.page_chunks,
             derived_content: {
               markdown_key: mdKey,
+              page_chunks_key: pageChunks.length > 0 ? extractedPageChunksKey(document) : undefined,
               page_count: payload.page_count > MAX_PDF_PAGES ? MAX_PDF_PAGES : payload.page_count,
               extraction_quality_score: quality?.score,
               extraction_quality_status: quality?.status,
