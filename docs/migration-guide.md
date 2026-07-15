@@ -2,7 +2,8 @@
 
 Gids voor hergebruikers van de Open Raadsinformatie API.
 
-Status: concept, 2026-07-10.
+Status: versie 2026-07-15. Alle beschreven endpoints (zoeken, entiteiten,
+export snapshot + changes) zijn live geverifieerd tegen productie.
 
 ## Voor wie is deze gids?
 
@@ -363,6 +364,15 @@ Verder geldt:
 - `_source.includes`/`excludes`-achtige veldselectie op `/api/search`;
 - schrijf-endpoints (die waren op Classic ook al geblokkeerd);
 - JSON-LD/`@context` en RDF content negotiation.
+
+## Historische dekking
+
+Er loopt een volledige her-import van alle bronnen terug tot het jaar 2000
+(juli 2026). Tot die afgerond is kan diepe historie per organisatie nog
+onvolledig zijn; recente jaren zijn eerst geladen en de dekking groeit
+per dag richting het verleden. Voor de meeste organisaties begint het
+digitale archief bij de bron overigens pas ergens tussen 2005 en 2015 —
+eerdere jaren bestaan dan ook bij Classic niet.
 
 ## Limieten en verwachtingen
 
