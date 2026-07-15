@@ -29,9 +29,15 @@ function isoDate(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
-async function gzip(bytes: Uint8Array): Promise<Uint8Array> {
-  const stream = new Blob([bytes as BlobPart]).stream().pipeThrough(new CompressionStream("gzip"));
-  return new Uint8Array(await new Response(stream).arrayBuffer());
+// Streams the snapshot straight from disk through gzip to a second file,
+// instead of buffering it as a Uint8Array first: woozi-export-log.sqlite3
+// has grown to several GB (July 2026 full-history backfill), and reading
+// the whole thing into memory -- twice, once raw and once compressed via
+// the old Blob-based gzip() -- OOM-killed the container (7.6GB host).
+async function gzipFileToFile(inputPath: string, outputPath: string): Promise<void> {
+  const input = await Deno.open(inputPath, { read: true });
+  const output = await Deno.open(outputPath, { write: true, create: true, truncate: true });
+  await input.readable.pipeThrough(new CompressionStream("gzip")).pipeTo(output.writable);
 }
 
 const storage = await ObjectStorageClient.fromEnvironment();
@@ -65,6 +71,7 @@ for (const target of targets) {
 
   const snapshotPath = await Deno.makeTempFile({ suffix: ".sqlite3" });
   await Deno.remove(snapshotPath); // VACUUM INTO refuses an existing file.
+  const gzPath = await Deno.makeTempFile({ suffix: ".sqlite3.gz" });
   try {
     const db = new DatabaseSync(path);
     try {
@@ -73,15 +80,17 @@ for (const target of targets) {
       db.close();
     }
 
-    const compressed = await gzip(await Deno.readFile(snapshotPath));
+    await gzipFileToFile(snapshotPath, gzPath);
     const key = `backups/sqlite/${target.name}/${today}.sqlite3.gz`;
-    await storage.putObject(key, compressed, { contentType: "application/gzip" });
+    // Multipart from disk: buffering the gzip in memory OOM-killed the
+    // container (exit 137) once the export log passed a few GB.
+    await storage.putObjectFromFile(key, gzPath, { contentType: "application/gzip" });
     console.log(
       JSON.stringify({
         event: "backup_uploaded",
         name: target.name,
         key,
-        bytes: compressed.byteLength,
+        bytes: (await Deno.stat(gzPath)).size,
       }),
     );
 
@@ -110,6 +119,7 @@ for (const target of targets) {
     );
   } finally {
     await Deno.remove(snapshotPath).catch(() => undefined);
+    await Deno.remove(gzPath).catch(() => undefined);
   }
 }
 

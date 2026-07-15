@@ -137,6 +137,108 @@ export class ObjectStorageClient {
     };
   }
 
+  /** Uploads a file of any size without buffering it in memory: S3 multipart
+   * upload, one part in RAM at a time. Buffered putObject OOM-killed the
+   * nightly backup once woozi-export-log.sqlite3 passed a few GB (July 2026:
+   * exit 137 every night, stale-backup alerts). Files at or below the part
+   * size go up as a plain single PUT. */
+  async putObjectFromFile(
+    key: string,
+    filePath: string,
+    options: { contentType?: string; partSizeBytes?: number } = {},
+  ): Promise<StoredObject> {
+    const partSize = options.partSizeBytes ?? 64 * 1024 * 1024;
+    const { size } = await Deno.stat(filePath);
+    if (size <= partSize) {
+      return await this.putObject(key, await Deno.readFile(filePath), {
+        contentType: options.contentType,
+      });
+    }
+
+    const url = this.objectUrl(key);
+    let uploadId = "";
+    try {
+      const createResponse = await this.client.fetch(`${url}?uploads`, {
+        method: "POST",
+        headers: options.contentType ? { "content-type": options.contentType } : {},
+      });
+      if (!createResponse.ok) {
+        throw new Error(await errorSummary(createResponse));
+      }
+      const createBody = await createResponse.text();
+      uploadId = createBody.match(/<UploadId>([^<]+)<\/UploadId>/)?.[1] ?? "";
+      if (!uploadId) {
+        throw new Error("multipart create returned no UploadId");
+      }
+
+      const file = await Deno.open(filePath, { read: true });
+      const etags: string[] = [];
+      try {
+        const buffer = new Uint8Array(partSize);
+        for (let partNumber = 1; ; partNumber += 1) {
+          let filled = 0;
+          while (filled < partSize) {
+            const read = await file.read(buffer.subarray(filled));
+            if (read === null) {
+              break;
+            }
+            filled += read;
+          }
+          if (filled === 0) {
+            break;
+          }
+          const partResponse = await this.client.fetch(
+            `${url}?partNumber=${partNumber}&uploadId=${encodeURIComponent(uploadId)}`,
+            { method: "PUT", body: buffer.slice(0, filled) as unknown as BodyInit },
+          );
+          if (!partResponse.ok) {
+            throw new Error(`part ${partNumber}: ${await errorSummary(partResponse)}`);
+          }
+          await partResponse.body?.cancel();
+          const etag = partResponse.headers.get("etag");
+          if (!etag) {
+            throw new Error(`part ${partNumber} returned no ETag`);
+          }
+          etags.push(etag);
+          if (filled < partSize) {
+            break;
+          }
+        }
+      } finally {
+        file.close();
+      }
+
+      const completeXml = `<CompleteMultipartUpload>${
+        etags
+          .map((etag, index) => `<Part><PartNumber>${index + 1}</PartNumber><ETag>${etag}</ETag></Part>`)
+          .join("")
+      }</CompleteMultipartUpload>`;
+      const completeResponse = await this.client.fetch(
+        `${url}?uploadId=${encodeURIComponent(uploadId)}`,
+        { method: "POST", headers: { "content-type": "application/xml" }, body: completeXml },
+      );
+      const completeBody = await completeResponse.text();
+      // S3 can return 200 with an <Error> body for a failed complete.
+      if (!completeResponse.ok || completeBody.includes("<Error>")) {
+        throw new Error(`multipart complete failed: HTTP ${completeResponse.status} ${completeBody.slice(0, 200)}`);
+      }
+    } catch (error) {
+      if (uploadId) {
+        await this.client
+          .fetch(`${url}?uploadId=${encodeURIComponent(uploadId)}`, { method: "DELETE" })
+          .then((response) => response.body?.cancel())
+          .catch(() => undefined);
+      }
+      throw describeStorageError("multipart write", key, error);
+    }
+
+    return {
+      bucket: this.bucket,
+      key,
+      url: this.urlForKey(key),
+    };
+  }
+
   urlForKey(key: string): string {
     return `${this.endpoint}/${this.bucket}/${key}`;
   }
