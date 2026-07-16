@@ -520,13 +520,18 @@ export async function materializeDocument(
     const issues: ExtractionIssue[] = [];
 
     const EXTRACTION_TIMEOUT_MS = 180_000; // 3 minutes — p99 is ~127s
-    // One attempt only. Retries don't help when the source PDF server is slow
-    // (the bottleneck is source download, not the extractor), and a second
-    // attempt doubles the worst-case slot-block time.
-    const MAX_RETRIES = 1;
+    // Under backfill load iBabs drops connections and times out mid-download;
+    // the service maps those to 422 and a fresh attempt usually succeeds.
+    // Truly dead sources keep their own 4xx status ("Source returned 404")
+    // and are never retried, nor is our own 3-minute timeout — repeating a
+    // full timeout only deepens the congestion that caused it.
+    const MAX_RETRIES = 3;
+    const RETRY_DELAY_MS = 1_500;
 
     let lastError: unknown;
+    let attemptsMade = 0;
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      attemptsMade = attempt;
       // Pick a different worker on each retry so we don't hammer a slow/down node
       const attemptUrl = attempt === 1 ? serviceUrl : (nextExtractionServiceUrl() ?? serviceUrl);
       try {
@@ -547,12 +552,17 @@ export async function materializeDocument(
 
         if (!response.ok) {
           const body = await response.text().catch(() => "");
-          // Don't retry on 4xx — the source document doesn't exist or isn't downloadable
-          if (response.status >= 400 && response.status < 500) {
-            lastError = new Error(`Extraction service returned ${response.status}: ${body}`);
+          const error = new Error(`Extraction service returned ${response.status}: ${body}`);
+          // 422 is the service's wrapper around download/extraction exceptions
+          // (disconnects, read timeouts) and 408/5xx are transient by nature;
+          // any other 4xx means the source document itself is gone.
+          const retryable = response.status === 422 || response.status === 408 ||
+            response.status >= 500;
+          if (!retryable) {
+            lastError = error;
             break;
           }
-          throw new Error(`Extraction service returned ${response.status}: ${body}`);
+          throw error;
         }
 
         const payload = (await response.json()) as {
@@ -622,8 +632,11 @@ export async function materializeDocument(
         };
       } catch (error) {
         lastError = error;
+        if (error instanceof DOMException && error.name === "TimeoutError") {
+          break;
+        }
         if (attempt < MAX_RETRIES) {
-          await new Promise((resolve) => setTimeout(resolve, 1000));
+          await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS * attempt));
         }
       }
     }
@@ -651,7 +664,7 @@ export async function materializeDocument(
       severity: "error",
       step: "extract_text",
       entity_id: document.id,
-      message: `${documentIssueContext(document)}: Extraction service failed after ${MAX_RETRIES} attempts: ${lastError instanceof Error ? lastError.message : String(lastError)}`,
+      message: `${documentIssueContext(document)}: Extraction service failed after ${attemptsMade} attempts: ${lastError instanceof Error ? lastError.message : String(lastError)}`,
       details: issueDetailsFromError(lastError),
     });
 
