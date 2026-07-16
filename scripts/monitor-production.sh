@@ -339,8 +339,8 @@ check_worker_fds() {
   # per peer inside the worker's own network namespace (host-side ss sees
   # nothing — the containers have their own netns). This is how the July 2026
   # leak was pinned to CLOSE-WAIT sockets to the S3 endpoint (AWS SDK on
-  # Deno's node-compat; fixed with keepAlive:false). Kept as a tripwire in
-  # case a leak to another peer ever shows up.
+  # Deno's node-compat; fixed by replacing the SDK with aws4fetch). Kept as
+  # a tripwire in case a leak to another peer ever shows up.
   if [ "$max_fds" -gt 2000 ]; then
     {
       printf '%s max_fds=%s\n' "$(date -u +%FT%TZ)" "$max_fds"
@@ -361,10 +361,17 @@ check_worker_fds() {
 alert_is_unsuppressed() {
   local key="$1"
   local state_file="$STATE_DIR/$key"
-  local now previous
+  local now previous cooldown
   now="$(date +%s)"
   previous="$(cat "$state_file" 2>/dev/null || echo 0)"
-  [ $((now - previous)) -ge "$ALERT_COOLDOWN_SECONDS" ]
+  cooldown="$ALERT_COOLDOWN_SECONDS"
+  # Slow-search warnings recur for hours whenever heavy indexing (backfill,
+  # repair rounds) competes with Quickwit; once an hour is informative,
+  # every 2-min interval is noise. Unreachable stays on the normal cooldown.
+  if [ "$key" = "search_slow" ]; then
+    cooldown="${SEARCH_SLOW_ALERT_COOLDOWN_SECONDS:-3600}"
+  fi
+  [ $((now - previous)) -ge "$cooldown" ]
 }
 
 mark_alert_sent() {
