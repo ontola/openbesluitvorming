@@ -37,6 +37,8 @@
 
   const PAGE_SIZE = 24;
   const DETAIL_MODE_STORAGE_KEY = "woozi.detailMode";
+  const DETAIL_SHEET_WIDTH_STORAGE_KEY = "woozi.detailSheetWidth";
+  const DETAIL_SHEET_MIN_WIDTH = 420;
   const INITIAL_LOADING_CARD_MIN = 6;
   const INITIAL_LOADING_CARD_MAX = 12;
   const INITIAL_LOADING_CARD_HEIGHT = 210;
@@ -104,6 +106,8 @@
   let detailPdfCurrentPage = 1;
   let detailPdfJumpOpen = false;
   let detailPdfJumpValue = "";
+  let detailSheetWidth: number | null = null;
+  let detailSheetResizing = false;
 
   const detailCache = new Map<string, EntityContentResponse | null>();
   const detailRequests = new Map<string, Promise<EntityContentResponse | null>>();
@@ -327,6 +331,57 @@
     } catch {
       // Ignore storage failures; the in-memory preference still works for this session.
     }
+  }
+
+  function loadDetailSheetWidth(): number | null {
+    try {
+      const stored = Number(window.localStorage.getItem(DETAIL_SHEET_WIDTH_STORAGE_KEY));
+      return Number.isFinite(stored) && stored >= DETAIL_SHEET_MIN_WIDTH ? stored : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function persistDetailSheetWidth(width: number | null): void {
+    detailSheetWidth = width;
+    try {
+      if (width === null) {
+        window.localStorage.removeItem(DETAIL_SHEET_WIDTH_STORAGE_KEY);
+      } else {
+        window.localStorage.setItem(DETAIL_SHEET_WIDTH_STORAGE_KEY, String(Math.round(width)));
+      }
+    } catch {
+      // Ignore storage failures; the in-memory width still works for this session.
+    }
+  }
+
+  // The sheet stays centered, so dragging one gutter moves both edges:
+  // every pixel of drag changes the width by two.
+  function startDetailSheetResize(event: PointerEvent, edge: -1 | 1): void {
+    if (!detailDialogEl || event.button !== 0) return;
+    event.preventDefault();
+    const gutter = event.currentTarget as HTMLElement;
+    const startX = event.clientX;
+    const startWidth = detailDialogEl.getBoundingClientRect().width;
+    const maxWidth = detailDialogEl.closest(".detail-overlay")?.getBoundingClientRect().width ??
+      window.innerWidth;
+    detailSheetResizing = true;
+    gutter.setPointerCapture(event.pointerId);
+
+    const onMove = (move: PointerEvent) => {
+      const width = startWidth + 2 * edge * (move.clientX - startX);
+      detailSheetWidth = Math.min(Math.max(width, DETAIL_SHEET_MIN_WIDTH), maxWidth);
+    };
+    const onUp = () => {
+      detailSheetResizing = false;
+      gutter.removeEventListener("pointermove", onMove);
+      gutter.removeEventListener("pointerup", onUp);
+      gutter.removeEventListener("pointercancel", onUp);
+      persistDetailSheetWidth(detailSheetWidth);
+    };
+    gutter.addEventListener("pointermove", onMove);
+    gutter.addEventListener("pointerup", onUp);
+    gutter.addEventListener("pointercancel", onUp);
   }
 
   function escapeRegex(value: string): string {
@@ -1084,6 +1139,7 @@
 
   onMount(async () => {
     preferredDetailMode = loadPreferredDetailMode();
+    detailSheetWidth = loadDetailSheetWidth();
     updateInitialLoadingCardCount();
     fetch("/api/stats")
       .then((r) => r.json())
@@ -1608,8 +1664,19 @@
       on:click={() => closeDetail()}
     ></button>
     <div
+      class="detail-sheet-gutter"
+      class:detail-sheet-gutter--active={detailSheetResizing}
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Breedte aanpassen (dubbelklik voor standaardbreedte)"
+      title="Sleep om de breedte aan te passen; dubbelklik voor standaardbreedte"
+      on:pointerdown={(event) => startDetailSheetResize(event, -1)}
+      on:dblclick={() => persistDetailSheetWidth(null)}
+    ></div>
+    <div
       bind:this={detailDialogEl}
       class="detail-sheet detail-sheet--reader"
+      style={detailSheetWidth === null ? "" : `width: min(${Math.round(detailSheetWidth)}px, 100%);`}
       aria-modal="true"
       aria-labelledby="detail-title"
       tabindex="-1"
@@ -1808,6 +1875,16 @@
         {/if}
       </div>
     </div>
+    <div
+      class="detail-sheet-gutter"
+      class:detail-sheet-gutter--active={detailSheetResizing}
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Breedte aanpassen (dubbelklik voor standaardbreedte)"
+      title="Sleep om de breedte aan te passen; dubbelklik voor standaardbreedte"
+      on:pointerdown={(event) => startDetailSheetResize(event, 1)}
+      on:dblclick={() => persistDetailSheetWidth(null)}
+    ></div>
   </section>
 {/if}
 
