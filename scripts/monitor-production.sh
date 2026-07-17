@@ -33,6 +33,24 @@ WORKER_FD_MAX="${WOOZI_MONITOR_WORKER_FD_MAX:-10000}"
 # queue has drained and more hosts than the steady-state baseline are
 # configured. See infra/terraform.tfvars for the scale-down procedure.
 SCALE_DOWN_BASELINE_HOSTS="${WOOZI_MONITOR_SCALE_DOWN_BASELINE_HOSTS:-2}"
+# Self-heal for searcher-split-cache pollution (July 2026): the index was
+# created with commit_timeout_secs: 1, so heavy ingest constantly produces
+# tiny splits that get merged away within days — but their cache files are
+# never reclaimed. The dead files accumulate faster than the ~40G cache
+# evicts them, pushing out the live splits, so cold searches keep re-fetching
+# from S3 (5-50s instead of <1s). Self-heals by wiping the cache and
+# restarting quickwit once the cache holds more files than a small multiple
+# of the actually-published splits. 0 disables.
+QUICKWIT_SPLIT_CACHE_POLLUTION_RATIO="${WOOZI_MONITOR_QUICKWIT_SPLIT_CACHE_POLLUTION_RATIO:-3}"
+# Below this file count, don't even compute a ratio — avoids noise right
+# after a wipe or on a freshly (re)built index with few real splits.
+QUICKWIT_SPLIT_CACHE_POLLUTION_MIN_FILES="${WOOZI_MONITOR_QUICKWIT_SPLIT_CACHE_POLLUTION_MIN_FILES:-150}"
+QUICKWIT_INDEX_ID="${WOOZI_MONITOR_QUICKWIT_INDEX_ID:-woozi-events-prod}"
+QUICKWIT_INDEX_ROOT_PREFIX="${WOOZI_MONITOR_QUICKWIT_INDEX_ROOT_PREFIX:-indexes-prod}"
+# Floor between two cache purges regardless of how often the ratio trips —
+# the purge itself resets the ratio to ~1x, so this only guards against a
+# flapping/misreading metastore causing a restart loop.
+QUICKWIT_SPLIT_CACHE_HEAL_COOLDOWN_SECONDS="${WOOZI_MONITOR_QUICKWIT_SPLIT_CACHE_HEAL_COOLDOWN_SECONDS:-1800}"
 SCALE_DOWN_QUEUE_THRESHOLD="${WOOZI_MONITOR_SCALE_DOWN_QUEUE_THRESHOLD:-10}"
 SCALE_DOWN_REMIND_SECONDS="${WOOZI_MONITOR_SCALE_DOWN_REMIND_SECONDS:-86400}"
 CURL_IP_VERSION="${WOOZI_MONITOR_CURL_IP_VERSION:-4}"
@@ -287,8 +305,8 @@ check_scale_down() {
   if [ "${hosts:-0}" -le "$SCALE_DOWN_BASELINE_HOSTS" ]; then
     return
   fi
-  [ -f "$OPS_DB" ] || return
-  command -v sqlite3 >/dev/null 2>&1 || return
+  [ -f "$OPS_DB" ] || return 0
+  command -v sqlite3 >/dev/null 2>&1 || return 0
   active="$(ops_query "SELECT COUNT(*) FROM ingest_run WHERE status IN ('queued', 'running')")"
   if [ -z "$active" ] || [ "$active" -gt "$SCALE_DOWN_QUEUE_THRESHOLD" ]; then
     return
@@ -356,6 +374,61 @@ check_worker_fds() {
   fi
   docker restart $(docker ps -q --filter 'name=woozi-worker') >/dev/null 2>&1 || true
   alert warning worker_fd_leak "Worker fd leak: restarted the import workers" "max_fds=${max_fds} threshold=${WORKER_FD_MAX}; interrupted runs are requeued by reconcile"
+}
+
+quickwit_split_cache_heal_on_cooldown() {
+  local state_file="$STATE_DIR/quickwit_split_cache_heal_last" now previous
+  now="$(date +%s)"
+  previous="$(cat "$state_file" 2>/dev/null || echo 0)"
+  [ $((now - previous)) -lt "$QUICKWIT_SPLIT_CACHE_HEAL_COOLDOWN_SECONDS" ]
+}
+
+mark_quickwit_split_cache_healed() {
+  mkdir -p "$STATE_DIR"
+  date +%s > "$STATE_DIR/quickwit_split_cache_heal_last"
+}
+
+check_quickwit_split_cache_pollution() {
+  # See QUICKWIT_SPLIT_CACHE_POLLUTION_RATIO above. Compares the searcher
+  # split cache's file count against the metastore's published-split count;
+  # a healthy cache tracks close to 1x, the July 2026 incidents sat at 39-46x.
+  local cache_files published_splits metastore_path ratio workers
+  [ "$QUICKWIT_SPLIT_CACHE_POLLUTION_RATIO" -gt 0 ] || return 0
+  command -v docker >/dev/null 2>&1 || return 0
+  docker ps --format '{{.Names}}' | grep -qx woozi-quickwit-1 || return 0
+  quickwit_split_cache_heal_on_cooldown && return
+
+  cache_files="$(docker exec woozi-quickwit-1 sh -c \
+    'find /quickwit/qwdata/searcher-split-cache -maxdepth 1 -type f 2>/dev/null | wc -l' 2>/dev/null | xargs || true)"
+  [ -n "$cache_files" ] && [ "$cache_files" -ge "$QUICKWIT_SPLIT_CACHE_POLLUTION_MIN_FILES" ] || return 0
+
+  metastore_path="/quickwit/qwdata/${QUICKWIT_INDEX_ROOT_PREFIX}/${QUICKWIT_INDEX_ID}/metastore.json"
+  published_splits="$(docker exec woozi-quickwit-1 sh -c \
+    "grep -o '\"split_state\":[[:space:]]*\"Published\"' '${metastore_path}' 2>/dev/null | wc -l" 2>/dev/null | xargs || true)"
+  [ -n "$published_splits" ] && [ "$published_splits" -gt 0 ] || return 0
+
+  ratio="$((cache_files / published_splits))"
+  [ "$ratio" -ge "$QUICKWIT_SPLIT_CACHE_POLLUTION_RATIO" ] || return 0
+
+  # Stop workers first so no in-flight ingest batches fail against the
+  # restarting Quickwit; only restart the ones we actually stopped (respects
+  # an intentional scale-down to 0 workers).
+  workers="$(docker ps --format '{{.Names}}' --filter 'name=woozi-worker' | tr '\n' ' ')"
+  # shellcheck disable=SC2086
+  [ -z "$workers" ] || docker stop $workers >/dev/null 2>&1 || true
+  docker stop woozi-quickwit-1 >/dev/null 2>&1 || true
+  docker run --rm -v woozi_quickwit-data:/qw alpine \
+    sh -c 'rm -rf /qw/searcher-split-cache && mkdir -p /qw/searcher-split-cache' >/dev/null 2>&1 || true
+  (cd /opt/woozi && docker compose -f docker-compose.production.yml up -d quickwit) >/dev/null 2>&1 || true
+  for _ in $(seq 1 30); do
+    [ "$(curl -s -o /dev/null -w '%{http_code}' -m 3 http://localhost:7280/health/readyz 2>/dev/null || true)" = "200" ] && break
+    sleep 2
+  done
+  # shellcheck disable=SC2086
+  [ -z "$workers" ] || docker start $workers >/dev/null 2>&1 || true
+
+  mark_quickwit_split_cache_healed
+  alert warning quickwit_split_cache_polluted "Quickwit split cache was polluted: purged and restarted" "cache_files=${cache_files} published_splits=${published_splits} ratio=${ratio}x threshold=${QUICKWIT_SPLIT_CACHE_POLLUTION_RATIO}x; interrupted runs are requeued by reconcile; structural fix is the planned reindex onto local storage with a normal commit_timeout_secs (docs/search-performance-quickwit-s3.md)"
 }
 
 alert_is_unsuppressed() {
@@ -436,6 +509,7 @@ main() {
   check_backups
   check_scale_down
   check_worker_fds
+  check_quickwit_split_cache_pollution
 
   if [ "${#ALERTS[@]}" -eq 0 ]; then
     printf '{"event":"monitor_run","ok":true,"alert_count":0}\n'
