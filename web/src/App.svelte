@@ -1635,6 +1635,12 @@
 
           <h2>Privacy</h2>
           <p>
+            Mocht u als gemeente onverhoopt, bijvoorbeeld om privacyredenen, raadsinformatie lokaal verwijderen, dan
+            zijn deze data niet direct verwijderd in andere raadpleegomgevingen. Indien stukken ontoegankelijk gemaakt
+            moeten worden op Open Raadsinformatie dan ontvangen we graag een bericht met de URL van het bestand. Dit
+            kunt u mailen naar <a href="mailto:sander.bakker@vng.nl">Sander Bakker</a>.
+          </p>
+          <p>
             We gebruiken Swetrix (een privacy-vriendelijk alternatief voor Google Analytics) om bezoekersstatistieken te
             verzamelen. We gebruiken deze gegevens alleen om anonieme rapportages te maken van bezoekers, en verkopen
             deze data aan niemand door. We slaan de laatste zes cijfers van IP-adressen niet op om jouw privacy te
