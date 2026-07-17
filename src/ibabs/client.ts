@@ -215,6 +215,14 @@ function parseMeetingTypesXml(xml: string): IbabsMeetingType[] {
     throw new Error("Invalid iBabs GetMeetingtypes response");
   }
 
+  // Archived sites (e.g. municipalities merged into a new one) report
+  // Status=ERR "No public meetingtypes!" while GetMeetingsByDateRange still
+  // serves their full history. The map only feeds meeting-type labels, so
+  // continue without it rather than failing the whole run.
+  if (textValue(result, "Message")?.includes("No public meetingtypes")) {
+    return [];
+  }
+
   assertIbabsResultOk(result, "GetMeetingtypes");
 
   const meetingTypes = valueForLocalName(result, "Meetingtypes");
