@@ -1,6 +1,7 @@
 # Search performance: Quickwit, S3, and local cache
 
-Date: 2026-07-01
+Date: 2026-07-01. Updated 2026-07-17 with the dead-split cache-pollution
+incident and the prevention plan (see the sections at the end).
 
 ## Summary
 
@@ -356,3 +357,85 @@ systemctl status woozi-monitor.timer
 journalctl -u woozi-monitor.service -n 50 --no-pager
 WOOZI_ALERT_WEBHOOK_URL= scripts/monitor-production.sh
 ```
+
+## Incident 2026-07-17: dead splits polluted the searcher split cache
+
+During the full-history backfill, cold search terms degraded from the usual
+sub-second to 5-50s, with intermittent criticals and one 15s probe timeout.
+Host resources (CPU, RAM, disk, I/O) were all healthy; repeated terms were
+fast. The cache itself was the problem:
+
+- the searcher split cache held **~1,950 files (38GB)** while the metastore
+  listed only **43 published splits (32GB)** — the cache was almost entirely
+  dead splits left behind by merge churn;
+- the live splits (including one 25GB split holding 11.8M docs) kept getting
+  evicted by that garbage, so cold terms re-fetched split data from Hetzner
+  object storage on every query;
+- the same object-storage endpoint was saturated by the running backfill
+  (split uploads, merges, document-cache writes), which is why latency spiked
+  into tens of seconds rather than the usual S3 roundtrip cost.
+
+Root cause of the churn: the index was created with **`commit_timeout_secs: 1`**,
+so every second of active ingest produces a tiny split that is later merged
+away (merge policy `stable_log`, maturation 2 days). Thousands of short-lived
+splits cycled through the cache and their files were never reclaimed. Quickwit
+0.8 cannot change `commit_timeout_secs` on an existing index (no update
+endpoint), so the churn itself cannot be stopped in place.
+
+### Recovery procedure (verified)
+
+Total interruption is about one minute; searches are cold for a few minutes
+afterwards while the cache refills (~32GB at 8 concurrent downloads):
+
+```sh
+docker stop woozi-worker-1 woozi-worker-2 woozi-worker-3 woozi-worker-4
+docker stop woozi-quickwit-1
+docker run --rm -v woozi_quickwit-data:/qw alpine \
+  sh -c 'rm -rf /qw/searcher-split-cache && mkdir -p /qw/searcher-split-cache'
+cd /opt/woozi && docker compose -f docker-compose.production.yml up -d quickwit
+docker start woozi-worker-1 woozi-worker-2 woozi-worker-3 woozi-worker-4
+```
+
+Workers are stopped first so no ingest batches fail against the restarting
+Quickwit. `QUICKWIT_SPLIT_CACHE_NUM_CONCURRENT_DOWNLOADS=8` is now set in
+`/opt/woozi/.env` (was 4) to speed up the refill. After recovery the
+previously-critical terms measured 0.4-0.7s cold and ~0.14s warm.
+
+Note: the live metastore is `/quickwit/qwdata/indexes-prod/woozi-events-prod/metastore.json`
+(file metastore), while the index data lives at
+`s3://woozi-dev/indexes-prod/woozi-events-prod` — the node config's
+`default_index_root_uri: file://...` does not apply to this index because
+`index_uri` was fixed at creation time. The same directory also contains
+~1,900 stale local `.split` files (~20GB) from an earlier local-storage
+period; they are unreferenced and can be deleted during the reindex.
+
+## Prevention plan
+
+Three layers, from root cause to safety net:
+
+1. **Remove the churn source at the planned post-backfill reindex.** Create
+   the next projection index with `commit_timeout_secs: 60-120` (only settable
+   at creation time on Quickwit 0.8) and with a local `index_uri` (file://)
+   instead of object storage. After query-time dedup is baked in, the index
+   shrinks ~3.5x and fits comfortably on local disk. This removes the entire
+   class of "cold search reads from an S3 endpoint the backfill is
+   saturating", and makes the split cache irrelevant. This folds into the
+   `search-v3-compact` work already described under Option C above.
+
+2. **Detect cache pollution before users feel it.** Add a monitor check that
+   compares the file count in `searcher-split-cache/` against the number of
+   published splits in the metastore. Healthy is roughly 1:1; the incident
+   ratio was 1,996:43. Alert at >3x with the recovery procedure in the alert
+   text. The pollution built up over weeks and was trivially measurable the
+   whole time — the existing search-slow probes only catch the symptom.
+
+3. **Upgrade Quickwit at the reindex moment, not before.** Newer versions can
+   update `commit_timeout_secs` on an existing index, which is attractive, but
+   an upgrade mid-backfill is the wrong trade: the metastore migration is
+   one-way (no downgrade), 0.9 replaced the ingest architecture that the
+   worker pushes through continuously, and an upgrade cannot move `index_uri`
+   off S3 anyway — so the reindex is still needed for the structural fix.
+   Sequence at the reindex: upgrade Quickwit first, verify against the
+   existing index, then create the new local-storage index on the new
+   version, keeping the old S3 index as fallback until the new one is
+   verified.
