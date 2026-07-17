@@ -36,6 +36,18 @@ Deno.test("cleanParlaeusLink strips the duplicated parlaeus prefix", () => {
   assert(cleanParlaeusLink(undefined) === undefined, "undefined input stays undefined");
 });
 
+Deno.test("cleanParlaeusLink strips a qualigraf-prefixed link with a dropped colon", () => {
+  // Real production case (July 2026): the prefix host isn't always
+  // *.parlaeus.nl, and the glued-on link can be missing its own "://".
+  const broken =
+    "https://maastricht.qualigraf.nlhttps//maastricht.parlaeus.nl/app/public/agenda/0202802a0820aaa202828aaa0961bd03";
+  const fixed = cleanParlaeusLink(broken);
+  assert(
+    fixed === "https://maastricht.parlaeus.nl/app/public/agenda/0202802a0820aaa202828aaa0961bd03",
+    `expected the qualigraf prefix and dropped colon to be fixed, got: ${fixed}`,
+  );
+});
+
 Deno.test("normalizeParlaeusCommittee marks the council vs ordinary committees", () => {
   const council = normalizeParlaeusCommittee(source, {
     cmid: "abc",

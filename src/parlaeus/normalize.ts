@@ -50,15 +50,19 @@ function isoEndDate(date: string | undefined, endtime: string | undefined): stri
 // Parlaeus occasionally returns links of the form
 //   https://maastricht.parlaeus.nlhttps://maastricht.parlaeus.nl/...
 //   https://maastricht.parlaeus.nlhttps://maastricht.qualigraf.nl/...
-// where the host got concatenated to a fully-qualified URL. Strip the
-// erroneous prefix so downstream HTTP fetches don't fail.
+//   https://maastricht.qualigraf.nlhttps//maastricht.parlaeus.nl/...
+// where some host got concatenated directly onto a second, fully-qualified
+// URL -- the prefix host isn't always parlaeus.nl, and the glued-on link's
+// own "://" is sometimes missing its colon. Strip the erroneous prefix (and
+// restore the colon) so downstream HTTP fetches don't fail with a DNS error
+// on the combined, nonexistent host.
 export function cleanParlaeusLink(link: string | undefined): string | undefined {
   if (!link) {
     return undefined;
   }
-  const match = link.match(/^https:\/\/[^.]*\.parlaeus\.nl(https:\/\/[^.]*\.[^.]*\.[^/]+\/)/);
+  const match = link.match(/^https?:\/\/[^/]+(https?):?(\/\/[^/]+\/.*)$/);
   if (match) {
-    return link.slice(match[0].length - match[1].length);
+    return `${match[1]}:${match[2]}`;
   }
   return link;
 }
