@@ -388,31 +388,14 @@ mark_quickwit_split_cache_healed() {
   date +%s > "$STATE_DIR/quickwit_split_cache_heal_last"
 }
 
-check_quickwit_split_cache_pollution() {
-  # See QUICKWIT_SPLIT_CACHE_POLLUTION_RATIO above. Compares the searcher
-  # split cache's file count against the metastore's published-split count;
-  # a healthy cache tracks close to 1x, the July 2026 incidents sat at 39-46x.
-  local cache_files published_splits metastore_path ratio workers
-  [ "$QUICKWIT_SPLIT_CACHE_POLLUTION_RATIO" -gt 0 ] || return 0
-  command -v docker >/dev/null 2>&1 || return 0
-  docker ps --format '{{.Names}}' | grep -qx woozi-quickwit-1 || return 0
-  quickwit_split_cache_heal_on_cooldown && return
+quickwit_split_cache_full_restart() {
+  # Disruptive fallback: stops the workers and Quickwit, so only reach for
+  # it when the (non-disruptive) janitor below couldn't keep the cache
+  # under control on its own -- e.g. it can't run (no python3 on the host)
+  # or Quickwit stopped responding to `docker exec`.
+  local cache_files="$1" published_splits="$2" ratio="$3" workers
+  quickwit_split_cache_heal_on_cooldown && return 0
 
-  cache_files="$(docker exec woozi-quickwit-1 sh -c \
-    'find /quickwit/qwdata/searcher-split-cache -maxdepth 1 -type f 2>/dev/null | wc -l' 2>/dev/null | xargs || true)"
-  [ -n "$cache_files" ] && [ "$cache_files" -ge "$QUICKWIT_SPLIT_CACHE_POLLUTION_MIN_FILES" ] || return 0
-
-  metastore_path="/quickwit/qwdata/${QUICKWIT_INDEX_ROOT_PREFIX}/${QUICKWIT_INDEX_ID}/metastore.json"
-  published_splits="$(docker exec woozi-quickwit-1 sh -c \
-    "grep -o '\"split_state\":[[:space:]]*\"Published\"' '${metastore_path}' 2>/dev/null | wc -l" 2>/dev/null | xargs || true)"
-  [ -n "$published_splits" ] && [ "$published_splits" -gt 0 ] || return 0
-
-  ratio="$((cache_files / published_splits))"
-  [ "$ratio" -ge "$QUICKWIT_SPLIT_CACHE_POLLUTION_RATIO" ] || return 0
-
-  # Stop workers first so no in-flight ingest batches fail against the
-  # restarting Quickwit; only restart the ones we actually stopped (respects
-  # an intentional scale-down to 0 workers).
   workers="$(docker ps --format '{{.Names}}' --filter 'name=woozi-worker' | tr '\n' ' ')"
   # shellcheck disable=SC2086
   [ -z "$workers" ] || docker stop $workers >/dev/null 2>&1 || true
@@ -428,7 +411,87 @@ check_quickwit_split_cache_pollution() {
   [ -z "$workers" ] || docker start $workers >/dev/null 2>&1 || true
 
   mark_quickwit_split_cache_healed
-  alert warning quickwit_split_cache_polluted "Quickwit split cache was polluted: purged and restarted" "cache_files=${cache_files} published_splits=${published_splits} ratio=${ratio}x threshold=${QUICKWIT_SPLIT_CACHE_POLLUTION_RATIO}x; interrupted runs are requeued by reconcile; structural fix is the planned reindex onto local storage with a normal commit_timeout_secs (docs/search-performance-quickwit-s3.md)"
+  alert warning quickwit_split_cache_polluted "Quickwit split cache was polluted: purged and restarted" "cache_files=${cache_files} published_splits=${published_splits} ratio=${ratio}x; the non-disruptive janitor could not keep up (see logs); interrupted runs are requeued by reconcile; structural fix is the planned reindex onto local storage with a normal commit_timeout_secs (docs/search-performance-quickwit-s3.md)"
+}
+
+check_quickwit_split_cache_pollution() {
+  # The searcher split cache accumulates files for splits the metastore no
+  # longer lists as Published (merged away under the index's
+  # commit_timeout_secs: 1 churn) faster than Quickwit's own LRU evicts them
+  # -- because by *byte size* they fit the configured budget, they just
+  # never get evicted, and crowd out large/less-recently-touched live splits
+  # instead. On 2026-07-17/18 this reached 13-46x live-vs-cached and made
+  # cold searches re-fetch from S3 (5-50s instead of sub-second).
+  #
+  # Fix without disrupting ingest: every cycle, diff the cache directory's
+  # filenames (split_id.split) against the metastore's Published split_ids
+  # and delete only the orphans, live, with Quickwit and the workers running
+  # the whole time (Linux allows unlinking a file a process still has open;
+  # it's simply not evicting these on its own). Only fall back to the
+  # disruptive full stop/wipe/restart if this can't run or doesn't help.
+  local cache_dir="/quickwit/qwdata/searcher-split-cache"
+  local metastore_path="/quickwit/qwdata/${QUICKWIT_INDEX_ROOT_PREFIX}/${QUICKWIT_INDEX_ID}/metastore.json"
+  local tmp_meta tmp_cache tmp_orphans cache_files published_splits orphan_count ratio
+
+  [ "$QUICKWIT_SPLIT_CACHE_POLLUTION_RATIO" -gt 0 ] || return 0
+  command -v docker >/dev/null 2>&1 || return 0
+  docker ps --format '{{.Names}}' | grep -qx woozi-quickwit-1 || return 0
+
+  cache_files="$(docker exec woozi-quickwit-1 sh -c \
+    "find '${cache_dir}' -maxdepth 1 -type f 2>/dev/null | wc -l" 2>/dev/null | xargs || true)"
+  [ -n "$cache_files" ] && [ "$cache_files" -ge "$QUICKWIT_SPLIT_CACHE_POLLUTION_MIN_FILES" ] || return 0
+
+  if ! command -v python3 >/dev/null 2>&1; then
+    published_splits="$(docker exec woozi-quickwit-1 sh -c \
+      "grep -o '\"split_state\":[[:space:]]*\"Published\"' '${metastore_path}' 2>/dev/null | wc -l" 2>/dev/null | xargs || true)"
+    [ -n "$published_splits" ] && [ "$published_splits" -gt 0 ] || return 0
+    ratio="$((cache_files / published_splits))"
+    [ "$ratio" -ge "$QUICKWIT_SPLIT_CACHE_POLLUTION_RATIO" ] || return 0
+    quickwit_split_cache_full_restart "$cache_files" "$published_splits" "$ratio"
+    return 0
+  fi
+
+  tmp_meta="$(mktemp)"; tmp_cache="$(mktemp)"; tmp_orphans="$(mktemp)"
+  docker exec woozi-quickwit-1 cat "$metastore_path" > "$tmp_meta" 2>/dev/null || true
+  docker exec woozi-quickwit-1 sh -c "ls '${cache_dir}'" > "$tmp_cache" 2>/dev/null || true
+
+  python3 - "$tmp_meta" "$tmp_cache" > "$tmp_orphans" 2>/dev/null << 'PY' || true
+import json, sys
+try:
+    data = json.load(open(sys.argv[1]))
+except Exception:
+    sys.exit(0)
+published = {s.get("split_id") for s in data.get("splits", []) if s.get("split_state") == "Published"}
+for line in open(sys.argv[2]):
+    name = line.strip()
+    if name.endswith(".split") and name[: -len(".split")] not in published:
+        print(name)
+PY
+
+  published_splits="$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(sum(1 for s in d.get('splits',[]) if s.get('split_state')=='Published'))" "$tmp_meta" 2>/dev/null || echo 0)"
+  orphan_count="$(wc -l < "$tmp_orphans" | xargs)"
+
+  if [ "$orphan_count" -gt 0 ] && [ -s "$tmp_meta" ]; then
+    docker exec -i woozi-quickwit-1 sh -c "cd '${cache_dir}' && xargs -r rm -f" < "$tmp_orphans" >/dev/null 2>&1 || true
+    printf '{"event":"quickwit_split_cache_janitor","cache_files":%s,"published_splits":%s,"orphans_removed":%s}\n' \
+      "$cache_files" "${published_splits:-0}" "$orphan_count"
+  fi
+  rm -f "$tmp_meta" "$tmp_cache" "$tmp_orphans"
+
+  # Fallback: metastore unreadable, or the janitor genuinely can't keep pace
+  # with the churn rate. Re-measure the cache *after* cleanup -- the deletion
+  # above already brings the count down in the common case, and comparing
+  # against the pre-cleanup count would trigger a needless restart on every
+  # single successful janitor run.
+  if [ -z "$published_splits" ] || [ "$published_splits" -le 0 ]; then
+    quickwit_split_cache_full_restart "$cache_files" "${published_splits:-0}" "n/a"
+    return 0
+  fi
+  cache_files="$(docker exec woozi-quickwit-1 sh -c \
+    "find '${cache_dir}' -maxdepth 1 -type f 2>/dev/null | wc -l" 2>/dev/null | xargs || echo "$cache_files")"
+  ratio="$((cache_files / published_splits))"
+  [ "$ratio" -ge "$QUICKWIT_SPLIT_CACHE_POLLUTION_RATIO" ] || return 0
+  quickwit_split_cache_full_restart "$cache_files" "$published_splits" "$ratio"
 }
 
 alert_is_unsuppressed() {
