@@ -8,7 +8,11 @@ SEARCH_CRITICAL_MS="${WOOZI_MONITOR_SEARCH_CRITICAL_MS:-8000}"
 QUICKWIT_WARN_MS="${WOOZI_MONITOR_QUICKWIT_WARN_MS:-1500}"
 DISK_WARN_PERCENT="${WOOZI_MONITOR_DISK_WARN_PERCENT:-80}"
 DISK_CRITICAL_PERCENT="${WOOZI_MONITOR_DISK_CRITICAL_PERCENT:-90}"
-QUICKWIT_MIN_CACHE_SPLITS="${WOOZI_MONITOR_QUICKWIT_MIN_CACHE_SPLITS:-60}"
+# Percentage of the currently-published split count, below which the
+# searcher split cache is considered cold (see check_containers). Was a
+# fixed absolute split count until the split-cache janitor made "healthy"
+# track the live count instead of a historical constant.
+QUICKWIT_MIN_CACHE_SPLITS="${WOOZI_MONITOR_QUICKWIT_MIN_CACHE_SPLITS:-70}"
 CONTAINER_RESTART_WARN="${WOOZI_MONITOR_CONTAINER_RESTART_WARN:-0}"
 STATE_DIR="${WOOZI_MONITOR_STATE_DIR:-/tmp/woozi-monitor-alerts}"
 ALERT_COOLDOWN_SECONDS="${WOOZI_MONITOR_ALERT_COOLDOWN_SECONDS:-900}"
@@ -227,9 +231,22 @@ check_containers() {
   cache_output="$(docker exec woozi-quickwit-1 sh -lc 'du -sk /quickwit/qwdata/searcher-split-cache 2>/dev/null; find /quickwit/qwdata/searcher-split-cache -maxdepth 1 -type f 2>/dev/null | wc -l')"
   cache_kb="$(sed -n '1s/[[:space:]].*$//p' <<< "$cache_output")"
   split_count="$(sed -n '2p' <<< "$cache_output" | xargs)"
-  if [ -n "$split_count" ] && [ "$split_count" -lt "$QUICKWIT_MIN_CACHE_SPLITS" ]; then
-    cache_gb="$(awk -v kb="${cache_kb:-0}" 'BEGIN { print int((kb / 1024 / 1024) + 0.5) }')"
-    alert warning quickwit_cache_cold "Quickwit split cache looks cold" "split_count=${split_count} cache_gb=${cache_gb}"
+  # "Cold" is relative to what's actually live, not a fixed historical count
+  # -- the janitor (see check_quickwit_split_cache_pollution) now keeps the
+  # cache trimmed close to the published-split count as its healthy steady
+  # state, so a stale absolute threshold from before the janitor existed
+  # fired as pure noise once the live split count settled lower than that
+  # constant. Alert only when the cache holds meaningfully less than what's
+  # actually published -- a real sign of a cold/just-recreated cache.
+  if [ -n "$split_count" ]; then
+    local published_now
+    published_now="$(docker exec woozi-quickwit-1 sh -c \
+      "grep -o '\"split_state\":[[:space:]]*\"Published\"' '/quickwit/qwdata/${QUICKWIT_INDEX_ROOT_PREFIX}/${QUICKWIT_INDEX_ID}/metastore.json' 2>/dev/null | wc -l" \
+      2>/dev/null | xargs || echo 0)"
+    if [ "${published_now:-0}" -gt 0 ] && [ "$split_count" -lt "$((published_now * QUICKWIT_MIN_CACHE_SPLITS / 100))" ]; then
+      cache_gb="$(awk -v kb="${cache_kb:-0}" 'BEGIN { print int((kb / 1024 / 1024) + 0.5) }')"
+      alert warning quickwit_cache_cold "Quickwit split cache looks cold" "split_count=${split_count} published_splits=${published_now} cache_gb=${cache_gb}"
+    fi
   fi
 }
 
