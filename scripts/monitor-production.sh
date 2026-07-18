@@ -404,7 +404,9 @@ quickwit_split_cache_full_restart() {
     sh -c 'rm -rf /qw/searcher-split-cache && mkdir -p /qw/searcher-split-cache' >/dev/null 2>&1 || true
   (cd /opt/woozi && docker compose -f docker-compose.production.yml up -d quickwit) >/dev/null 2>&1 || true
   for _ in $(seq 1 30); do
-    [ "$(curl -s -o /dev/null -w '%{http_code}' -m 3 http://localhost:7280/health/readyz 2>/dev/null || true)" = "200" ] && break
+    # Quickwit has no host-published port by design (compose network only),
+    # so the readiness probe has to run inside the container.
+    [ "$(docker exec woozi-quickwit-1 curl -s -o /dev/null -w '%{http_code}' -m 3 http://localhost:7280/health/readyz 2>/dev/null || true)" = "200" ] && break
     sleep 2
   done
   # shellcheck disable=SC2086
