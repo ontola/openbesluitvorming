@@ -1,15 +1,20 @@
 # iBabs Import Plan
 
+Status: **in production** since mid-2026. Sections below describe the
+original design/rollout plan; kept for the API exploration results and the
+still-unbuilt vote-import plan. See the "Production status" note under each
+section for what actually happened.
+
 ## Current State
 
-The iBabs integration is mostly built:
-- SOAP client (`src/ibabs/client.ts`) — calls `wcf.ibabs.eu/api/Public.svc`
+The iBabs integration is built and running in production:
+- SOAP client (`src/ibabs/client.ts`) — calls `wcf.ibabs.eu/api/Public.svc`, forces IPv4 DNS resolution (see "IPv4 Requirement" below)
 - Extractor (`src/ibabs/extractor.ts`) — fetches meetings, normalizes, materializes documents
 - Normalizer (`src/ibabs/normalize.ts`) — converts to canonical entities
-- 165 iBabs sources in the catalog (`src/sources/catalog.data.ts`), all marked `implemented: true`
-- Tests with XML fixtures
+- iBabs sources in the catalog (`src/sources/catalog.data.ts`), all marked `implemented: true`
+- Tests with XML fixtures, plus `tests/ibabs.test.ts` against the live client shape
 
-It has never been run in production.
+iBabs is one of four suppliers (alongside Notubiz, GemeenteOplossingen, Parlaeus) sharing the same worker pool, extraction-service fleet, and Quickwit projection. It runs both as part of the historical backfill and the daily scheduled cadence, on the same production worker(s) as originally recommended in "Option A" below — no SSH tunnel or proxy needed in production.
 
 ## Challenges
 
@@ -74,6 +79,13 @@ Use an SSH tunnel for API calls but process documents locally. More complex, onl
 Recommendation: **Option A** — iBabs API calls happen on the production worker, extraction is offloaded to workers. No tunnel needed in production.
 
 ## Implementation Steps
+
+**Production status: all four phases complete.** iBabs sources have run through
+full-history backfill and daily imports for weeks; the smoke-test issues below
+were the real ones encountered and are all resolved (IPv4 forcing, sequential
+processing was fine at this volume, dead/renamed sitenames get caught by the
+health checks in `src/ibabs/client.ts`'s error parsing rather than needing
+separate whitelisting per source).
 
 ### Phase 1: Smoke test on production
 
@@ -240,9 +252,11 @@ A test extraction of Utrecht (2024-06-01 to 2024-06-15) returned:
 - Sequential processing (one document at a time)
 - Large PDFs (34 MB) took ~96 seconds
 
+**Production status:** iBabs documents now go through the shared extraction-service fleet like every other supplier (`WOOZI_DOCUMENT_CONCURRENCY` concurrent documents per worker, `INGEST_CONCURRENCY` concurrent runs), not sequential single-document processing — the note above only describes the original local-subprocess prototype. iBabs's own API (`api1.ibabs.eu` downloads, `wcf.ibabs.eu` SOAP) is a recurring source of transient errors under the backfill's sustained load (connection drops, read timeouts); `src/documents/process.ts` retries transient extraction failures (422/408/5xx) up to 3 times before giving up.
+
 ## Open Questions
 
-- Do all 165 iBabs sitenames work with our single IP whitelist, or do some require separate approval?
+- ~~Do all 165 iBabs sitenames work with our single IP whitelist, or do some require separate approval?~~ **Resolved by production experience:** the whitelist covers all sitenames from the one IP. Sources that fail do so for other reasons — deactivated municipalities ("No public account!"), archived sites (answer `GetMeetingtypes` with an error but still serve `GetMeetingsByDateRange`, handled by treating that error as an empty type map rather than a failure), or a sitename typo/mismatch in the catalog (found and fixed per-source as backfill reaches them).
 - Can we negotiate authenticated API access with iBabs for **per-user** vote data (`GetListEntryVotes`)? Outcome-level votes are reachable without auth via `GetListEntry.Values["Status"]`; per-member breakdowns are not.
 - Is there a public URL pattern for iBabs webcasts (to embed or link to videos)?
 - How does iBabs handle document versioning — can documents change after initial publication?

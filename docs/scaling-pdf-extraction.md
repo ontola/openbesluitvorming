@@ -1,5 +1,15 @@
 # Scaling PDF Extraction
 
+Status (2026-07-20): **Option A (extraction microservice) was built and is
+in production**, along with the "Split Web Server and Import Worker" plan
+below. Auto-scaling was not built as designed — the fleet is scaled manually
+via OpenTofu (`extraction_server_count` in `infra/terraform.tfvars`) instead.
+"Problem" and "Current Architecture" below describe the original
+single-machine, local-subprocess setup and are historical context for why
+Option A was chosen; see "Production reality" near the end for what the
+system looks like now, including a bottleneck correction — the constraint
+turned out to be network I/O, not CPU, once the microservice existed.
+
 ## Problem
 
 Importing 3 months of data from ~200 municipalities takes about 5 days on a single Hetzner `cpx32` (4 vCPU, 8 GB RAM). The goal is to bring this down to 1 day or less.
@@ -180,6 +190,8 @@ Same as Option C, but replace SQLite with a shared PostgreSQL instance so all se
 
 ## Recommendation
 
+**Decided and built: Option A.** See "Production reality" near the end of this document for the fleet as it actually runs today.
+
 **Option A** (extraction microservice) is the best fit because:
 
 1. **Single admin panel** — one ingest server, one SQLite, one dashboard. No Postgres migration needed.
@@ -313,6 +325,8 @@ Each OOM kill triggers a container restart, which runs `reconcileInterruptedRuns
 
 ## Planned: Auto-scaling and Scheduled Imports
 
+**Status: daily scheduled imports were built (`src/scheduler.ts`), auto-scaling was not.** The fleet is scaled manually instead: `extraction_server_count` in `infra/terraform.tfvars` + `tofu apply`, done by hand around the start/end of a large backfill rather than automatically by queue depth. Simpler to operate at the current scale; revisit the design below if manual scaling becomes a bottleneck of its own.
+
 ### Daily scheduled imports (no workers needed)
 
 For ongoing daily imports, a cron trigger is sufficient. The local pymupdf4llm subprocess handles a few days of data in under a minute.
@@ -379,6 +393,8 @@ User starts large import via admin panel
 - Full backfill: 10× cpx22 for ~1 hour (~€0.10 total)
 
 ## Planned: Split Web Server and Import Worker
+
+**Status: built, in production.** `src/worker.ts` and the `worker` service in `docker-compose.production.yml` match this design closely, including the SQLite-sharing model. One refinement since (2026-07-20): the worker now releases any claimed run straight back to the queue on SIGTERM (sent by every deploy before recreating the container) instead of leaving it in `running` state for `reconcileInterruptedRuns()` to find later — see the `activeRuns` map and SIGTERM listener in `src/worker.ts`. This avoids spending one of the run's limited retry attempts on routine deploy churn.
 
 ### Problem
 
@@ -447,3 +463,13 @@ This should be done after the extraction service architecture stabilizes. The cu
 - Multiple users rely on the search UI during business hours
 - Imports need to run during peak traffic
 - The server needs to handle both search traffic and large backfills simultaneously
+
+## Production reality (2026-07-20)
+
+Where the system landed, for anyone using this doc to plan further changes:
+
+- **Extraction fleet:** 7 Hetzner hosts behind `WOOZI_EXTRACTION_SERVICE_URL` (comma-separated public IPs on port 8000, firewalled to the woozi production server only — not the private-network design sketched above; simpler and never revisited). Scaled up to 8 for the July 2026 historical backfill, down to 7 after removing one chronically overloaded 2 vCPU/4 GB node; the plan is 2 as the steady-state baseline once backfill work drains, via `tofu apply`.
+- **The bottleneck is not CPU.** With the microservice in place, the ingest/worker host's CPU sits mostly idle (load average well under its core count) even during heavy backfill throughput — confirmed by direct measurement. The real constraint is network latency: source RIS servers (especially iBabs) routinely take 15-30+ seconds to serve a single PDF download, dwarfing extraction time itself (typically under 3 seconds). `WOOZI_DOCUMENT_CONCURRENCY` (documents in flight per worker process) is the lever that matters, not CPU headroom — see the note below on why it isn't simply cranked up.
+- **Concurrency is tuned empirically, not maxed out.** Raising `WOOZI_DOCUMENT_CONCURRENCY` from 3 to 5 pushed the 4-core host to a sustained load average above 4 (full saturation) without a corresponding drop in the extraction-failure rate or search latency; rolled back to 4 as the stable middle ground. Push higher only with the same before/after measurement discipline (`uptime`, `docker stats`, extract-failure rate, search latency) — CPU headroom exists but isn't unlimited, and pushing too hard on the ingest host risks starving the web server sharing it.
+- **Health-aware extraction routing** (`src/documents/process.ts`, `nextExtractionServiceUrl()`): the fleet is no longer a blind round-robin. Each node's own `/health` is probed and cached for 15s; a node that fails is skipped for that window instead of eating a full 3-minute request timeout. Added after an overloaded node's own health check took over 10s to respond while still receiving its share of traffic.
+- **Retries are asymmetric by design:** transient extraction-service errors (422/408/5xx — typically the source server disconnecting or timing out mid-download) retry up to 3 times on a different node; the extraction service's own request timeout does not retry (repeating a 3-minute timeout only deepens whatever congestion caused it); a definitive 4xx from the source (404, dead document) never retries.
