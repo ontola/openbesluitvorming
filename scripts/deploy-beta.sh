@@ -53,10 +53,14 @@ fi
 
 # We deliberately do not block on imports-in-progress: the daily scheduler
 # enqueues ~290 runs every night and there are usually a handful still in
-# flight for most of the working day. Reconcile-on-startup requeues any
-# `running` rows interrupted by the restart (capped at two requeues per run),
-# and cache hits make the rerun cheap. If you genuinely need to wait for
-# idle, watch /api/admin/summary manually before deploying.
+# flight for most of the working day. `docker compose up` sends SIGTERM
+# first, and the worker's own shutdown handler hands any claimed runs
+# straight back to the queue (no retry budget spent — see the SIGTERM
+# listener in src/worker.ts); reconcileInterruptedRuns() is only the
+# fallback for a run whose worker died without a clean signal (crash, OOM),
+# capped at MAX_INTERRUPTED_REQUEUES retries. Cache hits make any rerun
+# cheap either way. If you genuinely need to wait for idle, watch
+# /api/admin/summary manually before deploying.
 
 # Sync runtime config alongside the image. $DEPLOY_DIR is a plain copy, not a
 # checkout: without this step, compose/Caddyfile changes in git silently never

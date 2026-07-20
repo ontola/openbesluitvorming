@@ -40,6 +40,13 @@ const ingestStallTimeoutMs = Math.max(
 );
 
 let activeCount = 0;
+// Tracks currently-claimed runs so a deploy's SIGTERM can hand them back to
+// the queue immediately (see the shutdown handler below) instead of leaving
+// them for reconcileInterruptedRuns() to discover up to
+// RECONCILE_MIN_CLAIM_AGE_MS later — and, more importantly, without burning
+// one of the run's limited MAX_INTERRUPTED_REQUEUES attempts on what is
+// routine deploy churn rather than a genuine crash.
+const activeRuns = new Map<string, IngestRunRecord>();
 
 function getAllowedConcurrency(): number {
   try {
@@ -133,12 +140,14 @@ async function pollAndExecute(): Promise<void> {
           // Another worker claimed this one between our list and our update.
           return;
         }
+        activeRuns.set(runningRun.id, runningRun);
         console.log(`[worker ${workerId}] claimed ${run.source_key} (${run.id})`);
         await executeIngestWithWatchdog(runningRun, run);
       } catch (error) {
         console.error(`[worker ${workerId}] import failed for ${run.source_key}`, error);
       } finally {
         activeCount -= 1;
+        activeRuns.delete(run.id);
       }
     })();
   }
@@ -159,6 +168,31 @@ if (reconciled.length > 0) {
 console.log(
   `[worker ${workerId}] started (concurrency=${ingestConcurrencyCap}, poll=${POLL_INTERVAL_MS}ms)`,
 );
+
+// A deploy's `docker compose up -d` sends SIGTERM before recreating the
+// container. Hand back any claimed runs right away — cheap local writes,
+// well within the compose stop grace period — rather than leaving them for
+// reconcile to find later at the cost of a retry attempt (see activeRuns
+// above). executeIngest itself isn't cancelled; it keeps running until the
+// container is actually killed, same as before this handler existed.
+let shuttingDown = false;
+async function releaseActiveRunsAndExit(): Promise<void> {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  const runs = [...activeRuns.values()];
+  if (runs.length > 0) {
+    console.log(`[worker ${workerId}] SIGTERM: releasing ${runs.length} claimed run(s) back to the queue`);
+    await Promise.all(
+      runs.map((run) =>
+        updateRun(run.id, { status: "queued", error_message: undefined }).catch((error) => {
+          console.error(`[worker ${workerId}] could not release run ${run.id} on shutdown:`, error);
+        })
+      ),
+    );
+  }
+  Deno.exit(0);
+}
+Deno.addSignalListener("SIGTERM", () => void releaseActiveRunsAndExit());
 
 // Poll loop
 while (true) {
