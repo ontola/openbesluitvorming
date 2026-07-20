@@ -10,7 +10,19 @@ import { pdfPageCacheKey, pdfPageMetaKey, renderPdfPageJpeg } from "./thumbnails
 let extractionServiceUrls: string[] | null = null;
 let extractionRoundRobin = 0;
 
-function nextExtractionServiceUrl(): string | null {
+// A node that's merely handling a slow source download looks identical to a
+// genuinely overloaded one from a single request's timeout — so routing
+// can't infer node health from document-level failures without punishing
+// healthy nodes that happen to draw a bad batch of source URLs. Instead,
+// probe each node's own /health directly (cheap: <20ms when healthy) and
+// cache the verdict briefly, so an overloaded node (observed: 2 vCPU node at
+// load 4+, its own /health not answering within 10s) gets skipped for
+// EXTRACTION_HEALTH_TTL_MS instead of eating a full 3-minute request timeout.
+const EXTRACTION_HEALTH_TTL_MS = 15_000;
+const EXTRACTION_HEALTH_CHECK_TIMEOUT_MS = 2_000;
+const extractionHealthCache = new Map<string, { healthy: boolean; checkedAt: number }>();
+
+function extractionServiceUrlList(): string[] {
   if (extractionServiceUrls === null) {
     const raw = Deno.env.get("WOOZI_EXTRACTION_SERVICE_URL")?.trim();
     extractionServiceUrls = raw
@@ -20,9 +32,55 @@ function nextExtractionServiceUrl(): string | null {
           .filter(Boolean)
       : [];
   }
-  if (extractionServiceUrls.length === 0) return null;
-  const url = extractionServiceUrls[extractionRoundRobin % extractionServiceUrls.length];
-  extractionRoundRobin++;
+  return extractionServiceUrls;
+}
+
+async function checkExtractionUrlHealth(url: string): Promise<boolean> {
+  try {
+    const response = await fetch(`${url}/health`, {
+      signal: AbortSignal.timeout(EXTRACTION_HEALTH_CHECK_TIMEOUT_MS),
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function isExtractionUrlHealthy(url: string): Promise<boolean> {
+  const cached = extractionHealthCache.get(url);
+  const now = Date.now();
+  if (cached && now - cached.checkedAt < EXTRACTION_HEALTH_TTL_MS) {
+    return cached.healthy;
+  }
+  const healthy = await checkExtractionUrlHealth(url);
+  extractionHealthCache.set(url, { healthy, checkedAt: now });
+  return healthy;
+}
+
+async function nextExtractionServiceUrl(): Promise<string | null> {
+  const urls = extractionServiceUrlList();
+  if (urls.length === 0) return null;
+
+  // Try each URL starting from the round-robin cursor, skipping ones whose
+  // cached health check currently says down. If every candidate is
+  // unhealthy (or the cache is cold), fall through to plain round-robin
+  // rather than blocking ingestion entirely.
+  for (let i = 0; i < urls.length; i++) {
+    const candidate = urls[(extractionRoundRobin + i) % urls.length];
+    const cached = extractionHealthCache.get(candidate);
+    const isStale = !cached || Date.now() - cached.checkedAt >= EXTRACTION_HEALTH_TTL_MS;
+    if (isStale || cached.healthy) {
+      extractionRoundRobin = (extractionRoundRobin + i + 1) % urls.length;
+      if (isStale) {
+        // Don't block this pick on a fresh probe; kick one off for next time.
+        void isExtractionUrlHealthy(candidate);
+      }
+      return candidate;
+    }
+  }
+
+  const url = urls[extractionRoundRobin % urls.length];
+  extractionRoundRobin = (extractionRoundRobin + 1) % urls.length;
   return url;
 }
 
@@ -513,7 +571,10 @@ export async function materializeDocument(
   // When extraction service is configured and the document is a PDF,
   // delegate download + extraction + S3 upload to the extraction worker.
   // The ingest server never holds the PDF bytes in memory.
-  const serviceUrl = nextExtractionServiceUrl();
+  const serviceUrl = hasExtractionService() && isPdf(document) && document.original_url &&
+      options.storage
+    ? await nextExtractionServiceUrl()
+    : null;
   if (serviceUrl && isPdf(document) && document.original_url && options.storage) {
     const pdfKey = objectKey(document);
     const mdKey = extractedMarkdownKey(document);
@@ -533,7 +594,7 @@ export async function materializeDocument(
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       attemptsMade = attempt;
       // Pick a different worker on each retry so we don't hammer a slow/down node
-      const attemptUrl = attempt === 1 ? serviceUrl : (nextExtractionServiceUrl() ?? serviceUrl);
+      const attemptUrl = attempt === 1 ? serviceUrl : ((await nextExtractionServiceUrl()) ?? serviceUrl);
       try {
         const response = await fetch(`${attemptUrl}/extract`, {
           method: "POST",
