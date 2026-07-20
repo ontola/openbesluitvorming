@@ -163,7 +163,10 @@ export async function getRunIssueCount(runId: string): Promise<number> {
 }
 
 function normalizeTrigger(trigger: string): IngestRunTrigger {
-  if (trigger === "scheduled" || trigger === "user" || trigger === "manual" || trigger === "api") {
+  if (
+    trigger === "scheduled" || trigger === "user" || trigger === "manual" ||
+    trigger === "api" || trigger === "backfill"
+  ) {
     return trigger;
   }
 

@@ -31,8 +31,9 @@ const { values: args } = parseArgs({
     apply: { type: "boolean", default: false },
     source: { type: "string" },
     // Only re-enqueue full-history chunks (12-month backfill windows), not
-    // the 14-day daily-scheduler windows -- identified by width, since both
-    // share trigger_mode="scheduled".
+    // the 14-day daily-scheduler windows -- identified by width. Matches
+    // both trigger values since older backfill rows may still carry
+    // "scheduled" from before it was split out into "backfill".
     "min-window-days": { type: "string", default: "20" },
   },
 });
@@ -44,7 +45,7 @@ const rows = readDb
   .prepare(
     `SELECT DISTINCT r.source_key, r.supplier, r.date_from, r.date_to
      FROM ingest_run r
-     WHERE r.trigger_mode = 'scheduled'
+     WHERE r.trigger_mode IN ('scheduled', 'backfill')
        AND r.execution_mode = 'full'
        AND r.status IN ('failed', 'partial')
        AND (julianday(r.date_to) - julianday(r.date_from)) > @min_window_days
@@ -90,7 +91,7 @@ for (const row of rows) {
       supplier: row.supplier,
       date_from: row.date_from,
       date_to: row.date_to,
-      trigger: "scheduled",
+      trigger: "backfill",
       execution_mode: "full",
       parent_run_id: undefined,
       projection_version: currentProjectionVersion(),

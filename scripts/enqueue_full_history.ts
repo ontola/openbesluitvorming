@@ -5,10 +5,12 @@
  * cover a long historical window, chunked per source into fixed-size date
  * ranges — newest chunks first, so the recent gap closes before deep history.
  *
- * Runs are enqueued with trigger "scheduled": the daily scheduler pauses its
- * own enqueue while scheduled runs are queued/running, so the backfill and the
- * daily window never compete, and the daily rhythm resumes automatically when
- * the backfill drains.
+ * Runs are enqueued with trigger "backfill", distinct from the daily
+ * scheduler's own "scheduled" trigger, so a long-running backfill no longer
+ * starves the daily cadence (countActiveScheduledRuns only counts
+ * "scheduled" rows). The two share the same worker pool and queue, so they
+ * still compete for execution slots, but freshness no longer waits weeks
+ * for a historical catch-up to finish.
  *
  * Dry-run by default; pass --apply to write.
  *
@@ -106,7 +108,7 @@ for (const [chunkFrom, chunkTo] of chunks) {
         supplier: source.supplier,
         date_from: chunkFrom,
         date_to: chunkTo,
-        trigger: "scheduled",
+        trigger: "backfill",
         execution_mode: "full",
         parent_run_id: undefined,
         projection_version: currentProjectionVersion(),

@@ -297,7 +297,7 @@ export interface IbabsMeeting {
   Documents?: IbabsDocument[];
 }
 
-export type IngestRunTrigger = "user" | "scheduled" | "manual" | "api";
+export type IngestRunTrigger = "user" | "scheduled" | "manual" | "api" | "backfill";
 export type IngestExecutionMode =
   | "full"
   | "rederive_cached"
