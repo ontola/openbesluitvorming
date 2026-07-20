@@ -2,8 +2,11 @@
 
 Gids voor hergebruikers van de Open Raadsinformatie API.
 
-Status: versie 2026-07-15. Alle beschreven endpoints (zoeken, entiteiten,
-export snapshot + changes) zijn live geverifieerd tegen productie.
+Status: versie 2026-07-20. Deze gids beschrijft alleen endpoints die
+daadwerkelijk in de publieke REST API bestaan (zoeken, entiteiten, export
+snapshot + changes). Een eerdere versie verwees ook naar een "raw Quickwit"
+power-user endpoint (`/api/v1/...`); dat endpoint bestaat niet en is uit deze
+gids verwijderd.
 
 ## Voor wie is deze gids?
 
@@ -22,8 +25,7 @@ Elasticsearch 7 proxy: je stuurde zelf Elastic Query DSL en kreeg ruwe
 indexdocumenten terug. OpenBesluitvorming is een product-API met daarachter een
 Quickwit-zoekprojectie. De belangrijkste verschillen:
 
-1. **Geen vrije Elastic DSL meer.** Zoeken gaat via `GET /api/search`
-   (aanbevolen) of via de ruwe Quickwit query language (geavanceerd).
+1. **Geen vrije Elastic DSL meer.** Zoeken gaat via `GET /api/search`.
 2. **Andere entiteitsnamen.** Classic `MediaObject` heet nu `Document`.
    `Meeting` blijft `Meeting`. `AgendaItem` is geen los zoekresultaat meer maar
    onderdeel van de `agenda` in een Meeting-detail.
@@ -62,13 +64,13 @@ Geen authenticatie; alle endpoints zijn read-only.
 | Classic | Nieuw aanbevolen | Opmerking |
 | --- | --- | --- |
 | `GET /v1/elastic/ori_*/_search?q=term` | `GET /api/search?query=term` | Simpel zoeken |
-| `POST /v1/elastic/ori_*/_search` (Query DSL) | `GET /api/search?...` of `POST /api/v1/woozi-events-prod/search` | DSL wordt niet 1-op-1 ondersteund |
+| `POST /v1/elastic/ori_*/_search` (Query DSL) | `GET /api/search?...` | DSL wordt niet ondersteund; geen power-user query-endpoint beschikbaar |
 | `POST /v1/elastic/ori_amersfoort_*/_search` | `GET /api/search?organization=amersfoort` | `organization` = source key |
-| `range` op `last_discussed_at` | `dateFrom`/`dateTo`, of raw Quickwit `start_date:[.. TO ..]` | Zie recept 3 voor het verschil |
-| `terms` op `_id` (batch lookup) | Raw Quickwit `entity_id:("a" OR "b")` | Zie recept 7 |
+| `range` op `last_discussed_at` | `dateFrom`/`dateTo` | Zie recept 3 voor het verschil met Classic |
+| `terms` op `_id` (batch lookup) | Geen batch-endpoint | Zie recept 7 |
 | `_source.text` / `md_text` | `GET /api/entities/{id}` → `markdownText` | Detailtekst apart ophalen |
 | `/v1/resolve/...` (document ophalen) | `downloadUrl` / `pdfUrl` uit detail response | Verwijst naar de bronleverancier |
-| Elastic `highlight` | `summaryHtml` in `/api/search`, of Quickwit `snippet_fields` | Niet identiek aan Elastic highlights |
+| Elastic `highlight` | `summaryHtml` in `/api/search` | Niet identiek aan Elastic highlights |
 | `GET /_cat/indices?v` | `GET /api/sources` | Organisatie-discovery |
 | `GET /ori_*/_mapping` | Veldtabel hieronder + `/schemas/*.schema.json` | Vast schema, geen mapping endpoint |
 | `search_after` harvesting | `/api/export/snapshot` + `/api/export/changes` | Zie recept 9 |
@@ -83,29 +85,29 @@ Geen authenticatie; alle endpoints zijn read-only.
 | `@id` | `entityId` (nieuw formaat) | search + detail |
 | `@type: MediaObject` | `entityType: Document` | search + detail |
 | `name` | `title` | search + detail |
-| `file_name` | `file_name` | alleen raw Quickwit |
+| `file_name` | — niet beschikbaar via publieke API | |
 | `content_type` | `contentType` | detail |
 | `size_in_bytes` | — niet beschikbaar | |
 | `url` (Classic resolve/cache) | `downloadUrl`, `pdfUrl` | detail; verwijst naar bronleverancier |
-| `original_url` | `downloadUrl` / `payload.original_url` | detail / raw Quickwit |
-| `last_discussed_at` | `sortDate` (API) / `start_date` (Quickwit) | search + detail |
-| `date_modified` | — niet beschikbaar (`time` in Quickwit is het indexeer-tijdstip, niet de bronwijziging) | |
+| `original_url` | `downloadUrl` | detail |
+| `last_discussed_at` | `sortDate` | search + detail |
+| `date_modified` | — niet beschikbaar | |
 | `is_referenced_by` | `meetingId` | detail |
 | `text`, `md_text` | `markdownText` | detail |
-| `text_pages` | `DocumentPage` entiteiten, `matchedPage`, `pageCount`, PDF page endpoint | search / raw / PDF endpoint |
-| `has_organization_name` | `organization` (label) / `source_key` (key) | search / raw |
-| index `ori_<gemeente>_*` | `source_key` | raw Quickwit; `organization`-parameter in `/api/search` |
+| `text_pages` | `matchedPage`, `pageCount`, PDF page endpoint | search / PDF endpoint |
+| `has_organization_name` | `organization` (label) | search |
+| index `ori_<gemeente>_*` | `organization`-parameter in `/api/search` | |
 
 ### Classic `Meeting` → nieuw `Meeting`
 
 | Classic veld | Nieuw | Waar |
 | --- | --- | --- |
 | `name` | `title` | search + detail |
-| `classification` | `classification` | alleen raw Quickwit |
+| `classification` | — niet beschikbaar via publieke API | |
 | `organization` | `organization` | search + detail |
-| `committee` | `committee` | alleen raw Quickwit |
+| `committee` | — niet beschikbaar via publieke API | |
 | `attachment` | `agenda[].documents[]` | detail |
-| `start_date` | `sortDate` / `start_date` | search + detail |
+| `start_date` | `sortDate` / `date` | search + detail |
 | `status` | — niet beschikbaar | |
 
 ### Classic `AgendaItem`
@@ -162,8 +164,6 @@ spaties). Haal de lijst met geldige keys op via:
 curl "https://openbesluitvorming.nl/api/sources?implemented=true"
 ```
 
-In raw Quickwit is het equivalent `source_key:amersfoort`.
-
 ### Recept 3: Filteren op datum
 
 Classic:
@@ -181,18 +181,9 @@ curl "https://openbesluitvorming.nl/api/search?query=begroting&dateFrom=2024-01-
 **Belangrijk verschil met Classic:** bij een zoekterm evalueert `/api/search`
 het datumfilter over een begrensde relevantie-window, niet over de volledige
 index. Voor brede zoektermen met een datumfilter op een oudere periode kun je
-dus resultaten missen. Heb je een volledig, exact datumbereik nodig, gebruik
-dan raw Quickwit — daar is de range onderdeel van de query zelf:
-
-```bash
-curl -X POST "https://openbesluitvorming.nl/api/v1/woozi-events-prod/search" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "query": "entity_type:Document AND source_key:amersfoort AND start_date:[2024-01-01T00:00:00Z TO 2024-12-31T23:59:59Z]",
-    "max_hits": 100,
-    "sort_by": "-start_date"
-  }'
-```
+dus resultaten missen. Er is momenteel geen publiek endpoint voor een
+volledig, exact datumbereik buiten dit relevantie-window; heb je dat nodig,
+neem dan contact op met het team (zie onderaan deze gids).
 
 ### Recept 4: Alleen documenten of alleen vergaderingen
 
@@ -208,9 +199,6 @@ Nieuw:
 curl "https://openbesluitvorming.nl/api/search?query=begroting&entityType=Document"
 curl "https://openbesluitvorming.nl/api/search?query=begroting&entityType=Meeting"
 ```
-
-Raw Quickwit: `entity_type:Document`, `entity_type:Meeting`,
-`entity_type:DocumentPage`.
 
 ### Recept 5: Documentdetail en volledige tekst ophalen
 
@@ -251,17 +239,6 @@ curl -o page3.jpg "https://openbesluitvorming.nl/api/entities/document%3A...%3A1
 
 De response header `X-Pdf-Page-Count` bevat het totale aantal pagina's.
 
-- pagina-niveau zoeken kan ook direct via raw Quickwit:
-
-```bash
-curl -X POST "https://openbesluitvorming.nl/api/v1/woozi-events-prod/search" \
-  -H "Content-Type: application/json" \
-  -d '{ "query": "entity_type:DocumentPage AND stikstof", "max_hits": 10, "snippet_fields": ["content"] }'
-```
-
-Een `DocumentPage`-hit heeft `page_number` en verwijst via `parent_entity_id`
-naar het document.
-
 ### Recept 7: Meerdere entiteiten op ID ophalen (batch)
 
 Classic-patroon (veel gebruikt door scrapers die eerder gevonden IDs
@@ -271,20 +248,9 @@ verrijken):
 { "size": 60, "query": { "terms": { "_id": ["123", "456"] } }, "_source": ["attachment"] }
 ```
 
-Nieuw: er is (nog) geen batch-endpoint. Opties:
-
-1. Per stuk via `GET /api/entities/{id}` (prima voor tientallen IDs).
-2. Batch via raw Quickwit met een OR-query — quote de IDs altijd, ze bevatten
-   dubbele punten:
-
-```bash
-curl -X POST "https://openbesluitvorming.nl/api/v1/woozi-events-prod/search" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "query": "entity_id:(\"document:notubiz:gemeente:soest:12345\" OR \"document:notubiz:gemeente:soest:12346\")",
-    "max_hits": 100
-  }'
-```
+Nieuw: er is (nog) geen batch-endpoint. Vraag entiteiten per stuk op via
+`GET /api/entities/{id}` (prima voor tientallen IDs). Heb je een grotere
+batch-use-case, neem dan contact op met het team (zie onderaan deze gids).
 
 ### Recept 8: Discovery — welke organisaties en velden zijn er?
 
@@ -353,8 +319,7 @@ Verder geldt:
   ondersteund in de nieuwe API.
 - Wil je een bestaande Classic-dataset koppelen aan nieuwe entiteiten, gebruik
   dan `original_url` als sleutel: die staat in Classic in `_source.original_url`
-  en in de nieuwe data als `payload.original_url` (raw Quickwit) respectievelijk
-  `downloadUrl` (detail response).
+  en in de nieuwe data als `downloadUrl` (detail response).
 
 ## Wat wordt bewust niet meer ondersteund
 
@@ -380,19 +345,12 @@ eerdere jaren bestaan dan ook bij Classic niet.
   het doorbladeren van de eerste pagina's, niet voor harvesting — bij een
   zoekterm wordt een begrensde window van ruwe hits bekeken.
 - `totalCount` is approximatief.
-- Raw Quickwit (`/api/v1/...`): alleen read-only paths zijn publiek. Dit is een
-  power-user route: de velden volgen de interne zoekprojectie
-  (`projection_version`) en kunnen bij projectiewijzigingen veranderen zonder
-  de garanties van de publieke REST API.
 - Voor bulk: gebruik de export endpoints (recept 9), niet de zoek-API.
 
 ## Vragen, wijzigingen en aankondigingen
 
 - Breaking changes aan de publieke REST API worden vooraf aangekondigd;
   aanmelden voor aankondigingen kan via de contactroute hieronder.
-- De raw Quickwit route volgt de interne zoekprojectie en valt buiten die
-  garantie; het veld `projection_version` in de hits geeft aan met welke
-  projectieversie je praat.
 - De einddatum van de Classic API wordt ruim van tevoren aangekondigd, ook in
   de Classic API-responses zelf.
 - Loop je bij het migreren ergens op vast, of heb je een bulk-use-case die de
@@ -408,5 +366,4 @@ eerdere jaren bestaan dan ook bij Classic niet.
 | PDF-pagina als afbeelding | `GET /api/entities/{id}/pdf/page/{n}` |
 | Organisatielijst | `GET /api/sources` |
 | Indexstatistieken | `GET /api/stats` |
-| Geavanceerde queries, exacte datumranges, batch-IDs, aggregaties | `POST /api/v1/woozi-events-prod/search` |
 | Bulk export / synchronisatie | `GET /api/export/snapshot` + `GET /api/export/changes` |
