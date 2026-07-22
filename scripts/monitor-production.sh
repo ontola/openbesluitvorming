@@ -210,14 +210,26 @@ check_disk() {
 
 check_containers() {
   local line name restarts status worker cache_output cache_kb split_count cache_gb
+  local restart_state_file previous_restarts
   while read -r name restarts status; do
     [ -n "${name:-}" ] || continue
     if [ "$status" != "running" ]; then
       alert critical "container_${name}_not_running" "Container is not running" "name=${name} status=${status}"
     fi
-    if [ "$restarts" -gt "$CONTAINER_RESTART_WARN" ]; then
-      alert warning "container_${name}_restarted" "Container has restarted" "name=${name} restarts=${restarts}"
+    # RestartCount is cumulative for the container's lifetime, not per-interval
+    # -- comparing it directly against a fixed threshold means one restart
+    # trips the alert forever afterwards (every cooldown window, indefinitely,
+    # until the container is recreated by a deploy). Track the last-seen count
+    # instead and only alert on new restarts since the previous check. Missing
+    # state (first run, or state dir wiped) baselines silently rather than
+    # alerting on history it can't distinguish from "just happened".
+    restart_state_file="$STATE_DIR/container_${name}_restart_count"
+    previous_restarts="$(cat "$restart_state_file" 2>/dev/null || echo "$restarts")"
+    if [ "$((restarts - previous_restarts))" -gt "$CONTAINER_RESTART_WARN" ]; then
+      alert warning "container_${name}_restarted" "Container has restarted" "name=${name} restarts=${restarts} new_since_last_check=$((restarts - previous_restarts))"
     fi
+    mkdir -p "$STATE_DIR"
+    printf '%s\n' "$restarts" > "$restart_state_file"
   done < <(docker inspect -f '{{.Name}} {{.RestartCount}} {{.State.Status}}' woozi-quickwit-1 woozi-openbesluitvorming-1 | sed 's#^/##')
 
   # The worker used to run only during catch-up windows; since July 2026 it is
