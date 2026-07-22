@@ -4,6 +4,11 @@ services:
     depends_on:
       - openbesluitvorming
     restart: unless-stopped
+    # Relative CPU scheduling weight (default 1024), not a hard cap: lets
+    # user-facing traffic stay responsive when the worker containers are
+    # pegged at 100% CPU on this 4-vCPU host (July 2026: backfill workers
+    # starved the web server enough that requests started timing out).
+    cpu_shares: 2048
     environment:
       ADMIN_PASSWORD_HASH: ${ADMIN_PASSWORD_HASH}
     ports:
@@ -42,6 +47,8 @@ services:
     depends_on:
       - quickwit
     restart: unless-stopped
+    # See caddy's cpu_shares comment: same priority-under-contention reasoning.
+    cpu_shares: 2048
     environment:
       DENO_V8_FLAGS: --max-old-space-size=1024
       PORT: 8787
@@ -73,6 +80,11 @@ services:
       - quickwit
     restart: unless-stopped
     command: ["run", "-A", "src/worker.ts"]
+    # Lower relative weight than caddy/openbesluitvorming (see their
+    # cpu_shares comments): under contention the kernel favors user-facing
+    # traffic, but workers can still burst to 100% of a core when the host
+    # is otherwise idle -- this only reshuffles priority, not throughput.
+    cpu_shares: 256
     environment:
       DENO_V8_FLAGS: --max-old-space-size=4096
       QUICKWIT_URL: http://quickwit:7280
