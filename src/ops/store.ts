@@ -64,6 +64,18 @@ async function getDatabase(): Promise<DatabaseSync> {
           details TEXT,
           created_at TEXT NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS document_revalidation (
+          entity_id TEXT PRIMARY KEY,
+          supplier TEXT NOT NULL,
+          source_key TEXT NOT NULL,
+          url TEXT,
+          streak INTEGER NOT NULL DEFAULT 0,
+          last_checked_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS revalidation_cursor (
+          supplier TEXT PRIMARY KEY,
+          start_offset INTEGER NOT NULL DEFAULT 0
+        );
       `);
       try {
         db.exec("ALTER TABLE ingest_run_issue ADD COLUMN details TEXT");
@@ -843,4 +855,90 @@ export async function getRunDetails(runId: string): Promise<RunDetails | null> {
     .all(runId) as unknown as ExtractionIssue[];
 
   return { run: normalizeRunRecord(run), issues };
+}
+
+// -- Source revalidation sweep (scripts/revalidate_documents.ts) --------
+//
+// Tracks, per document entity, how many consecutive sweep runs found it
+// genuinely gone at the source (see the script for the "genuinely gone" vs
+// "unknown" classification per supplier). Only report()-able once a document
+// reaches a confirmation threshold across separate runs -- a single miss is
+// never enough (API hiccups, timeouts, org-wide outages must not count).
+
+export interface RevalidationEntry {
+  entity_id: string;
+  supplier: string;
+  source_key: string;
+  url: string | null;
+  streak: number;
+  last_checked_at: string;
+}
+
+export async function getRevalidationCursor(supplier: string): Promise<number> {
+  const db = await getDatabase();
+  const row = db
+    .prepare("SELECT start_offset FROM revalidation_cursor WHERE supplier = ?")
+    .get(supplier) as { start_offset?: number } | undefined;
+  return row?.start_offset ?? 0;
+}
+
+export async function setRevalidationCursor(supplier: string, offset: number): Promise<void> {
+  const db = await getDatabase();
+  db.prepare(
+    `INSERT INTO revalidation_cursor (supplier, start_offset) VALUES (@supplier, @offset)
+     ON CONFLICT(supplier) DO UPDATE SET start_offset = excluded.start_offset`,
+  ).run({ supplier, offset });
+}
+
+/** Call once per checked document per run. status "gone" extends the streak,
+ * "live" clears it (source restored it, or an earlier miss was a fluke). An
+ * "unknown" result (org-wide outage, timeout, ...) must simply not be called
+ * at all -- there is deliberately no way to record it here. */
+export async function recordRevalidationResult(
+  entityId: string,
+  supplier: string,
+  sourceKey: string,
+  status: "gone" | "live",
+  url: string | null,
+): Promise<number> {
+  const db = await getDatabase();
+  if (status === "live") {
+    db.prepare("DELETE FROM document_revalidation WHERE entity_id = ?").run(entityId);
+    return 0;
+  }
+
+  const existing = db
+    .prepare("SELECT streak FROM document_revalidation WHERE entity_id = ?")
+    .get(entityId) as { streak?: number } | undefined;
+  const streak = (existing?.streak ?? 0) + 1;
+  db.prepare(
+    `INSERT INTO document_revalidation (entity_id, supplier, source_key, url, streak, last_checked_at)
+     VALUES (@entity_id, @supplier, @source_key, @url, @streak, @last_checked_at)
+     ON CONFLICT(entity_id) DO UPDATE SET
+       source_key = excluded.source_key, url = excluded.url,
+       streak = excluded.streak, last_checked_at = excluded.last_checked_at`,
+  ).run({
+    entity_id: entityId,
+    supplier,
+    source_key: sourceKey,
+    url,
+    streak,
+    last_checked_at: new Date().toISOString(),
+  });
+  return streak;
+}
+
+export async function listConfirmedGoneDocuments(
+  supplier: string,
+  threshold: number,
+): Promise<RevalidationEntry[]> {
+  const db = await getDatabase();
+  return db
+    .prepare(
+      `SELECT entity_id, supplier, source_key, url, streak, last_checked_at
+       FROM document_revalidation
+       WHERE supplier = @supplier AND streak >= @threshold
+       ORDER BY streak DESC`,
+    )
+    .all({ supplier, threshold }) as unknown as RevalidationEntry[];
 }
