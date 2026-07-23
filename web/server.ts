@@ -27,6 +27,7 @@ import {
   getEntityPdfInfo,
   getIndexStats,
   searchMeetings,
+  startStatsRefreshLoop,
 } from "./search_api.ts";
 import { ObjectStorageClient } from "../src/storage/s3.ts";
 import { pdfPageCacheKey, pdfPageMetaKey, renderPdfPageJpeg } from "../src/documents/thumbnails.ts";
@@ -230,6 +231,10 @@ if (reconciledRuns.length > 0) {
 // Start the daily rolling-window scheduler. Gated behind WOOZI_SCHEDULER_ENABLED
 // so only one container (the web one) enqueues scheduled runs.
 startScheduler();
+
+// Keeps the homepage stats cache warm in the background so /api/stats never
+// makes a request wait on it (see search_api.ts for the full reasoning).
+await startStatsRefreshLoop();
 
 function contentType(pathname: string): string {
   if (pathname.endsWith(".css")) return "text/css; charset=utf-8";
@@ -486,8 +491,12 @@ async function handleRequest(request: Request): Promise<Response> {
     try {
       const stats = await measureTiming(metrics, "stats", () => getIndexStats());
       return withServerTiming(
+        // Matches STATS_CACHE_TTL_MS in search_api.ts: the server-side value
+        // itself is never more than one refresh cycle stale, so a browser
+        // cache longer than that would just serve numbers the server has
+        // already moved past.
         Response.json(stats, {
-          headers: { "cache-control": "public, max-age=3600" },
+          headers: { "cache-control": "public, max-age=1800" },
         }),
         requestStart,
         metrics,

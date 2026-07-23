@@ -7,6 +7,7 @@ import type {
   SearchResponse,
   SearchResult,
 } from "../src/types.ts";
+import { getConfigValue } from "../src/config.ts";
 import { getExportLog } from "../src/exports/log.ts";
 import { NotubizClient } from "../src/notubiz/client.ts";
 import { normalizeNotubizAgendaItems } from "../src/notubiz/normalize.ts";
@@ -975,14 +976,45 @@ const EMPTY_INDEX_STATS: IndexStats = {
 // Failures and the "empty index" fallback are not cached so they don't pin
 // a bad result; a fresh local stack will pick up real data on the next call
 // after its index appears.
-const STATS_CACHE_TTL_MS = 5 * 60 * 1000;
+//
+// startStatsRefreshLoop() keeps this warm in the background (see server.ts),
+// so in steady state a request never waits on computeIndexStats() at all;
+// STATS_CACHE_TTL_MS is only the fallback if that loop ever stalls. The
+// on-disk copy exists purely to survive a restart (this app redeploys ~7x/day
+// -- an in-memory-only cache would force a full recompute, Quickwit
+// aggregation included, on the very first request after every deploy).
+const STATS_CACHE_TTL_MS = 30 * 60 * 1000;
+const STATS_REFRESH_INTERVAL_MS = 15 * 60 * 1000;
 let cachedStats: { value: IndexStats; expiresAt: number } | null = null;
 let statsInFlight: Promise<IndexStats> | null = null;
 
-export async function getIndexStats(): Promise<IndexStats> {
-  if (cachedStats && Date.now() < cachedStats.expiresAt) {
-    return cachedStats.value;
+async function statsCachePath(): Promise<string> {
+  return await getConfigValue("WOOZI_STATS_CACHE_PATH", "./woozi-stats-cache.json");
+}
+
+async function loadPersistedStats(): Promise<void> {
+  try {
+    const raw = await Deno.readTextFile(await statsCachePath());
+    const value = JSON.parse(raw) as IndexStats;
+    if (value.documentCount > 0) {
+      cachedStats = { value, expiresAt: Date.now() + STATS_CACHE_TTL_MS };
+    }
+  } catch {
+    // No persisted cache yet (fresh environment, or first deploy after this
+    // change) -- the next computeIndexStats() call seeds it as usual.
   }
+}
+
+async function persistStats(value: IndexStats): Promise<void> {
+  try {
+    await Deno.writeTextFile(await statsCachePath(), JSON.stringify(value));
+  } catch {
+    // Best-effort: an unwritable cache file must not fail the request or the
+    // refresh loop, it just means the next restart recomputes cold again.
+  }
+}
+
+async function refreshStats(): Promise<IndexStats> {
   if (statsInFlight) {
     return statsInFlight;
   }
@@ -990,6 +1022,7 @@ export async function getIndexStats(): Promise<IndexStats> {
     .then((result) => {
       if (result.documentCount > 0) {
         cachedStats = { value: result, expiresAt: Date.now() + STATS_CACHE_TTL_MS };
+        void persistStats(result);
       }
       return result;
     })
@@ -997,6 +1030,25 @@ export async function getIndexStats(): Promise<IndexStats> {
       statsInFlight = null;
     });
   return statsInFlight;
+}
+
+export async function getIndexStats(): Promise<IndexStats> {
+  if (cachedStats && Date.now() < cachedStats.expiresAt) {
+    return cachedStats.value;
+  }
+  return refreshStats();
+}
+
+/** Proactively keeps the stats cache warm so requests never pay for
+ * computeIndexStats() (a Quickwit aggregation plus an export-log scan).
+ * Seeds from the on-disk copy first so a freshly deployed container serves a
+ * real (if briefly stale) number instead of an empty/default one. */
+export async function startStatsRefreshLoop(): Promise<void> {
+  await loadPersistedStats();
+  void refreshStats();
+  setInterval(() => {
+    void refreshStats();
+  }, STATS_REFRESH_INTERVAL_MS);
 }
 
 async function computeIndexStats(): Promise<IndexStats> {

@@ -56,6 +56,7 @@ services:
       QUICKWIT_INDEX_ID: ${QUICKWIT_INDEX_ID:-woozi-events-prod}
       WOOZI_KV_PATH: /data/woozi-ops.sqlite3
       WOOZI_EXPORT_LOG_PATH: /data/woozi-export-log.sqlite3
+      WOOZI_STATS_CACHE_PATH: /data/woozi-stats-cache.json
       AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY}
       AWS_SECRET_ACCESS_KEY: ${S3_SECRET_KEY}
       S3_ACCESS_KEY: ${S3_ACCESS_KEY}
