@@ -35,7 +35,13 @@ services:
       QUICKWIT_CLUSTER_ID: ${QUICKWIT_CLUSTER_ID:-woozi-prod}
       QUICKWIT_NODE_ID: ${QUICKWIT_NODE_ID:-quickwit-prod}
       QUICKWIT_INDEX_ROOT_PREFIX: ${QUICKWIT_INDEX_ROOT_PREFIX:-indexes-prod}
-      QUICKWIT_SPLIT_CACHE_MAX_NUM_BYTES: ${QUICKWIT_SPLIT_CACHE_MAX_NUM_BYTES:-40G}
+      # Bumped from 40G (2026-07-23): the backfill has grown the live/published
+      # split set past the old budget (63 splits vs. a 40G/43-file cache),
+      # causing routine cold S3 refetches (1-5s, occasionally 12s+) even
+      # without the dead-split "pollution" failure mode this cache also
+      # guards against (see check_quickwit_split_cache_pollution). Revisit
+      # once the post-backfill dedup/reindex shrinks the index back down.
+      QUICKWIT_SPLIT_CACHE_MAX_NUM_BYTES: ${QUICKWIT_SPLIT_CACHE_MAX_NUM_BYTES:-55G}
       QUICKWIT_SPLIT_CACHE_NUM_CONCURRENT_DOWNLOADS: ${QUICKWIT_SPLIT_CACHE_NUM_CONCURRENT_DOWNLOADS:-4}
     volumes:
       - quickwit-data:/quickwit/qwdata
