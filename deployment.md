@@ -664,7 +664,7 @@ ADMIN_PASSWORD_HASH=$$2a$$14$$exampleexampleexampleexampleexampleexampleexamplee
 
 ## Monitoring and Backups
 
-Two systemd timers run on the production host:
+Three systemd timers run on the production host:
 
 - `woozi-monitor.timer` (every 2 min) runs
   [scripts/monitor-production.sh](scripts/monitor-production.sh) — the bash
@@ -685,6 +685,20 @@ Two systemd timers run on the production host:
   retention. Losing these databases without a backup resurrects taken-down
   documents and corrupts export cursors. Install with
   [scripts/install-production-backup.sh](scripts/install-production-backup.sh).
+- `woozi-revalidate.timer` (daily 02:00) runs
+  [scripts/revalidate_documents.ts](scripts/revalidate_documents.ts) inside
+  the web container, once per calibrated supplier (iBabs, Notubiz): checks
+  whether documents we still serve have actually been removed at the source
+  (a cheap HTTP status check against the stored `original_url`, no
+  re-download), so a source-side deletion eventually gets reflected here even
+  when nobody files a takedown request for it. It never deletes anything —
+  only entity ids that come back "gone" for several consecutive daily runs
+  are reported (`docker exec woozi-openbesluitvorming-1 deno run -A
+  scripts/revalidate_documents.ts --supplier ibabs --report-only`) for manual
+  review and deletion via `scripts/delete_document.ts`. See
+  [docs_internal/bsn-takedown.md](docs_internal/bsn-takedown.md) for the
+  calibration details and the ori3 equivalent. Install with
+  [scripts/install-production-revalidate.sh](scripts/install-production-revalidate.sh).
 
 To restore: download the newest `backups/sqlite/...` object, gunzip, stop the
 `openbesluitvorming` and `worker` containers, replace the file on the

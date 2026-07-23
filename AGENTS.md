@@ -128,6 +128,19 @@ Current implemented slices:
   `woozi-backup.timer` running `scripts/backup_state.ts` inside the web
   container (14-day retention, `backups/sqlite/` prefix). Install with
   `scripts/install-production-backup.sh`.
+- A source revalidation sweep runs daily via `woozi-revalidate.timer`
+  (`scripts/revalidate_documents.ts`, one run per calibrated supplier —
+  currently iBabs and Notubiz): checks whether documents we still serve have
+  actually been removed at the source (HTTP status only, no re-download), so
+  a source-side deletion eventually surfaces without a manual takedown
+  report. Confirmed-gone documents (3+ consecutive daily misses, tracked in
+  `document_revalidation`/`revalidation_cursor` in the ops SQLite) are only
+  reported, never auto-deleted — review and delete via
+  `scripts/delete_document.ts`. Install with
+  `scripts/install-production-revalidate.sh`. See
+  `docs_internal/bsn-takedown.md` ("Stap 6") for the per-supplier
+  "genuinely gone" calibration and the org-wide-outage-vs-real-deletion
+  distinction.
 - The admin dashboard polls every 5s. Any per-run work it does (e.g. fetching run detail) multiplies by the number of visible runs — keep the dashboard cheap so it doesn't starve the single-threaded `openbesluitvorming` process and slow down user searches.
 
 ### iBabs specifics
