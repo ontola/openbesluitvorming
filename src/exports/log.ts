@@ -93,6 +93,13 @@ export class ExportChangesLog {
         created_at TEXT NOT NULL,
         PRIMARY KEY (source_key, start_seq)
       );
+      -- Covers countLiveEntities' prefix range scan (see below): without it,
+      -- the query fell back to a full table scan, which at production scale
+      -- (3.9M rows, July 2026) took 100+ seconds and -- because node:sqlite's
+      -- DatabaseSync calls are synchronous -- stalled every other request on
+      -- the single request-handling thread for the same duration.
+      CREATE INDEX IF NOT EXISTS idx_export_entity_state_entity_id_op
+        ON export_entity_state (entity_id, op);
     `);
   }
 
@@ -102,12 +109,19 @@ export class ExportChangesLog {
    * (measured 3.5x duplication, July 2026) — this table is keyed per entity,
    * so the count is deduplicated by construction. */
   countLiveEntities(idPrefix: string): number {
+    // Rewritten from `entity_id LIKE ${idPrefix}%` as an explicit range scan:
+    // it's the same set of rows (idPrefix is a plain literal, no wildcards),
+    // but a range scan is guaranteed to use idx_export_entity_state_entity_id_op
+    // regardless of SQLite version/collation quirks in the LIKE optimizer.
+    const upperBound =
+      idPrefix.slice(0, -1) +
+      String.fromCharCode(idPrefix.charCodeAt(idPrefix.length - 1) + 1);
     const row = this.db
       .prepare(
         `SELECT COUNT(*) AS count FROM export_entity_state
-         WHERE entity_id LIKE ? AND op != 'delete'`,
+         WHERE entity_id >= ? AND entity_id < ? AND op != 'delete'`,
       )
-      .get(`${idPrefix}%`) as { count?: number } | undefined;
+      .get(idPrefix, upperBound) as { count?: number } | undefined;
     return row?.count ?? 0;
   }
 
