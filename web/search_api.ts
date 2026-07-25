@@ -1039,16 +1039,30 @@ export async function getIndexStats(): Promise<IndexStats> {
   return refreshStats();
 }
 
+/** Fire-and-forget refresh that can never take the process down.
+ *
+ * computeIndexStats() rejects on a Quickwit search timeout (AbortSignal, 8s x
+ * the retry budget), and Deno terminates the process on an unhandled promise
+ * rejection -- so an un-caught background refresh turns a *transient* Quickwit
+ * slowdown into a web-server crash loop: start -> refresh -> reject ~16s later
+ * -> exit -> restart -> repeat. Observed in production 2026-07-25. Request-path
+ * callers go through getIndexStats() and handle their own errors; this wrapper
+ * is only for the callers that discard the promise. */
+function refreshStatsInBackground(): void {
+  refreshStats().catch((error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[stats] background refresh failed, keeping previous value: ${message}`);
+  });
+}
+
 /** Proactively keeps the stats cache warm so requests never pay for
  * computeIndexStats() (a Quickwit aggregation plus an export-log scan).
  * Seeds from the on-disk copy first so a freshly deployed container serves a
  * real (if briefly stale) number instead of an empty/default one. */
 export async function startStatsRefreshLoop(): Promise<void> {
   await loadPersistedStats();
-  void refreshStats();
-  setInterval(() => {
-    void refreshStats();
-  }, STATS_REFRESH_INTERVAL_MS);
+  refreshStatsInBackground();
+  setInterval(refreshStatsInBackground, STATS_REFRESH_INTERVAL_MS);
 }
 
 async function computeIndexStats(): Promise<IndexStats> {
