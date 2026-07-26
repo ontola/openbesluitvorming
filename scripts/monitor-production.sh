@@ -46,8 +46,13 @@ SCALE_DOWN_BASELINE_HOSTS="${WOOZI_MONITOR_SCALE_DOWN_BASELINE_HOSTS:-2}"
 # restarting quickwit once the cache holds more files than a small multiple
 # of the actually-published splits. 0 disables.
 QUICKWIT_SPLIT_CACHE_POLLUTION_RATIO="${WOOZI_MONITOR_QUICKWIT_SPLIT_CACHE_POLLUTION_RATIO:-3}"
-# Below this file count, don't even compute a ratio — avoids noise right
-# after a wipe or on a freshly (re)built index with few real splits.
+# Floor for the *disruptive* ratio-based purge only (it stops Quickwit), so a
+# fresh/small cache can't trigger a restart. It deliberately does NOT gate the
+# non-disruptive orphan sweep: deleting a split the metastore no longer
+# publishes is always correct, and gating it on a raw file count silently
+# disabled the whole self-heal once splits got large. Measured 2026-07-26: 99
+# cached files (below this floor, so the janitor never ran) of which 40 were
+# orphans, occupying 44G of the 55G budget and evicting live splits.
 QUICKWIT_SPLIT_CACHE_POLLUTION_MIN_FILES="${WOOZI_MONITOR_QUICKWIT_SPLIT_CACHE_POLLUTION_MIN_FILES:-150}"
 QUICKWIT_INDEX_ID="${WOOZI_MONITOR_QUICKWIT_INDEX_ID:-woozi-events-prod}"
 QUICKWIT_INDEX_ROOT_PREFIX="${WOOZI_MONITOR_QUICKWIT_INDEX_ROOT_PREFIX:-indexes-prod}"
@@ -470,9 +475,12 @@ check_quickwit_split_cache_pollution() {
 
   cache_files="$(docker exec woozi-quickwit-1 sh -c \
     "find '${cache_dir}' -maxdepth 1 -type f 2>/dev/null | wc -l" 2>/dev/null | xargs || true)"
-  [ -n "$cache_files" ] && [ "$cache_files" -ge "$QUICKWIT_SPLIT_CACHE_POLLUTION_MIN_FILES" ] || return 0
+  [ -n "$cache_files" ] && [ "$cache_files" -gt 0 ] || return 0
 
   if ! command -v python3 >/dev/null 2>&1; then
+    # No python3: only the coarse, *disruptive* ratio path is available, so it
+    # keeps the file-count floor (see the MIN_FILES comment at the top).
+    [ "$cache_files" -ge "$QUICKWIT_SPLIT_CACHE_POLLUTION_MIN_FILES" ] || return 0
     published_splits="$(docker exec woozi-quickwit-1 sh -c \
       "grep -o '\"split_state\":[[:space:]]*\"Published\"' '${metastore_path}' 2>/dev/null | wc -l" 2>/dev/null | xargs || true)"
     [ -n "$published_splits" ] && [ "$published_splits" -gt 0 ] || return 0
@@ -514,6 +522,10 @@ PY
   # above already brings the count down in the common case, and comparing
   # against the pre-cleanup count would trigger a needless restart on every
   # single successful janitor run.
+  #
+  # Everything below stops Quickwit, so it keeps the MIN_FILES floor that the
+  # (harmless, non-disruptive) orphan sweep above deliberately no longer has.
+  [ "$cache_files" -ge "$QUICKWIT_SPLIT_CACHE_POLLUTION_MIN_FILES" ] || return 0
   if [ -z "$published_splits" ] || [ "$published_splits" -le 0 ]; then
     quickwit_split_cache_full_restart "$cache_files" "${published_splits:-0}" "n/a"
     return 0
