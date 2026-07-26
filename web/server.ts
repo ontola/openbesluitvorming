@@ -31,6 +31,12 @@ import {
 } from "./search_api.ts";
 import { ObjectStorageClient } from "../src/storage/s3.ts";
 import { pdfPageCacheKey, pdfPageMetaKey, renderPdfPageJpeg } from "../src/documents/thumbnails.ts";
+import {
+  RATE_LIMIT_PAGE_UNIT,
+  RateLimiter,
+  type RateVerdict,
+  requestCost,
+} from "./rate_limit.ts";
 
 const root = new URL("./", import.meta.url);
 const distRoot = new URL("./dist/", import.meta.url);
@@ -801,8 +807,97 @@ async function handleRequest(request: Request): Promise<Response> {
   return withServerTiming(new Response("Niet gevonden", { status: 404 }), requestStart);
 }
 
-Deno.serve({ port }, async (request) => {
+// --- Rate limiting for the public API ---------------------------------------
+//
+// /api/* is a public reuse API with no throttling at any layer (the Caddyfile
+// proxies it straight through, and standard caddy:2 has no rate_limit module).
+// On 2026-07-26 a single consumer fanned out concurrent `limit=100` searches:
+// 219 of that window's 580 slow requests landed in ~5 minutes, saturating the
+// 4-vCPU host and evicting live splits from Quickwit's cache for everybody.
+//
+// Token bucket per client IP. A search costs one unit per page of 24 results
+// (the UI's PAGE_SIZE), so ordinary browsing and paging are unaffected while
+// bulk scraping at the 100-result cap is charged 5x. Budget is reported on
+// *every* API response, not just rejections, so reusers can self-regulate
+// instead of discovering the limit by hitting it.
+const RATE_LIMIT_PER_MINUTE = Number(Deno.env.get("WOOZI_RATE_LIMIT_PER_MIN") ?? "60");
+const rateLimitEnabled = Number.isFinite(RATE_LIMIT_PER_MINUTE) && RATE_LIMIT_PER_MINUTE > 0;
+const rateLimiter = new RateLimiter(RATE_LIMIT_PER_MINUTE);
+
+/** Caddy appends the peer it actually observed to X-Forwarded-For, so the
+ * rightmost entry is the trustworthy one -- a client-supplied prefix cannot
+ * spoof past it. The container publishes no host port, so requests cannot
+ * reach this server except through Caddy. */
+function clientKey(request: Request, remoteAddr?: Deno.Addr): string {
+  const forwarded = request.headers.get("x-forwarded-for");
+  if (forwarded) {
+    const parts = forwarded.split(",").map((part) => part.trim()).filter(Boolean);
+    if (parts.length > 0) {
+      return parts[parts.length - 1];
+    }
+  }
+  if (remoteAddr && "hostname" in remoteAddr) {
+    return (remoteAddr as Deno.NetAddr).hostname;
+  }
+  return "unknown";
+}
+
+function applyRateLimitHeaders(response: Response, verdict: RateVerdict): void {
+  response.headers.set("RateLimit-Limit", String(verdict.limit));
+  response.headers.set("RateLimit-Remaining", String(verdict.remaining));
+  response.headers.set("RateLimit-Reset", String(verdict.resetSeconds));
+}
+
+function rateLimitedResponse(verdict: RateVerdict): Response {
+  const response = Response.json(
+    {
+      error:
+        `Te veel verzoeken. Probeer het over ${verdict.retryAfterSeconds} seconde(n) opnieuw.`,
+      limit_per_minute: verdict.limit,
+      retry_after_seconds: verdict.retryAfterSeconds,
+      hint:
+        `Zware verzoeken tellen zwaarder: een zoekopdracht kost 1 eenheid per ${RATE_LIMIT_PAGE_UNIT} resultaten, dus limit=100 kost 5. Verlaag 'limit' of spreid je verzoeken. Elke API-response bevat RateLimit-Limit, RateLimit-Remaining en RateLimit-Reset.`,
+      documentation: "https://github.com/ontola/openbesluitvorming",
+    },
+    { status: 429 },
+  );
+  applyRateLimitHeaders(response, verdict);
+  response.headers.set("Retry-After", String(verdict.retryAfterSeconds));
+  return response;
+}
+
+Deno.serve({ port }, async (request, info) => {
+  const url = new URL(request.url);
+  // /api/admin/* sits behind Caddy basic auth and is used by ops tooling.
+  const rateLimited = rateLimitEnabled &&
+    url.pathname.startsWith("/api/") &&
+    !url.pathname.startsWith("/api/admin/");
+
+  let verdict: RateVerdict | null = null;
+  if (rateLimited) {
+    const key = clientKey(request, info?.remoteAddr);
+    verdict = rateLimiter.consume(key, requestCost(url));
+    if (!verdict.allowed) {
+      if (verdict.shouldLog) {
+        console.warn(
+          JSON.stringify({
+            level: "warn",
+            event: "rate_limited",
+            client: key,
+            path: url.pathname,
+            limit_per_minute: verdict.limit,
+            retry_after_seconds: verdict.retryAfterSeconds,
+          }),
+        );
+      }
+      return rateLimitedResponse(verdict);
+    }
+  }
+
   const response = await handleRequest(request);
+  if (verdict) {
+    applyRateLimitHeaders(response, verdict);
+  }
   logRequestPerformance(request, response);
   return response;
 });
