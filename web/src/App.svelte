@@ -1438,6 +1438,20 @@
                 }}
               >
                 <div class:result-card__layout--with-preview={Boolean(item.previewImageUrl)} class="result-card__layout">
+                  <!-- The meta row is a sibling of the content column, not a child, so that on
+                       narrow viewports the preview can sit beside it as a corner thumbnail while
+                       title and snippet keep the full card width. -->
+                  <div class="result-card__meta">
+                    <div class="result-card__tags">
+                      <span class="pill">{item.organization}</span>
+                      <span class="pill pill--soft">{item.entityTypeLabel}</span>
+                      {#if item.pageCount && item.entityType === "Document"}
+                        <span class="pill pill--soft">{item.pageCount} pagina's</span>
+                      {/if}
+                    </div>
+                    <span class="result-card__date">{item.date}</span>
+                  </div>
+
                   {#if item.previewImageUrl}
                     <div
                       class="result-card__preview"
@@ -1457,16 +1471,6 @@
                   {/if}
 
                   <div class="result-card__content">
-                    <div class="result-card__meta">
-                      <div class="result-card__tags">
-                        <span class="pill">{item.organization}</span>
-                        <span class="pill pill--soft">{item.entityTypeLabel}</span>
-                        {#if item.pageCount && item.entityType === "Document"}
-                          <span class="pill pill--soft">{item.pageCount} pagina's</span>
-                        {/if}
-                      </div>
-                      <span class="result-card__date">{item.date}</span>
-                    </div>
                     <h3>{item.title}</h3>
                     {#if item.summaryHtml}
                       <p>{@html item.summaryHtml}</p>
@@ -1552,6 +1556,8 @@
               target="_blank">GitHub</a>,
             samen met de
             <button type="button" class="inline-link" on:click={() => void openApiDocs()}>API-documentatie</button>
+            en de
+            <a href="/docs/migration-guide" rel="noopener noreferrer" target="_blank">migration guide</a>
             voor hergebruikers.
           </p>
           <p>OpenBesluitvorming komt voort uit het project OpenRaadsinformatie en OpenStateninformatie, welke waren gestart door de Open State Foundation.</p>

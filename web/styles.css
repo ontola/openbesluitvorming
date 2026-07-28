@@ -861,7 +861,9 @@ select {
 
 .result-card__layout--with-preview {
   grid-template-columns: minmax(0, 1fr) 7rem;
-  grid-template-areas: "content preview";
+  grid-template-areas:
+    "meta preview"
+    "content preview";
   align-items: stretch;
   gap: 0;
   min-height: 100%;
@@ -872,11 +874,16 @@ select {
   padding: 0;
 }
 
+.result-card--with-preview .result-card__meta {
+  grid-area: meta;
+  padding-block: 1.25rem 0;
+  padding-right: 1rem;
+}
+
 .result-card--with-preview .result-card__content {
-  display: grid;
   align-content: start;
   grid-area: content;
-  padding-block: 1.25rem 1.35rem;
+  padding-block: 0 1.35rem;
   padding-right: 1rem;
 }
 
@@ -1226,95 +1233,6 @@ select {
 .detail-sheet-gutter:hover::after,
 .detail-sheet-gutter--active::after {
   opacity: 1;
-}
-
-/* The sheet width is user-adjustable, so its internals must respond to the
-   sheet's own width, not the viewport's. These mirror the 640px mobile
-   treatment; browsers without container queries keep the media-query path. */
-.detail-sheet {
-  container: detail-sheet / inline-size;
-}
-
-@container detail-sheet (max-width: 760px) {
-  .detail-sheet__header-bar {
-    flex-wrap: wrap;
-  }
-
-  .detail-sheet__header-actions {
-    flex-wrap: wrap;
-    row-gap: 0.5rem;
-    min-width: 0;
-  }
-}
-
-@container detail-sheet (max-width: 640px) {
-  .detail-sheet__header-top h2 {
-    font-size: 1.6rem;
-  }
-
-  .detail-sheet__meta {
-    gap: 0.5rem;
-  }
-
-  .detail-sheet__header-actions {
-    gap: 0.55rem;
-  }
-
-  .detail-sheet__header-actions > .primary-button,
-  .detail-sheet__header-actions > .ghost-button,
-  .detail-sheet__header-actions > .select-field {
-    min-height: 2.5rem;
-    flex: 0 0 auto;
-  }
-
-  .detail-sheet__header-actions > .primary-button,
-  .detail-sheet__header-actions > .ghost-button {
-    padding: 0 0.75rem;
-  }
-
-  .detail-sheet__header-actions > .ghost-button {
-    min-width: 2.5rem;
-    justify-content: center;
-  }
-
-  .detail-sheet__header-actions > .primary-button.button-with-icon,
-  .detail-sheet__header-actions > .ghost-button.button-with-icon {
-    width: 2.5rem;
-    padding: 0;
-    justify-content: center;
-    gap: 0;
-  }
-
-  .detail-sheet__header-actions > .primary-button.button-with-icon .button-label,
-  .detail-sheet__header-actions > .ghost-button.button-with-icon .button-label {
-    display: none;
-  }
-
-  .detail-sheet__header-actions > .primary-button.button-with-icon .button-icon,
-  .detail-sheet__header-actions > .ghost-button.button-with-icon .button-icon {
-    font-size: 1.15rem;
-  }
-
-  .detail-sheet__pdf-overlay {
-    bottom: 0.65rem;
-    right: 0.7rem;
-    gap: 0.28rem;
-    padding: 0.24rem 0.24rem 0.24rem 0.5rem;
-  }
-
-  .detail-sheet__pdf-counter {
-    font-size: 0.72rem;
-  }
-
-  .detail-sheet__pdf-jump {
-    width: 1.65rem;
-    height: 1.65rem;
-    font-size: 0.88rem;
-  }
-
-  .detail-sheet__body {
-    padding: 1rem;
-  }
 }
 
 .detail-sheet__header {
@@ -2078,6 +1996,157 @@ select {
   animation: detail-highlight-bloom 820ms ease-out both;
 }
 
+/* The sheet width is user-adjustable, so its internals must respond to the
+   sheet's own width, not the viewport's. These mirror the 640px mobile
+   treatment; browsers without container queries keep the media-query path.
+   Keep these blocks *after* the base .detail-sheet__* rules: a container query
+   adds no specificity, so an earlier position silently loses the cascade. */
+.detail-sheet {
+  container: detail-sheet / inline-size;
+}
+
+@container detail-sheet (max-width: 760px) {
+  .detail-sheet__header-bar {
+    flex-wrap: wrap;
+  }
+
+  .detail-sheet__header-actions {
+    flex-wrap: wrap;
+    row-gap: 0.5rem;
+    min-width: 0;
+  }
+}
+
+/* Tight sheets get a two-row header: [tags + date] / [view toggle + actions].
+   Everything below is about buying back rows — the segmented Tekst/PDF control
+   collapses to a single button that switches to the *other* mode. */
+@container detail-sheet (max-width: 640px) {
+  .detail-sheet__header {
+    gap: 0.55rem;
+    padding: 0.85rem 0.95rem 0.8rem;
+  }
+
+  .detail-sheet__header-top h2 {
+    font-size: 1.32rem;
+    line-height: 1.16;
+    letter-spacing: -0.025em;
+  }
+
+  .detail-sheet__meta {
+    flex: 1 1 100%;
+    gap: 0.3rem 0.45rem;
+  }
+
+  .detail-sheet__meta .pill {
+    min-height: 1.75rem;
+    padding: 0 0.62rem;
+    font-size: 0.78rem;
+  }
+
+  .detail-sheet__date {
+    font-size: 0.82rem;
+  }
+
+  /* Stays wrappable: the sheet is a flex item with min-width: auto, so a
+     nowrap action row would push the whole sheet wider than the viewport. */
+  .detail-sheet__header-actions {
+    width: 100%;
+    justify-content: flex-end;
+    gap: 0.4rem;
+  }
+
+  .detail-sheet__view-switch {
+    flex: 0 0 auto;
+    margin: 0 auto 0 0;
+    padding: 0.18rem;
+    gap: 0;
+  }
+
+  .detail-sheet__view-toggle {
+    min-height: 1.95rem;
+    padding: 0 0.75rem;
+    color: var(--accent-deep);
+    font-size: 0.85rem;
+    font-weight: 700;
+  }
+
+  .detail-sheet__view-toggle::before {
+    content: "⇄";
+    margin-right: 0.32rem;
+    opacity: 0.65;
+  }
+
+  .detail-sheet__view-toggle[aria-pressed="true"] {
+    display: none;
+  }
+
+  .detail-sheet__nav {
+    gap: 0.3rem;
+  }
+
+  .detail-sheet__nav-button {
+    min-width: 2.25rem;
+    min-height: 2.25rem;
+    font-size: 1rem;
+  }
+
+  .detail-sheet__header-actions > .primary-button,
+  .detail-sheet__header-actions > .ghost-button,
+  .detail-sheet__header-actions > .select-field {
+    min-height: 2.25rem;
+    flex: 0 0 auto;
+  }
+
+  .detail-sheet__header-actions > .primary-button,
+  .detail-sheet__header-actions > .ghost-button {
+    padding: 0 0.75rem;
+  }
+
+  .detail-sheet__header-actions > .ghost-button {
+    min-width: 2.25rem;
+    justify-content: center;
+  }
+
+  .detail-sheet__header-actions > .primary-button.button-with-icon,
+  .detail-sheet__header-actions > .ghost-button.button-with-icon {
+    width: 2.25rem;
+    padding: 0;
+    justify-content: center;
+    gap: 0;
+  }
+
+  .detail-sheet__header-actions > .primary-button.button-with-icon .button-label,
+  .detail-sheet__header-actions > .ghost-button.button-with-icon .button-label {
+    display: none;
+  }
+
+  .detail-sheet__header-actions > .primary-button.button-with-icon .button-icon,
+  .detail-sheet__header-actions > .ghost-button.button-with-icon .button-icon {
+    font-size: 1.15rem;
+  }
+
+  .detail-sheet__pdf-overlay {
+    bottom: 0.65rem;
+    right: 0.7rem;
+    gap: 0.28rem;
+    padding: 0.24rem 0.24rem 0.24rem 0.5rem;
+  }
+
+  .detail-sheet__pdf-counter {
+    font-size: 0.72rem;
+  }
+
+  .detail-sheet__pdf-jump {
+    width: 1.65rem;
+    height: 1.65rem;
+    font-size: 0.88rem;
+  }
+
+  .detail-sheet__body {
+    padding: 1rem;
+  }
+}
+
 @keyframes detail-highlight-bloom {
   0% {
     background: rgba(78, 166, 255, 0);
@@ -2565,8 +2634,75 @@ select {
 }
 
 @media (max-width: 640px) {
-  .result-card__content {
-    padding-right: 0;
+  /* Narrow cards: the preview becomes a corner thumbnail next to the tags
+     instead of a full-height column, so title and snippet get the full width. */
+  .result-card,
+  .result-card--with-preview {
+    padding: 0.85rem 1rem 0.95rem;
+  }
+
+  .result-card--with-preview {
+    min-height: 0;
+  }
+
+  .result-card__layout--with-preview {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "meta preview"
+      "content content";
+    column-gap: 0.8rem;
+  }
+
+  .result-card--with-preview .result-card__meta,
+  .result-card--with-preview .result-card__content {
+    padding: 0;
+  }
+
+  .result-card--with-preview .result-card__meta {
+    margin-bottom: 0.5rem;
+  }
+
+  .result-card__preview {
+    width: 3.4rem;
+    height: 4.4rem;
+    min-height: 0;
+    align-self: start;
+    border-radius: 0.6rem;
+  }
+
+  /* Let the pills and the date share one wrapping flow instead of being pushed
+     to opposite edges of a narrow row. */
+  .result-card__meta {
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.3rem 0.4rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .result-card__tags {
+    display: contents;
+  }
+
+  .result-card .pill {
+    min-height: 1.7rem;
+    padding: 0 0.6rem;
+    font-size: 0.76rem;
+  }
+
+  .result-card__date {
+    font-size: 0.8rem;
+  }
+
+  .result-card h3 {
+    margin-bottom: 0.35rem;
+    font-size: 1.1rem;
+    line-height: 1.2;
+  }
+
+  .result-card p {
+    font-size: 0.95rem;
+    line-height: 1.5;
   }
 
   .hero__meta {
@@ -2591,16 +2727,17 @@ select {
     gap: 0;
   }
 
+  /* Keep the result count and the filter button on one row — they both fit,
+     and stacking them wasted a full row above every result list. */
   .search-results__heading {
-    grid-template-columns: minmax(0, 1fr);
-    justify-items: start;
     gap: 0.75rem;
+    margin-bottom: 0.75rem;
   }
 
   .search-results__toggle {
-    justify-self: start;
-    min-width: 3.25rem;
-    min-height: 3.1rem;
+    min-height: 2.4rem;
+    padding-inline: 0.85rem;
+    font-size: 0.9rem;
   }
 
   .search-results__filters {
@@ -2609,6 +2746,13 @@ select {
 
   .content {
     padding-top: 2.8rem;
+  }
+
+  /* .content wins over .content--search on specificity alone (both one class,
+     this one later), so the search page has to restate it — under the sticky
+     search bar that 2.8rem is dead space, not breathing room. */
+  .content--search {
+    padding-top: 0.75rem;
   }
 
   .section__heading h2 {
@@ -2629,18 +2773,77 @@ select {
     max-height: calc(100vh - 1.5rem);
   }
 
-  .detail-sheet__meta {
-    gap: 0.5rem;
+  /* Two header rows: [tags + date] / [view toggle + actions].
+     Mirrors the @container (max-width: 640px) block. */
+  .detail-sheet__header {
+    gap: 0.55rem;
+    padding: 0.85rem 0.95rem 0.8rem;
   }
 
+  .detail-sheet__header-top h2 {
+    font-size: 1.32rem;
+    line-height: 1.16;
+    letter-spacing: -0.025em;
+  }
+
+  .detail-sheet__header-bar {
+    flex-wrap: wrap;
+  }
+
+  .detail-sheet__meta {
+    flex: 1 1 100%;
+    gap: 0.3rem 0.45rem;
+  }
+
+  .detail-sheet__meta .pill {
+    min-height: 1.75rem;
+    padding: 0 0.62rem;
+    font-size: 0.78rem;
+  }
+
+  .detail-sheet__date {
+    font-size: 0.82rem;
+  }
+
+  /* Stays wrappable: the sheet is a flex item with min-width: auto, so a
+     nowrap action row would push the whole sheet wider than the viewport. */
   .detail-sheet__header-actions {
-    gap: 0.55rem;
+    width: 100%;
+    justify-content: flex-end;
+    gap: 0.4rem;
+  }
+
+  .detail-sheet__view-switch {
+    flex: 0 0 auto;
+    width: auto;
+    margin: 0 auto 0 0;
+    padding: 0.18rem;
+    gap: 0;
+  }
+
+  .detail-sheet__view-toggle {
+    flex: 0 0 auto;
+    min-height: 1.95rem;
+    padding: 0 0.75rem;
+    color: var(--accent-deep);
+    font-size: 0.85rem;
+    font-weight: 700;
+  }
+
+  .detail-sheet__view-toggle::before {
+    content: "⇄";
+    margin-right: 0.32rem;
+    opacity: 0.65;
+  }
+
+  .detail-sheet__view-toggle[aria-pressed="true"] {
+    display: none;
   }
 
   .detail-sheet__header-actions > .primary-button,
   .detail-sheet__header-actions > .ghost-button,
   .detail-sheet__header-actions > .select-field {
-    min-height: 2.5rem;
+    min-height: 2.25rem;
     flex: 0 0 auto;
   }
 
@@ -2650,13 +2853,13 @@ select {
   }
 
   .detail-sheet__header-actions > .ghost-button {
-    min-width: 2.5rem;
+    min-width: 2.25rem;
     justify-content: center;
   }
 
   .detail-sheet__header-actions > .primary-button.button-with-icon,
   .detail-sheet__header-actions > .ghost-button.button-with-icon {
-    width: 2.5rem;
+    width: 2.25rem;
     padding: 0;
     justify-content: center;
     gap: 0;
@@ -2694,8 +2897,8 @@ select {
   }
 
   .detail-sheet__nav-button {
-    min-width: 2.4rem;
-    min-height: 2.4rem;
+    min-width: 2.25rem;
+    min-height: 2.25rem;
     font-size: 1rem;
   }
 
@@ -2706,28 +2909,35 @@ select {
 
 /* Collapse the detail-sheet header to two rows earlier than the tight mobile
    breakpoint — otherwise the header becomes cramped between ~640px and
-   ~900px as the title and controls fight for space. */
-@media (max-width: 900px) {
+   ~900px as the title and controls fight for space. The view switch stays
+   inline with the other actions here; stretching it full width cost a third
+   row. Below 640px the tighter block above takes over.
+
+   The break is forced with a full-width flex basis on the meta row, never with
+   flex-direction: column. The sheet's own container query sets flex-wrap: wrap
+   here, and column + wrap lays the two rows out as side-by-side *columns* —
+   which pushed the actions past the sheet edge, where overflow: hidden ate
+   them. */
+@media (min-width: 641px) and (max-width: 900px) {
   .detail-sheet__header-bar {
-    flex-direction: column;
-    align-items: stretch;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .detail-sheet__meta {
+    flex: 1 1 100%;
   }
 
   .detail-sheet__header-actions {
     width: 100%;
     justify-content: flex-end;
-    flex-direction: row;
     align-items: center;
     gap: 0.55rem;
   }
 
   .detail-sheet__view-switch {
-    width: 100%;
+    margin-right: auto;
     margin-left: 0;
-  }
-
-  .detail-sheet__view-toggle {
-    flex: 1 1 0;
   }
 }
 
