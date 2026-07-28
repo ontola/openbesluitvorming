@@ -97,7 +97,7 @@ separate whitelisting per source).
 
 ```sh
 # From admin panel or via API:
-curl -X POST https://beta.openbesluitvorming.nl/api/admin/rerun \
+curl -X POST https://openbesluitvorming.nl/api/admin/rerun \
   -H "Content-Type: application/json" \
   -d '{"sourceKey":"amstelveen","dateFrom":"2024-06-01","dateTo":"2024-07-01","executionMode":"full"}'
 ```

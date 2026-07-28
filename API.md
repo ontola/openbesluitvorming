@@ -5,7 +5,7 @@ This page documents the API for Open Besluitvorming (Woozi), which indexes publi
 ## Base URL
 
 ```
-https://beta.openbesluitvorming.nl
+https://openbesluitvorming.nl
 ```
 
 ## Endpoints overview
@@ -46,7 +46,7 @@ The recommended search endpoint. Returns grouped, deduplicated results with docu
 **Example:**
 
 ```bash
-curl "https://beta.openbesluitvorming.nl/api/search?query=begroting&organization=soest&sort=date_desc&limit=10"
+curl "https://openbesluitvorming.nl/api/search?query=begroting&organization=soest&sort=date_desc&limit=10"
 ```
 
 **Response:**
@@ -139,7 +139,7 @@ Returns the full content for a meeting or document.
 **Example:**
 
 ```bash
-curl "https://beta.openbesluitvorming.nl/api/entities/document%3Anotubiz%3Agemeente%3Asoest%3A12345"
+curl "https://openbesluitvorming.nl/api/entities/document%3Anotubiz%3Agemeente%3Asoest%3A12345"
 ```
 
 **Response (document):**
@@ -206,7 +206,7 @@ Returns a rendered page of a PDF document as a PNG image. Pages are rendered at 
 **Example:**
 
 ```bash
-curl -o page1.png "https://beta.openbesluitvorming.nl/api/entities/document%3Anotubiz%3Agemeente%3Asoest%3A12345/pdf/page/1"
+curl -o page1.png "https://openbesluitvorming.nl/api/entities/document%3Anotubiz%3Agemeente%3Asoest%3A12345/pdf/page/1"
 ```
 
 ---

@@ -55,8 +55,6 @@ Quickwit-zoekprojectie. De belangrijkste verschillen:
 https://openbesluitvorming.nl
 ```
 
-(ook bereikbaar als `https://beta.openbesluitvorming.nl`)
-
 Geen authenticatie; alle endpoints zijn read-only.
 
 ## Endpoint cheat sheet

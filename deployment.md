@@ -545,11 +545,15 @@ The practical rule is:
 
 ### Public domains
 
-The production stack serves the same content on multiple hostnames from a
-single Caddy site block. As of 2026-05-07 the live names are:
+The production stack serves the apex from a single Caddy site block:
 
-- `beta.openbesluitvorming.nl` (original)
 - `openbesluitvorming.nl` (apex, added 2026-05-07)
+
+`beta.openbesluitvorming.nl` was the original name and was dropped on
+2026-07-28, when DNS moved from Netlify to Openprovider and the new zone was
+created with only the apex `A` record. A site block for a name that no longer
+resolves is not free: Caddy keeps retrying the ACME challenge for it and can
+get rate-limited, so the hostname has to go from here too, not just from DNS.
 
 Planned next:
 
@@ -563,7 +567,7 @@ indirection for the site addresses anymore — they are listed verbatim in the
 Caddyfile so the canonical list lives in version control.
 
 ```caddy
-beta.openbesluitvorming.nl, openbesluitvorming.nl {
+openbesluitvorming.nl {
   encode gzip zstd
   reverse_proxy openbesluitvorming:8787
 }

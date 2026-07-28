@@ -1,4 +1,4 @@
-beta.openbesluitvorming.nl, openbesluitvorming.nl {
+openbesluitvorming.nl {
   @admin {
     path /admin /admin.html /api/admin/*
   }
