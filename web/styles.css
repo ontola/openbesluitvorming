@@ -1186,6 +1186,9 @@ select {
 }
 
 .detail-sheet {
+  /* Header and reader bodies share one inset so the text lines up with the
+     title instead of sitting a few pixels off it. */
+  --detail-inline-padding: 1.25rem;
   position: relative;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
@@ -1201,6 +1204,14 @@ select {
 
 .detail-sheet--reader {
   min-height: 0;
+}
+
+/* The dialog is focused on open so the modal traps the keyboard; it is not
+   tab-reachable, and a ring drawn around the entire sheet reads as a stray
+   outline. Meetings showed it because focus stays here, while documents hand
+   it straight to the text pane. Controls inside keep their own rings. */
+.detail-sheet:focus {
+  outline: none;
 }
 
 /* Drag gutters flanking the sheet: the overlay centers the trio, so a
@@ -1241,7 +1252,7 @@ select {
   justify-content: space-between;
   flex: 0 0 auto;
   gap: 0.9rem;
-  padding: 1.1rem 1.25rem 1rem;
+  padding: 1.1rem var(--detail-inline-padding) 1rem;
   border-bottom: 1px solid var(--line);
 }
 
@@ -1465,27 +1476,41 @@ select {
   box-shadow: 0 4px 14px rgba(37, 89, 168, 0.1);
 }
 
-.detail-sheet__text {
+/* One reader surface behind every detail body — document text, meeting agenda,
+   PDF viewer and the API docs. They differ in what they render, not in how the
+   pane behaves, so scrolling, padding and focus live here instead of being
+   restated (and drifting) per body. */
+.detail-sheet__surface {
   margin: 0;
   flex: 1 1 auto;
-  color: var(--text);
-  background: var(--document-surface-muted);
-  padding: 1rem;
-  line-height: 1.65;
-  font-size: 1rem;
+  min-height: 0;
   overflow: auto;
+  padding: var(--detail-inline-padding);
+  background: var(--document-surface-muted);
+  color: var(--text);
 }
 
-.detail-sheet--reader .detail-sheet__text {
-  min-height: 0;
+/* These panes are focused programmatically so the keyboard can scroll them;
+   they are never tab-reachable, so the default ring only ever appears as a box
+   drawn around the whole reader. */
+.detail-sheet__surface:focus {
+  outline: none;
+}
+
+/* For bodies that manage their own insets — the PDF viewer paints page cards
+   edge to edge. */
+.detail-sheet__surface--flush {
+  padding: 0;
+  overflow: hidden;
+  background: var(--document-surface);
+}
+
+.detail-sheet__text {
+  line-height: 1.65;
+  font-size: 1rem;
 }
 
 .detail-sheet__pdf {
-  margin-top: 0;
-  flex: 1 1 auto;
-  background: var(--document-surface);
-  min-height: 0;
-  overflow: hidden;
   position: relative;
 }
 
@@ -1512,14 +1537,6 @@ select {
 
 .detail-sheet__pdf-fallback a {
   color: var(--accent-deep);
-}
-
-.detail-sheet__meeting {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow: auto;
-  padding: 1rem;
-  background: var(--document-surface-muted);
 }
 
 .detail-sheet__meeting-intro {
@@ -1563,14 +1580,11 @@ select {
   margin: 0;
 }
 
+/* Frame comes from .surface-card, the same primitive the result cards use. */
 .meeting-agenda__card {
   display: grid;
   gap: 0.75rem;
   padding: 1rem;
-  border: 1px solid rgba(41, 88, 153, 0.12);
-  border-radius: 1rem;
-  background: white;
-  box-shadow: 0 8px 20px rgba(23, 50, 92, 0.06);
 }
 
 .meeting-agenda__header {
@@ -2023,7 +2037,7 @@ select {
 @container detail-sheet (max-width: 640px) {
   .detail-sheet__header {
     gap: 0.55rem;
-    padding: 0.85rem 0.95rem 0.8rem;
+    padding: 0.85rem var(--detail-inline-padding) 0.8rem;
   }
 
   .detail-sheet__header-top h2 {
@@ -2142,8 +2156,14 @@ select {
     font-size: 0.88rem;
   }
 
-  .detail-sheet__body {
-    padding: 1rem;
+  /* Narrow the shared inset rather than padding the body wrapper — that used to
+     stack on top of each reader's own padding, so the text sat twice as far in
+     as the title and the PDF viewer gained a frame it never has on desktop.
+     Set on the consumers, not on .detail-sheet: a container query cannot match
+     its own query container. */
+  .detail-sheet__header,
+  .detail-sheet__surface {
+    --detail-inline-padding: 0.95rem;
   }
 }
 
@@ -2451,10 +2471,6 @@ select {
   .detail-sheet__meeting-empty {
     background: rgba(18, 21, 27, 0.74);
     border-color: rgba(114, 163, 232, 0.2);
-  }
-
-  .meeting-agenda__card {
-    background: rgba(14, 16, 20, 0.9);
   }
 
   .meeting-agenda__number {
@@ -2777,7 +2793,7 @@ select {
      Mirrors the @container (max-width: 640px) block. */
   .detail-sheet__header {
     gap: 0.55rem;
-    padding: 0.85rem 0.95rem 0.8rem;
+    padding: 0.85rem var(--detail-inline-padding) 0.8rem;
   }
 
   .detail-sheet__header-top h2 {
@@ -2892,8 +2908,14 @@ select {
     font-size: 0.88rem;
   }
 
-  .detail-sheet__body {
-    padding: 1rem;
+  /* Narrow the shared inset rather than padding the body wrapper — that used to
+     stack on top of each reader's own padding, so the text sat twice as far in
+     as the title and the PDF viewer gained a frame it never has on desktop.
+     Set on the consumers, not on .detail-sheet: a container query cannot match
+     its own query container. */
+  .detail-sheet__header,
+  .detail-sheet__surface {
+    --detail-inline-padding: 0.95rem;
   }
 
   .detail-sheet__nav-button {

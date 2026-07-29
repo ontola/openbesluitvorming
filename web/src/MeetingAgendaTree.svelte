@@ -86,7 +86,7 @@
   <ol class="meeting-agenda">
     {#each items as item}
       <li class="meeting-agenda__item">
-        <article class="meeting-agenda__card">
+        <article class="surface-card meeting-agenda__card">
           <header class="meeting-agenda__header">
             {#if item.number}
               <span class="meeting-agenda__number">{item.number}</span>

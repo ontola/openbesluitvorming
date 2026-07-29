@@ -1796,7 +1796,7 @@
       <div class="detail-sheet__body">
         {#if detailMode === "text"}
           {#if detailItem.entityType === "Meeting"}
-            <div class="detail-sheet__meeting">
+            <div class="detail-sheet__surface detail-sheet__meeting">
               <div class="detail-sheet__meeting-intro">
                 <p class="detail-sheet__meeting-label">Agenda</p>
                 {#if detailContent?.agenda?.length}
@@ -1812,7 +1812,11 @@
               {/if}
             </div>
           {:else}
-            <div bind:this={detailTextEl} class="detail-sheet__text prose-detail" tabindex="-1">
+            <div
+              bind:this={detailTextEl}
+              class="detail-sheet__surface detail-sheet__text prose-detail"
+              tabindex="-1"
+            >
               {#if detailLoading}
                 <div class="detail-sheet__loading" aria-hidden="true">
                   <span class="detail-sheet__loading-line detail-sheet__loading-line--title"></span>
@@ -1829,7 +1833,11 @@
             </div>
           {/if}
         {:else}
-          <div bind:this={detailPdfEl} class="detail-sheet__pdf" tabindex="-1">
+          <div
+            bind:this={detailPdfEl}
+            class="detail-sheet__surface detail-sheet__surface--flush detail-sheet__pdf"
+            tabindex="-1"
+          >
             <div class="detail-sheet__pdf-overlay">
               {#if detailPdfJumpOpen}
                 <form class="detail-sheet__pdf-page-form" on:submit|preventDefault={submitPdfPageJump}>
@@ -1934,7 +1942,7 @@
         </div>
       </div>
       <div class="detail-sheet__body">
-        <div class="detail-sheet__text prose-detail">
+        <div class="detail-sheet__surface detail-sheet__text prose-detail">
           <!-- eslint-disable-next-line svelte/no-at-html-tags -->
           {@html apiDocsHtml}
         </div>
