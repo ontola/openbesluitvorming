@@ -12,6 +12,7 @@
   import vngLogo from "../vng-logo.svg";
   import PdfDocumentView from "./PdfDocumentView.svelte";
   import MeetingAgendaTree from "./MeetingAgendaTree.svelte";
+  import ReaderLoading from "./ReaderLoading.svelte";
   import SourcePicker from "./SourcePicker.svelte";
 
   type SearchRouteState = {
@@ -1411,14 +1412,14 @@
               >
                 <div class="result-card__meta">
                   <div class="result-card__tags">
-                    <span class="pill pill--skeleton"></span>
-                    <span class="pill pill--soft pill--skeleton"></span>
+                    <span class="skeleton pill pill--skeleton"></span>
+                    <span class="skeleton pill pill--soft pill--skeleton"></span>
                   </div>
-                  <span class="result-card__date result-card__line result-card__line--date"></span>
+                  <span class="skeleton result-card__date result-card__line result-card__line--date"></span>
                 </div>
-                <span class="result-card__line result-card__line--title"></span>
-                <span class="result-card__line result-card__line--body"></span>
-                <span class="result-card__line result-card__line--body result-card__line--short"></span>
+                <span class="skeleton result-card__line result-card__line--title"></span>
+                <span class="skeleton result-card__line result-card__line--body"></span>
+                <span class="skeleton result-card__line result-card__line--body result-card__line--short"></span>
               </article>
             {/each}
           {:else if results.length === 0 && !loading}
@@ -1492,14 +1493,14 @@
                 >
                   <div class="result-card__meta">
                     <div class="result-card__tags">
-                      <span class="pill pill--skeleton"></span>
-                      <span class="pill pill--soft pill--skeleton"></span>
+                      <span class="skeleton pill pill--skeleton"></span>
+                      <span class="skeleton pill pill--soft pill--skeleton"></span>
                     </div>
-                    <span class="result-card__date result-card__line result-card__line--date"></span>
+                    <span class="skeleton result-card__date result-card__line result-card__line--date"></span>
                   </div>
-                  <span class="result-card__line result-card__line--title"></span>
-                  <span class="result-card__line result-card__line--body"></span>
-                  <span class="result-card__line result-card__line--body result-card__line--short"></span>
+                  <span class="skeleton result-card__line result-card__line--title"></span>
+                  <span class="skeleton result-card__line result-card__line--body"></span>
+                  <span class="skeleton result-card__line result-card__line--body result-card__line--short"></span>
                 </article>
               {/each}
             {/if}
@@ -1771,6 +1772,21 @@
                   </button>
                 </div>
               {/if}
+            {#if detailContent?.downloadUrl || detailItem.downloadUrl}
+              <a
+                class="primary-button button-with-icon"
+                href={detailContent?.downloadUrl ?? detailItem.downloadUrl}
+                aria-label="Download"
+                download
+              >
+                <span class="button-icon" aria-hidden="true">↓</span>
+                <span class="button-label">Download</span>
+              </a>
+            {/if}
+            <!-- Nav sits after everything optional, next to the always-present close
+                 button: the row is right-aligned, so anything to the left of these can
+                 appear or vanish (download, the Tekst/PDF switch) without shifting them.
+                 Stepping through results with repeated clicks depends on that. -->
             <div class="detail-sheet__nav">
               <button
                 type="button"
@@ -1795,17 +1811,6 @@
                 →
               </button>
             </div>
-            {#if detailContent?.downloadUrl || detailItem.downloadUrl}
-              <a
-                class="primary-button button-with-icon"
-                href={detailContent?.downloadUrl ?? detailItem.downloadUrl}
-                aria-label="Download"
-                download
-              >
-                <span class="button-icon" aria-hidden="true">↓</span>
-                <span class="button-label">Download</span>
-              </a>
-            {/if}
             <button
               class="ghost-button button-with-icon"
               type="button"
@@ -1838,13 +1843,15 @@
             <div class="detail-sheet__surface detail-sheet__meeting">
               <div class="detail-sheet__meeting-intro">
                 <p class="detail-sheet__meeting-label">Agenda</p>
-                {#if detailContent?.agenda?.length}
+                {#if !detailLoading && detailContent?.agenda?.length}
                   <p class="detail-sheet__meeting-copy">
                     Bekijk agendapunten en gekoppelde documenten van deze vergadering.
                   </p>
                 {/if}
               </div>
-              {#if detailContent?.agenda?.length}
+              {#if detailLoading}
+                <ReaderLoading label="Agenda wordt geladen…" variant="agenda" />
+              {:else if detailContent?.agenda?.length}
                 <MeetingAgendaTree items={detailContent.agenda} on:opendocument={handleAgendaDocumentOpen} />
               {:else}
                 <p class="detail-sheet__meeting-empty">Geen agenda beschikbaar.</p>
@@ -1857,15 +1864,7 @@
               tabindex="-1"
             >
               {#if detailLoading}
-                <div class="detail-sheet__loading" aria-hidden="true">
-                  <span class="detail-sheet__loading-line detail-sheet__loading-line--title"></span>
-                  <span class="detail-sheet__loading-line"></span>
-                  <span class="detail-sheet__loading-line"></span>
-                  <span class="detail-sheet__loading-line detail-sheet__loading-line--short"></span>
-                  <span class="detail-sheet__loading-line"></span>
-                  <span class="detail-sheet__loading-line"></span>
-                  <span class="detail-sheet__loading-line detail-sheet__loading-line--medium"></span>
-                </div>
+                <ReaderLoading label="Tekst wordt geladen…" lines={7} />
               {:else}
                 {@html detailMarkdownHtml}
               {/if}

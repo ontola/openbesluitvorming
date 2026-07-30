@@ -1012,18 +1012,11 @@ select {
   opacity: 1;
 }
 
+/* Shimmer comes from .skeleton; these only set the shape. */
 .pill--skeleton,
 .result-card__line {
   display: block;
   border-radius: 999px;
-  background: linear-gradient(
-    90deg,
-    rgba(37, 89, 168, 0.08) 0%,
-    rgba(78, 166, 255, 0.14) 50%,
-    rgba(37, 89, 168, 0.08) 100%
-  );
-  background-size: 200% 100%;
-  animation: result-skeleton-shimmer 1.35s linear infinite;
 }
 
 .pill--skeleton {
@@ -1222,13 +1215,6 @@ select {
   min-height: 0;
 }
 
-/* The dialog is focused on open so the modal traps the keyboard; it is not
-   tab-reachable, and a ring drawn around the entire sheet reads as a stray
-   outline. Meetings showed it because focus stays here, while documents hand
-   it straight to the text pane. Controls inside keep their own rings. */
-.detail-sheet:focus {
-  outline: none;
-}
 
 /* Drag gutters flanking the sheet: the overlay centers the trio, so a
    symmetric width change keeps the sheet centered. They live outside the
@@ -1506,10 +1492,15 @@ select {
   color: var(--text);
 }
 
-/* These panes are focused programmatically so the keyboard can scroll them;
-   they are never tab-reachable, so the default ring only ever appears as a box
-   drawn around the whole reader. */
-.detail-sheet__surface:focus {
+/* Every tabindex="-1" element in the reader: the dialog (focused on open so the
+   modal traps the keyboard), the surfaces and the PDF scroller (focused so the
+   keyboard can scroll them). None are tab-reachable, so the browser's default
+   ring only ever draws a stray box around a whole pane — meetings showed it
+   around the entire sheet, documents around the text. Controls inside keep
+   their own rings. Add to this list, don't start a second one. */
+.detail-sheet:focus,
+.detail-sheet__surface:focus,
+.pdf-document:focus {
   outline: none;
 }
 
@@ -1822,45 +1813,6 @@ select {
   color: var(--text);
 }
 
-.meeting-agenda__document-skeleton {
-  display: grid;
-  gap: 0.45rem;
-}
-
-.meeting-agenda__document-skeleton span {
-  display: block;
-  height: 0.72rem;
-  border-radius: 999px;
-  background: linear-gradient(
-    90deg,
-    rgba(219, 228, 240, 0.7),
-    rgba(234, 240, 248, 1),
-    rgba(219, 228, 240, 0.7)
-  );
-  background-size: 200% 100%;
-  animation: meeting-agenda-skeleton-shimmer 1.3s ease-in-out infinite;
-}
-
-.meeting-agenda__document-skeleton span:nth-child(1) {
-  width: 96%;
-}
-
-.meeting-agenda__document-skeleton span:nth-child(2) {
-  width: 90%;
-}
-
-.meeting-agenda__document-skeleton span:nth-child(3) {
-  width: 92%;
-}
-
-.meeting-agenda__document-skeleton span:nth-child(4) {
-  width: 74%;
-}
-
-.meeting-agenda__document-skeleton span:nth-child(5) {
-  width: 81%;
-}
-
 .meeting-agenda__document-preview pre {
   margin: 0;
   font:
@@ -1876,16 +1828,6 @@ select {
 .meeting-agenda__document-preview-state {
   margin: 0;
   color: var(--muted);
-}
-
-@keyframes meeting-agenda-skeleton-shimmer {
-  0% {
-    background-position: 200% 0;
-  }
-
-  100% {
-    background-position: -200% 0;
-  }
 }
 
 .meeting-agenda__children {
@@ -1907,22 +1849,9 @@ select {
   overscroll-behavior: contain;
 }
 
-.pdf-document__loading {
-  display: grid;
-  gap: 1rem;
-}
-
-.pdf-document__skeleton {
-  height: min(72vh, 56rem);
-  border-radius: 1rem;
-  background: linear-gradient(
-    90deg,
-    rgba(37, 89, 168, 0.06) 0%,
-    rgba(78, 166, 255, 0.12) 50%,
-    rgba(37, 89, 168, 0.06) 100%
-  );
-  background-size: 200% 100%;
-  animation: result-skeleton-shimmer 1.2s ease-in-out infinite;
+/* Pages sit edge to edge, so the loading state has to bring its own inset. */
+.pdf-document > .reader-loading {
+  padding: var(--detail-inline-padding);
 }
 
 .pdf-document__pages {
@@ -1959,59 +1888,103 @@ select {
 .pdf-document__page-placeholder {
   width: 100%;
   height: 100%;
+}
+
+/* A page that failed keeps a flat tint; a page still fetching carries
+   .skeleton and shimmers like every other placeholder. */
+.pdf-document__page-placeholder:not(.skeleton) {
   background: linear-gradient(180deg, rgba(37, 89, 168, 0.03), rgba(37, 89, 168, 0.01));
 }
 
-.pdf-document__page-placeholder--loading {
+/* The one placeholder shape in the app: results, readers and the PDF viewer all
+   shimmer the same way. */
+.skeleton {
+  display: block;
   background: linear-gradient(
     90deg,
-    rgba(37, 89, 168, 0.06) 0%,
-    rgba(78, 166, 255, 0.12) 50%,
-    rgba(37, 89, 168, 0.06) 100%
+    rgba(37, 89, 168, 0.08) 0%,
+    rgba(78, 166, 255, 0.16) 50%,
+    rgba(37, 89, 168, 0.08) 100%
   );
   background-size: 200% 100%;
-  animation: result-skeleton-shimmer 1.2s ease-in-out infinite;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
 }
 
-.detail-sheet__loading {
+.reader-loading {
+  display: grid;
+  gap: 1rem;
+  align-content: start;
+}
+
+/* The label carries the message; the shapes only suggest the shape of what is
+   coming, which on its own reads as "empty" rather than "loading". */
+.reader-loading__label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.reader-loading__spinner {
+  flex: 0 0 auto;
+  width: 0.95rem;
+  height: 0.95rem;
+  border: 2px solid rgba(78, 166, 255, 0.28);
+  border-top-color: var(--accent-deep);
+  border-radius: 999px;
+  animation: reader-loading-spin 700ms linear infinite;
+}
+
+.reader-loading__shapes {
   display: grid;
   gap: 0.85rem;
 }
 
-.detail-sheet__loading-line {
-  display: block;
+.reader-loading__line {
   height: 1rem;
   border-radius: 999px;
-  background: linear-gradient(
-    90deg,
-    rgba(37, 89, 168, 0.08),
-    rgba(78, 166, 255, 0.18),
-    rgba(37, 89, 168, 0.08)
-  );
-  background-size: 200% 100%;
-  animation: detail-loading-sheen 1.5s ease-in-out infinite;
 }
 
-.detail-sheet__loading-line--title {
-  width: 48%;
-  height: 1.25rem;
-}
-
-.detail-sheet__loading-line--short {
-  width: 62%;
-}
-
-.detail-sheet__loading-line--medium {
+.reader-loading__line:nth-child(3n + 2) {
   width: 76%;
 }
 
-@keyframes detail-loading-sheen {
+.reader-loading__line:nth-child(4n + 3) {
+  width: 62%;
+}
+
+.reader-loading__card {
+  height: 4.5rem;
+  border-radius: 1.2rem;
+}
+
+.reader-loading__page {
+  height: min(72vh, 56rem);
+  border-radius: 1rem;
+}
+
+@keyframes skeleton-shimmer {
   0% {
     background-position: 200% 0;
   }
 
   100% {
     background-position: -200% 0;
+  }
+}
+
+@keyframes reader-loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton,
+  .reader-loading__spinner {
+    animation: none;
   }
 }
 
@@ -2197,16 +2170,6 @@ select {
   100% {
     background: rgba(78, 166, 255, 0.24);
     box-shadow: 0 0 0 rgba(78, 166, 255, 0);
-  }
-}
-
-@keyframes result-skeleton-shimmer {
-  0% {
-    background-position: 200% 0;
-  }
-
-  100% {
-    background-position: -200% 0;
   }
 }
 

@@ -2,6 +2,7 @@
   import { marked } from "marked";
   import { createEventDispatcher } from "svelte";
   import type { EntityContentResponse, MeetingAgendaItem } from "../../src/types.ts";
+  import ReaderLoading from "./ReaderLoading.svelte";
 
   export let items: MeetingAgendaItem[] = [];
 
@@ -166,13 +167,7 @@
                   {#if expandedDocumentId === document.id}
                     <div class="meeting-agenda__document-preview">
                       {#if loadingDocumentId === document.id}
-                        <div class="meeting-agenda__document-skeleton" aria-hidden="true">
-                          <span></span>
-                          <span></span>
-                          <span></span>
-                          <span></span>
-                          <span></span>
-                        </div>
+                        <ReaderLoading label="Documenttekst wordt geladen…" lines={4} />
                       {:else if documentErrors[document.id]}
                         <p class="meeting-agenda__document-preview-state">{documentErrors[document.id]}</p>
                       {:else if documentMarkdown[document.id]}

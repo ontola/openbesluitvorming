@@ -1,5 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher, onDestroy, tick } from "svelte";
+  import ReaderLoading from "./ReaderLoading.svelte";
 
   export let url = "";
   export let initialPage: number | null = null;
@@ -320,6 +321,8 @@
     resizeObserver.observe(containerEl);
   }
 
+  $: initialPagePending = !pages.some((page) => page.blobUrl || page.error);
+
   onDestroy(() => {
     for (const ctrl of abortControllers.values()) ctrl.abort();
     for (const entry of pageEntries.values()) {
@@ -331,11 +334,12 @@
 </script>
 
 <div bind:this={containerEl} class="pdf-document" on:scroll={scheduleScrollCheck} tabindex="-1">
-  {#if loading && pages.length === 0}
-    <div class="pdf-document__loading" aria-hidden="true">
-      <div class="pdf-document__skeleton"></div>
-      <div class="pdf-document__skeleton"></div>
-    </div>
+  {#if initialPagePending && !error}
+    <!-- `loading` only spans a synchronous block, so it never covers the real
+         wait: fetching the first page image. Hold the labelled state until a
+         page has arrived (or failed, so a broken document still falls through
+         to its own placeholder rather than loading forever). -->
+    <ReaderLoading label="PDF wordt geladen…" variant="pages" />
   {:else if error}
     <p class="detail-sheet__pdf-fallback">
       {error}
@@ -360,7 +364,7 @@
             {:else if page.error}
               <div class="pdf-document__page-placeholder" aria-hidden="true"></div>
             {:else}
-              <div class="pdf-document__page-placeholder pdf-document__page-placeholder--loading" aria-hidden="true"></div>
+              <div class="skeleton pdf-document__page-placeholder" aria-hidden="true"></div>
             {/if}
           </div>
         </figure>
