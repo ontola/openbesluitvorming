@@ -63,6 +63,19 @@ QUICKWIT_INDEX_ROOT_PREFIX="${WOOZI_MONITOR_QUICKWIT_INDEX_ROOT_PREFIX:-indexes-
 # the purge itself resets the ratio to ~1x, so this only guards against a
 # flapping/misreading metastore causing a restart loop.
 QUICKWIT_SPLIT_CACHE_HEAL_COOLDOWN_SECONDS="${WOOZI_MONITOR_QUICKWIT_SPLIT_CACHE_HEAL_COOLDOWN_SECONDS:-1800}"
+# Disk on the extraction fleet, read from each host's /stats. Those hosts
+# write downloaded PDFs into the extraction container's writable layer, and
+# a worker killed mid-request (routine: 4 uvicorn workers on 3.8GB RAM)
+# orphans the directory. That leak filled all 8 hosts to 100% on 2026-07-30
+# and was invisible here, because this monitor only watched the woozi
+# server's own disk -- it surfaced instead as a storm of extraction failures
+# with "No usable temporary directory found". 0 disables.
+EXTRACTION_DISK_WARN_PERCENT="${WOOZI_MONITOR_EXTRACTION_DISK_WARN_PERCENT:-80}"
+EXTRACTION_DISK_CRITICAL_PERCENT="${WOOZI_MONITOR_EXTRACTION_DISK_CRITICAL_PERCENT:-90}"
+# Consecutive checks (2 min apart) a host must fail /stats before alerting.
+# These hosts go briefly unresponsive under load, so one failed probe is
+# noise; ~6 minutes of silence is not.
+EXTRACTION_UNREACHABLE_STREAK="${WOOZI_MONITOR_EXTRACTION_UNREACHABLE_STREAK:-3}"
 SCALE_DOWN_QUEUE_THRESHOLD="${WOOZI_MONITOR_SCALE_DOWN_QUEUE_THRESHOLD:-10}"
 SCALE_DOWN_REMIND_SECONDS="${WOOZI_MONITOR_SCALE_DOWN_REMIND_SECONDS:-86400}"
 CURL_IP_VERSION="${WOOZI_MONITOR_CURL_IP_VERSION:-4}"
@@ -341,6 +354,74 @@ check_imports() {
     alert critical extract_failures "Document extraction is failing at scale" "new_failures_this_interval=${extract_failures} threshold=${EXTRACT_FAIL_CRITICAL}"
   elif [ "${extract_failures:-0}" -ge "$EXTRACT_FAIL_WARN" ]; then
     alert warning extract_failures "Document extraction failure rate is elevated" "new_failures_this_interval=${extract_failures} threshold=${EXTRACT_FAIL_WARN}"
+  fi
+}
+
+check_extraction_disk() {
+  # Port 8000 is firewalled to this host, so /stats is only reachable from
+  # here -- which is also why the fleet has no monitoring of its own.
+  local url pct worst=0 worst_host="" over="" checked=0 unreachable=0
+  [ "$EXTRACTION_DISK_WARN_PERCENT" -gt 0 ] || return 0
+  [ -n "${WOOZI_EXTRACTION_SERVICE_URL:-}" ] || return 0
+  command -v curl >/dev/null 2>&1 || return 0
+
+  for url in $(tr ',' ' ' <<< "$WOOZI_EXTRACTION_SERVICE_URL"); do
+    [ -n "$url" ] || continue
+    # disk_used_percent exists only on images from 2026-07-30 onward; an
+    # older host simply reports nothing and is counted unreachable rather
+    # than silently passing.
+    pct="$(curl -fsS -m 8 "${url%/}/stats" 2>/dev/null |
+      grep -o '"disk_used_percent"[[:space:]]*:[[:space:]]*[0-9]*' |
+      grep -o '[0-9]*$' || true)"
+    if [ -z "$pct" ]; then
+      unreachable=$((unreachable + 1))
+      continue
+    fi
+    checked=$((checked + 1))
+    if [ "$pct" -ge "$EXTRACTION_DISK_WARN_PERCENT" ]; then
+      over="${over}${over:+, }${url%/}=${pct}%"
+    fi
+    if [ "$pct" -gt "$worst" ]; then
+      worst="$pct"
+      worst_host="${url%/}"
+    fi
+  done
+
+  # A host that stops answering still reports "running" in the Hetzner API --
+  # that only means the VM is powered on, not that the OS responds. On
+  # 2026-07-31 woozi-extraction-7 stopped answering both SSH and HTTP, then
+  # recovered on its own minutes later. Since these hosts routinely go
+  # briefly unresponsive under CPU and memory pressure, a single failed probe
+  # is not worth waking anyone for; require a streak, the same way the search
+  # probes do. What makes a *sustained* outage worth catching is that workers
+  # keep dispatching to a dead host and burn the full timeout per request,
+  # and the only visible symptom is a rise in extraction failures.
+  local total=$((checked + unreachable))
+  local streak_file="$STATE_DIR/extraction_unreachable_streak" streak=0
+  mkdir -p "$STATE_DIR"
+  if [ "$unreachable" -gt 0 ]; then
+    streak="$(cat "$streak_file" 2>/dev/null || echo 0)"
+    [[ "$streak" =~ ^[0-9]+$ ]] || streak=0
+    streak=$((streak + 1))
+  fi
+  printf '%s\n' "$streak" > "$streak_file"
+
+  if [ "$checked" -eq 0 ] && [ "$total" -gt 0 ]; then
+    alert critical extraction_hosts_unreachable "No extraction host is reachable" \
+      "all ${total} host(s) failed /stats; document extraction cannot make progress"
+  elif [ "$streak" -ge "$EXTRACTION_UNREACHABLE_STREAK" ]; then
+    alert warning extraction_host_unreachable "Extraction host unreachable for several checks" \
+      "${unreachable} of ${total} host(s) did not answer /stats, ${streak} checks in a row. Workers keep dispatching to them and burn the full request timeout each attempt. The hosts are stateless -- a reboot restores them (the container restarts on boot)."
+  fi
+
+  [ "$checked" -gt 0 ] || return 0
+
+  if [ "$worst" -ge "$EXTRACTION_DISK_CRITICAL_PERCENT" ]; then
+    alert critical extraction_disk_critical "Extraction host disk is critically full" \
+      "worst=${worst_host} used_percent=${worst} hosts_over_threshold=[${over}] checked=${checked} unreachable=${unreachable}; extractions fail with 'No usable temporary directory found' once a host hits 100%"
+  elif [ "$worst" -ge "$EXTRACTION_DISK_WARN_PERCENT" ]; then
+    alert warning extraction_disk_warning "Extraction host disk is getting full" \
+      "worst=${worst_host} used_percent=${worst} hosts_over_threshold=[${over}] checked=${checked} unreachable=${unreachable}"
   fi
 }
 
@@ -627,6 +708,7 @@ main() {
   check_containers
   check_imports
   check_backups
+  check_extraction_disk
   check_scale_down
   check_worker_fds
   check_quickwit_split_cache_pollution
