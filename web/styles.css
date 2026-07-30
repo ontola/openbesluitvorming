@@ -680,6 +680,22 @@ select {
   color: var(--accent);
 }
 
+/* The logo is its own attribution row above the "Door wie" text, so it needs to
+   shed the inline-link colouring and the prose line-height that would otherwise
+   pad the image box. */
+.home-about__prose.prose-detail .home-about__logo-link {
+  display: inline-block;
+  line-height: 0;
+  margin: 0.35rem 0 0.9rem;
+}
+
+.home-about__logo {
+  display: block;
+  width: auto;
+  height: 2.75rem;
+  border-radius: 0.4rem;
+}
+
 .content--search {
   max-width: 64rem;
   padding-top: 1.2rem;
@@ -2339,6 +2355,14 @@ select {
 
   .brand__dark {
     color: color-mix(in srgb, var(--text) 92%, var(--accent-deep) 8%);
+  }
+
+  /* The VNG wordmark is navy (#004388) and vanishes on the dark background, so
+     it gets a light plate instead of a filter that would break the brand colours. */
+  .home-about__logo {
+    background: #ffffff;
+    padding: 0.4rem 0.55rem;
+    box-sizing: content-box;
   }
 
   .brand__light {
