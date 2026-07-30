@@ -63,7 +63,10 @@ export class ExportChangesLog {
   constructor(options: { db: DatabaseSync; storage: ExportSegmentStorage }) {
     this.db = options.db;
     this.storage = options.storage;
-    this.db.exec("PRAGMA busy_timeout=5000");
+    // Same contention as the ops database (see src/ops/store.ts): every
+    // worker writes here on each entity commit, and 5s was not enough to
+    // outlast the write lock when the whole backfill fleet ran at once.
+    this.db.exec("PRAGMA busy_timeout=30000");
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS export_head (
         source_key TEXT PRIMARY KEY,
@@ -398,6 +401,10 @@ export function getExportLog(): Promise<ExportChangesLog> {
       }
       const db = new DatabaseSync(path);
       db.exec("PRAGMA journal_mode=WAL");
+      // See src/ops/store.ts for the reasoning; this file sees the heavier
+      // write rate of the two (one commit per entity, not per run).
+      db.exec("PRAGMA synchronous=NORMAL");
+      db.exec("PRAGMA wal_autocheckpoint=4000");
       const storage = await ObjectStorageClient.fromEnvironment();
       return new ExportChangesLog({ db, storage });
     })();

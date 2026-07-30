@@ -23,8 +23,26 @@ async function getDatabase(): Promise<DatabaseSync> {
       }
 
       const db = new DatabaseSync(path);
-      db.exec("PRAGMA busy_timeout=5000");
+      // Four worker containers (each with INGEST_CONCURRENCY tasks) plus the
+      // web container all write to this single file on a shared Docker
+      // volume. Enqueuing the full-history backfill on 2026-07-12 produced
+      // 679 "database is locked" errors and killed ~700 windows outright --
+      // 2013 lost 316 of 330 sources -- because 5s was not long enough to
+      // outlast the write lock under that fan-in. Waiting is always better
+      // than failing here: the caller's alternative is losing the run.
+      db.exec("PRAGMA busy_timeout=30000");
       db.exec("PRAGMA journal_mode=WAL");
+      // WAL already survives process death (container restart, OOM kill);
+      // FULL additionally fsyncs on every commit, which is what makes each
+      // writer hold the lock long enough for others to time out. NORMAL only
+      // risks the most recent commits on *host* power loss, and this database
+      // is reconstructible from the sources and backed up daily.
+      db.exec("PRAGMA synchronous=NORMAL");
+      // Default autocheckpoint (1000 pages) was not keeping up: both WAL
+      // files had grown past 330MB, which slows every read and wastes disk on
+      // a host that already trips its 80% alert. Checkpoint less often but in
+      // bigger batches, so writers spend less total time blocked.
+      db.exec("PRAGMA wal_autocheckpoint=4000");
       db.exec(`
         CREATE TABLE IF NOT EXISTS ingest_run (
           id TEXT PRIMARY KEY,
