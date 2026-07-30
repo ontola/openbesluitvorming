@@ -8,11 +8,14 @@ SEARCH_CRITICAL_MS="${WOOZI_MONITOR_SEARCH_CRITICAL_MS:-8000}"
 QUICKWIT_WARN_MS="${WOOZI_MONITOR_QUICKWIT_WARN_MS:-1500}"
 DISK_WARN_PERCENT="${WOOZI_MONITOR_DISK_WARN_PERCENT:-80}"
 DISK_CRITICAL_PERCENT="${WOOZI_MONITOR_DISK_CRITICAL_PERCENT:-90}"
-# Percentage of the currently-published split count, below which the
-# searcher split cache is considered cold (see check_containers). Was a
-# fixed absolute split count until the split-cache janitor made "healthy"
-# track the live count instead of a historical constant.
-QUICKWIT_MIN_CACHE_SPLITS="${WOOZI_MONITOR_QUICKWIT_MIN_CACHE_SPLITS:-70}"
+# Percentage of the configured split-cache budget below which the cache
+# counts as cold (see check_containers). Byte-based on purpose: the previous
+# rule compared split *counts* against published splits, which became
+# unsatisfiable once one 24.9GB split took 38% of the budget. 0 disables.
+QUICKWIT_CACHE_COLD_PERCENT="${WOOZI_MONITOR_QUICKWIT_CACHE_COLD_PERCENT:-40}"
+# Must match docker-compose.production.yml; used to turn the cache size into
+# a percentage of budget. Accepts the same G/M/K suffixes Quickwit does.
+QUICKWIT_SPLIT_CACHE_MAX_NUM_BYTES="${QUICKWIT_SPLIT_CACHE_MAX_NUM_BYTES:-55G}"
 CONTAINER_RESTART_WARN="${WOOZI_MONITOR_CONTAINER_RESTART_WARN:-0}"
 STATE_DIR="${WOOZI_MONITOR_STATE_DIR:-/tmp/woozi-monitor-alerts}"
 ALERT_COOLDOWN_SECONDS="${WOOZI_MONITOR_ALERT_COOLDOWN_SECONDS:-900}"
@@ -248,21 +251,32 @@ check_containers() {
   cache_output="$(docker exec woozi-quickwit-1 sh -lc 'du -sk /quickwit/qwdata/searcher-split-cache 2>/dev/null; find /quickwit/qwdata/searcher-split-cache -maxdepth 1 -type f 2>/dev/null | wc -l')"
   cache_kb="$(sed -n '1s/[[:space:]].*$//p' <<< "$cache_output")"
   split_count="$(sed -n '2p' <<< "$cache_output" | xargs)"
-  # "Cold" is relative to what's actually live, not a fixed historical count
-  # -- the janitor (see check_quickwit_split_cache_pollution) now keeps the
-  # cache trimmed close to the published-split count as its healthy steady
-  # state, so a stale absolute threshold from before the janitor existed
-  # fired as pure noise once the live split count settled lower than that
-  # constant. Alert only when the cache holds meaningfully less than what's
-  # actually published -- a real sign of a cold/just-recreated cache.
-  if [ -n "$split_count" ]; then
-    local published_now
-    published_now="$(docker exec woozi-quickwit-1 sh -c \
-      "grep -o '\"split_state\":[[:space:]]*\"Published\"' '/quickwit/qwdata/${QUICKWIT_INDEX_ROOT_PREFIX}/${QUICKWIT_INDEX_ID}/metastore.json' 2>/dev/null | wc -l" \
-      2>/dev/null | xargs || echo 0)"
-    if [ "${published_now:-0}" -gt 0 ] && [ "$split_count" -lt "$((published_now * QUICKWIT_MIN_CACHE_SPLITS / 100))" ]; then
+  # "Cold" has to be measured in bytes, not split count. Split sizes are wildly
+  # uneven -- measured 2026-07-31: one 24.9GB split is 38% of a 65.6GB index
+  # whose median split is 774MB -- so only ~35 of 81 splits physically fit in
+  # the 55G budget. A count-based rule ("cache should hold >=70% of published
+  # splits") is then arithmetically unsatisfiable and fires forever, the same
+  # way the janitor's MIN_FILES gate silently broke once splits got large.
+  #
+  # What actually indicates a cold cache is a cache far below its own budget:
+  # freshly wiped, or just recreated. A cache sitting near budget is warm by
+  # definition, however few splits that buys. Genuine slowness caused by an
+  # index that outgrew the budget is already caught, directly, by the search
+  # probes above -- which is the symptom that actually matters.
+  if [ -n "$cache_kb" ] && [ "${QUICKWIT_CACHE_COLD_PERCENT:-0}" -gt 0 ]; then
+    local budget_kb cache_pct
+    budget_kb="$(awk -v spec="${QUICKWIT_SPLIT_CACHE_MAX_NUM_BYTES:-55G}" 'BEGIN {
+      n = spec + 0
+      if (spec ~ /[Gg]/) n *= 1024 * 1024
+      else if (spec ~ /[Mm]/) n *= 1024
+      else if (spec ~ /[Kk]/) n *= 1
+      else n /= 1024
+      printf "%d", n
+    }')"
+    cache_pct=$((budget_kb > 0 ? cache_kb * 100 / budget_kb : 100))
+    if [ "$cache_pct" -lt "$QUICKWIT_CACHE_COLD_PERCENT" ]; then
       cache_gb="$(awk -v kb="${cache_kb:-0}" 'BEGIN { print int((kb / 1024 / 1024) + 0.5) }')"
-      alert warning quickwit_cache_cold "Quickwit split cache looks cold" "split_count=${split_count} published_splits=${published_now} cache_gb=${cache_gb}"
+      alert warning quickwit_cache_cold "Quickwit split cache is far below its budget" "cache_gb=${cache_gb} percent_of_budget=${cache_pct} threshold=${QUICKWIT_CACHE_COLD_PERCENT}; splits=${split_count}"
     fi
   fi
 }
