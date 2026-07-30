@@ -1,7 +1,9 @@
 """PDF extraction service: downloads PDF, extracts markdown, uploads to S3."""
 
+import asyncio
 import os
 import json
+import shutil
 import tempfile
 import time
 from pathlib import Path
@@ -20,6 +22,69 @@ MAX_PAGES_DEFAULT = 40
 _start_time = time.monotonic()
 _requests_total = 0
 _requests_failed = 0
+
+# Every extraction gets a working directory under this root instead of
+# straight into the system temp dir, so leftovers can be swept without ever
+# touching files belonging to anything else on the box.
+#
+# TemporaryDirectory() cleans up on the normal path *and* on exceptions, but
+# not when the process dies mid-request -- which happens routinely here:
+# uvicorn runs 4 workers against 3.8GB of RAM, and a single large PDF is held
+# in memory as bytes, written to disk, and reopened by pymupdf, so the kernel
+# OOM-kills workers under load. Each kill orphans a directory containing a
+# full PDF. By 2026-07-30 that had reached 75GB per host and filled the root
+# disk on all 8 extraction servers at once, which surfaced as
+# "No usable temporary directory found" and "No space left on device" -- and
+# left the disk so full that even `docker exec` failed.
+WORK_ROOT = Path(os.environ.get("EXTRACTION_WORK_DIR", "/tmp/woozi-extraction"))
+
+# An extraction that has not finished within this window is not coming back:
+# the source download alone is capped at 120s. Anything older is an orphan.
+ORPHAN_MAX_AGE_SECONDS = float(os.environ.get("EXTRACTION_ORPHAN_MAX_AGE", "1800"))
+SWEEP_INTERVAL_SECONDS = float(os.environ.get("EXTRACTION_SWEEP_INTERVAL", "900"))
+_orphans_removed = 0
+
+
+def sweep_work_root(max_age_seconds: float | None) -> int:
+    """Delete work directories older than max_age_seconds (all of them when
+    None). Never raises: a failed sweep must not take the service down, it
+    just means the disk reclaim waits for the next pass."""
+    global _orphans_removed
+    removed = 0
+    try:
+        WORK_ROOT.mkdir(parents=True, exist_ok=True)
+        now = time.time()
+        for entry in WORK_ROOT.iterdir():
+            try:
+                if max_age_seconds is not None:
+                    if now - entry.stat().st_mtime < max_age_seconds:
+                        continue
+                shutil.rmtree(entry, ignore_errors=True)
+                removed += 1
+            except FileNotFoundError:
+                continue
+            except Exception as error:  # noqa: BLE001 - best effort per entry
+                print(f"[sweep] could not remove {entry}: {error}", flush=True)
+    except Exception as error:  # noqa: BLE001 - best effort overall
+        print(f"[sweep] failed: {error}", flush=True)
+    if removed:
+        _orphans_removed += removed
+        print(f"[sweep] removed {removed} orphaned work dir(s)", flush=True)
+    return removed
+
+
+async def _sweep_loop() -> None:
+    while True:
+        await asyncio.sleep(SWEEP_INTERVAL_SECONDS)
+        await asyncio.to_thread(sweep_work_root, ORPHAN_MAX_AGE_SECONDS)
+
+
+@app.on_event("startup")
+async def _start_sweeper() -> None:
+    # On startup nothing of ours can be in flight, so anything already here is
+    # left over from a previous process and can go unconditionally.
+    sweep_work_root(None)
+    asyncio.create_task(_sweep_loop())
 
 
 def normalize_text(text: str) -> str:
@@ -113,7 +178,8 @@ async def extract(req: ExtractRequest):
             pdf_bytes = response.content
         t_download = time.monotonic()
 
-        with tempfile.TemporaryDirectory() as work_dir:
+        WORK_ROOT.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=WORK_ROOT) as work_dir:
             pdf_path = Path(work_dir) / "document.pdf"
             pdf_path.write_bytes(pdf_bytes)
 
@@ -208,6 +274,11 @@ async def health():
 @app.get("/stats")
 async def stats():
     load_1, load_5, load_15 = os.getloadavg()
+    usage = shutil.disk_usage(WORK_ROOT if WORK_ROOT.exists() else "/")
+    try:
+        work_dirs = sum(1 for _ in WORK_ROOT.iterdir()) if WORK_ROOT.exists() else 0
+    except OSError:
+        work_dirs = -1
     return {
         "requests_total": _requests_total,
         "requests_failed": _requests_failed,
@@ -215,4 +286,11 @@ async def stats():
         "load_1m": round(load_1, 2),
         "load_5m": round(load_5, 2),
         "load_15m": round(load_15, 2),
+        # Surfaced so a filling disk is visible before extractions start
+        # failing: the July 2026 outage was invisible until every host was
+        # already at 100%.
+        "disk_free_gb": round(usage.free / 1e9, 1),
+        "disk_used_percent": round(usage.used / usage.total * 100),
+        "work_dirs_open": work_dirs,
+        "orphans_removed": _orphans_removed,
     }
