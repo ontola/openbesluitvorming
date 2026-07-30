@@ -17,6 +17,18 @@
  *   deno run -A scripts/reenqueue_failed_windows.ts                # dry-run
  *   deno run -A scripts/reenqueue_failed_windows.ts --apply
  *   deno run -A scripts/reenqueue_failed_windows.ts --source soest --apply
+ *
+ * Highest-yield first: --status/--from-year/--to-year narrow the sweep so a
+ * short, high-value pass can run ahead of the long tail. Coverage analysis
+ * on 2026-07-30 found 2012-2014 were the real holes (2013: 316 of 330
+ * sources had no successful run at all), caused by "database is locked"
+ * contention on 2026-07-12 when the backfill was first enqueued -- our own
+ * bug, so the documents are still at the source. Those `failed` windows had
+ * ingested zero documents, while `partial` windows already hold most of
+ * theirs:
+ *
+ *   deno run -A scripts/reenqueue_failed_windows.ts \
+ *     --status failed --from-year 2012 --to-year 2014 --apply
  */
 
 import { parseArgs } from "node:util";
@@ -35,8 +47,25 @@ const { values: args } = parseArgs({
     // both trigger values since older backfill rows may still carry
     // "scheduled" from before it was split out into "backfill".
     "min-window-days": { type: "string", default: "20" },
+    // Narrow the sweep to the window's start year, so the highest-yield
+    // periods can be re-run first instead of queueing everything at once.
+    "from-year": { type: "string" },
+    "to-year": { type: "string" },
+    // Which prior outcomes to retry. "failed" windows are the pure gaps --
+    // measured 2026-07-30, the 2012/2013 failures had ingested *zero*
+    // documents -- whereas "partial" windows already hold most of their
+    // content, so retrying them costs the same but recovers far less.
+    status: { type: "string", default: "failed,partial" },
   },
 });
+
+const statuses = args.status.split(",").map((s) => s.trim()).filter(Boolean);
+for (const status of statuses) {
+  if (status !== "failed" && status !== "partial") {
+    console.error(`Unknown --status value ${status}; expected "failed" and/or "partial".`);
+    Deno.exit(1);
+  }
+}
 
 const dbPath = await getConfigValue("WOOZI_KV_PATH", "./woozi-ops.sqlite3");
 const readDb = new DatabaseSync(dbPath, { readOnly: true });
@@ -47,9 +76,11 @@ const rows = readDb
      FROM ingest_run r
      WHERE r.trigger_mode IN ('scheduled', 'backfill')
        AND r.execution_mode = 'full'
-       AND r.status IN ('failed', 'partial')
+       AND r.status IN (${statuses.map((s) => `'${s}'`).join(", ")})
        AND (julianday(r.date_to) - julianday(r.date_from)) > @min_window_days
        AND (@source IS NULL OR r.source_key = @source)
+       AND (@from_year IS NULL OR substr(r.date_from, 1, 4) >= @from_year)
+       AND (@to_year IS NULL OR substr(r.date_from, 1, 4) <= @to_year)
        AND NOT EXISTS (
          SELECT 1 FROM ingest_run r2
          WHERE r2.source_key = r.source_key
@@ -62,6 +93,8 @@ const rows = readDb
   .all({
     min_window_days: Number(args["min-window-days"]),
     source: args.source ?? null,
+    from_year: args["from-year"] ?? null,
+    to_year: args["to-year"] ?? null,
   }) as Array<{ source_key: string; supplier: string; date_from: string; date_to: string }>;
 
 readDb.close();
