@@ -251,13 +251,23 @@ function buildQuickwitQuery(
   //
   // Meetings are deliberately NOT exempted here any more. They carry no
   // document_month, so `entity_type:Meeting OR ...` matched every meeting of
-  // every year and defeated the filter entirely: Quickwit ranks by relevance,
-  // so the capped sample filled up with out-of-range meetings and the
-  // app-side day filter then discarded all of them. Measured 2026-07-31 on a
-  // dateFrom=2026-01-01 search: 40 of the first 40 hits were Meetings dated
-  // 2018-2019, totalCount reported 523231, and *zero* rows came back. Users
-  // read that as "there is nothing after 2020". Dropping the exemption
-  // returned correctly-dated 2026 documents immediately.
+  // every year and defeated the filter entirely.
+  //
+  // Why that is so destructive: this index sets timestamp_field: time (the
+  // *ingest* time), so Quickwit scans the most recently written splits first
+  // and stops once max_hits is satisfied. The capped window therefore holds
+  // whatever was ingested last -- not the best matches, and not the newest
+  // documents by their own date. While the full-history backfill runs, that
+  // means the window is full of whichever historical year the backfill
+  // happens to be replaying.
+  //
+  // Measured 2026-07-31 with the backfill replaying 2018: every hit had
+  // time=2026-07-31 but start_date=2018, so a dateFrom=2026-01-01 search
+  // reported totalCount 523231 and returned *zero* rows, while the index held
+  // 1539484 documents for 2026. To users the visible date ceiling looked like
+  // "nothing after 2020" and it silently moved as the backfill progressed.
+  // Pushing the month terms down scopes the split scan correctly and returned
+  // 2026 documents immediately.
   //
   // Meetings therefore no longer appear in date-filtered searches at all --
   // they cannot: start_date is a dynamic text field, so range queries against
