@@ -183,8 +183,10 @@ const MAX_PUSHDOWN_MONTHS = 60;
  * Documents without document_month also lack start_date (same source,
  * documentReferenceDate) and are dropped by the exact app-side date filter
  * regardless, so excluding them here does not change results. Meetings carry
- * no document_month; callers must OR this with entity_type:Meeting. Returns
- * null when the range is unusable or too broad to be selective. */
+ * no document_month and so cannot be date-filtered at all -- do NOT OR this
+ * with entity_type:Meeting, which silently disables the whole filter (see the
+ * caller). Returns null when the range is unusable or too broad to be
+ * selective. */
 export function documentMonthTerms(dateFrom: string, dateTo: string): string[] | null {
   const from = dateFrom.trim().slice(0, 7);
   // Open-ended "from" ranges still push down: cap at a few months ahead
@@ -246,11 +248,27 @@ function buildQuickwitQuery(
   // Push the date filter into Quickwit at month granularity; the exact
   // day-level filter stays app-side. Without this, a narrow date range made
   // the search loop page through (and discard) up to the full scan cap.
+  //
+  // Meetings are deliberately NOT exempted here any more. They carry no
+  // document_month, so `entity_type:Meeting OR ...` matched every meeting of
+  // every year and defeated the filter entirely: Quickwit ranks by relevance,
+  // so the capped sample filled up with out-of-range meetings and the
+  // app-side day filter then discarded all of them. Measured 2026-07-31 on a
+  // dateFrom=2026-01-01 search: 40 of the first 40 hits were Meetings dated
+  // 2018-2019, totalCount reported 523231, and *zero* rows came back. Users
+  // read that as "there is nothing after 2020". Dropping the exemption
+  // returned correctly-dated 2026 documents immediately.
+  //
+  // Meetings therefore no longer appear in date-filtered searches at all --
+  // they cannot: start_date is a dynamic text field, so range queries against
+  // it are silently ignored (all three of 2019/2026/unfiltered return the
+  // identical 1138409 hits). Making meetings date-filterable needs a
+  // meeting-month term or a proper fast field, i.e. the reindex.
   if (dateFrom.trim() && entityType !== "Meeting") {
     const months = documentMonthTerms(dateFrom, dateTo);
     if (months) {
       const monthClause = months.map((month) => `document_month:${month}`).join(" OR ");
-      parts.push(`(entity_type:Meeting OR ${monthClause})`);
+      parts.push(`(${monthClause})`);
     }
   }
 

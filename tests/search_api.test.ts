@@ -550,3 +550,44 @@ Deno.test("documentMonthTerms enumerates months and rejects unusable ranges", as
   assert(documentMonthTerms("2024-06-01", "2024-01-01") === null, "inverted range is rejected");
   assert(documentMonthTerms("geen-datum", "2024-01-01") === null, "garbage input is rejected");
 });
+
+Deno.test("date-filtered search does not exempt meetings from the month filter", async () => {
+  // Regression guard. `entity_type:Meeting OR document_month:...` matched every
+  // meeting of every year, so the relevance-ranked sample filled with
+  // out-of-range meetings and the app-side day filter discarded all of them.
+  // Measured in production 2026-07-31 on dateFrom=2026-01-01: 40 of the first
+  // 40 hits were meetings dated 2018-2019 and zero rows were returned, which
+  // reads to a user as "nothing exists after 2020".
+  const originalFetch = globalThis.fetch;
+  let capturedQuery = "";
+
+  globalThis.fetch = async (input, init) => {
+    const body = JSON.parse(String((init as { body?: string } | undefined)?.body ?? "{}"));
+    capturedQuery = String(body.query ?? "");
+    return new Response(JSON.stringify({ num_hits: 0, hits: [] }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  };
+
+  try {
+    await searchMeetings({
+      query: "begroting",
+      dateFrom: "2026-01-01",
+      dateTo: "2026-03-31",
+      offset: 0,
+      limit: 24,
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+
+  assert(
+    capturedQuery.includes("document_month:2026-01"),
+    `date filter should push month terms into Quickwit, got: ${capturedQuery}`,
+  );
+  assert(
+    !/entity_type:Meeting\s+OR\s+document_month/.test(capturedQuery),
+    `meetings must not be exempted from the date filter, got: ${capturedQuery}`,
+  );
+});
