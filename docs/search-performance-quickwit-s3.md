@@ -291,6 +291,26 @@ S3-backed splits and returns large stored hits, cold-tail latency can remain.
    - reindex into the compact projection;
    - compare cold and warm timings before switching default traffic.
 
+   The mechanism for that reindex now exists: `executionMode: "reindex_only"`
+   (`src/pipeline/reindex.ts`) re-projects a source from the export log instead
+   of the supplier APIs. It walks `export_entity_state` — the latest upsert per
+   entity, i.e. exactly the state a projection should reflect — and rebuilds a
+   commit event per record. Export records are compact by design, so document
+   text is pulled back from object storage via `derived_content.page_chunks_key`
+   (falling back to `markdown_key`); without that step a reindexed document
+   would keep its title and lose every searchable word.
+
+   What it does **not** do: invent data that was never imported. A new entity
+   type or a new supplier field still needs a real import first — the export log
+   can only replay what the pipeline once produced. Motions are the worked
+   example: they were added in the same release and had to be imported, not
+   reindexed.
+
+   To point a reindex at a freshly created index, set `QUICKWIT_INDEX_ID` (and
+   `WOOZI_PROJECTION_VERSION` if the projection changed shape) for the run. The
+   old index stays untouched and remains the fallback until the new one is
+   verified, as step 3 of the prevention plan requires.
+
 4. **Only then consider a new node**
    - buy a new node only if measurements show CPU/RAM isolation is still needed.
 

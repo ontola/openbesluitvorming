@@ -451,16 +451,34 @@ async function handleRequest(request: Request): Promise<Response> {
       if (!sourceSelector) {
         return Response.json({ error: "Kies eerst een bron." }, { status: 400 });
       }
-      if (!payload.dateFrom?.trim() || !payload.dateTo?.trim()) {
-        return Response.json({ error: "Vul zowel een start- als einddatum in." }, { status: 400 });
-      }
-      if (payload.dateFrom > payload.dateTo) {
-        return Response.json(
-          { error: "De startdatum moet op of voor de einddatum liggen." },
-          { status: 400 },
-        );
-      }
       const executionMode = payload.executionMode ?? "full";
+      // A reindex re-projects everything the source has, so a date range would
+      // be accepted and then silently ignored — which reads as "only this
+      // period gets reindexed". Reject it instead of quietly misleading.
+      if (executionMode === "reindex_only") {
+        if (payload.dateFrom?.trim() || payload.dateTo?.trim()) {
+          return Response.json(
+            {
+              error:
+                "Een herindexatie verwerkt altijd de volledige bron; laat de datums leeg.",
+            },
+            { status: 400 },
+          );
+        }
+      } else {
+        if (!payload.dateFrom?.trim() || !payload.dateTo?.trim()) {
+          return Response.json(
+            { error: "Vul zowel een start- als einddatum in." },
+            { status: 400 },
+          );
+        }
+        if (payload.dateFrom > payload.dateTo) {
+          return Response.json(
+            { error: "De startdatum moet op of voor de einddatum liggen." },
+            { status: 400 },
+          );
+        }
+      }
       if (sourceSelector.startsWith("__supplier__:") && executionMode !== "full") {
         return Response.json(
           {

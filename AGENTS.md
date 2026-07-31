@@ -73,6 +73,7 @@ Current implemented slices:
 
 - Keep vocabulary and entity shapes consistent; do not invent a parallel naming scheme casually.
 - Prefer explicit pipeline levels such as full import, rederive from cache, and reindex, rather than hidden cache behavior.
+- `reindex_only` is implemented (`src/pipeline/reindex.ts`): it re-projects a source from the export log, never from the supplier APIs, and rehydrates document text from object storage. It replays what was imported once — it cannot produce a newly added entity type or field, which still needs a real import. `retry_failed_documents` is still unimplemented and throws.
 - Treat Quickwit index changes as projection-versioned changes, not mutable source-of-truth edits.
 
 ### Frontend

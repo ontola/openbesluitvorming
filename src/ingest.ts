@@ -16,6 +16,8 @@ import {
   updateRun,
 } from "./ops/store.ts";
 import { QuickwitClient } from "./quickwit/client.ts";
+import { reindexSource } from "./pipeline/reindex.ts";
+import { ObjectStorageClient } from "./storage/s3.ts";
 import { currentDerivationVersion, currentProjectionVersion } from "./pipeline/versioning.ts";
 import { getSource } from "./sources/index.ts";
 import { computeAllowedIngestConcurrency } from "./ingest_scheduler.ts";
@@ -127,11 +129,12 @@ export async function executeIngest(
   run: IngestRunRecord;
   quickwit_index_id?: string;
 }> {
-  if (
-    options.executionMode === "reindex_only" ||
-    options.executionMode === "retry_failed_documents"
-  ) {
+  if (options.executionMode === "retry_failed_documents") {
     throw new Error(`Execution mode "${options.executionMode}" is not implemented yet.`);
+  }
+
+  if (options.executionMode === "reindex_only") {
+    return await executeReindexOnly(run, sourceKey, options);
   }
 
   try {
@@ -263,6 +266,89 @@ export async function executeIngest(
       step: "ingest_quickwit",
       message,
     });
+    const issueCount = await getRunIssueCount(run.id);
+    const updated = await updateRun(run.id, {
+      status: "failed",
+      finished_at: new Date().toISOString(),
+      error_message: message,
+      issue_count: issueCount || 1,
+    });
+    throw new Error(`Run ${updated.id} failed: ${message}`);
+  }
+}
+
+/**
+ * Re-project a source's stored entities into Quickwit.
+ *
+ * Deliberately never calls a supplier API: this exists for projection changes
+ * (a new field, a bumped `WOOZI_PROJECTION_VERSION`, a freshly created index)
+ * where a full re-import would mean re-downloading documents we already have.
+ * It cannot conjure data that was never imported — a new entity type still
+ * needs a real import first.
+ */
+async function executeReindexOnly(
+  run: IngestRunRecord,
+  sourceKey: string,
+  options: { ingestToQuickwit?: boolean; onHeartbeat?: () => void },
+): Promise<{ run: IngestRunRecord; quickwit_index_id?: string }> {
+  try {
+    const source = getSource(sourceKey);
+
+    if (!options.ingestToQuickwit) {
+      throw new Error("Reindex needs Quickwit ingestion enabled; there is nothing else to write.");
+    }
+
+    const quickwit = new QuickwitClient();
+    const configPath = new URL("../quickwit/index-config.json", import.meta.url);
+    await quickwit.waitUntilReady();
+    await quickwit.ensureIndex(configPath.pathname);
+    const quickwitIndexId = Deno.env.get("QUICKWIT_INDEX_ID") ?? "woozi-events";
+
+    const exportLog = await getExportLog();
+    const storage = await ObjectStorageClient.fromEnvironment();
+    let currentRun = run;
+
+    const stats = await reindexSource(source.key, {
+      exportLog,
+      storage,
+      batchSize: quickwitBatchSize,
+      ingest: (documents) => quickwit.ingestDocuments(documents),
+      onProgress: async (progress) => {
+        options.onHeartbeat?.();
+        currentRun = await updateRun(run.id, {
+          // Reindex has no notion of meetings versus documents beyond what it
+          // reads back, so report entities under the document counter and keep
+          // meeting_count at zero rather than inventing a number.
+          document_count: progress.entity_count,
+          cache_hits: progress.rehydrated_count,
+          issue_count: progress.issue_count,
+        });
+      },
+      onIssue: async (issue) => {
+        options.onHeartbeat?.();
+        await appendRunIssue(run.id, issue);
+      },
+    });
+
+    console.log(
+      `[reindex] ${sourceKey} entities=${stats.entity_count} documents=${stats.document_count} ` +
+        `rehydrated=${stats.rehydrated_count} issues=${stats.issue_count}`,
+    );
+
+    const updated = await updateRun(run.id, {
+      ...currentRun,
+      status: stats.issue_count > 0 ? "partial" : "succeeded",
+      finished_at: new Date().toISOString(),
+      document_count: stats.entity_count,
+      cache_hits: stats.rehydrated_count,
+      issue_count: stats.issue_count,
+      quickwit_index_id: quickwitIndexId,
+    });
+
+    return { run: updated, quickwit_index_id: quickwitIndexId };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Reindex failed";
+    await appendRunIssue(run.id, { severity: "error", step: "ingest_quickwit", message });
     const issueCount = await getRunIssueCount(run.id);
     const updated = await updateRun(run.id, {
       status: "failed",

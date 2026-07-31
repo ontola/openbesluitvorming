@@ -1,0 +1,243 @@
+import { reindexSource, __test__ as reindexTest } from "../src/pipeline/reindex.ts";
+import type { ExportChangeRecord } from "../src/types.ts";
+import type { QuickwitSearchDocument } from "../src/quickwit/project.ts";
+
+function assert(condition: unknown, message: string): asserts condition {
+  if (!condition) {
+    throw new Error(message);
+  }
+}
+
+function assertEquals<T>(actual: T, expected: T, message: string): void {
+  if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+    throw new Error(
+      `${message}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`,
+    );
+  }
+}
+
+/** Stands in for the export log, paging like the real readSnapshot does. */
+class FakeExportLog {
+  readonly pageRequests: Array<string | null | undefined> = [];
+
+  constructor(private readonly records: ExportChangeRecord[]) {}
+
+  readSnapshot(_sourceKey: string, options: { cursor?: string | null; limit?: number }) {
+    this.pageRequests.push(options.cursor);
+    const after = options.cursor ?? "";
+    const limit = options.limit ?? 500;
+    const sorted = [...this.records].sort((a, b) => a.entity_id.localeCompare(b.entity_id));
+    const remaining = sorted.filter((record) => record.entity_id > after);
+    const page = remaining.slice(0, limit);
+    return {
+      records: page,
+      nextCursor: page.length > 0 ? page[page.length - 1].entity_id : after,
+      hasMore: remaining.length > limit,
+      changesCursor: "0",
+    };
+  }
+}
+
+class FakeStorage {
+  readonly reads: string[] = [];
+  constructor(private readonly objects: Record<string, string>) {}
+  getObjectText(key: string): Promise<string> {
+    this.reads.push(key);
+    return Promise.resolve(this.objects[key] ?? "");
+  }
+}
+
+function meetingRecord(id: string): ExportChangeRecord {
+  return {
+    seq: 1,
+    op: "upsert",
+    time: "2026-01-29T10:00:00.000Z",
+    entity_id: id,
+    entity_type: "Meeting",
+    source_key: "utrecht",
+    supplier: "ibabs",
+    commit_id: `commit:${id}:abc`,
+    content_hash: "sha256:abc",
+    payload: {
+      type: "Meeting",
+      name: "Gemeenteraad",
+      classification: ["Agenda"],
+      start_date: "2026-01-29T19:30:00Z",
+      location: "Stadhuis",
+      agenda: [{ id: `${id}:item-1`, title: "Programmabegroting" }],
+    },
+  };
+}
+
+function documentRecord(id: string, keys: { markdown?: string; chunks?: string }): ExportChangeRecord {
+  return {
+    seq: 2,
+    op: "upsert",
+    time: "2026-01-29T10:00:00.000Z",
+    entity_id: id,
+    entity_type: "Document",
+    source_key: "utrecht",
+    supplier: "ibabs",
+    commit_id: `commit:${id}:def`,
+    content_hash: "sha256:def",
+    payload: {
+      type: "Document",
+      name: "Raadsvoorstel",
+      classification: ["Bijlage"],
+      last_discussed_at: "2026-01-29T19:30:00Z",
+      derived_content: {
+        markdown_key: keys.markdown,
+        page_chunks_key: keys.chunks,
+        page_count: 2,
+      },
+    },
+  };
+}
+
+Deno.test("a stored export record rebuilds into a projectable commit event", () => {
+  const event = reindexTest.toCommitEvent(meetingRecord("meeting:ibabs:gemeente:utrecht:m1"));
+  assertEquals(event.data.entity_id, "meeting:ibabs:gemeente:utrecht:m1", "entity id");
+  assertEquals(event.data.entity_type, "Meeting", "entity type");
+  assertEquals(event.data.source.supplier, "ibabs", "supplier survives");
+  assertEquals(event.data.source.source, "utrecht", "source key survives");
+  assertEquals(event.source, "/woozi/ibabs/utrecht", "cloudevents source uri");
+  assertEquals(event.data.op, "upsert", "reindex only ever upserts");
+  assertEquals(event.id, "commit:meeting:ibabs:gemeente:utrecht:m1:abc", "keeps the commit id");
+});
+
+Deno.test("reindex projects stored entities without touching any supplier API", async () => {
+  const log = new FakeExportLog([
+    meetingRecord("meeting:ibabs:gemeente:utrecht:m1"),
+    meetingRecord("meeting:ibabs:gemeente:utrecht:m2"),
+  ]);
+  const ingested: QuickwitSearchDocument[] = [];
+
+  const stats = await reindexSource("utrecht", {
+    // deno-lint-ignore no-explicit-any
+    exportLog: log as any,
+    storage: undefined,
+    batchSize: 64,
+    ingest: (documents) => {
+      ingested.push(...documents);
+      return Promise.resolve();
+    },
+  });
+
+  assertEquals(stats.entity_count, 2, "both meetings projected");
+  assertEquals(ingested.length, 2, "one quickwit document per meeting");
+  assertEquals(ingested[0].entity_type, "Meeting", "projected type");
+  assert(ingested[0].content?.includes("Gemeenteraad"), "meeting stays searchable");
+  assert(ingested[0].content?.includes("Programmabegroting"), "agenda text survives the round trip");
+});
+
+Deno.test("document text is rehydrated from object storage, not lost", async () => {
+  const chunks = JSON.stringify([
+    { page_number: 1, markdown: "Eerste pagina over de begroting" },
+    { page_number: 2, markdown: "Tweede pagina met de dekking" },
+  ]);
+  const storage = new FakeStorage({ "text/doc-1/chunks.json": chunks });
+  const log = new FakeExportLog([
+    documentRecord("document:ibabs:gemeente:utrecht:d1", { chunks: "text/doc-1/chunks.json" }),
+  ]);
+  const ingested: QuickwitSearchDocument[] = [];
+
+  const stats = await reindexSource("utrecht", {
+    // deno-lint-ignore no-explicit-any
+    exportLog: log as any,
+    // deno-lint-ignore no-explicit-any
+    storage: storage as any,
+    batchSize: 64,
+    ingest: (documents) => {
+      ingested.push(...documents);
+      return Promise.resolve();
+    },
+  });
+
+  assertEquals(stats.rehydrated_count, 1, "one document rehydrated");
+  assertEquals(storage.reads, ["text/doc-1/chunks.json"], "read the stored chunks");
+
+  // The whole point: page documents come back, so full-text search still works.
+  const pages = ingested.filter((doc) => doc.entity_type === "DocumentPage");
+  assertEquals(pages.length, 2, "one indexed document per page");
+  assert(pages[0].content?.includes("begroting"), "page text is indexed again");
+  assertEquals(pages[0].parent_entity_id, "document:ibabs:gemeente:utrecht:d1", "page links home");
+});
+
+Deno.test("a document falls back to markdown when there are no page chunks", async () => {
+  const storage = new FakeStorage({ "text/doc-2/full.md": "# Raadsvoorstel\n\nInhoud" });
+  const log = new FakeExportLog([
+    documentRecord("document:ibabs:gemeente:utrecht:d2", { markdown: "text/doc-2/full.md" }),
+  ]);
+  const ingested: QuickwitSearchDocument[] = [];
+
+  const stats = await reindexSource("utrecht", {
+    // deno-lint-ignore no-explicit-any
+    exportLog: log as any,
+    // deno-lint-ignore no-explicit-any
+    storage: storage as any,
+    batchSize: 64,
+    ingest: (documents) => {
+      ingested.push(...documents);
+      return Promise.resolve();
+    },
+  });
+
+  assertEquals(stats.rehydrated_count, 1, "rehydrated from markdown");
+  assert(ingested[0].content?.includes("Inhoud"), "markdown reaches the index");
+});
+
+Deno.test("reindex pages through the whole source and batches its writes", async () => {
+  const records = Array.from({ length: 25 }, (_, index) =>
+    meetingRecord(`meeting:ibabs:gemeente:utrecht:m${String(index).padStart(3, "0")}`));
+  const log = new FakeExportLog(records);
+  const batches: number[] = [];
+
+  const stats = await reindexSource("utrecht", {
+    // deno-lint-ignore no-explicit-any
+    exportLog: log as any,
+    storage: undefined,
+    batchSize: 10,
+    pageSize: 7,
+    ingest: (documents) => {
+      batches.push(documents.length);
+      return Promise.resolve();
+    },
+  });
+
+  assertEquals(stats.entity_count, 25, "every entity reindexed exactly once");
+  assertEquals(batches.reduce((a, b) => a + b, 0), 25, "and written exactly once");
+  assert(batches.length > 1, "writes are batched rather than one giant request");
+  assert(log.pageRequests.length >= 4, "paged through the source with a cursor");
+  // Cursor advances rather than repeating: a stuck cursor would loop forever.
+  assertEquals(new Set(log.pageRequests).size, log.pageRequests.length, "cursor always advances");
+});
+
+Deno.test("one unreadable entity is reported, not fatal", async () => {
+  const broken: ExportChangeRecord = {
+    ...documentRecord("document:ibabs:gemeente:utrecht:d3", { chunks: "text/broken.json" }),
+  };
+  const storage = new FakeStorage({ "text/broken.json": "{ this is not json" });
+  const log = new FakeExportLog([broken, meetingRecord("meeting:ibabs:gemeente:utrecht:zz")]);
+  const issues: string[] = [];
+  const ingested: QuickwitSearchDocument[] = [];
+
+  const stats = await reindexSource("utrecht", {
+    // deno-lint-ignore no-explicit-any
+    exportLog: log as any,
+    // deno-lint-ignore no-explicit-any
+    storage: storage as any,
+    batchSize: 64,
+    ingest: (documents) => {
+      ingested.push(...documents);
+      return Promise.resolve();
+    },
+    onIssue: (issue) => {
+      issues.push(issue.entity_id ?? "");
+    },
+  });
+
+  assertEquals(stats.issue_count, 1, "the broken record is counted");
+  assertEquals(issues, ["document:ibabs:gemeente:utrecht:d3"], "and identified");
+  assertEquals(stats.entity_count, 1, "the healthy entity still went through");
+  assertEquals(ingested.length, 1, "and was indexed");
+});
