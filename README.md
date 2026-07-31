@@ -238,7 +238,7 @@ Instead, each source payload is transformed into a canonical entity such as:
 - `Meeting`
 - `Document`
 - `Committee`
-- `Vote`
+- `Motion`
 
 The schemas in [`schemas/`](schemas) are the first version of those contracts.
 

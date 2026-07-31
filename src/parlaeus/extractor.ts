@@ -3,6 +3,7 @@ import { ObjectStorageClient } from "../storage/s3.ts";
 import type {
   CommitteeEntity,
   DocumentEntity,
+  ExtractedEntity,
   ExtractionBundle,
   ExtractionIssue,
   IngestExecutionMode,
@@ -55,7 +56,7 @@ export class ParlaeusExtractor {
       onProgress?: (stats: ExtractionBundle["stats"]) => Promise<void> | void;
       onIssue?: (issue: ExtractionIssue, stats: ExtractionBundle["stats"]) => Promise<void> | void;
       onEntity?: (
-        entity: MeetingEntity | DocumentEntity | CommitteeEntity | PartyEntity | PersonEntity,
+        entity: ExtractedEntity,
       ) => Promise<void> | void;
       executionMode?: IngestExecutionMode;
       retainEntities?: boolean;

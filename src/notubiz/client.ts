@@ -1,4 +1,8 @@
-import type { NotubizOrganizationAttributes } from "../types.ts";
+import type {
+  NotubizModule,
+  NotubizModuleItem,
+  NotubizOrganizationAttributes,
+} from "../types.ts";
 
 const DEFAULT_QUERY = "format=json&version=1.17.0";
 const MAX_RETRIES = 3;
@@ -219,6 +223,34 @@ export class NotubizClient {
 
   async getMeeting(meetingId: number): Promise<unknown> {
     return await fetchJson(buildUrl(`events/meetings/${meetingId}`));
+  }
+
+  /** Registries configured for an organisation (Moties, Toezeggingen, …). */
+  async listModules(organizationId: number): Promise<NotubizModule[]> {
+    const data = await fetchJson<{ modules?: NotubizModule[] }>(
+      buildUrl(`organisations/${organizationId}/modules`),
+    );
+    return Array.isArray(data.modules) ? data.modules : [];
+  }
+
+  /** Entries in one registry, filtered on the entry's own date.
+   *
+   * Without `date_from`/`date_to` this returns the organisation's entire
+   * history in one response — 4.8 MB and ~36s for Alkmaar's 1331 moties, and
+   * it frequently 504s. The filter narrows that to the run window. */
+  async listModuleItems(
+    organizationId: number,
+    moduleId: number,
+    dateFrom: string,
+    dateTo: string,
+  ): Promise<NotubizModuleItem[]> {
+    const data = await fetchJson<{ items?: NotubizModuleItem[] }>(
+      buildUrl(`organisations/${organizationId}/modules/${moduleId}/items`, {
+        date_from: `${dateFrom} 00:00:00`,
+        date_to: `${dateTo} 23:59:59`,
+      }),
+    );
+    return Array.isArray(data.items) ? data.items : [];
   }
 
   async downloadDocument(document: unknown): Promise<Uint8Array> {

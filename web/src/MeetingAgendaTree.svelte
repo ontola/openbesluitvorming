@@ -1,10 +1,14 @@
 <script lang="ts">
   import { marked } from "marked";
   import { createEventDispatcher } from "svelte";
-  import type { EntityContentResponse, MeetingAgendaItem } from "../../src/types.ts";
+  import type { EntityContentResponse, MeetingAgendaItem, MeetingMotion } from "../../src/types.ts";
   import ReaderLoading from "./ReaderLoading.svelte";
+  import MotionCard from "./MotionCard.svelte";
 
   export let items: MeetingAgendaItem[] = [];
+  /** Motions decided in this meeting, keyed by agenda item id. Passed whole
+   * through the recursion so nested items get theirs too. */
+  export let motionsByAgendaItem: Record<string, MeetingMotion[]> = {};
 
   const dispatch = createEventDispatcher<{
     opendocument: { entityId: string };
@@ -190,11 +194,24 @@
             </div>
           {/if}
 
+          {#if motionsByAgendaItem[item.id]?.length}
+            <div class="meeting-agenda__motions">
+              <p class="meeting-agenda__motions-label">
+                Moties en amendementen bij dit agendapunt
+              </p>
+              {#each motionsByAgendaItem[item.id] as motion (motion.id)}
+                <MotionCard {motion} />
+              {/each}
+            </div>
+          {/if}
+
           {#if item.agenda_items?.length}
             <div class="meeting-agenda__children">
               <svelte:self
                 items={item.agenda_items}
+                {motionsByAgendaItem}
                 on:opendocument={(event) => dispatch("opendocument", event.detail)}
+                on:documentpreview={(event) => dispatch("documentpreview", event.detail)}
               />
             </div>
           {/if}

@@ -3,14 +3,24 @@ import { NotubizClient } from "./client.ts";
 import { buildEntityCommitEvent } from "../events/entity_commit.ts";
 import { canonicalMeetingId } from "../ids.ts";
 import { normalizeNotubizDocuments, normalizeNotubizMeeting } from "./normalize.ts";
+import {
+  isMotionModule,
+  normalizeNotubizMotion,
+  normalizeNotubizMotionDocuments,
+} from "./motions.ts";
+import { MeetingIndex } from "../motions/normalize.ts";
 import { ObjectStorageClient } from "../storage/s3.ts";
 import { mapLimit } from "../util/map_limit.ts";
 import type {
   EntityCommitEvent,
   DocumentEntity,
+  ExtractedEntity,
   ExtractionIssue,
   ExtractionBundle,
   MeetingEntity,
+  MotionEntity,
+  NotubizModule,
+  NotubizModuleItem,
   NotubizSourceDefinition,
   WooziEntity,
   IngestExecutionMode,
@@ -71,7 +81,7 @@ export class NotubizMeetingExtractor {
     options: {
       onProgress?: (stats: ExtractionBundle["stats"]) => Promise<void> | void;
       onIssue?: (issue: ExtractionIssue, stats: ExtractionBundle["stats"]) => Promise<void> | void;
-      onEntity?: (entity: MeetingEntity | DocumentEntity) => Promise<void> | void;
+      onEntity?: (entity: ExtractedEntity) => Promise<void> | void;
       executionMode?: IngestExecutionMode;
       retainEntities?: boolean;
       retainIssues?: boolean;
@@ -85,14 +95,17 @@ export class NotubizMeetingExtractor {
     const retainIssues = options.retainIssues ?? true;
     const meetings: MeetingEntity[] = [];
     const documents: DocumentEntity[] = [];
+    const motions: MotionEntity[] = [];
     const issues: ExtractionIssue[] = [];
     let cacheHits = 0;
     let downloadedCount = 0;
     let meetingCount = 0;
     let documentCount = 0;
+    let motionCount = 0;
     let issueCount = 0;
     let page = 1;
     const storage = await this.storageProvider();
+    const meetingIndex = new MeetingIndex();
     const meetingConcurrency = Number(
       Deno.env.get("WOOZI_MEETING_CONCURRENCY") ?? `${DEFAULT_MEETING_CONCURRENCY}`,
     );
@@ -106,6 +119,7 @@ export class NotubizMeetingExtractor {
       cache_hits: cacheHits,
       downloaded_count: downloadedCount,
       issue_count: issueCount,
+      motion_count: motionCount,
     });
 
     const registerIssue = async (issue: ExtractionIssue): Promise<void> => {
@@ -154,6 +168,7 @@ export class NotubizMeetingExtractor {
               meetingResponse.meeting,
             );
             meetingCount += 1;
+            meetingIndex.add(meeting);
             if (retainEntities) {
               meetings.push(meeting);
             }
@@ -223,12 +238,119 @@ export class NotubizMeetingExtractor {
       page += 1;
     }
 
+    // Motions run once all pages are in, so every meeting they could reference
+    // is already in the index.
+    await this.extractMotions(source, dateFrom, dateTo, {
+      meetingIndex,
+      registerIssue,
+      onMotion: async (motion, motionDocuments) => {
+        motionCount += 1;
+        if (retainEntities) {
+          motions.push(motion);
+        }
+        await options.onProgress?.(currentStats());
+        await options.onEntity?.(motion);
+
+        await mapLimit(motionDocuments, documentConcurrency, async (document) => {
+          try {
+            const materialized = await materializeDocument(document, {
+              download: (documentEntity) => this.client.downloadDocument(documentEntity),
+              storage,
+              executionMode: options.executionMode,
+            });
+            for (const issue of materialized.issues) {
+              await registerIssue(issue);
+            }
+            documentCount += 1;
+            if (retainEntities) {
+              documents.push(materialized.document);
+            }
+            if (materialized.cacheHit) {
+              cacheHits += 1;
+            } else {
+              downloadedCount += 1;
+            }
+            await options.onProgress?.(currentStats());
+            await options.onEntity?.(materialized.document);
+          } catch (error) {
+            await registerIssue({
+              severity: "error",
+              step: issueStepForDocumentError(error),
+              entity_id: document.id,
+              message: error instanceof Error ? error.message : "Document processing failed",
+            });
+          }
+        });
+      },
+    });
+
     return {
       meetings,
       documents,
+      motions,
       issues,
       stats: currentStats(),
     };
+  }
+
+  /** Import moties/amendementen from the organisation's registry modules.
+   *
+   * Reported but never fatal: not every organisation has a moties module, and
+   * meetings are the primary product of a run. */
+  private async extractMotions(
+    source: NotubizSourceDefinition,
+    dateFrom: string,
+    dateTo: string,
+    context: {
+      meetingIndex: MeetingIndex;
+      registerIssue: (issue: ExtractionIssue) => Promise<void>;
+      onMotion: (motion: MotionEntity, documents: DocumentEntity[]) => Promise<void>;
+    },
+  ): Promise<void> {
+    let modules: NotubizModule[];
+    try {
+      modules = await this.client.listModules(source.notubizOrganizationId);
+    } catch (error) {
+      await context.registerIssue({
+        severity: "warning",
+        step: "list_motions",
+        entity_id: source.key,
+        message: `Notubiz modules unavailable for ${source.key}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      });
+      return;
+    }
+
+    for (const module of modules.filter(isMotionModule)) {
+      let items: NotubizModuleItem[];
+      try {
+        items = await this.client.listModuleItems(
+          source.notubizOrganizationId,
+          module.id,
+          dateFrom,
+          dateTo,
+        );
+      } catch (error) {
+        await context.registerIssue({
+          severity: "warning",
+          step: "list_motions",
+          entity_id: source.key,
+          message: `Notubiz module "${module.name}" failed for ${source.key}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        });
+        continue;
+      }
+
+      for (const item of items) {
+        const motion = normalizeNotubizMotion(source, module, item, context.meetingIndex);
+        await context.onMotion(
+          motion,
+          normalizeNotubizMotionDocuments(source, motion, item),
+        );
+      }
+    }
   }
 
   async extractCommitEventsForDateRange(
@@ -237,7 +359,7 @@ export class NotubizMeetingExtractor {
     dateTo: string,
   ): Promise<Array<EntityCommitEvent<WooziEntity>>> {
     const bundle = await this.extractForDateRange(source, dateFrom, dateTo);
-    const entities = [...bundle.meetings, ...bundle.documents];
+    const entities = [...bundle.meetings, ...bundle.documents, ...(bundle.motions ?? [])];
     return await Promise.all(entities.map((entity) => buildEntityCommitEvent(entity)));
   }
 }

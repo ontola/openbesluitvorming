@@ -1847,6 +1847,28 @@ select {
   padding-left: 0.9rem;
 }
 
+.meeting-agenda__motions {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.meeting-agenda__motions-label {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+}
+
+/* Motions we couldn't tie to a specific agenda item, listed under the agenda
+   so they stay visible. */
+.detail-sheet__motions {
+  display: grid;
+  gap: 0.6rem;
+  margin-top: 1.25rem;
+}
+
 .pdf-document {
   --pdf-page-aspect-ratio: 0.707214;
   height: 100%;

@@ -6,12 +6,15 @@
     AdminSourceOption,
     AdminSourcesResponse,
     EntityContentResponse,
+    MeetingAgendaItem,
+    MeetingMotion,
     SearchResponse,
     SearchResult,
   } from "../../src/types.ts";
   import vngLogo from "../vng-logo.svg";
   import PdfDocumentView from "./PdfDocumentView.svelte";
   import MeetingAgendaTree from "./MeetingAgendaTree.svelte";
+  import MotionCard from "./MotionCard.svelte";
   import ReaderLoading from "./ReaderLoading.svelte";
   import SourcePicker from "./SourcePicker.svelte";
 
@@ -316,6 +319,32 @@
       breaks: true,
       gfm: true,
     }) as string;
+  }
+
+  function collectAgendaItemIds(items?: MeetingAgendaItem[]): Set<string> {
+    const ids = new Set<string>();
+    const walk = (nodes?: MeetingAgendaItem[]) => {
+      for (const node of nodes ?? []) {
+        ids.add(node.id);
+        walk(node.agenda_items);
+      }
+    };
+    walk(items);
+    return ids;
+  }
+
+  function groupMotionsByAgendaItem(
+    motions: MeetingMotion[] | undefined,
+    agendaItemIds: Set<string>,
+  ): Record<string, MeetingMotion[]> {
+    const grouped: Record<string, MeetingMotion[]> = {};
+    for (const motion of motions ?? []) {
+      if (!motion.agenda_item || !agendaItemIds.has(motion.agenda_item)) {
+        continue;
+      }
+      (grouped[motion.agenda_item] ??= []).push(motion);
+    }
+    return grouped;
   }
 
   function loadPreferredDetailMode(): "text" | "pdf" {
@@ -1239,6 +1268,14 @@
   $: hasPreviousDetail = detailIndex > 0;
   $: hasNextDetail = detailIndex >= 0 && (detailIndex < results.length - 1 || hasMore);
   $: detailMarkdownHtml = renderMarkdown(detailContent?.markdownText);
+  $: agendaItemIds = collectAgendaItemIds(detailContent?.agenda);
+  // A motion only renders inside the agenda when we resolved it to an item
+  // that is actually on this agenda; the rest go in a section below, so a
+  // motion is never silently dropped from the page.
+  $: motionsByAgendaItem = groupMotionsByAgendaItem(detailContent?.motions, agendaItemIds);
+  $: unplacedMotions = (detailContent?.motions ?? []).filter(
+    (motion) => !motion.agenda_item || !agendaItemIds.has(motion.agenda_item),
+  );
   $: loadMoreSkeletonCount = totalCount !== null
     ? Math.max(1, Math.min(PAGE_SIZE, totalCount - results.length))
     : PAGE_SIZE;
@@ -1881,11 +1918,25 @@
               {:else if detailContent?.agenda?.length}
                 <MeetingAgendaTree
                   items={detailContent.agenda}
+                  {motionsByAgendaItem}
                   on:opendocument={handleAgendaDocumentOpen}
                   on:documentpreview={() => void refreshDetailHighlights()}
                 />
               {:else}
                 <p class="detail-sheet__meeting-empty">Geen agenda beschikbaar.</p>
+              {/if}
+
+              {#if !detailLoading && unplacedMotions.length > 0}
+                <div class="detail-sheet__motions">
+                  <p class="detail-sheet__meeting-label">
+                    {detailContent?.agenda?.length
+                      ? "Overige moties en amendementen"
+                      : "Moties en amendementen"}
+                  </p>
+                  {#each unplacedMotions as motion (motion.id)}
+                    <MotionCard {motion} />
+                  {/each}
+                </div>
               {/if}
             </div>
           {:else}

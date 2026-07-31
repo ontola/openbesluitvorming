@@ -3,16 +3,35 @@ import {
   canonicalCommitteeId,
   canonicalDocumentId,
   canonicalMeetingId,
+  canonicalMotionId,
   canonicalOrganizationId,
+  canonicalPartyId,
+  canonicalPersonId,
 } from "../ids.ts";
+import {
+  findAgendaItemId,
+  type MeetingIndex,
+  normalizeMotionResult,
+  parseAgendaPointReference,
+  parseMotionDate,
+  partyFromProposer,
+  splitProposers,
+  tallyVotes,
+} from "../motions/normalize.ts";
 import type {
   DocumentEntity,
+  IbabsList,
+  IbabsListEntryBase,
+  IbabsListEntryDetail,
+  IbabsListEntryVote,
   IbabsMeeting,
   IbabsMeetingItem,
   IbabsSourceDefinition,
   MeetingAgendaDocumentLink,
   MeetingAgendaItem,
   MeetingEntity,
+  MotionEntity,
+  MotionVote,
 } from "../types.ts";
 
 function normalizeDateTime(value?: string): string | undefined {
@@ -132,6 +151,136 @@ export function normalizeIbabsMeeting(
     },
     raw: meeting,
   };
+}
+
+/** Look up a list-entry value by any of several spellings.
+ *
+ * The `Values` keys come from a per-municipality list template, so the same
+ * field appears as "Indiener(s)", "Indieners" or "Indiener" depending on the
+ * site. Matching is case-insensitive and ignores surrounding whitespace. */
+function pickValue(values: Record<string, string>, names: string[]): string | undefined {
+  for (const name of names) {
+    const wanted = name.toLowerCase();
+    for (const [key, value] of Object.entries(values)) {
+      if (key.trim().toLowerCase() === wanted && value.trim().length > 0) {
+        return value.trim();
+      }
+    }
+  }
+  return undefined;
+}
+
+function motionVotes(source: IbabsSourceDefinition, votes: IbabsListEntryVote[]): MotionVote[] {
+  return votes
+    .filter((vote) => vote.Vote !== undefined)
+    .map((vote) => ({
+      option: vote.Vote ? ("voor" as const) : ("tegen" as const),
+      voter: vote.UserId ? canonicalPersonId(source, vote.UserId) : undefined,
+      voter_name: vote.UserName,
+      group: vote.GroupId ? canonicalPartyId(source, vote.GroupId) : undefined,
+      group_name: vote.GroupName,
+    }));
+}
+
+export function normalizeIbabsMotion(
+  source: IbabsSourceDefinition,
+  list: IbabsList,
+  entry: IbabsListEntryBase,
+  detail: IbabsListEntryDetail,
+  votes: IbabsListEntryVote[],
+  meetings?: MeetingIndex,
+): MotionEntity {
+  const values = detail.Values;
+  const name = pickValue(values, ["Onderwerp", "Titel", "Toezegging"]) ??
+    entry.EntryTitle ??
+    `${list.ListName} ${entry.EntryId}`;
+  const status = pickValue(values, ["Status"]);
+  const date = parseMotionDate(pickValue(values, ["Datum", "Datum motie", "Datum indiening"]));
+
+  const proposers = splitProposers(
+    pickValue(values, ["Indiener(s)", "Indieners", "Indiener"]),
+  );
+  const coProposers = splitProposers(
+    pickValue(values, ["Mede-indieners", "Mede-indiener(s)", "Medeondertekenaars"]),
+  );
+  const parties = [
+    ...new Set(
+      [...proposers, ...coProposers]
+        .map((proposer) => partyFromProposer(proposer))
+        .filter((party): party is string => Boolean(party)),
+    ),
+  ];
+
+  const reference = parseAgendaPointReference(pickValue(values, ["Agendapunt"]));
+  const meeting = reference && meetings ? meetings.find(reference) : undefined;
+  const agendaItemId = meeting && reference ? findAgendaItemId(meeting, reference) : undefined;
+  const normalizedVotes = motionVotes(source, votes);
+
+  return {
+    id: canonicalMotionId(source, entry.EntryId),
+    type: "Motion",
+    name,
+    classification: [list.ListName],
+    motion_type: list.ListName,
+    status,
+    result: normalizeMotionResult(status),
+    date,
+    description: pickValue(values, ["Toelichting", "Stand van zaken openbaar", "Beleidsveld"]),
+    proposers: proposers.length > 0 ? proposers : undefined,
+    co_proposers: coProposers.length > 0 ? coProposers : undefined,
+    parties: parties.length > 0 ? parties : undefined,
+    votes: normalizedVotes.length > 0 ? normalizedVotes : undefined,
+    tally: tallyVotes(normalizedVotes),
+    meeting: meeting?.id,
+    agenda_item: agendaItemId,
+    // Keep the raw reference when we couldn't resolve it: the meeting may
+    // simply fall outside this run's window, and the string still tells a
+    // reader which meeting the motion belongs to.
+    agenda_item_hint: meeting && agendaItemId ? undefined : pickValue(values, ["Agendapunt"]),
+    attachment: detail.Documents.map((document) => canonicalDocumentId(source, document.Id)),
+    organization: canonicalOrganizationId(source),
+    last_discussed_at: meeting?.start_date ?? date,
+    source_info: {
+      supplier: source.supplier,
+      source: source.key,
+      organization_type: source.organizationType,
+      canonical_id: entry.EntryId,
+      canonical_iri: `ibabs://${source.ibabsSitename}/listentry/${entry.EntryId}`,
+    },
+    raw: { list, entry, values, documents: detail.Documents, votes },
+  };
+}
+
+/** Documents attached to a motion, so the motion PDF itself becomes
+ * searchable. Ids are derived the same way as meeting documents, so a file
+ * that hangs off both an agenda item and a motion stays one entity. */
+export function normalizeIbabsMotionDocuments(
+  source: IbabsSourceDefinition,
+  motion: MotionEntity,
+  detail: IbabsListEntryDetail,
+): DocumentEntity[] {
+  return detail.Documents.map((document) => ({
+    id: canonicalDocumentId(source, document.Id),
+    type: "Document",
+    name: documentName(document),
+    classification: [motion.motion_type ?? "Motie"],
+    original_url: document.PublicDownloadURL,
+    identifier_url: `ibabs://${source.ibabsSitename}/document/${document.Id}`,
+    file_name: document.FileName,
+    size_in_bytes: document.FileSize,
+    last_discussed_at: motion.last_discussed_at,
+    is_referenced_by: motion.id,
+    organization: motion.organization,
+    source_info: {
+      supplier: source.supplier,
+      source: source.key,
+      organization_type: source.organizationType,
+      canonical_id: document.Id,
+      canonical_iri: `ibabs://${source.ibabsSitename}/document/${document.Id}`,
+      source_iri: motion.source_info.canonical_iri,
+    },
+    raw: document,
+  }));
 }
 
 export function normalizeIbabsDocuments(

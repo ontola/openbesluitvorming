@@ -1,0 +1,34 @@
+{
+ "modules": [
+  {
+   "custom_name": "",
+   "name": "Ingekomen stukken",
+   "id": 1
+  },
+  {
+   "custom_name": "Toezeggingen",
+   "name": "Toezeggingen",
+   "id": 3
+  },
+  {
+   "custom_name": "Raadsvragen",
+   "name": "Schriftelijke vragen",
+   "id": 4
+  },
+  {
+   "custom_name": "Moties en Amendementen",
+   "name": "Moties",
+   "id": 6
+  },
+  {
+   "custom_name": "Voorstellen tot 2023",
+   "name": "Bestuursdocumenten",
+   "id": 8
+  },
+  {
+   "custom_name": "Voorstellen vanaf 2023",
+   "name": "Raadsvoorstellen",
+   "id": 19
+  }
+ ]
+}

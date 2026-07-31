@@ -3,6 +3,10 @@ import { setDefaultResultOrder } from "node:dns";
 import type {
   DocumentEntity,
   IbabsDocument,
+  IbabsList,
+  IbabsListEntryBase,
+  IbabsListEntryDetail,
+  IbabsListEntryVote,
   IbabsMeeting,
   IbabsMeetingItem,
   IbabsMeetingType,
@@ -285,11 +289,22 @@ function parseMeetingsXml(xml: string): IbabsMeeting[] {
     .filter((meeting) => meeting.Id.length > 0);
 }
 
+function escapeXml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
 function soapEnvelope(operation: string, params: Record<string, string>): string {
   const paramXml = Object.entries(params)
-    .map(([key, value]) => `<${key}>${value}</${key}>`)
+    .map(([key, value]) => `<${key}>${escapeXml(value)}</${key}>`)
     .join("");
 
+  return soapEnvelopeRaw(operation, paramXml);
+}
+
+function soapEnvelopeRaw(operation: string, paramXml: string): string {
   return `<?xml version="1.0" encoding="utf-8"?>
 <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
   <s:Body>
@@ -298,6 +313,115 @@ function soapEnvelope(operation: string, params: Record<string, string>): string
     </${operation}>
   </s:Body>
 </s:Envelope>`;
+}
+
+function parseListsXml(xml: string): IbabsList[] {
+  const document = xmlParser.parse(xml);
+  const result = nestedValue(document, ["Envelope", "Body", "GetListsResponse", "GetListsResult"]);
+  if (!result) {
+    throw new Error("Invalid iBabs GetLists response");
+  }
+
+  // GetLists answers with a bare iBabsKeyValue array — no Status/Message
+  // wrapper, unlike the other list operations. Don't assert on status here.
+  return asArray(valueForLocalName(result, "iBabsKeyValue"))
+    .map((pair) => ({
+      ListId: textValue(pair, "Key") ?? "",
+      ListName: textValue(pair, "Value") ?? "",
+    }))
+    .filter((list) => list.ListId.length > 0 && list.ListName.length > 0);
+}
+
+function parseListEntriesXml(xml: string): IbabsListEntryBase[] {
+  const document = xmlParser.parse(xml);
+  const result = nestedValue(document, [
+    "Envelope",
+    "Body",
+    "GetListsEntriesByFilterRequestResponse",
+    "GetListsEntriesByFilterRequestResult",
+  ]);
+  if (!result) {
+    throw new Error("Invalid iBabs GetListsEntriesByFilterRequest response");
+  }
+
+  assertIbabsResultOk(result, "GetListsEntriesByFilterRequest");
+
+  const entries = valueForLocalName(result, "Entries");
+  if (!entries) {
+    return [];
+  }
+
+  return asArray(valueForLocalName(entries, "iBabsListEntryBase"))
+    .map((entry) => ({
+      EntryId: textValue(entry, "EntryId") ?? "",
+      EntryMasterId: textValue(entry, "EntryMasterId"),
+      EntryTitle: textValue(entry, "EntryTitle"),
+      ListId: textValue(entry, "ListId"),
+      ListName: textValue(entry, "ListName"),
+      ListCanVote: parseBoolean(textValue(entry, "ListCanVote")),
+      MutationDate: textValue(entry, "MutationDate"),
+    }))
+    .filter((entry) => entry.EntryId.length > 0);
+}
+
+function parseListEntryXml(xml: string, entryId: string): IbabsListEntryDetail {
+  const document = xmlParser.parse(xml);
+  const result = nestedValue(document, [
+    "Envelope",
+    "Body",
+    "GetListEntryResponse",
+    "GetListEntryResult",
+  ]);
+  if (!result) {
+    throw new Error("Invalid iBabs GetListEntry response");
+  }
+
+  assertIbabsResultOk(result, "GetListEntry");
+
+  const values: Record<string, string> = {};
+  const valuesNode = valueForLocalName(result, "Values");
+  for (const pair of asArray(valueForLocalName(valuesNode, "KeyValueOfstringstring"))) {
+    const key = textValue(pair, "Key");
+    const value = textValue(pair, "Value");
+    if (key && value !== undefined) {
+      values[key] = value;
+    }
+  }
+
+  return {
+    EntryId: entryId,
+    Values: values,
+    Documents: parseDocuments(valueForLocalName(result, "Documents")),
+  };
+}
+
+function parseListEntryVotesXml(xml: string): IbabsListEntryVote[] {
+  const document = xmlParser.parse(xml);
+  const result = nestedValue(document, [
+    "Envelope",
+    "Body",
+    "GetListEntryVotesByListEntryIdResponse",
+    "GetListEntryVotesByListEntryIdResult",
+  ]);
+  if (!result) {
+    throw new Error("Invalid iBabs GetListEntryVotesByListEntryId response");
+  }
+
+  assertIbabsResultOk(result, "GetListEntryVotesByListEntryId");
+
+  const votes = valueForLocalName(result, "ListEntryVotes");
+  if (!votes) {
+    return [];
+  }
+
+  return asArray(valueForLocalName(votes, "iBabsListEntryVote")).map((vote) => ({
+    EntryId: textValue(vote, "EntryId"),
+    GroupId: textValue(vote, "GroupId"),
+    GroupName: textValue(vote, "GroupName"),
+    UserId: textValue(vote, "UserId"),
+    UserName: textValue(vote, "UserName"),
+    Vote: parseBoolean(textValue(vote, "Vote")),
+  }));
 }
 
 // iBabs occasionally holds a connection open without responding. Without an
@@ -372,6 +496,80 @@ export class IbabsClient {
     );
   }
 
+  /** Registries for a site: moties, amendementen, toezeggingen, … */
+  async getLists(source: IbabsSourceDefinition): Promise<IbabsList[]> {
+    return parseListsXml(
+      await this.postSoap("GetLists", {
+        Sitename: source.ibabsSitename,
+      }),
+    );
+  }
+
+  /** Entries in one registry, changed on or after `sinceDate` (YYYY-MM-DD). */
+  async listListEntries(
+    source: IbabsSourceDefinition,
+    listId: string,
+    sinceDate: string,
+  ): Promise<IbabsListEntryBase[]> {
+    // This operation takes a single complex parameter whose children live in
+    // two other namespaces, so it can't go through the flat key/value builder.
+    const filterRequest =
+      `<filterRequest xmlns:r="http://schemas.datacontract.org/2004/07/iBabsWCFObjects.Public.Request"` +
+      ` xmlns:b="http://schemas.datacontract.org/2004/07/iBabsWCFObjects.Base">` +
+      `<b:Sitename>${escapeXml(source.ibabsSitename)}</b:Sitename>` +
+      `<r:ListId>${escapeXml(listId)}</r:ListId>` +
+      `<r:SinceDate>${escapeXml(sinceDate)}T00:00:00</r:SinceDate>` +
+      `</filterRequest>`;
+
+    return parseListEntriesXml(
+      await fetchText(this.endpoint, {
+        method: "POST",
+        headers: {
+          "content-type": "text/xml; charset=utf-8",
+          soapaction: `"${SOAP_ACTION_PREFIX}GetListsEntriesByFilterRequest"`,
+          "user-agent": "woozi/0.1",
+        },
+        body: soapEnvelopeRaw("GetListsEntriesByFilterRequest", filterRequest),
+      }),
+    );
+  }
+
+  async getListEntry(
+    source: IbabsSourceDefinition,
+    listId: string,
+    entryId: string,
+  ): Promise<IbabsListEntryDetail> {
+    return parseListEntryXml(
+      await this.postSoap("GetListEntry", {
+        Sitename: source.ibabsSitename,
+        ListId: listId,
+        EntryId: entryId,
+      }),
+      entryId,
+    );
+  }
+
+  /** Per-member votes for one entry.
+   *
+   * Note the operation name says `ByListEntryId` but the parameter that works
+   * is `EntryId`; passing `ListEntryId` fails with a misleading
+   * "cast to value type 'System.Guid' failed" error. The similarly named
+   * `GetListEntryVotes` is access-denied — this one is public.
+   *
+   * Returns an empty list for the roughly half of iBabs sources that don't use
+   * the digital voting module. That is a normal outcome, not a failure. */
+  async getListEntryVotes(
+    source: IbabsSourceDefinition,
+    entryId: string,
+  ): Promise<IbabsListEntryVote[]> {
+    return parseListEntryVotesXml(
+      await this.postSoap("GetListEntryVotesByListEntryId", {
+        Sitename: source.ibabsSitename,
+        EntryId: entryId,
+      }),
+    );
+  }
+
   async downloadDocument(document: DocumentEntity): Promise<Uint8Array> {
     if (!document.original_url) {
       throw new Error("Document has no download URL");
@@ -399,4 +597,8 @@ export class IbabsClient {
 export const __test__ = {
   parseMeetingTypesXml,
   parseMeetingsXml,
+  parseListsXml,
+  parseListEntriesXml,
+  parseListEntryXml,
+  parseListEntryVotesXml,
 };

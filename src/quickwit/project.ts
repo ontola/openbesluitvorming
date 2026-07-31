@@ -3,6 +3,7 @@ import type {
   DocumentEntity,
   EntityCommitEvent,
   MeetingEntity,
+  MotionEntity,
   PartyEntity,
   PersonEntity,
   WooziEntity,
@@ -110,6 +111,35 @@ function projectDocumentContent(payload?: DocumentEntity): string | undefined {
   return content || undefined;
 }
 
+function projectMotionContent(payload?: MotionEntity): string | undefined {
+  if (!payload) {
+    return undefined;
+  }
+
+  // Party names come from both the submitters and the vote breakdown, so a
+  // search for a fractie finds the motions it voted on, not just the ones it
+  // submitted.
+  const voteGroups = payload.votes?.map((vote) => vote.group_name) ?? [];
+  const content = [
+    payload.name,
+    ...(payload.classification ?? []),
+    payload.motion_type,
+    payload.status,
+    payload.result,
+    payload.description,
+    ...(payload.proposers ?? []),
+    ...(payload.co_proposers ?? []),
+    ...(payload.parties ?? []),
+    ...new Set(voteGroups),
+    payload.vote_summary,
+    payload.agenda_item_hint,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  return content || undefined;
+}
+
 function projectGenericEntityContent(
   payload?: CommitteeEntity | PartyEntity | PersonEntity,
 ): string | undefined {
@@ -183,6 +213,30 @@ export function compactEntityPayload(payload?: WooziEntity): unknown {
     };
   }
 
+  if (payload.type === "Motion") {
+    return {
+      type: payload.type,
+      name: payload.name,
+      classification: payload.classification,
+      motion_type: payload.motion_type,
+      status: payload.status,
+      result: payload.result,
+      date: payload.date,
+      proposers: payload.proposers,
+      co_proposers: payload.co_proposers,
+      parties: payload.parties,
+      votes: payload.votes,
+      tally: payload.tally,
+      vote_summary: payload.vote_summary,
+      meeting: payload.meeting,
+      agenda_item: payload.agenda_item,
+      agenda_item_hint: payload.agenda_item_hint,
+      attachment: payload.attachment,
+      organization: payload.organization,
+      last_discussed_at: payload.last_discussed_at,
+    };
+  }
+
   return {
     type: payload.type,
     name: payload.name,
@@ -245,7 +299,9 @@ export function projectEntityCommitToQuickwitDocuments(
       ? projectDocumentContent(payload)
       : payload?.type === "Meeting"
         ? projectMeetingContent(payload)
-        : projectGenericEntityContent(payload);
+        : payload?.type === "Motion"
+          ? projectMotionContent(payload)
+          : projectGenericEntityContent(payload);
 
   const primaryDocument: QuickwitSearchDocument = {
     time: event.time,
@@ -273,10 +329,15 @@ export function projectEntityCommitToQuickwitDocuments(
         ? payload.start_date
         : payload?.type === "Document"
           ? documentReferenceDate(payload)
-          : undefined,
+          : payload?.type === "Motion"
+            ? (payload.last_discussed_at ?? payload.date)
+            : undefined,
     end_date: payload?.type === "Meeting" ? payload.end_date : undefined,
     organization: (payload as { organization?: string } | undefined)?.organization,
     committee: payload?.type === "Meeting" ? payload.committee : undefined,
+    // Motions hang off the meeting they were decided in, the same way document
+    // pages hang off their document, so the meeting view can fetch them.
+    parent_entity_id: payload?.type === "Motion" ? payload.meeting : undefined,
     content,
     projection_version: projectionVersion,
     payload: compactEntityPayload(payload),

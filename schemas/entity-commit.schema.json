@@ -33,7 +33,7 @@
       "additionalProperties": false,
       "properties": {
         "entity_type": {
-          "enum": ["Meeting", "Document", "Committee", "Vote"]
+          "enum": ["Meeting", "Document", "Committee", "Motion", "Vote"]
         },
         "entity_id": {
           "$ref": "common.schema.json#/$defs/id"
@@ -51,7 +51,7 @@
           "enum": ["replace", "merge"]
         },
         "schema_name": {
-          "enum": ["Meeting", "Document", "Committee", "Vote"]
+          "enum": ["Meeting", "Document", "Committee", "Motion", "Vote"]
         },
         "schema_version": {
           "type": "string",
@@ -74,6 +74,9 @@
             },
             {
               "$ref": "committee.schema.json"
+            },
+            {
+              "$ref": "motion.schema.json"
             },
             {
               "$ref": "vote.schema.json"

@@ -153,12 +153,83 @@ export interface PersonEntity {
   raw: unknown;
 }
 
+/** How a single council member voted on a motion.
+ *
+ * Shaped after `schemas/vote.schema.json` so these can be promoted to
+ * first-class Vote entities later, but carried inside the motion rather than
+ * emitted separately: a vote is meaningless without its motion, and Utrecht
+ * alone would add ~22k standalone index documents per half-year. */
+export interface MotionVote {
+  option: "voor" | "tegen";
+  voter?: string;
+  voter_name?: string;
+  group?: string;
+  group_name?: string;
+}
+
+export interface MotionVoteTally {
+  in_favour: number;
+  against: number;
+}
+
+/** A motie, amendement or comparable registry entry with a voting outcome.
+ *
+ * iBabs calls these "list entries", Notubiz calls them "module items". Both
+ * expose an outcome per entry and a link back to the agenda item it was
+ * decided in. */
+export interface MotionEntity {
+  id: string;
+  type: "Motion";
+  name: string;
+  classification: string[];
+  /** The supplier's own label, e.g. "Motie", "Amendement", "Motie Vreemd". */
+  motion_type?: string;
+  /** Supplier status text, verbatim, e.g. "Motie verworpen" or "aangenomen". */
+  status?: string;
+  /** Normalized outcome derived from `status`. */
+  result?: "aangenomen" | "verworpen" | "ingetrokken" | "aangehouden" | "overig";
+  date?: string;
+  description?: string;
+  proposers?: string[];
+  co_proposers?: string[];
+  parties?: string[];
+  /** Per-member breakdown, where the supplier publishes one. */
+  votes?: MotionVote[];
+  tally?: MotionVoteTally;
+  /** Free-text vote breakdown (Notubiz field 61). Stored verbatim — the
+   * formatting varies per municipality and misparsing a vote count is worse
+   * than showing the original sentence. */
+  vote_summary?: string;
+  meeting?: string;
+  agenda_item?: string;
+  /** The raw supplier reference to the agenda item, kept when it could not be
+   * resolved to a `meeting`/`agenda_item` id. */
+  agenda_item_hint?: string;
+  attachment?: string[];
+  organization?: string;
+  last_discussed_at?: string;
+  source_info: SourceInfo;
+  raw: unknown;
+}
+
 export type WooziEntity =
   | MeetingEntity
   | DocumentEntity
   | CommitteeEntity
   | PartyEntity
-  | PersonEntity;
+  | PersonEntity
+  | MotionEntity;
+
+/** Everything an extractor can hand to `onEntity`. Shared so every extractor
+ * declares the same (widest) callback type — `runExtractor` in `ingest.ts`
+ * passes one handler to all of them. */
+export type ExtractedEntity =
+  | MeetingEntity
+  | DocumentEntity
+  | CommitteeEntity
+  | PartyEntity
+  | PersonEntity
+  | MotionEntity;
 
 export interface ExtractionBundle {
   meetings: MeetingEntity[];
@@ -166,6 +237,7 @@ export interface ExtractionBundle {
   committees?: CommitteeEntity[];
   parties?: PartyEntity[];
   persons?: PersonEntity[];
+  motions?: MotionEntity[];
   stats: ExtractionStats;
   issues: ExtractionIssue[];
 }
@@ -176,6 +248,7 @@ export interface ExtractionStats {
   cache_hits: number;
   downloaded_count: number;
   issue_count: number;
+  motion_count?: number;
 }
 
 export interface ExtractionIssue {
@@ -183,6 +256,7 @@ export interface ExtractionIssue {
   step:
     | "list_events"
     | "get_meeting"
+    | "list_motions"
     | "download_document"
     | "extract_text"
     | "upload_s3"
@@ -209,6 +283,40 @@ export interface SourceDefinitionBase {
 export interface NotubizSourceDefinition extends SourceDefinitionBase {
   supplier: "notubiz";
   notubizOrganizationId: number;
+}
+
+export interface NotubizModule {
+  id: number;
+  /** Notubiz's own module name, stable across organisations ("Moties"). */
+  name: string;
+  /** The organisation's rename of it ("Moties en Amendementen"), often empty. */
+  custom_name?: string;
+}
+
+export interface NotubizModuleItemValue {
+  content?: string | number | null;
+  meta_data?: {
+    reference_model?: string;
+    label?: string;
+  } | null;
+}
+
+export interface NotubizModuleItemAttribute {
+  id: number;
+  label?: string;
+  datatype?: string;
+  values?: NotubizModuleItemValue[];
+}
+
+export interface NotubizModuleItem {
+  id: number;
+  module_id?: number;
+  organisation_id?: number;
+  last_modified?: string;
+  attributes?: NotubizModuleItemAttribute[];
+  attachments?: {
+    document?: unknown[];
+  };
 }
 
 export interface NotubizOrganizationAttributes {
@@ -278,6 +386,38 @@ export interface IbabsMeetingItem {
   Explanation?: string;
   Confidential?: boolean;
   Documents?: IbabsDocument[];
+}
+
+/** One registry in `GetLists`, e.g. "Moties" or "1.2 Amendementen". */
+export interface IbabsList {
+  ListId: string;
+  ListName: string;
+}
+
+export interface IbabsListEntryBase {
+  EntryId: string;
+  EntryMasterId?: string;
+  EntryTitle?: string;
+  ListId?: string;
+  ListName?: string;
+  ListCanVote?: boolean;
+  MutationDate?: string;
+}
+
+export interface IbabsListEntryDetail {
+  EntryId: string;
+  /** Per-list-template key/value pairs: Onderwerp, Status, Indiener(s), … */
+  Values: Record<string, string>;
+  Documents: IbabsDocument[];
+}
+
+export interface IbabsListEntryVote {
+  EntryId?: string;
+  GroupId?: string;
+  GroupName?: string;
+  UserId?: string;
+  UserName?: string;
+  Vote?: boolean;
 }
 
 export interface IbabsMeeting {
@@ -438,6 +578,24 @@ export interface SearchResponse {
   hasMore?: boolean;
 }
 
+/** A motion as shown on a meeting page. */
+export interface MeetingMotion {
+  id: string;
+  name: string;
+  motion_type?: string;
+  status?: string;
+  result?: MotionEntity["result"];
+  date?: string;
+  proposers?: string[];
+  co_proposers?: string[];
+  parties?: string[];
+  votes?: MotionVote[];
+  tally?: MotionVoteTally;
+  vote_summary?: string;
+  agenda_item?: string;
+  agenda_item_hint?: string;
+}
+
 export interface EntityContentResponse {
   entityId: string;
   entityType: string;
@@ -452,6 +610,8 @@ export interface EntityContentResponse {
   pdfUrl?: string;
   meetingId?: string;
   agenda?: MeetingAgendaItem[];
+  /** Motions decided in this meeting, when the entity is a Meeting. */
+  motions?: MeetingMotion[];
 }
 
 /** One line in the per-source export changes log. Compact by design: full

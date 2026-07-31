@@ -301,7 +301,8 @@ Canonical entity schemas are published as JSON Schema documents:
 | [meeting.schema.json](/schemas/meeting.schema.json) | Council or committee meeting |
 | [document.schema.json](/schemas/document.schema.json) | Attached document or media object |
 | [committee.schema.json](/schemas/committee.schema.json) | Committee or organisation |
-| [vote.schema.json](/schemas/vote.schema.json) | Vote record |
+| [motion.schema.json](/schemas/motion.schema.json) | Motie/amendement with outcome and vote breakdown |
+| [vote.schema.json](/schemas/vote.schema.json) | Vote record (shape reused inside `Motion.votes`) |
 | [entity-commit.schema.json](/schemas/entity-commit.schema.json) | CloudEvents envelope |
 
 These define the structure of entity detail responses.

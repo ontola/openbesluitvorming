@@ -1,0 +1,455 @@
+{
+ "items": [
+  {
+   "id": 1184235,
+   "creation_date": null,
+   "last_modified": "2026-07-08 13:15:16",
+   "confidential": 0,
+   "body": null,
+   "permission_group": "public",
+   "organisation_id": 3423,
+   "module_id": 6,
+   "attributes": [
+    {
+     "label": "Titel",
+     "id": 1,
+     "datatype": "varchar",
+     "order": 4,
+     "multiple": 0,
+     "visible": "both",
+     "values": [
+      {
+       "meta_data": null,
+       "content": "Vergunningverlening rond geitenhouderijen"
+      }
+     ]
+    },
+    {
+     "label": "Datum",
+     "id": 15,
+     "datatype": "datetime",
+     "order": 5,
+     "multiple": 0,
+     "visible": "both",
+     "values": [
+      {
+       "meta_data": null,
+       "content": "2026-07-07 00:00:00"
+      }
+     ]
+    },
+    {
+     "label": "Ingediend in",
+     "id": 54,
+     "datatype": "integer",
+     "order": 6,
+     "multiple": 1,
+     "visible": "detail",
+     "values": [
+      {
+       "meta_data": {
+        "reference_model": "agenda_item",
+        "label": "Motie Claudia Schipper (CDA) en Henri de Raad (SGP) - Vergunningverlening rond geitenhouderijen (Raadsvergadering 07-07-2026 16:00)"
+       },
+       "content": 10383120
+      }
+     ]
+    },
+    {
+     "label": "Motie",
+     "id": 2,
+     "datatype": "document",
+     "order": 8,
+     "multiple": 0,
+     "visible": "detail",
+     "values": [
+      {
+       "document": {
+        "self": "api.notubiz.nl/document/17194168",
+        "url": "https://api.notubiz.nl/document/17194168/2",
+        "title": "Getekende motie vreemd CDA en SGP - Vergunningverlening rond geitenhouderijen (aangenomen)",
+        "description": "",
+        "date": "",
+        "case_code": "",
+        "policy_field": "",
+        "category": "",
+        "id": 17194168,
+        "confidential": 0,
+        "publication_date": "2026-07-31",
+        "last_modified": "2026-07-08 13:15:16",
+        "version": 2,
+        "types": [
+         {
+          "id": 7,
+          "value": "Motie"
+         }
+        ],
+        "versions": [
+         {
+          "type": "file",
+          "mime_type": "application/pdf",
+          "file_name": "Getekende motie vreemd CDA en SGP - Vergunningverlening rond geitenhouderijen (aangenomen).pdf",
+          "file_size": 737363,
+          "id": 2
+         },
+         {
+          "type": "file",
+          "mime_type": "application/pdf",
+          "file_name": "Getekende motie vreemd CDA en SGP - Vergunningverlening rond geitenhouderijen (aangenomen).pdf",
+          "file_size": 785704,
+          "id": 1
+         }
+        ],
+        "connections": [
+         {
+          "self": "https://api.notubiz.nl/document/17194168/2/connections/17/13598068",
+          "version": 2,
+          "order": 1,
+          "document_id": 17194168,
+          "connection_type": 17,
+          "connection_id": 13598068
+         }
+        ]
+       },
+       "meta_data": null
+      }
+     ]
+    },
+    {
+     "label": "Fractie(s)",
+     "id": 37,
+     "datatype": "integer",
+     "order": 9,
+     "multiple": 1,
+     "visible": "both",
+     "values": [
+      {
+       "meta_data": {
+        "reference_model": "party",
+        "label": "CDA"
+       },
+       "content": 2
+      },
+      {
+       "meta_data": {
+        "reference_model": "party",
+        "label": "SGP"
+       },
+       "content": 6
+      }
+     ]
+    },
+    {
+     "label": "Indiener(s)",
+     "id": 36,
+     "datatype": "integer",
+     "order": 10,
+     "multiple": 1,
+     "visible": "detail",
+     "values": [
+      {
+       "meta_data": {
+        "reference_model": "person",
+        "label": "Claudia Schipper-Heijmans"
+       },
+       "content": 187947
+      },
+      {
+       "meta_data": {
+        "reference_model": "person",
+        "label": "Henri de Raad"
+       },
+       "content": 143125
+      }
+     ]
+    },
+    {
+     "label": "Medeondertekenaars",
+     "id": 87,
+     "datatype": "integer",
+     "order": 11,
+     "multiple": 1,
+     "visible": "detail",
+     "values": [
+      {
+       "meta_data": {
+        "reference_model": "person",
+        "label": "Philip den Haan"
+       },
+       "content": 143105
+      },
+      {
+       "meta_data": {
+        "reference_model": "person",
+        "label": "Jan Kolff"
+       },
+       "content": 143136
+      }
+     ]
+    },
+    {
+     "label": "Uitslag",
+     "id": 62,
+     "datatype": "varchar",
+     "order": 12,
+     "multiple": 0,
+     "visible": "detail",
+     "values": [
+      {
+       "meta_data": null,
+       "content": "Aangenomen"
+      }
+     ]
+    },
+    {
+     "label": "Stemmingsuitslag",
+     "id": 61,
+     "datatype": "text",
+     "order": 13,
+     "multiple": 0,
+     "visible": "detail",
+     "values": [
+      {
+       "meta_data": null,
+       "content": "<p>Stemmen voor: 23 CDA, AL, SGP, VVD, FVD, H. Timmermans (VVA), en A. de Weerd (VVA)</p>\n<p>Stemmen tegen: 7 PA, CU, A. Visser (VVA) en A. de Jong (VVA)</p>"
+      }
+     ]
+    },
+    {
+     "label": "Portefeuillehouder",
+     "id": 23,
+     "datatype": "integer",
+     "order": 14,
+     "multiple": 1,
+     "visible": "both",
+     "values": [
+      {
+       "meta_data": {
+        "reference_model": "role",
+        "label": "J.P. Neven (Wethouder)"
+       },
+       "content": 272313
+      }
+     ]
+    },
+    {
+     "label": "Termijn afdoening",
+     "id": 28,
+     "datatype": "datetime",
+     "order": 17,
+     "multiple": 0,
+     "visible": "both",
+     "values": [
+      {
+       "meta_data": null,
+       "content": "2026-09-30 00:00:00"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": 1184230,
+   "creation_date": null,
+   "last_modified": "2026-07-08 11:39:56",
+   "confidential": 0,
+   "body": null,
+   "permission_group": "public",
+   "organisation_id": 3423,
+   "module_id": 6,
+   "attributes": [
+    {
+     "label": "Titel",
+     "id": 1,
+     "datatype": "varchar",
+     "order": 4,
+     "multiple": 0,
+     "visible": "both",
+     "values": [
+      {
+       "meta_data": null,
+       "content": "Een open en transparante gemeente subsidieregister"
+      }
+     ]
+    },
+    {
+     "label": "Datum",
+     "id": 15,
+     "datatype": "datetime",
+     "order": 5,
+     "multiple": 0,
+     "visible": "both",
+     "values": [
+      {
+       "meta_data": null,
+       "content": "2026-07-07 00:00:00"
+      }
+     ]
+    },
+    {
+     "label": "Ingediend in",
+     "id": 54,
+     "datatype": "integer",
+     "order": 6,
+     "multiple": 1,
+     "visible": "detail",
+     "values": [
+      {
+       "meta_data": {
+        "reference_model": "agenda_item",
+        "label": "Programma 6 Financiën (Raadsvergadering 07-07-2026 16:00)"
+       },
+       "content": 10412869
+      }
+     ]
+    },
+    {
+     "label": "Motie",
+     "id": 2,
+     "datatype": "document",
+     "order": 8,
+     "multiple": 0,
+     "visible": "detail",
+     "values": [
+      {
+       "document": {
+        "self": "api.notubiz.nl/document/17194140",
+        "url": "https://api.notubiz.nl/document/17194140/1",
+        "title": "Getekende motie FVD - Een open en transparante gemeente - subsidieregister (aangenomen)",
+        "description": "",
+        "date": "",
+        "case_code": "",
+        "policy_field": "",
+        "category": "",
+        "id": 17194140,
+        "confidential": 0,
+        "publication_date": "2026-07-31",
+        "last_modified": "2026-07-08 11:39:56",
+        "version": 1,
+        "types": [
+         {
+          "id": 7,
+          "value": "Motie"
+         }
+        ],
+        "versions": [
+         {
+          "type": "file",
+          "mime_type": "application/pdf",
+          "file_name": "Getekende motie FVD - Een open en transparante gemeente - subsidieregister (aangenomen).pdf",
+          "file_size": 479263,
+          "id": 1
+         }
+        ],
+        "connections": [
+         {
+          "self": "https://api.notubiz.nl/document/17194140/1/connections/17/13597999",
+          "version": 1,
+          "order": 1,
+          "document_id": 17194140,
+          "connection_type": 17,
+          "connection_id": 13597999
+         }
+        ]
+       },
+       "meta_data": null
+      }
+     ]
+    },
+    {
+     "label": "Fractie(s)",
+     "id": 37,
+     "datatype": "integer",
+     "order": 9,
+     "multiple": 1,
+     "visible": "both",
+     "values": [
+      {
+       "meta_data": {
+        "reference_model": "party",
+        "label": "Forum voor Democratie"
+       },
+       "content": 2191
+      }
+     ]
+    },
+    {
+     "label": "Indiener(s)",
+     "id": 36,
+     "datatype": "integer",
+     "order": 10,
+     "multiple": 1,
+     "visible": "detail",
+     "values": [
+      {
+       "meta_data": {
+        "reference_model": "person",
+        "label": "Benjamin van Leeuwen"
+       },
+       "content": 219513
+      }
+     ]
+    },
+    {
+     "label": "Uitslag",
+     "id": 62,
+     "datatype": "varchar",
+     "order": 12,
+     "multiple": 0,
+     "visible": "detail",
+     "values": [
+      {
+       "meta_data": null,
+       "content": "Aangenomen"
+      }
+     ]
+    },
+    {
+     "label": "Stemmingsuitslag",
+     "id": 61,
+     "datatype": "text",
+     "order": 13,
+     "multiple": 0,
+     "visible": "detail",
+     "values": [
+      {
+       "meta_data": null,
+       "content": "<p>Stemmen voor: 27 - overige fracties</p>\n<p>Stemmen tegen: 3 - PA</p>"
+      }
+     ]
+    },
+    {
+     "label": "Portefeuillehouder",
+     "id": 23,
+     "datatype": "integer",
+     "order": 14,
+     "multiple": 1,
+     "visible": "both",
+     "values": [
+      {
+       "meta_data": {
+        "reference_model": "role",
+        "label": "N.G. van Ooijen (Wethouder)"
+       },
+       "content": 226691
+      }
+     ]
+    },
+    {
+     "label": "Termijn afdoening",
+     "id": 28,
+     "datatype": "datetime",
+     "order": 17,
+     "multiple": 0,
+     "visible": "both",
+     "values": [
+      {
+       "meta_data": null,
+       "content": "2026-12-31 00:00:00"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

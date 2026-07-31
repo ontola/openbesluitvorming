@@ -1,0 +1,467 @@
+{
+ "pagination": {
+  "list_start": 0,
+  "list_end": 2,
+  "total_results": 2
+ },
+ "items": [
+  {
+   "id": 1124979,
+   "creation_date": null,
+   "last_modified": "2026-01-23 17:05:10",
+   "confidential": 0,
+   "body": null,
+   "permission_group": "public",
+   "organisation_id": 987,
+   "module_id": 6,
+   "attributes": [
+    {
+     "label": "Ingediend in",
+     "id": 54,
+     "datatype": "integer",
+     "order": 4,
+     "multiple": 1,
+     "visible": "detail",
+     "values": [
+      {
+       "meta_data": {
+        "reference_model": "agenda_item",
+        "label": "Amendement - GL PvdA - Geotechnisch onderzoek mogelijkheden woningbouw op die plek (Gemeenteraad 22-01-2026 19:30)"
+       },
+       "content": 9977098
+      }
+     ]
+    },
+    {
+     "label": "Titel",
+     "id": 1,
+     "datatype": "varchar",
+     "order": 5,
+     "multiple": 0,
+     "visible": "both",
+     "values": [
+      {
+       "meta_data": null,
+       "content": "15-A-1 Amendement - GL PvdA - Geotechnisch onderzoek mogelijkheden woningbouw op die plek"
+      }
+     ]
+    },
+    {
+     "label": "Datum",
+     "id": 15,
+     "datatype": "datetime",
+     "order": 6,
+     "multiple": 0,
+     "visible": "both",
+     "values": [
+      {
+       "meta_data": null,
+       "content": "2026-01-22 00:00:00"
+      }
+     ]
+    },
+    {
+     "label": "Hoofddocument",
+     "id": 2,
+     "datatype": "document",
+     "order": 8,
+     "multiple": 0,
+     "visible": "detail",
+     "values": [
+      {
+       "document": {
+        "self": "api.notubiz.nl/document/16506217",
+        "url": "https://api.notubiz.nl/document/16506217/1",
+        "title": "260122 15-A-1 Amendement - GL PvdA - Geotechnisch onderzoek mogelijkheden woningbouw op die plek (Karperton)",
+        "description": "",
+        "date": "",
+        "case_code": "",
+        "policy_field": "",
+        "category": "",
+        "id": 16506217,
+        "confidential": 0,
+        "publication_date": "2026-07-31",
+        "last_modified": "2026-01-21 10:14:53",
+        "version": 1,
+        "types": [
+         {
+          "id": 11,
+          "value": "Amendement"
+         }
+        ],
+        "versions": [
+         {
+          "type": "file",
+          "mime_type": "application/pdf",
+          "file_name": "260122 15-A-1 Amendement - GL PvdA - Geotechnisch onderzoek mogelijkheden woningbouw op die plek (Karperton).pdf",
+          "file_size": 201201,
+          "id": 1
+         }
+        ],
+        "connections": [
+         {
+          "self": "https://api.notubiz.nl/document/16506217/1/connections/17/12876181",
+          "version": 1,
+          "order": 1,
+          "document_id": 16506217,
+          "connection_type": 17,
+          "connection_id": 12876181
+         }
+        ]
+       },
+       "meta_data": null
+      }
+     ]
+    },
+    {
+     "label": "Type",
+     "id": 45,
+     "datatype": "varchar",
+     "order": 10,
+     "multiple": 0,
+     "visible": "both",
+     "values": [
+      {
+       "meta_data": null,
+       "content": "Amendement"
+      }
+     ]
+    },
+    {
+     "label": "Indienende partij",
+     "id": 37,
+     "datatype": "integer",
+     "order": 11,
+     "multiple": 1,
+     "visible": "both",
+     "values": [
+      {
+       "meta_data": {
+        "reference_model": "party",
+        "label": "GroenLinks"
+       },
+       "content": 7
+      },
+      {
+       "meta_data": {
+        "reference_model": "party",
+        "label": "PvdA"
+       },
+       "content": 14
+      }
+     ]
+    },
+    {
+     "label": "Stemming",
+     "id": 62,
+     "datatype": "varchar",
+     "order": 13,
+     "multiple": 0,
+     "visible": "both",
+     "values": [
+      {
+       "meta_data": null,
+       "content": "verworpen"
+      }
+     ]
+    },
+    {
+     "label": "Afdoeningsdocument",
+     "id": 21,
+     "datatype": "document",
+     "order": 16,
+     "multiple": 0,
+     "visible": "detail",
+     "values": [
+      {
+       "document": {
+        "self": "api.notubiz.nl/document/16525323",
+        "url": "https://api.notubiz.nl/document/16525323/1",
+        "title": "260122 15-A-1 Amendement - GL PvdA - Geotechnisch onderzoek mogelijkheden woningbouw op die plek (Karperton) - verworpen",
+        "description": "",
+        "date": "",
+        "case_code": "",
+        "policy_field": "",
+        "category": "",
+        "id": 16525323,
+        "confidential": 0,
+        "publication_date": "2026-07-31",
+        "last_modified": "2026-01-23 17:05:10",
+        "version": 1,
+        "types": [
+         {
+          "id": 1,
+          "value": "Document"
+         }
+        ],
+        "versions": [
+         {
+          "type": "file",
+          "mime_type": "application/pdf",
+          "file_name": "260122 15-A-1 - GL PvdA - Geotechnisch onderzoek mogelijkheden woningbouw op die plek (Karperton) - verworpen.pdf",
+          "file_size": 101686,
+          "id": 1
+         }
+        ],
+        "connections": [
+         {
+          "self": "https://api.notubiz.nl/document/16525323/1/connections/17/12892785",
+          "version": 1,
+          "order": 1,
+          "document_id": 16525323,
+          "connection_type": 17,
+          "connection_id": 12892785
+         }
+        ]
+       },
+       "meta_data": null
+      }
+     ]
+    },
+    {
+     "label": "Afdoeningsdatum",
+     "id": 17,
+     "datatype": "datetime",
+     "order": 17,
+     "multiple": 0,
+     "visible": "both",
+     "values": [
+      {
+       "meta_data": null,
+       "content": "2026-01-22 00:00:00"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": 1125193,
+   "creation_date": null,
+   "last_modified": "2026-01-23 17:07:06",
+   "confidential": 0,
+   "body": null,
+   "permission_group": "public",
+   "organisation_id": 987,
+   "module_id": 6,
+   "attributes": [
+    {
+     "label": "Ingediend in",
+     "id": 54,
+     "datatype": "integer",
+     "order": 4,
+     "multiple": 1,
+     "visible": "detail",
+     "values": [
+      {
+       "meta_data": {
+        "reference_model": "agenda_item",
+        "label": "Amendement - GL PvdA - Een Jongerenraad met stem en mandaat (Gemeenteraad 22-01-2026 19:30)"
+       },
+       "content": 9978816
+      }
+     ]
+    },
+    {
+     "label": "Titel",
+     "id": 1,
+     "datatype": "varchar",
+     "order": 5,
+     "multiple": 0,
+     "visible": "both",
+     "values": [
+      {
+       "meta_data": null,
+       "content": "17-A-1 Amendement - GL PvdA - Een Jongerenraad met stem en mandaat"
+      }
+     ]
+    },
+    {
+     "label": "Datum",
+     "id": 15,
+     "datatype": "datetime",
+     "order": 6,
+     "multiple": 0,
+     "visible": "both",
+     "values": [
+      {
+       "meta_data": null,
+       "content": "2026-01-22 00:00:00"
+      }
+     ]
+    },
+    {
+     "label": "Hoofddocument",
+     "id": 2,
+     "datatype": "document",
+     "order": 8,
+     "multiple": 0,
+     "visible": "detail",
+     "values": [
+      {
+       "document": {
+        "self": "api.notubiz.nl/document/16506221",
+        "url": "https://api.notubiz.nl/document/16506221/1",
+        "title": "260122 17-A-1 Amendement - GL PvdA - Een Jongerenraad met stem en mandaat",
+        "description": "",
+        "date": "",
+        "case_code": "",
+        "policy_field": "",
+        "category": "",
+        "id": 16506221,
+        "confidential": 0,
+        "publication_date": "2026-07-31",
+        "last_modified": "2026-01-21 10:15:13",
+        "version": 1,
+        "types": [
+         {
+          "id": 11,
+          "value": "Amendement"
+         }
+        ],
+        "versions": [
+         {
+          "type": "file",
+          "mime_type": "application/pdf",
+          "file_name": "260122 17-A-1 Amendement - GL PvdA - Een Jongerenraad met stem en mandaat.pdf",
+          "file_size": 187198,
+          "id": 1
+         }
+        ],
+        "connections": [
+         {
+          "self": "https://api.notubiz.nl/document/16506221/1/connections/17/12876191",
+          "version": 1,
+          "order": 1,
+          "document_id": 16506221,
+          "connection_type": 17,
+          "connection_id": 12876191
+         }
+        ]
+       },
+       "meta_data": null
+      }
+     ]
+    },
+    {
+     "label": "Type",
+     "id": 45,
+     "datatype": "varchar",
+     "order": 10,
+     "multiple": 0,
+     "visible": "both",
+     "values": [
+      {
+       "meta_data": null,
+       "content": "Amendement"
+      }
+     ]
+    },
+    {
+     "label": "Indienende partij",
+     "id": 37,
+     "datatype": "integer",
+     "order": 11,
+     "multiple": 1,
+     "visible": "both",
+     "values": [
+      {
+       "meta_data": {
+        "reference_model": "party",
+        "label": "GroenLinks"
+       },
+       "content": 7
+      },
+      {
+       "meta_data": {
+        "reference_model": "party",
+        "label": "PvdA"
+       },
+       "content": 14
+      }
+     ]
+    },
+    {
+     "label": "Stemming",
+     "id": 62,
+     "datatype": "varchar",
+     "order": 13,
+     "multiple": 0,
+     "visible": "both",
+     "values": [
+      {
+       "meta_data": null,
+       "content": "aangenomen"
+      }
+     ]
+    },
+    {
+     "label": "Afdoeningsdocument",
+     "id": 21,
+     "datatype": "document",
+     "order": 16,
+     "multiple": 0,
+     "visible": "detail",
+     "values": [
+      {
+       "document": {
+        "self": "api.notubiz.nl/document/16525338",
+        "url": "https://api.notubiz.nl/document/16525338/1",
+        "title": "260122 17-A-1 Amendement - GL PvdA - Een Jongerenraad met stem en mandaat - aangenomen",
+        "description": "",
+        "date": "",
+        "case_code": "",
+        "policy_field": "",
+        "category": "",
+        "id": 16525338,
+        "confidential": 0,
+        "publication_date": "2026-07-31",
+        "last_modified": "2026-01-23 17:07:06",
+        "version": 1,
+        "types": [
+         {
+          "id": 11,
+          "value": "Amendement"
+         }
+        ],
+        "versions": [
+         {
+          "type": "file",
+          "mime_type": "application/pdf",
+          "file_name": "260122 17-A-1 Amendement - GL PvdA - Een Jongerenraad met stem en mandaat - aangenomen.pdf",
+          "file_size": 91192,
+          "id": 1
+         }
+        ],
+        "connections": [
+         {
+          "self": "https://api.notubiz.nl/document/16525338/1/connections/17/12892802",
+          "version": 1,
+          "order": 1,
+          "document_id": 16525338,
+          "connection_type": 17,
+          "connection_id": 12892802
+         }
+        ]
+       },
+       "meta_data": null
+      }
+     ]
+    },
+    {
+     "label": "Afdoeningsdatum",
+     "id": 17,
+     "datatype": "datetime",
+     "order": 17,
+     "multiple": 0,
+     "visible": "both",
+     "values": [
+      {
+       "meta_data": null,
+       "content": "2026-01-22 00:00:00"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

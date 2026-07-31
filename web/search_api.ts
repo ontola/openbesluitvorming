@@ -4,6 +4,7 @@ import type {
   AdminCoverageRow,
   EntityContentResponse,
   MeetingAgendaItem,
+  MeetingMotion,
   SearchResponse,
   SearchResult,
 } from "../src/types.ts";
@@ -45,6 +46,19 @@ type SearchHit = {
     };
     is_referenced_by?: string;
     agenda?: MeetingAgendaItem[];
+    motion_type?: string;
+    status?: string;
+    result?: MeetingMotion["result"];
+    date?: string;
+    proposers?: string[];
+    co_proposers?: string[];
+    parties?: string[];
+    votes?: MeetingMotion["votes"];
+    tally?: MeetingMotion["tally"];
+    vote_summary?: string;
+    meeting?: string;
+    agenda_item?: string;
+    agenda_item_hint?: string;
   };
 };
 
@@ -931,6 +945,8 @@ export async function getEntityContent(entityId: string): Promise<EntityContentR
     }
   }
 
+  const motions = hit.entity_type === "Meeting" ? await getMeetingMotions(entityId) : undefined;
+
   return {
     entityId: hit.entity_id ?? entityId,
     entityType: hit.entity_type ?? "Unknown",
@@ -949,7 +965,40 @@ export async function getEntityContent(entityId: string): Promise<EntityContentR
     pdfUrl,
     meetingId: hit.payload?.is_referenced_by,
     agenda,
+    motions: motions && motions.length > 0 ? motions : undefined,
   };
+}
+
+/** Motions decided in a meeting.
+ *
+ * Motions are projected with `parent_entity_id` set to their meeting, the same
+ * way document pages hang off their document, so one term query finds them. */
+async function getMeetingMotions(meetingId: string): Promise<MeetingMotion[]> {
+  const quickwit = new QuickwitClient();
+  const response = await quickwit.search(
+    `projection_version:${escapeTerm(currentProjectionVersion())}` +
+      ` AND entity_type:Motion AND parent_entity_id:${escapeTerm(meetingId)}`,
+    100,
+  );
+
+  return dedupeLatestHits(response.hits as SearchHit[])
+    .filter((hit) => hit.entity_id)
+    .map((hit) => ({
+      id: hit.entity_id!,
+      name: hit.name ?? "Ongetitelde motie",
+      motion_type: hit.payload?.motion_type,
+      status: hit.payload?.status,
+      result: hit.payload?.result,
+      date: hit.payload?.date,
+      proposers: hit.payload?.proposers,
+      co_proposers: hit.payload?.co_proposers,
+      parties: hit.payload?.parties,
+      votes: hit.payload?.votes,
+      tally: hit.payload?.tally,
+      vote_summary: hit.payload?.vote_summary,
+      agenda_item: hit.payload?.agenda_item,
+      agenda_item_hint: hit.payload?.agenda_item_hint,
+    }));
 }
 
 export async function getEntityPdfInfo(entityId: string): Promise<{

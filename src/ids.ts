@@ -6,7 +6,8 @@ export type ScopedEntityType =
   | "committee"
   | "agenda_item"
   | "person"
-  | "party";
+  | "party"
+  | "motion";
 
 export function canonicalOrganizationId(source: SourceDefinitionBase): string {
   return `organization:nl:${source.organizationType}:${source.key}`;
@@ -60,4 +61,11 @@ export function canonicalPartyId(
   nativeId: number | string,
 ): string {
   return scopedEntityId("party", source, nativeId);
+}
+
+export function canonicalMotionId(
+  source: SourceDefinitionBase,
+  nativeId: number | string,
+): string {
+  return scopedEntityId("motion", source, nativeId);
 }

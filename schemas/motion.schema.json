@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openraadsinformatie.nl/schemas/motion.schema.json",
+  "title": "Motion",
+  "description": "A motie, amendement or comparable registry entry with a voting outcome. iBabs models these as list entries, Notubiz as module items; both publish an outcome per entry and a reference back to the agenda item it was decided in.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "id": {
+      "$ref": "common.schema.json#/$defs/id"
+    },
+    "type": {
+      "const": "Motion"
+    },
+    "name": {
+      "type": "string"
+    },
+    "classification": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "motion_type": {
+      "type": "string",
+      "description": "The supplier's own label, e.g. \"Motie\", \"Amendement\", \"Motie Vreemd\"."
+    },
+    "status": {
+      "type": "string",
+      "description": "Supplier status text, verbatim (\"Motie verworpen\", \"aangenomen\", …)."
+    },
+    "result": {
+      "type": "string",
+      "enum": ["aangenomen", "verworpen", "ingetrokken", "aangehouden", "overig"],
+      "description": "Normalized outcome derived from status."
+    },
+    "date": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "proposers": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "co_proposers": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "parties": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "votes": {
+      "type": "array",
+      "description": "Per-member breakdown where the supplier publishes one. Available from iBabs GetListEntryVotesByListEntryId for roughly half of its sources; empty elsewhere. Items follow vote.schema.json minus the standalone-entity fields, because votes are carried inside their motion rather than emitted separately.",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "option": { "type": "string", "enum": ["voor", "tegen"] },
+          "voter": { "type": "string" },
+          "voter_name": { "type": "string" },
+          "group": { "type": "string" },
+          "group_name": { "type": "string" }
+        },
+        "required": ["option"]
+      }
+    },
+    "tally": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "in_favour": { "type": "integer", "minimum": 0 },
+        "against": { "type": "integer", "minimum": 0 }
+      },
+      "required": ["in_favour", "against"]
+    },
+    "vote_summary": {
+      "type": "string",
+      "description": "Free-text vote breakdown as published by the source (Notubiz field 61). Stored verbatim; the formatting varies per municipality."
+    },
+    "meeting": {
+      "$ref": "common.schema.json#/$defs/entityRef"
+    },
+    "agenda_item": {
+      "$ref": "common.schema.json#/$defs/entityRef"
+    },
+    "agenda_item_hint": {
+      "type": "string",
+      "description": "Raw supplier reference to the agenda item, kept when it could not be resolved to a meeting/agenda_item id."
+    },
+    "attachment": {
+      "type": "array",
+      "items": { "$ref": "common.schema.json#/$defs/entityRef" }
+    },
+    "organization": {
+      "$ref": "common.schema.json#/$defs/entityRef"
+    },
+    "last_discussed_at": {
+      "type": "string"
+    },
+    "source_info": {
+      "$ref": "common.schema.json#/$defs/sourceInfo"
+    }
+  },
+  "required": ["id", "type", "name", "source_info"]
+}

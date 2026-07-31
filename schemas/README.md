@@ -19,6 +19,7 @@ Current scope:
 - `Meeting`
 - `Document`
 - `Committee`
+- `Motion`
 - `Vote`
 - `entity.commit`
 
@@ -26,7 +27,11 @@ Notes:
 
 - `Document` is based on the current `MediaObject` / attachment shape.
 - `Committee` is based on the current `Organization` usage for committees.
-- `Vote` exists in the current ontology/model layer, even though it is not yet
-  a major first-class output path in the pipeline.
+- `Motion` covers moties/amendementen from iBabs list entries and Notubiz module
+  items, including the outcome and — where the source publishes it — the
+  per-member vote breakdown.
+- `Vote` exists in the current ontology/model layer but is not emitted as a
+  standalone entity. Per-member votes live in `Motion.votes`, shaped after this
+  schema, because a vote is only meaningful together with its motion.
 - `entity.commit` is the first event schema and wraps these entity schemas in a
   CloudEvents-compatible envelope.
