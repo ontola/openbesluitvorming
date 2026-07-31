@@ -8,10 +8,11 @@ SEARCH_CRITICAL_MS="${WOOZI_MONITOR_SEARCH_CRITICAL_MS:-8000}"
 QUICKWIT_WARN_MS="${WOOZI_MONITOR_QUICKWIT_WARN_MS:-1500}"
 DISK_WARN_PERCENT="${WOOZI_MONITOR_DISK_WARN_PERCENT:-80}"
 DISK_CRITICAL_PERCENT="${WOOZI_MONITOR_DISK_CRITICAL_PERCENT:-90}"
-# Percentage of the configured split-cache budget below which the cache
-# counts as cold (see check_containers). Byte-based on purpose: the previous
-# rule compared split *counts* against published splits, which became
-# unsatisfiable once one 24.9GB split took 38% of the budget. 0 disables.
+# Percentage of the *cacheable* bytes -- min(budget, published index size) --
+# below which the cache counts as cold (see check_containers). Measured
+# against the index rather than the budget, because once the budget exceeds
+# the index a full cache can never reach a budget-relative threshold. 0
+# disables.
 QUICKWIT_CACHE_COLD_PERCENT="${WOOZI_MONITOR_QUICKWIT_CACHE_COLD_PERCENT:-40}"
 # Must match docker-compose.production.yml; used to turn the cache size into
 # a percentage of budget. Accepts the same G/M/K suffixes Quickwit does.
@@ -76,6 +77,12 @@ EXTRACTION_DISK_CRITICAL_PERCENT="${WOOZI_MONITOR_EXTRACTION_DISK_CRITICAL_PERCE
 # These hosts go briefly unresponsive under load, so one failed probe is
 # noise; ~6 minutes of silence is not.
 EXTRACTION_UNREACHABLE_STREAK="${WOOZI_MONITOR_EXTRACTION_UNREACHABLE_STREAK:-3}"
+# Probe timeout. Deliberately well above a healthy response (~2ms): these are
+# 2-vCPU boxes running 4 uvicorn workers on CPU-bound PDF extraction, so a
+# busy host queues /stats behind real work. At 8s the probe reported hosts as
+# unreachable on 2026-07-31 while their logs showed /extract returning 200
+# throughout -- saturation, not an outage.
+EXTRACTION_PROBE_TIMEOUT="${WOOZI_MONITOR_EXTRACTION_PROBE_TIMEOUT:-20}"
 SCALE_DOWN_QUEUE_THRESHOLD="${WOOZI_MONITOR_SCALE_DOWN_QUEUE_THRESHOLD:-10}"
 SCALE_DOWN_REMIND_SECONDS="${WOOZI_MONITOR_SCALE_DOWN_REMIND_SECONDS:-86400}"
 CURL_IP_VERSION="${WOOZI_MONITOR_CURL_IP_VERSION:-4}"
@@ -271,14 +278,23 @@ check_containers() {
   # splits") is then arithmetically unsatisfiable and fires forever, the same
   # way the janitor's MIN_FILES gate silently broke once splits got large.
   #
-  # What actually indicates a cold cache is a cache far below its own budget:
-  # freshly wiped, or just recreated. A cache sitting near budget is warm by
-  # definition, however few splits that buys. Genuine slowness caused by an
-  # index that outgrew the budget is already caught, directly, by the search
-  # probes above -- which is the symptom that actually matters.
-  if [ -n "$cache_kb" ] && [ "${QUICKWIT_CACHE_COLD_PERCENT:-0}" -gt 0 ]; then
-    local budget_kb cache_pct
-    budget_kb="$(awk -v spec="${QUICKWIT_SPLIT_CACHE_MAX_NUM_BYTES:-55G}" 'BEGIN {
+  # What indicates a cold cache is a cache far below *what there is to cache*,
+  # i.e. the published index -- not below its configured budget. Measuring
+  # against the budget breaks as soon as the budget exceeds the index: after
+  # the cache moved to a 150GB volume and the budget went to 120G, a
+  # completely full cache could only ever reach 55% of budget (index 66.4GB),
+  # so a 40% threshold fired on every janitor sweep while the cache held 93%
+  # of the index. That is the same unsatisfiable-threshold trap as the
+  # split-count rule this replaced -- twice now, from tying the check to a
+  # number that does not track what it claims to measure.
+  #
+  # So compare against min(budget, index): whichever actually limits how much
+  # can be resident. Genuine slowness from an index larger than the budget is
+  # already caught directly by the search probes above.
+  if [ -n "$cache_kb" ] && [ "${QUICKWIT_CACHE_COLD_PERCENT:-0}" -gt 0 ] &&
+    command -v python3 >/dev/null 2>&1; then
+    local budget_kb cache_pct index_kb target_kb
+    budget_kb="$(awk -v spec="${QUICKWIT_SPLIT_CACHE_MAX_NUM_BYTES:-120G}" 'BEGIN {
       n = spec + 0
       if (spec ~ /[Gg]/) n *= 1024 * 1024
       else if (spec ~ /[Mm]/) n *= 1024
@@ -286,10 +302,28 @@ check_containers() {
       else n /= 1024
       printf "%d", n
     }')"
-    cache_pct=$((budget_kb > 0 ? cache_kb * 100 / budget_kb : 100))
+    index_kb="$(docker exec woozi-quickwit-1 cat \
+      "/quickwit/qwdata/${QUICKWIT_INDEX_ROOT_PREFIX}/${QUICKWIT_INDEX_ID}/metastore.json" 2>/dev/null |
+      python3 -c "
+import json,sys
+try:
+    d = json.load(sys.stdin)
+except Exception:
+    print(0); raise SystemExit
+pub = [s for s in d.get('splits', []) if s.get('split_state') == 'Published']
+total = sum((s.get('split_metadata', s).get('footer_offsets', {}) or {}).get('end') or 0 for s in pub)
+print(total // 1024)
+" 2>/dev/null || echo 0)"
+    [ -n "$index_kb" ] || index_kb=0
+    if [ "$index_kb" -gt 0 ] && [ "$index_kb" -lt "$budget_kb" ]; then
+      target_kb="$index_kb"
+    else
+      target_kb="$budget_kb"
+    fi
+    cache_pct=$((target_kb > 0 ? cache_kb * 100 / target_kb : 100))
     if [ "$cache_pct" -lt "$QUICKWIT_CACHE_COLD_PERCENT" ]; then
       cache_gb="$(awk -v kb="${cache_kb:-0}" 'BEGIN { print int((kb / 1024 / 1024) + 0.5) }')"
-      alert warning quickwit_cache_cold "Quickwit split cache is far below its budget" "cache_gb=${cache_gb} percent_of_budget=${cache_pct} threshold=${QUICKWIT_CACHE_COLD_PERCENT}; splits=${split_count}"
+      alert warning quickwit_cache_cold "Quickwit split cache is far below what it should hold" "cache_gb=${cache_gb} percent_of_cacheable=${cache_pct} threshold=${QUICKWIT_CACHE_COLD_PERCENT} cacheable_gb=$(awk -v kb="$target_kb" 'BEGIN { print int((kb / 1024 / 1024) + 0.5) }') splits=${split_count}"
     fi
   fi
 }
@@ -370,7 +404,7 @@ check_extraction_disk() {
     # disk_used_percent exists only on images from 2026-07-30 onward; an
     # older host simply reports nothing and is counted unreachable rather
     # than silently passing.
-    pct="$(curl -fsS -m 8 "${url%/}/stats" 2>/dev/null |
+    pct="$(curl -fsS -m "$EXTRACTION_PROBE_TIMEOUT" "${url%/}/stats" 2>/dev/null |
       grep -o '"disk_used_percent"[[:space:]]*:[[:space:]]*[0-9]*' |
       grep -o '[0-9]*$' || true)"
     if [ -z "$pct" ]; then
@@ -410,8 +444,8 @@ check_extraction_disk() {
     alert critical extraction_hosts_unreachable "No extraction host is reachable" \
       "all ${total} host(s) failed /stats; document extraction cannot make progress"
   elif [ "$streak" -ge "$EXTRACTION_UNREACHABLE_STREAK" ]; then
-    alert warning extraction_host_unreachable "Extraction host unreachable for several checks" \
-      "${unreachable} of ${total} host(s) did not answer /stats, ${streak} checks in a row. Workers keep dispatching to them and burn the full request timeout each attempt. The hosts are stateless -- a reboot restores them (the container restarts on boot)."
+    alert warning extraction_host_unreachable "Extraction host not answering /stats" \
+      "${unreachable} of ${total} host(s) failed the ${EXTRACTION_PROBE_TIMEOUT}s probe, ${streak} checks in a row. Check whether they are actually down or merely saturated: 'docker logs woozi-extraction --tail 20' on the host still showing /extract 200 means it is working and overloaded, not dead -- in that case reduce extraction_uvicorn_workers rather than rebooting. A host that is genuinely hung answers neither SSH nor HTTP; those are stateless and a reboot restores them."
   fi
 
   [ "$checked" -gt 0 ] || return 0
