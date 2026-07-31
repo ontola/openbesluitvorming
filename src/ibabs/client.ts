@@ -23,6 +23,52 @@ const DEFAULT_IBABS_URL = "https://wcf.ibabs.eu/api/Public.svc";
 const SOAP_ACTION_PREFIX = "http://tempuri.org/IPublic/";
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 300;
+// iBabs throttles a burst of SOAP calls with HTTP 403 — measured 2026-07-31: a
+// 4-way concurrent probe drew 403s after ~240 calls, while a single request
+// straight afterwards succeeded. So at the transport layer a 403 is a rate
+// limit, not an authorisation problem; genuine access denials come back as
+// HTTP 200 with Status=ERR and are caught by assertIbabsResultOk.
+//
+// Throttles need seconds, not the sub-second transport retry: 300ms/600ms
+// burns all three attempts inside a second and fails anyway. These get their
+// own budget of ~30s total.
+const THROTTLE_MAX_RETRIES = 4;
+const throttleBaseDelayMs = Math.max(
+  1,
+  Number(Deno.env.get("WOOZI_IBABS_THROTTLE_BASE_MS") ?? "2000"),
+);
+
+/** An HTTP-level failure that kept its status code, so the retry policy can
+ * tell a throttle apart from a hard error. */
+class IbabsHttpError extends Error {
+  constructor(
+    readonly status: number,
+    url: string,
+    readonly retryAfterMs?: number,
+  ) {
+    // Message shape is unchanged: other layers match on it.
+    super(`Request failed ${status} for ${url}`);
+    this.name = "IbabsHttpError";
+  }
+}
+
+function isThrottleError(error: unknown): error is IbabsHttpError {
+  return error instanceof IbabsHttpError && (error.status === 429 || error.status === 403);
+}
+
+/** `Retry-After` in seconds. The HTTP-date form is ignored — iBabs has not been
+ * seen using it, and guessing wrong is worse than falling back to the curve. */
+function parseRetryAfter(value: string | null): number | undefined {
+  if (!value) {
+    return undefined;
+  }
+  const seconds = Number(value.trim());
+  return Number.isFinite(seconds) && seconds >= 0 ? seconds * 1000 : undefined;
+}
+
+function throttleDelayMs(attempt: number, retryAfterMs?: number): number {
+  return retryAfterMs ?? throttleBaseDelayMs * 2 ** (attempt - 1);
+}
 
 // When IBABS_PROXY_URL is set (e.g. http://localhost:8888), all iBabs
 // requests are routed through this HTTP proxy. This allows local development
@@ -433,8 +479,13 @@ const SOAP_TIMEOUT_MS = 90_000;
 
 async function fetchText(url: string, init: RequestInit): Promise<string> {
   let lastError: unknown;
+  // Two independent budgets. A throttle is not the same failure as a dropped
+  // connection, and sharing one counter would let a couple of connection
+  // resets eat the patience a rate limit needs.
+  let transportAttempts = 0;
+  let throttleAttempts = 0;
 
-  for (let attempt = 1; attempt <= MAX_RETRIES; attempt += 1) {
+  while (true) {
     try {
       const client = getProxyClient();
       const response = await fetch(url, {
@@ -443,19 +494,37 @@ async function fetchText(url: string, init: RequestInit): Promise<string> {
         ...(client ? { client } : {}),
       });
       if (!response.ok) {
-        throw new Error(`Request failed ${response.status} for ${url}`);
+        throw new IbabsHttpError(
+          response.status,
+          url,
+          parseRetryAfter(response.headers.get("retry-after")),
+        );
       }
       return await response.text();
     } catch (error) {
       lastError = error;
-      if (attempt === MAX_RETRIES || !isRetryableError(error)) {
+
+      if (isThrottleError(error)) {
+        throttleAttempts += 1;
+        if (throttleAttempts > THROTTLE_MAX_RETRIES) {
+          throw error;
+        }
+        console.log(
+          `[ibabs] throttled ${error.status}, backing off ` +
+            `${throttleDelayMs(throttleAttempts, error.retryAfterMs)}ms ` +
+            `(attempt ${throttleAttempts}/${THROTTLE_MAX_RETRIES})`,
+        );
+        await sleep(throttleDelayMs(throttleAttempts, error.retryAfterMs));
+        continue;
+      }
+
+      transportAttempts += 1;
+      if (transportAttempts >= MAX_RETRIES || !isRetryableError(error)) {
         throw error;
       }
-      await sleep(RETRY_DELAY_MS * attempt);
+      await sleep(RETRY_DELAY_MS * transportAttempts);
     }
   }
-
-  throw lastError instanceof Error ? lastError : new Error(`Request failed for ${url}`);
 }
 
 export class IbabsClient {
@@ -595,6 +664,11 @@ export class IbabsClient {
 }
 
 export const __test__ = {
+  fetchText,
+  isThrottleError,
+  parseRetryAfter,
+  throttleDelayMs,
+  IbabsHttpError,
   parseMeetingTypesXml,
   parseMeetingsXml,
   parseListsXml,

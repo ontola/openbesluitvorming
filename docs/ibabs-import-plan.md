@@ -269,8 +269,19 @@ backoff and iBabs answered HTTP 403 after roughly 240 calls, failing 132 of 153
 sitenames. It is a throttle, not a ban — a single `curl -4` succeeded immediately
 afterwards, and the production workers logged zero 403s throughout. Re-running at
 concurrency 2 with a 0.4s pace and exponential backoff on 403/429/5xx completed
-cleanly. Note that `src/ibabs/client.ts` does *not* treat 403 as retryable, so a
-throttle during a heavy backfill would fail the run rather than back off.
+cleanly: the same 132 sitenames that failed without backoff all succeeded with it.
+
+`src/ibabs/client.ts` now acts on that. HTTP 403 and 429 are treated as throttles
+and retried on their own budget (4 attempts, doubling from
+`WOOZI_IBABS_THROTTLE_BASE_MS`, default 2s — about 30s total), honouring
+`Retry-After` when present. That budget is separate from the 3-attempt,
+sub-second transport retry, so a couple of connection resets can't eat the
+patience a rate limit needs. Genuine access denials are unaffected: they arrive
+as HTTP 200 with `Status=ERR` and are caught by `assertIbabsResultOk`.
+
+Still per-connection, not global: five workers each backing off independently
+does not coordinate a fleet-wide slowdown. If throttling ever shows up in
+production logs (it has not yet), a shared circuit breaker is the next step.
 
 `ListCanVote` on `iBabsListEntryBase` is `true` for every entry in every moties list
 tested, including sources that return no votes at all, so it is **not** a usable
