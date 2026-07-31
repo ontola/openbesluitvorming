@@ -1358,6 +1358,10 @@ select {
   justify-content: space-between;
   align-items: center;
   gap: 1rem 1.25rem;
+  /* Wrapping stays available at every width so flexbox can decide per sheet
+     whether the tags and the actions fit side by side. The breakpoints below
+     only force the split for the action rows that genuinely can't share. */
+  flex-wrap: wrap;
 }
 
 .detail-sheet__meta {
@@ -1373,6 +1377,10 @@ select {
   align-items: center;
   gap: 0.75rem;
   flex: 0 0 auto;
+  /* Keeps the actions right-aligned whether they share the row with the tags
+     or wrap onto their own — space-between alone would left-align them once
+     they are the only item on a line. */
+  margin-left: auto;
 }
 
 .detail-sheet__header-actions > .select-field {
@@ -2067,7 +2075,6 @@ select {
   }
 
   .detail-sheet__meta {
-    flex: 1 1 100%;
     gap: 0.3rem 0.45rem;
   }
 
@@ -2082,10 +2089,15 @@ select {
   }
 
   /* Stays wrappable: the sheet is a flex item with min-width: auto, so a
-     nowrap action row would push the whole sheet wider than the viewport. */
-  .detail-sheet__header-actions {
+     nowrap action row would push the whole sheet wider than the viewport.
+     Scoped to the action sets that carry the wide controls — tags plus the
+     nav/close buttons alone still fit beside each other at this width. */
+  .detail-sheet__header-actions:has(.detail-sheet__view-switch, .primary-button) {
     width: 100%;
     justify-content: flex-end;
+  }
+
+  .detail-sheet__header-actions {
     gap: 0.4rem;
   }
 
@@ -2820,12 +2832,7 @@ select {
     letter-spacing: -0.025em;
   }
 
-  .detail-sheet__header-bar {
-    flex-wrap: wrap;
-  }
-
   .detail-sheet__meta {
-    flex: 1 1 100%;
     gap: 0.3rem 0.45rem;
   }
 
@@ -2840,10 +2847,15 @@ select {
   }
 
   /* Stays wrappable: the sheet is a flex item with min-width: auto, so a
-     nowrap action row would push the whole sheet wider than the viewport. */
-  .detail-sheet__header-actions {
+     nowrap action row would push the whole sheet wider than the viewport.
+     Scoped like the container-query rule above so a plain meeting header
+     doesn't spend a row it doesn't need. */
+  .detail-sheet__header-actions:has(.detail-sheet__view-switch, .primary-button) {
     width: 100%;
     justify-content: flex-end;
+  }
+
+  .detail-sheet__header-actions {
     gap: 0.4rem;
   }
 
@@ -2960,18 +2972,20 @@ select {
    them. */
 @media (min-width: 641px) and (max-width: 900px) {
   .detail-sheet__header-bar {
-    flex-wrap: wrap;
     align-items: center;
   }
 
-  .detail-sheet__meta {
-    flex: 1 1 100%;
-  }
-
-  .detail-sheet__header-actions {
+  /* Only an action row carrying the wide controls (the Tekst/PDF switch or a
+     download button) needs a row of its own here. A meeting sheet has neither,
+     and forcing the split on it cost a whole header row while the tags and the
+     nav buttons together used well under half the available width. */
+  .detail-sheet__header-actions:has(.detail-sheet__view-switch, .primary-button) {
     width: 100%;
     justify-content: flex-end;
     align-items: center;
+  }
+
+  .detail-sheet__header-actions {
     gap: 0.55rem;
   }
 
