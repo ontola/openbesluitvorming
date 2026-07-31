@@ -1712,6 +1712,7 @@ select {
 }
 
 .meeting-agenda__document-thumb {
+  position: relative;
   flex: 0 0 3.5rem;
   align-self: stretch;
   margin-left: auto;
@@ -1722,7 +1723,13 @@ select {
   background: rgba(233, 239, 246, 0.6);
 }
 
+/* Taken out of flow so a lazily loaded page render cannot grow its row: these
+   images are ~1120px tall, and each one landing added 8px to its pill. Over a
+   long agenda that shifted everything below by hundreds of pixels — enough to
+   push the scrolled-to search hit back off screen. */
 .meeting-agenda__document-thumb img {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -1988,14 +1995,16 @@ select {
   }
 }
 
-.detail-sheet__text mark {
+/* Query hits are marked in whichever reader holds text — document markdown and
+   meeting agendas alike. */
+.detail-sheet__surface mark {
   background: rgba(78, 166, 255, 0.24);
   color: inherit;
   border-radius: 0.3rem;
   padding: 0 0.1rem;
 }
 
-.detail-sheet__text--highlighting mark {
+.detail-sheet__surface--highlighting mark {
   animation: detail-highlight-bloom 820ms ease-out both;
 }
 
@@ -2523,7 +2532,7 @@ select {
     );
   }
 
-  .detail-sheet__text mark {
+  .detail-sheet__surface mark {
     background: rgba(114, 183, 255, 0.28);
   }
 

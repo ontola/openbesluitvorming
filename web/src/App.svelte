@@ -119,6 +119,7 @@
   let brandBlockEl: HTMLDivElement | null = null;
   let detailDialogEl: HTMLDivElement | null = null;
   let detailTextEl: HTMLElement | null = null;
+  let detailMeetingEl: HTMLElement | null = null;
   let detailPdfEl: HTMLDivElement | null = null;
   let detailPdfJumpInputEl: HTMLInputElement | null = null;
   let loadMoreSentinelEl: HTMLDivElement | null = null;
@@ -553,11 +554,20 @@
       return detailPdfEl?.querySelector<HTMLElement>(".pdf-document") ?? detailPdfEl;
     }
 
-    if (detailItem?.entityType === "Document") {
-      return detailTextEl;
+    return activeDetailTextSurface() ?? detailDialogEl;
+  }
+
+  /**
+   * The reader pane that holds searchable text in the current mode: the rendered
+   * markdown for a document, the agenda for a meeting. Both get the query
+   * highlighted and both are the element that actually scrolls.
+   */
+  function activeDetailTextSurface(): HTMLElement | null {
+    if (detailMode !== "text") {
+      return null;
     }
 
-    return detailDialogEl;
+    return detailItem?.entityType === "Meeting" ? detailMeetingEl : detailTextEl;
   }
 
   async function focusActiveDetailSurface(): Promise<void> {
@@ -695,32 +705,44 @@
 
   async function syncDetailText(): Promise<void> {
     if (detailMode !== "text") return;
-    // Don't check detailTextEl yet: when switching from the PDF view the text
+    // Don't resolve the surface yet: when switching from the PDF view the text
     // container only mounts after the next render, so the binding is still
     // null here. Wait for the re-render (and one frame for layout) first.
     await tick();
     await new Promise<void>((resolve) => {
       requestAnimationFrame(() => resolve());
     });
-    if (detailMode !== "text" || !detailTextEl) return;
-    highlightElementText(detailTextEl, query);
-    const firstMatch = detailTextEl.querySelector<HTMLElement>("mark");
+    const surface = activeDetailTextSurface();
+    if (!surface) return;
+    highlightElementText(surface, query);
+    const firstMatch = surface.querySelector<HTMLElement>("mark");
     if (firstMatch) {
-      detailTextEl.classList.remove("detail-sheet__text--highlighting");
-      void detailTextEl.offsetWidth;
-      detailTextEl.classList.add("detail-sheet__text--highlighting");
-      const containerRect = detailTextEl.getBoundingClientRect();
+      surface.classList.remove("detail-sheet__surface--highlighting");
+      void surface.offsetWidth;
+      surface.classList.add("detail-sheet__surface--highlighting");
+      const containerRect = surface.getBoundingClientRect();
       const matchRect = firstMatch.getBoundingClientRect();
-      const targetTop = detailTextEl.scrollTop + (matchRect.top - containerRect.top)
-        - (detailTextEl.clientHeight / 2) + (matchRect.height / 2);
-      detailTextEl.scrollTo({
+      const targetTop = surface.scrollTop + (matchRect.top - containerRect.top)
+        - (surface.clientHeight / 2) + (matchRect.height / 2);
+      surface.scrollTo({
         top: Math.max(0, targetTop),
         behavior: "smooth",
       });
     } else {
-      detailTextEl.classList.remove("detail-sheet__text--highlighting");
-      detailTextEl.scrollTop = 0;
+      surface.classList.remove("detail-sheet__surface--highlighting");
+      surface.scrollTop = 0;
     }
+  }
+
+  /**
+   * Re-mark newly rendered content without touching the scroll position — an
+   * agenda document expanded in place shouldn't yank the reader back.
+   */
+  async function refreshDetailHighlights(): Promise<void> {
+    await tick();
+    const surface = activeDetailTextSurface();
+    if (!surface) return;
+    highlightElementText(surface, query);
   }
 
   async function openDetail(item: SearchResult, updateUrl = true, pageOverride: number | null = null): Promise<void> {
@@ -1229,6 +1251,7 @@
     detailLoading;
     detailItem?.entityType;
     detailTextEl;
+    detailMeetingEl;
     detailPdfEl;
     void focusActiveDetailSurface();
   }
@@ -1840,7 +1863,11 @@
       <div class="detail-sheet__body">
         {#if detailMode === "text"}
           {#if detailItem.entityType === "Meeting"}
-            <div class="detail-sheet__surface detail-sheet__meeting">
+            <div
+              bind:this={detailMeetingEl}
+              class="detail-sheet__surface detail-sheet__meeting"
+              tabindex="-1"
+            >
               <div class="detail-sheet__meeting-intro">
                 <p class="detail-sheet__meeting-label">Agenda</p>
                 {#if !detailLoading && detailContent?.agenda?.length}
@@ -1852,7 +1879,11 @@
               {#if detailLoading}
                 <ReaderLoading label="Agenda wordt geladen…" variant="agenda" />
               {:else if detailContent?.agenda?.length}
-                <MeetingAgendaTree items={detailContent.agenda} on:opendocument={handleAgendaDocumentOpen} />
+                <MeetingAgendaTree
+                  items={detailContent.agenda}
+                  on:opendocument={handleAgendaDocumentOpen}
+                  on:documentpreview={() => void refreshDetailHighlights()}
+                />
               {:else}
                 <p class="detail-sheet__meeting-empty">Geen agenda beschikbaar.</p>
               {/if}

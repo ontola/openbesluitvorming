@@ -6,7 +6,10 @@
 
   export let items: MeetingAgendaItem[] = [];
 
-  const dispatch = createEventDispatcher<{ opendocument: { entityId: string } }>();
+  const dispatch = createEventDispatcher<{
+    opendocument: { entityId: string };
+    documentpreview: { entityId: string };
+  }>();
   let expandedDocumentId: string | null = null;
   let loadingDocumentId: string | null = null;
   let documentMarkdown: Record<string, string | null> = {};
@@ -68,6 +71,9 @@
         ...documentMarkdown,
         [entityId]: payload.markdownText?.trim() ? payload.markdownText : null,
       };
+      // Text that arrives after the agenda rendered still has to pick up the
+      // query highlight, so tell the reader to re-mark.
+      dispatch("documentpreview", { entityId });
     } catch (error) {
       documentErrors = {
         ...documentErrors,
