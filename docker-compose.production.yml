@@ -35,16 +35,28 @@ services:
       QUICKWIT_CLUSTER_ID: ${QUICKWIT_CLUSTER_ID:-woozi-prod}
       QUICKWIT_NODE_ID: ${QUICKWIT_NODE_ID:-quickwit-prod}
       QUICKWIT_INDEX_ROOT_PREFIX: ${QUICKWIT_INDEX_ROOT_PREFIX:-indexes-prod}
-      # Bumped from 40G (2026-07-23): the backfill has grown the live/published
-      # split set past the old budget (63 splits vs. a 40G/43-file cache),
-      # causing routine cold S3 refetches (1-5s, occasionally 12s+) even
-      # without the dead-split "pollution" failure mode this cache also
-      # guards against (see check_quickwit_split_cache_pollution). Revisit
-      # once the post-backfill dedup/reindex shrinks the index back down.
-      QUICKWIT_SPLIT_CACHE_MAX_NUM_BYTES: ${QUICKWIT_SPLIT_CACHE_MAX_NUM_BYTES:-55G}
+      # 40G -> 55G (2026-07-23) -> 120G (2026-07-31). The index outgrew every
+      # budget the 150GB root disk could support: measured 65.6GB across 81
+      # published splits, one of them 24.9GB, so only ~35 splits fit in 55G and
+      # the rest were refetched from S3 on every cold query (1-5s, sometimes
+      # 12s+). The split cache now lives on a dedicated 150GB volume
+      # (/mnt/quickwit-cache, see the bind mount below) instead of competing
+      # with Docker images, the SQLite state and the extraction spillover for
+      # root-disk space, so the whole index fits with room for backfill growth.
+      #
+      # Rescaling the server was the obvious alternative but is not possible
+      # here: fsn1-dc14 lists no affordable larger type in
+      # available_for_migration, so the cheap big machines can only be had by
+      # rebuilding onto a new server.
+      QUICKWIT_SPLIT_CACHE_MAX_NUM_BYTES: ${QUICKWIT_SPLIT_CACHE_MAX_NUM_BYTES:-120G}
       QUICKWIT_SPLIT_CACHE_NUM_CONCURRENT_DOWNLOADS: ${QUICKWIT_SPLIT_CACHE_NUM_CONCURRENT_DOWNLOADS:-4}
     volumes:
       - quickwit-data:/quickwit/qwdata
+      # Dedicated 150GB Hetzner volume for the searcher split cache only. It
+      # holds no durable state -- everything here is a local copy of splits
+      # that live in S3 -- so it can be wiped or lost without data loss, which
+      # is also why it is safe to keep off the backed-up root disk.
+      - /mnt/quickwit-cache:/quickwit/qwdata/searcher-split-cache
       - ./quickwit/quickwit.yaml:/quickwit/config/quickwit.yaml:ro
 
   openbesluitvorming:
