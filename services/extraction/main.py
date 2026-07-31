@@ -157,6 +157,49 @@ class ExtractRequest(BaseModel):
     max_pages: int = MAX_PAGES_DEFAULT
 
 
+def materialize_document(
+    pdf_bytes: bytes, max_pages: int, want_thumbnail: bool
+) -> tuple[int, list[dict], str, bytes | None, list[str]]:
+    """Blocking half of an extraction: write the PDF, parse it, build the
+    per-page markdown and optionally the thumbnail. Kept synchronous and run
+    via asyncio.to_thread by the caller, so it cannot stall the event loop."""
+    warnings: list[str] = []
+    WORK_ROOT.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(dir=WORK_ROOT) as work_dir:
+        pdf_path = Path(work_dir) / "document.pdf"
+        pdf_path.write_bytes(pdf_bytes)
+
+        with pymupdf.open(str(pdf_path)) as doc:
+            page_count = doc.page_count
+
+        pages = list(range(min(max_pages, page_count)))
+
+        if page_count > max_pages:
+            warnings.append(
+                f"Document has {page_count} pages; only the first {max_pages} were imported."
+            )
+
+        try:
+            page_chunks = markdown_chunks(pdf_path, pages)
+        except Exception as error:
+            warnings.append(
+                f"pymupdf4llm failed, falling back to plain pymupdf extraction: {error}"
+            )
+            page_chunks = fallback_chunks_with_pymupdf(pdf_path, max_pages)
+        markdown = "\n\n".join(
+            chunk["markdown"] for chunk in page_chunks if chunk["markdown"]
+        ).strip()
+
+        thumbnail_bytes: bytes | None = None
+        if want_thumbnail:
+            try:
+                thumbnail_bytes = render_first_page_jpeg(pdf_path)
+            except Exception as error:
+                warnings.append(f"PDF thumbnail prewarm failed: {error}")
+
+    return page_count, page_chunks, markdown, thumbnail_bytes, warnings
+
+
 @app.post("/extract")
 async def extract(req: ExtractRequest):
     global _requests_total, _requests_failed
@@ -178,73 +221,67 @@ async def extract(req: ExtractRequest):
             pdf_bytes = response.content
         t_download = time.monotonic()
 
-        WORK_ROOT.mkdir(parents=True, exist_ok=True)
-        with tempfile.TemporaryDirectory(dir=WORK_ROOT) as work_dir:
-            pdf_path = Path(work_dir) / "document.pdf"
-            pdf_path.write_bytes(pdf_bytes)
-
-            with pymupdf.open(str(pdf_path)) as doc:
-                page_count = doc.page_count
-
-            pages = list(range(min(req.max_pages, page_count)))
-            warnings: list[str] = []
-
-            if page_count > req.max_pages:
-                warnings.append(
-                    f"Document has {page_count} pages; only the first {req.max_pages} were imported."
-                )
-
-            try:
-                page_chunks = markdown_chunks(pdf_path, pages)
-            except Exception as error:
-                warnings.append(
-                    f"pymupdf4llm failed, falling back to plain pymupdf extraction: {error}"
-                )
-                page_chunks = fallback_chunks_with_pymupdf(pdf_path, req.max_pages)
-            markdown = "\n\n".join(
-                chunk["markdown"] for chunk in page_chunks if chunk["markdown"]
-            ).strip()
-
-            thumbnail_bytes: bytes | None = None
-            if req.s3_thumbnail_key:
-                try:
-                    thumbnail_bytes = render_first_page_jpeg(pdf_path)
-                except Exception as error:
-                    warnings.append(f"PDF thumbnail prewarm failed: {error}")
+        # Everything below blocks: pymupdf is CPU-bound and boto3 is a
+        # synchronous HTTP client. Running it directly in this `async def`
+        # pinned the worker's whole event loop for the duration -- measured
+        # 2026-07-31 at ~4.2s per document (1.7s extract + 2.5s upload) -- so
+        # a worker could serve nothing else meanwhile, including /health and
+        # /stats. With 4 uvicorn workers and continuous traffic all four loops
+        # were blocked, /stats queued behind them and timed out at 20s, and the
+        # monitor reported healthy hosts as unreachable.
+        #
+        # Handing the blocking work to threads keeps each loop free. It also
+        # actually buys concurrency: only 20% of a request is CPU (extract),
+        # while 50% is download and 29% upload, so overlapping I/O is where
+        # the throughput is -- which is the same reason the worker count is
+        # deliberately oversubscribed (see infra/terraform.tfvars).
+        page_count, page_chunks, markdown, thumbnail_bytes, warnings = await asyncio.to_thread(
+            materialize_document, pdf_bytes, req.max_pages, bool(req.s3_thumbnail_key)
+        )
 
         t_extract = time.monotonic()
 
         # Upload PDF to S3
-        s3.put_object(Bucket=bucket, Key=req.s3_pdf_key, Body=pdf_bytes,
-                      ContentType="application/pdf")
+        await asyncio.to_thread(
+            s3.put_object, Bucket=bucket, Key=req.s3_pdf_key, Body=pdf_bytes,
+            ContentType="application/pdf",
+        )
 
         # Upload markdown to S3
         if req.s3_markdown_key and markdown:
-            s3.put_object(Bucket=bucket, Key=req.s3_markdown_key,
-                          Body=markdown.encode("utf-8"),
-                          ContentType="text/markdown; charset=utf-8")
+            await asyncio.to_thread(
+                s3.put_object, Bucket=bucket, Key=req.s3_markdown_key,
+                Body=markdown.encode("utf-8"),
+                ContentType="text/markdown; charset=utf-8",
+            )
 
         # Upload per-page chunks; same JSON shape as the ingest server's own
         # extracted-page-chunks cache objects ({"pages": [...]}).
         if req.s3_page_chunks_key and page_chunks:
-            s3.put_object(Bucket=bucket, Key=req.s3_page_chunks_key,
-                          Body=json.dumps({"pages": page_chunks}).encode("utf-8"),
-                          ContentType="application/json; charset=utf-8",
-                          Metadata={"kind": "pdf_page_chunks"})
+            await asyncio.to_thread(
+                s3.put_object, Bucket=bucket, Key=req.s3_page_chunks_key,
+                Body=json.dumps({"pages": page_chunks}).encode("utf-8"),
+                ContentType="application/json; charset=utf-8",
+                Metadata={"kind": "pdf_page_chunks"},
+            )
 
         if req.s3_thumbnail_key and thumbnail_bytes:
-            s3.put_object(Bucket=bucket, Key=req.s3_thumbnail_key,
-                          Body=thumbnail_bytes,
-                          ContentType="image/jpeg",
-                          Metadata={
-                              "kind": "pdf_page_thumbnail",
-                              "page_number": "1",
-                          })
+            await asyncio.to_thread(
+                s3.put_object, Bucket=bucket, Key=req.s3_thumbnail_key,
+                Body=thumbnail_bytes,
+                ContentType="image/jpeg",
+                Metadata={
+                    "kind": "pdf_page_thumbnail",
+                    "page_number": "1",
+                },
+            )
 
         if req.s3_thumbnail_meta_key:
-            s3.put_object(Bucket=bucket, Key=req.s3_thumbnail_meta_key,
-                          Body=json.dumps({"page_count": page_count}).encode("utf-8"),
-                          ContentType="application/json; charset=utf-8")
+            await asyncio.to_thread(
+                s3.put_object, Bucket=bucket, Key=req.s3_thumbnail_meta_key,
+                Body=json.dumps({"page_count": page_count}).encode("utf-8"),
+                ContentType="application/json; charset=utf-8",
+            )
 
         t_upload = time.monotonic()
 
