@@ -232,19 +232,45 @@ Verified against Utrecht motion M25 "Vergroen Amerhof": 43 vote records, 18 `tru
 voor/tegen only — there is no abstain/absent value; non-voting members are simply
 absent from the list.
 
-**Coverage.** `Status=OK` comes back for every sitename, but the list is empty for
-municipalities that don't use iBabs's digital voting module. Sampling 5 recent motions
-each across 23 sitenames (entries since 2025-09-01):
+**Coverage (full measurement, 2026-07-31).** `Status=OK` comes back for every
+sitename, but the list is empty for municipalities that don't use iBabs's digital
+voting module. All 153 catalogued sitenames were probed with 10 motions each, spread
+over their whole mutation range since 2015. Per-sitename results are in
+`docs_internal/ibabs-vote-coverage-2026-07-31.csv`.
 
-- vote records present: utrecht (4/5), peel en maas (4/5), arnhem (3/5), nijkerk (3/5),
-  bergeijk, haarlemmermeer, heiloo, tytsjerksteradiel, vught, zoetermeer (2/5),
-  renkum, westland (1/5)
-- consistently empty: dantumadiel, duiven, enschede, krimpenerwaard, lingewaard,
-  midden-delfland, rozendaal, staphorst, de dommel
-- no data to judge: oldebroek, zuiderzeeland (0 motions in the window)
+- **67 sitenames publish per-member votes**; 75 have a moties list but returned none in
+  any of 10 samples; 9 have no moties list; 1 (`vechtstromen`) errored.
+- Council sizes seen: 11 to 47, median 25 — a useful sanity check that the vote lists
+  are complete rosters rather than partial.
 
-So roughly **half of iBabs sources publish per-member votes**, and within a source the
-coverage is partial — plan for "some motions have votes" rather than all-or-nothing.
+**Read the hit ratio as an adoption date, not as completeness.** Samples are spread
+back to 2015, so early ones predate the module. Grouping by ratio shows exactly that:
+
+| probes with votes | sitenames | median first vote seen |
+|---|---|---|
+| 1-2 of 10 | 22 | 2025 |
+| 3-4 of 10 | 21 | 2022 |
+| 5-6 of 10 | 17 | 2020 |
+| 7-10 of 10 | 7 | 2020 |
+
+Adoption spans 2017-2026. Of the 37,085 motions those 67 sitenames have logged since
+2015, about **24,750 (67%) fall in years at or after votes appear** — that is the
+realistic ceiling on motions carrying a vote breakdown, roughly 4,000-5,000 a year
+recently.
+
+**Absence is not derivable.** `Vote` is a boolean, so an abstention and an absence are
+both simply missing from the list. The obvious fix — diff the vote list against the
+meeting's attendees — does not work: `Invitees` and `Attendees` are empty in every
+meeting checked across utrecht, nijmegen, zwolle, amstelveen, houten, hoorn and
+lelystad. The public API never populates them.
+
+**Probe politely.** The first attempt at this scan ran 4-way concurrent with no
+backoff and iBabs answered HTTP 403 after roughly 240 calls, failing 132 of 153
+sitenames. It is a throttle, not a ban — a single `curl -4` succeeded immediately
+afterwards, and the production workers logged zero 403s throughout. Re-running at
+concurrency 2 with a 0.4s pace and exponential backoff on 403/429/5xx completed
+cleanly. Note that `src/ibabs/client.ts` does *not* treat 403 as retryable, so a
+throttle during a heavy backfill would fail the run rather than back off.
 
 `ListCanVote` on `iBabsListEntryBase` is `true` for every entry in every moties list
 tested, including sources that return no votes at all, so it is **not** a usable
