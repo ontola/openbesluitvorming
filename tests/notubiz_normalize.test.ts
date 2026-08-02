@@ -67,3 +67,31 @@ Deno.test("normalizeNotubizMeeting and normalizeNotubizDocuments produce determi
     "documents should reference the canonical meeting id",
   );
 });
+
+Deno.test("meeting responses without a meeting are described, not swallowed", async () => {
+  const { describeMeetingResponseError } = await import("../src/notubiz/extractor.ts");
+
+  // Notubiz answers HTTP 200 with an error body rather than a 4xx, so
+  // fetchJson never throws and the extractor has to recognise this shape.
+  // Verbatim response for a den_haag meeting whose permission_group is not
+  // public (observed 2026-08-02).
+  const full = describeMeetingResponseError({
+    message: "No rights to see this meeting",
+    error_code: 45624584670,
+  });
+  assert(
+    full === "No rights to see this meeting (error_code 45624584670)",
+    `expected message and code, got ${full}`,
+  );
+
+  const messageOnly = describeMeetingResponseError({ message: "No rights to see this meeting" });
+  assert(messageOnly === "No rights to see this meeting", `got ${messageOnly}`);
+
+  const codeOnly = describeMeetingResponseError({ error_code: 123 });
+  assert(codeOnly === "error_code 123", `got ${codeOnly}`);
+
+  // An empty body must still produce something an operator can act on rather
+  // than an empty string, which is what made these drops invisible.
+  const empty = describeMeetingResponseError({});
+  assert(empty === "no error detail in response", `got ${empty}`);
+});

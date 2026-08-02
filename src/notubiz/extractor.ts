@@ -35,6 +35,12 @@ type NotubizEventsResponse = {
 
 type NotubizMeetingResponse = {
   meeting?: unknown;
+  // Notubiz reports failures as HTTP 200 with an error body rather than a
+  // 4xx/5xx, e.g. {"message":"No rights to see this meeting","error_code":...}
+  // for a meeting whose permission_group is not public. fetchJson therefore
+  // never throws for these, so they have to be recognised from the payload.
+  message?: unknown;
+  error_code?: unknown;
 };
 
 const DEFAULT_MEETING_CONCURRENCY = 6;
@@ -48,6 +54,30 @@ function isSkippableMeetingError(error: unknown): boolean {
   return (
     error.message.includes("Request failed 401") || error.message.includes("Request failed 403")
   );
+}
+
+/** Human-readable reason for a meeting response that carries no `meeting`.
+ * Notubiz signals these as HTTP 200 with an error body, so the reason is only
+ * available from the payload. */
+export function describeMeetingResponseError(response: {
+  message?: unknown;
+  error_code?: unknown;
+}): string {
+  const message = typeof response.message === "string" ? response.message.trim() : "";
+  const code =
+    typeof response.error_code === "number" || typeof response.error_code === "string"
+      ? String(response.error_code)
+      : "";
+  if (message && code) {
+    return `${message} (error_code ${code})`;
+  }
+  if (message) {
+    return message;
+  }
+  if (code) {
+    return `error_code ${code}`;
+  }
+  return "no error detail in response";
 }
 
 function issueStepForDocumentError(error: unknown): ExtractionIssue["step"] {
@@ -160,6 +190,20 @@ export class NotubizMeetingExtractor {
               meetingId,
             )) as NotubizMeetingResponse;
             if (!meetingResponse.meeting) {
+              // Never drop this silently. A meeting that yields no detail is
+              // a document-coverage hole, and reporting nothing made runs
+              // finish "succeeded" with issue_count 0 while contributing no
+              // documents at all -- indistinguishable from an organisation
+              // that genuinely published none. Den Haag looked like that bug
+              // for a while (2026-08-02) before measurement showed its
+              // documents really are absent from the API.
+              const detail = describeMeetingResponseError(meetingResponse);
+              await registerIssue({
+                severity: "warning",
+                step: "get_meeting",
+                entity_id: canonicalMeetingId(source, meetingId),
+                message: `Meeting detail returned no meeting: ${detail}`,
+              });
               return null;
             }
             const meeting = normalizeNotubizMeeting(
