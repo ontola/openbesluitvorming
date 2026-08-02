@@ -1437,6 +1437,7 @@
                   <option value="">Type</option>
                   <option value="Document">Documenten</option>
                   <option value="Meeting">Vergaderingen</option>
+                  <option value="Motion">Moties</option>
                 </select>
               </label>
 

@@ -234,16 +234,21 @@ function buildQuickwitQuery(
   dateFrom = "",
   dateTo = "",
 ): string {
+  // Every branch has to name its types explicitly: an unknown entityType falls
+  // through to the union, so a type that is missing here is not merely
+  // unfilterable — it is invisible in ordinary search too.
   const typeQuery =
     entityType === "Meeting"
       ? "entity_type:Meeting"
-      : entityType === "Document"
-        ? query
-          ? "(entity_type:Document OR entity_type:DocumentPage)"
-          : "entity_type:Document"
-        : query
-          ? "(entity_type:Meeting OR entity_type:Document OR entity_type:DocumentPage)"
-          : "(entity_type:Meeting OR entity_type:Document)";
+      : entityType === "Motion"
+        ? "entity_type:Motion"
+        : entityType === "Document"
+          ? query
+            ? "(entity_type:Document OR entity_type:DocumentPage)"
+            : "entity_type:Document"
+          : query
+            ? "(entity_type:Meeting OR entity_type:Document OR entity_type:DocumentPage OR entity_type:Motion)"
+            : "(entity_type:Meeting OR entity_type:Document OR entity_type:Motion)";
   const parts = [`projection_version:${escapeTerm(currentProjectionVersion())}`, typeQuery];
 
   if (organization) {
@@ -288,7 +293,9 @@ function buildQuickwitQuery(
   // it are silently ignored (all three of 2019/2026/unfiltered return the
   // identical 1138409 hits). Making meetings date-filterable needs a
   // meeting-month term or a proper fast field, i.e. the reindex.
-  if (dateFrom.trim() && entityType !== "Meeting") {
+  // Motions carry no document_month either (the projection only sets it for
+  // Documents), so a date filter would silently exclude every one of them.
+  if (dateFrom.trim() && entityType !== "Meeting" && entityType !== "Motion") {
     const months = documentMonthTerms(dateFrom, dateTo);
     if (months) {
       const monthClause = months.map((month) => `document_month:${month}`).join(" OR ");
@@ -305,6 +312,9 @@ function entityTypeLabel(entityType?: string): string {
   }
   if (entityType === "Meeting") {
     return "Vergadering";
+  }
+  if (entityType === "Motion") {
+    return "Motie";
   }
   return "Resultaat";
 }
@@ -1217,3 +1227,5 @@ async function computeIndexStats(): Promise<IndexStats> {
     provinceCount,
   };
 }
+
+export const __test__ = { buildQuickwitQuery, entityTypeLabel };
