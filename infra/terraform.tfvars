@@ -20,9 +20,11 @@
 # stored on the app server.
 # After scaling, update WOOZI_EXTRACTION_SERVICE_URL in /opt/woozi/.env with
 # the new worker IPs (tofu output) and recreate the worker containers.
-# Temporarily at 8 for the July 2026 full-history backfill (extraction hosts
-# were CPU-saturated at 2). Scale back to 2 when the backfill queue drains.
-extraction_server_count = 8
+# Back to the steady-state 2 on 2026-08-02: the July 2026 full-history backfill
+# finished (queue drained, 5.13M unique documents, 97.3% of the legacy corpus),
+# so the temporary fleet of 8 is no longer earning its EUR188.66/mo -- steady
+# state is EUR47.17.
+extraction_server_count = 2
 
 # 4 uvicorn workers on 2-vCPU hosts: the service downloads the PDF (I/O-bound)
 # before the CPU-bound extraction, so 2x oversubscription overlaps downloads

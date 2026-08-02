@@ -47,5 +47,34 @@ for name in TF_VAR_s3_storage_endpoint TF_VAR_s3_storage_bucket_name TF_VAR_s3_a
   fi
 done
 
+# The script already insists on HCLOUD_TOKEN being set, but never handed it to
+# tofu, so every run stopped to prompt for var.hcloud_token interactively.
+export TF_VAR_hcloud_token="$HCLOUD_TOKEN"
+
+# The S3 state backend authenticates separately from the TF_VAR_* above. Its
+# credentials were baked in at `tofu init -backend-config=...` time, so once the
+# S3 keys were rotated every run died with "InvalidAccessKeyId" (403) before
+# reaching the plan. Handing the current keys to the backend through the
+# standard AWS variables keeps them in this process only -- re-running init with
+# -backend-config would instead persist them into infra/.terraform, which is
+# exactly the leak this wrapper exists to avoid.
+export AWS_ACCESS_KEY_ID="$TF_VAR_s3_access_key"
+export AWS_SECRET_ACCESS_KEY="$TF_VAR_s3_secret_key"
+
 cd "$(dirname "$0")/../infra"
-tofu apply "$@"
+
+# The header has always advertised "or any tofu subcommand", but this only ever
+# ran apply -- so there was no way to read a plan with the credentials wired up,
+# and the only route to seeing what an apply would do was to run it. Treat a
+# leading bare word as the subcommand; `-var=...` style args still default to
+# apply, so existing invocations are unchanged.
+subcommand="apply"
+case "${1:-}" in
+  "" | -*) ;;
+  *)
+    subcommand="$1"
+    shift
+    ;;
+esac
+
+tofu "$subcommand" "$@"
