@@ -2758,7 +2758,7 @@ export const sourceCatalog = [
     supplier: "ibabs",
     organizationType: "waterschap",
     allmanakId: 21194,
-    ibabsSitename: "limburg",
+    ibabsSitename: "waterschaplimburg",
     legacyConfigFile: "owi.ibabs.yaml",
     legacyConfigRoot: "owi.ibabs",
     implemented: true,
