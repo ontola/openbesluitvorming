@@ -612,6 +612,10 @@ export interface EntityContentResponse {
   agenda?: MeetingAgendaItem[];
   /** Motions decided in this meeting, when the entity is a Meeting. */
   motions?: MeetingMotion[];
+  /** The motion itself, when the entity is a Motion. Without this the detail
+   * endpoint would answer with a title and a date and silently drop the
+   * outcome and the votes — the only reason to look a motion up. */
+  motion?: MeetingMotion;
 }
 
 /** One line in the per-source export changes log. Compact by design: full

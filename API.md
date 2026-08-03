@@ -12,15 +12,17 @@ https://openbesluitvorming.nl
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/api/search` | GET | Search meetings and documents (recommended) |
+| `/api/search` | GET | Search meetings, documents and motions (recommended) |
 | `/api/stats` | GET | Index statistics (document count, organization count) |
 | `/api/sources` | GET | List available data sources |
-| `/api/entities/{entity_id}` | GET | Full entity detail (text, agenda, download URL) |
+| `/api/entities/{entity_id}` | GET | Full entity detail (text, agenda, motion with votes, download URL) |
 | `/api/entities/{entity_id}/pdf/page/{n}` | GET | Rendered PDF page as JPEG image |
 | `/api/export/snapshot` | GET | Bulk export: current state per source (NDJSON) |
 | `/api/export/changes` | GET | Bulk export: change feed per source (NDJSON) |
 
 No authentication is required. All endpoints are read-only.
+
+Looking for voting behaviour per party? See [Use case: voting data](#use-case-voting-data).
 
 ---
 
@@ -36,7 +38,7 @@ The recommended search endpoint. Returns grouped, deduplicated results with docu
 |-----------|------|-------------|
 | `query` | string | Search query (required) |
 | `organization` | string | Filter by source key (e.g. `soest`, `amsterdam`) |
-| `entityType` | string | Filter by type: `Meeting` or `Document` |
+| `entityType` | string | Filter by type: `Meeting`, `Document` or `Motion` |
 | `sort` | string | Sort order: `date_desc` (default), `date_asc`, or `relevance` |
 | `dateFrom` | string | Start date filter (ISO 8601, e.g. `2024-01-01`) |
 | `dateTo` | string | End date filter |
@@ -291,6 +293,107 @@ Both endpoints return NDJSON (`application/x-ndjson`): one record per line.
 3. Call `/api/entities/{entityId}` to retrieve the full text or meeting agenda
 4. Use `meetingId` on a document to navigate to the parent meeting
 5. Use `/api/entities/{entityId}/pdf/page/{n}` to render PDF pages
+
+---
+
+## Use case: voting data
+
+Moties and amendementen are published as `Motion` entities. Where the council
+uses a digital voting module, each one carries the vote of every individual
+member, with their party.
+
+### Find motions
+
+```bash
+curl "https://openbesluitvorming.nl/api/search?query=woningbouw&entityType=Motion&limit=10"
+```
+
+Add `organization=<source key>` to scope to one municipality. Note that a
+search **requires a `query`** — an empty query returns no results for any
+entity type.
+
+### Fetch one motion
+
+```bash
+curl "https://openbesluitvorming.nl/api/entities/motion%3Aibabs%3Agemeente%3Ahouten%3A493049d8-2b51-4a8f-a885-bcd48efc1a2f"
+```
+
+The response carries a `motion` object:
+
+```json
+{
+  "entityId": "motion:ibabs:gemeente:houten:...",
+  "entityType": "Motion",
+  "entityTypeLabel": "Motie",
+  "motion": {
+    "name": "045-2022 M Essenkade verhogen duurzaamheid",
+    "motion_type": "Moties",
+    "status": "Motie aangenomen",
+    "result": "aangenomen",
+    "tally": { "in_favour": 20, "against": 11 },
+    "votes": [
+      {
+        "option": "tegen",
+        "voter": "person:ibabs:gemeente:houten:4fe947d1-...",
+        "voter_name": "Kasius, S.",
+        "group": "party:ibabs:gemeente:houten:a93295fa-...",
+        "group_name": "Partij ITH"
+      }
+    ]
+  },
+  "meetingId": "meeting:ibabs:gemeente:houten:..."
+}
+```
+
+`result` is normalised to `aangenomen`, `verworpen`, `ingetrokken`,
+`aangehouden` or `overig`; `status` keeps the supplier's own wording.
+
+### Bulk: every motion of a source
+
+For analysis, use the export feed rather than paging search. Entity ids sort
+alphabetically, so `cursor=motion` jumps straight past the documents:
+
+```bash
+curl "https://openbesluitvorming.nl/api/export/snapshot?source=houten&cursor=motion&limit=200"
+```
+
+Each line is a record whose `payload` holds the same fields as above. Follow
+`x-next-cursor` until `x-has-more` is `false`, then switch to
+`/api/export/changes` with `x-changes-cursor` to stay in sync.
+
+### What to expect
+
+Measured across all 153 iBabs sitenames (2026-07-31), and against the first
+imported sources:
+
+- **67 of 142 municipalities publish per-member votes.** The rest publish the
+  motion and its outcome but no breakdown.
+- Within those, roughly **62% of motions in the vote-era carry vote records** —
+  a withdrawn motion never reaches a vote, and unanimous ones are not always
+  recorded. Of 200 Houten motions sampled from the live feed: 127 had a
+  `result`, 116 had `votes`, 130 linked to a meeting.
+- Coverage starts when the municipality adopted the module, between 2017 and
+  2026 — check the oldest motion with `votes` per source rather than assuming.
+
+### Limitations worth designing around
+
+- **`option` is only `voor` or `tegen`.** Abstentions and absences are
+  indistinguishable: a member who did not vote is simply absent from the array.
+  Meeting attendee lists are empty in the public supplier API, so turnout
+  cannot be reconstructed.
+- **Use `votes[].group_name` for party, not `parties`.** The `parties` field is
+  derived from the proposer strings and is empty for many sources; the vote
+  records always carry the fractie.
+- **Identifiers are per-municipality.** `person:` and `party:` ids are stable
+  within a source but there is no national register link, and party names vary
+  in spelling (`CDA`, `Fractie CDA`, `raadsleden cda`). Roughly 42% of distinct
+  party names map to a national party; the remainder are local lists.
+- **Notubiz sources have no per-member votes**, only the outcome and the
+  submitting parties. A few publish a vote breakdown as free text in
+  `vote_summary`, stored verbatim.
+- **Not every motion links to a meeting.** `meetingId` is absent when the
+  reference could not be resolved; `motion.agenda_item_hint` then holds the
+  supplier's raw text.
 
 ## Schemas
 

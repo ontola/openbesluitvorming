@@ -956,6 +956,7 @@ export async function getEntityContent(entityId: string): Promise<EntityContentR
   }
 
   const motions = hit.entity_type === "Meeting" ? await getMeetingMotions(entityId) : undefined;
+  const motion = hit.entity_type === "Motion" ? motionFromHit(hit) : undefined;
 
   return {
     entityId: hit.entity_id ?? entityId,
@@ -973,9 +974,30 @@ export async function getEntityContent(entityId: string): Promise<EntityContentR
     downloadUrl,
     contentType,
     pdfUrl,
-    meetingId: hit.payload?.is_referenced_by,
+    meetingId: hit.payload?.is_referenced_by ?? hit.payload?.meeting,
     agenda,
     motions: motions && motions.length > 0 ? motions : undefined,
+    motion,
+  };
+}
+
+/** Shape a Motion search hit into the payload the detail endpoint returns. */
+function motionFromHit(hit: SearchHit): MeetingMotion {
+  return {
+    id: hit.entity_id ?? "",
+    name: hit.name ?? "Ongetitelde motie",
+    motion_type: hit.payload?.motion_type,
+    status: hit.payload?.status,
+    result: hit.payload?.result,
+    date: hit.payload?.date,
+    proposers: hit.payload?.proposers,
+    co_proposers: hit.payload?.co_proposers,
+    parties: hit.payload?.parties,
+    votes: hit.payload?.votes,
+    tally: hit.payload?.tally,
+    vote_summary: hit.payload?.vote_summary,
+    agenda_item: hit.payload?.agenda_item,
+    agenda_item_hint: hit.payload?.agenda_item_hint,
   };
 }
 
@@ -993,22 +1015,7 @@ async function getMeetingMotions(meetingId: string): Promise<MeetingMotion[]> {
 
   return dedupeLatestHits(response.hits as SearchHit[])
     .filter((hit) => hit.entity_id)
-    .map((hit) => ({
-      id: hit.entity_id!,
-      name: hit.name ?? "Ongetitelde motie",
-      motion_type: hit.payload?.motion_type,
-      status: hit.payload?.status,
-      result: hit.payload?.result,
-      date: hit.payload?.date,
-      proposers: hit.payload?.proposers,
-      co_proposers: hit.payload?.co_proposers,
-      parties: hit.payload?.parties,
-      votes: hit.payload?.votes,
-      tally: hit.payload?.tally,
-      vote_summary: hit.payload?.vote_summary,
-      agenda_item: hit.payload?.agenda_item,
-      agenda_item_hint: hit.payload?.agenda_item_hint,
-    }));
+    .map(motionFromHit);
 }
 
 export async function getEntityPdfInfo(entityId: string): Promise<{
