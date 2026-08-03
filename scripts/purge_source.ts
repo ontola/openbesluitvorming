@@ -120,15 +120,41 @@ async function main(): Promise<void> {
   await log.flush(source.key);
   console.log(`\ntombstones recorded: ${tombstones}`);
 
-  // 2. Object storage.
+  // 2. Object storage. The store 504s under a long delete run, and an
+  //    exception here used to skip step 3 entirely — a flaky bucket must not
+  //    decide whether the index gets cleaned. Retry, then carry on regardless
+  //    and report honestly at the end.
+  let storageComplete = true;
   if (storage && !keepStorage) {
-    const deleted = await storage.deleteByPrefix(storagePrefix);
-    console.log(`objects deleted:     ${deleted.length}`);
+    let deletedTotal = 0;
+    for (let attempt = 1; attempt <= 5; attempt += 1) {
+      try {
+        const deleted = await storage.deleteByPrefix(storagePrefix);
+        deletedTotal += deleted.length;
+        if (deleted.length === 0) {
+          break;
+        }
+        // deleteByPrefix returns once the prefix is empty; a non-empty result
+        // that did not throw means it finished this pass.
+        break;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(`  storage delete attempt ${attempt}/5 failed: ${message.slice(0, 120)}`);
+        if (attempt === 5) {
+          storageComplete = false;
+          break;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 2000 * 2 ** (attempt - 1)));
+      }
+    }
+    console.log(
+      `objects deleted:     ${deletedTotal}${storageComplete ? "" : " (INCOMPLETE — re-run to finish)"}`,
+    );
   } else {
     console.log("objects deleted:     skipped");
   }
 
-  // 3. Quickwit, only on request.
+  // 3. Quickwit, only on request — and independent of how storage went.
   if (purgeQuickwit) {
     await new QuickwitClient().createDeleteTask(deleteQuery);
     console.log("quickwit delete task submitted (applied during the next merge)");
@@ -137,6 +163,11 @@ async function main(): Promise<void> {
   console.log(
     `\nDone. Re-import with a normal full run; the source now starts from an empty state.`,
   );
+
+  if (!storageComplete) {
+    console.log("Storage was not fully cleared. Re-running is safe: every step is idempotent.");
+    Deno.exit(2);
+  }
 }
 
 if (import.meta.main) {
