@@ -115,7 +115,11 @@ function isRetryableError(error: unknown): boolean {
     message.includes("timed out") ||
     message.includes("dns error") ||
     message.includes("client error") ||
-    message.includes("error reading a body from connection")
+    message.includes("error reading a body from connection") ||
+    // Deno's wording when the connection cannot be established at all. Seen
+    // 10 times in one motion run against iBabs; without this it was the only
+    // transport failure that got no retry, and each one skipped a motion.
+    message.includes("error sending request")
   );
 }
 

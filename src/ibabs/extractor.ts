@@ -35,6 +35,13 @@ const MOTION_LIST_PATTERN = /moties?|amendement|stemming/i;
  * an unexpectedly wide window shouldn't be able to run for hours. Overruns are
  * reported as an issue rather than silently dropped. */
 const DEFAULT_MOTION_LIMIT = 750;
+/** Concurrency for the motion pass, deliberately below the document one.
+ *
+ * Motions are pure SOAP traffic against a single throttled endpoint, where
+ * documents are downloads spread over api1.ibabs.eu. Reusing the document
+ * setting meant 20 parallel runs each firing 3 concurrent SOAP calls; iBabs
+ * answered with 403s and 203 motions were skipped across one batch. */
+const DEFAULT_MOTION_CONCURRENCY = 2;
 // Some sitenames (e.g. Rotterdam) return SOAP payloads large enough to exceed
 // the 90s client timeout at 6-month chunks. When that happens we recursively
 // halve the chunk; this floor stops the recursion if something else is wrong.
@@ -204,6 +211,9 @@ export class IbabsMeetingExtractor {
     const documentConcurrency = Number(
       Deno.env.get("WOOZI_DOCUMENT_CONCURRENCY") ?? `${DEFAULT_DOCUMENT_CONCURRENCY}`,
     );
+    const motionConcurrency = Number(
+      Deno.env.get("WOOZI_IBABS_MOTION_CONCURRENCY") ?? `${DEFAULT_MOTION_CONCURRENCY}`,
+    );
     const chunkMonths = Number(
       Deno.env.get("WOOZI_IBABS_DATE_CHUNK_MONTHS") ?? `${DEFAULT_DATE_CHUNK_MONTHS}`,
     );
@@ -287,7 +297,7 @@ export class IbabsMeetingExtractor {
     await this.extractMotions(source, dateFrom, dateTo, {
       meetingIndex,
       meetingTypes: meetingTypeMap,
-      concurrency: documentConcurrency,
+      concurrency: motionConcurrency,
       registerIssue,
       onMotion: async (motion, motionDocuments) => {
         motionCount += 1;

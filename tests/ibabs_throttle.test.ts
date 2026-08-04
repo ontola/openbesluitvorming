@@ -153,3 +153,20 @@ Deno.test("throttles and connection drops do not consume each other's budget", a
     stub.restore();
   }
 });
+
+Deno.test("a connection that cannot be established is retried like other transport errors", async () => {
+  // Deno's wording when the socket never opens. It was the one transport
+  // failure without a retry, and in production each occurrence skipped a
+  // motion outright.
+  const stub = stubFetch([
+    new Error("error sending request for url (https://wcf.ibabs.eu/api/Public.svc)"),
+    ok("<recovered/>"),
+  ]);
+  try {
+    const body = await __test__.fetchText("https://example.test/soap", { method: "POST" });
+    assertEquals(body, "<recovered/>", "recovers on the retry");
+    assertEquals(stub.attempts, 2, "one failure, one success");
+  } finally {
+    stub.restore();
+  }
+});
