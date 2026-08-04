@@ -208,7 +208,13 @@ export class IbabsMeetingExtractor {
       Deno.env.get("WOOZI_IBABS_DATE_CHUNK_MONTHS") ?? `${DEFAULT_DATE_CHUNK_MONTHS}`,
     );
 
-    const chunks = splitDateRange(dateFrom, dateTo, chunkMonths);
+    // Motions-only skips the meeting and document pass entirely. Linking still
+    // works: extractMotions fetches the meeting day each motion references, so
+    // it builds exactly the slice of the index it needs instead of relying on
+    // meetings this run happened to import.
+    const chunks = options.executionMode === "motions_only"
+      ? []
+      : splitDateRange(dateFrom, dateTo, chunkMonths);
 
     for (const [chunkFrom, chunkTo] of chunks) {
       const rawMeetings = await listMeetingsAdaptive(

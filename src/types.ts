@@ -442,6 +442,11 @@ export type IngestExecutionMode =
   | "full"
   | "rederive_cached"
   | "reindex_only"
+  /** Import only the motion registries, skipping the meeting and document
+   * pass. Backfilling motions across every source in `full` mode would redo
+   * work already done — waterschap_limburg's ten-year window took 479 minutes,
+   * almost all of it meetings and documents we already hold. */
+  | "motions_only"
   | "retry_failed_documents";
 
 export interface IngestRunRecord {

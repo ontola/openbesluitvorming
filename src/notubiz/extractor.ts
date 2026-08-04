@@ -117,6 +117,17 @@ export class NotubizMeetingExtractor {
       retainIssues?: boolean;
     } = {},
   ): Promise<ExtractionBundle> {
+    if (options.executionMode === "motions_only") {
+      // Notubiz motions reference their agenda item by id, and the only way we
+      // resolve that to a meeting is from meetings imported in the same run.
+      // Skipping the meeting pass would produce motions that silently link to
+      // nothing, which is worse than not importing them.
+      throw new Error(
+        'Execution mode "motions_only" is iBabs-only: Notubiz motions link to a ' +
+          "meeting through agenda items collected by the meeting pass.",
+      );
+    }
+
     const organizationAttributes = await this.client.getOrganizationAttributes(
       source.notubizOrganizationId,
     );

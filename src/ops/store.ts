@@ -208,6 +208,7 @@ function normalizeExecutionMode(mode: string): IngestExecutionMode {
     mode === "full" ||
     mode === "rederive_cached" ||
     mode === "reindex_only" ||
+    mode === "motions_only" ||
     mode === "retry_failed_documents"
   ) {
     return mode;

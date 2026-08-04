@@ -415,6 +415,40 @@ Deno.test("motions link to meetings outside the run window, fetching each date o
   );
 });
 
+Deno.test("motions_only skips the meeting pass but still links motions", async () => {
+  const source = getIbabsSource("utrecht");
+  const client = new FakeIbabsClient(
+    {
+      "2024-11-07": [{ Id: "old-meeting", MeetingDate: "2024-11-07T19:30:00", Title: "Programmabegroting" }],
+    },
+    [
+      { EntryId: "e1", MutationDate: "2026-07-15T10:00:00", agendapunt: "Gemeenteraad 7-11-2024\\n5 Programmabegroting" },
+    ],
+  );
+
+  // deno-lint-ignore no-explicit-any
+  const extractor = new IbabsMeetingExtractor(client as any, () => Promise.resolve(undefined));
+  const seen: string[] = [];
+  const bundle = await extractor.extractForDateRange(source, "2026-07-14", "2026-07-18", {
+    executionMode: "motions_only",
+    retainEntities: false,
+    onEntity: (entity) => {
+      seen.push(entity.type);
+    },
+  });
+
+  assertEquals(bundle.stats.meeting_count, 0, "no meetings imported");
+  assertEquals(seen, ["Motion"], "only the motion is emitted");
+  assertEquals(bundle.stats.motion_count, 1, "the motion is counted");
+
+  // The window itself is never queried for meetings; only the referenced day is.
+  assertEquals(
+    client.meetingRangeCalls,
+    [["2024-11-07", "2024-11-07"]],
+    "fetches the day the motion points at, and nothing else",
+  );
+});
+
 Deno.test("a motion projects into a searchable Quickwit document", async () => {
   const source = getIbabsSource("utrecht");
   const lists = ibabsClientTest.parseListsXml(await fixture("ibabs_lists_response.xml"));
@@ -443,4 +477,21 @@ Deno.test("a motion projects into a searchable Quickwit document", async () => {
   assert(projected.content?.includes("Volt"), "submitting party is searchable");
   assert(projected.content?.includes("GroenLinks"), "voting fractie is searchable");
   assertEquals(projected.start_date, "2026-01-29T00:00:00Z", "sorts on the meeting date");
+});
+
+Deno.test("the backfill planner splits only where the cap demands it", async () => {
+  const { __test__: planner } = await import("../scripts/plan_motion_backfill.ts");
+
+  const windows = planner.yearWindows(2016, "2026-08-04");
+  assertEquals(windows.length, 11, "2016 through 2026 inclusive");
+  assertEquals(windows[0], ["2016-01-01", "2016-12-31"], "first year is whole");
+  assertEquals(windows.at(-1), ["2026-01-01", "2026-08-04"], "current year stops today");
+
+  // The registry filter has to agree with the extractor's, or the planner
+  // would size runs against lists the import never reads.
+  assertEquals(
+    planner.MOTION_LIST_PATTERN.source,
+    ibabsExtractorTest.MOTION_LIST_PATTERN.source,
+    "planner and extractor select the same registries",
+  );
 });
