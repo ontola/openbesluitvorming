@@ -123,6 +123,14 @@ services:
       INGEST_MEMORY_PER_JOB_MB: ${INGEST_MEMORY_PER_JOB_MB:-1400}
       INGEST_MIN_FREE_MEMORY_MB: ${INGEST_MIN_FREE_MEMORY_MB:-1024}
       WOOZI_DOCUMENT_CONCURRENCY: ${WOOZI_DOCUMENT_CONCURRENCY:-3}
+      WOOZI_IBABS_MOTION_CONCURRENCY: ${WOOZI_IBABS_MOTION_CONCURRENCY:-2}
+      # iBabs throttles the SOAP endpoint with 403s. The client backs off four
+      # times, doubling from this base, so 5s spans ~75s instead of the ~30s a
+      # 2s base gives. Measured during the motion backfill: at 2s roughly one
+      # in every 25 registry fetches still exhausted the budget and skipped its
+      # motions, because the backfill runs dozens of imports in parallel and
+      # the backoff is per connection — it cannot coordinate across workers.
+      WOOZI_IBABS_THROTTLE_BASE_MS: ${WOOZI_IBABS_THROTTLE_BASE_MS:-5000}
       OTEL_DENO: ${OTEL_DENO:-true}
       OTEL_SERVICE_NAME: woozi-worker
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
