@@ -465,6 +465,9 @@ export interface IngestRunRecord {
   finished_at?: string;
   meeting_count: number;
   document_count: number;
+  /** Motions imported. Optional because runs predating the motion pass have
+   * no value for it, and a missing count must not read as a real zero. */
+  motion_count?: number;
   cache_hits: number;
   downloaded_count: number;
   issue_count: number;

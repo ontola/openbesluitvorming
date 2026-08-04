@@ -1179,6 +1179,7 @@
         <div>Eind</div>
         <div>Verg.</div>
         <div>Doc.</div>
+        <div>Moties</div>
         <div>Issues</div>
         <div>Cache</div>
         <div>Dl.</div>
@@ -1211,6 +1212,7 @@
                 </div>
                 <div class="admin-run__metric"><strong>{run.meeting_count}</strong></div>
                 <div class="admin-run__metric"><strong>{run.document_count}</strong></div>
+                <div class="admin-run__metric"><strong>{run.motion_count ?? 0}</strong></div>
                 <div class="admin-run__metric"><strong>{run.issue_count}</strong></div>
                 <div class="admin-run__metric"><strong>{run.cache_hits}</strong></div>
                 <div class="admin-run__metric"><strong>{run.downloaded_count}</strong></div>
@@ -1324,6 +1326,7 @@
             <div><strong>Afleiding</strong><p>{openRun.derivation_version ?? "onbekend"}</p></div>
             <div><strong>Vergaderingen</strong><p>{openRun.meeting_count}</p></div>
             <div><strong>Documenten</strong><p>{openRun.document_count}</p></div>
+            <div><strong>Moties</strong><p>{openRun.motion_count ?? 0}</p></div>
             <div><strong>Documentfouten</strong><p>{failedDocumentCount(openRun)}</p></div>
             <div><strong>Cache hits</strong><p>{openRun.cache_hits}</p></div>
             <div><strong>Downloads</strong><p>{openRun.downloaded_count}</p></div>

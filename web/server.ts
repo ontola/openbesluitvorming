@@ -278,6 +278,11 @@ async function handleRequest(request: Request): Promise<Response> {
     return new Response(file, { headers: { "content-type": "text/plain; charset=utf-8" } });
   }
 
+  if (url.pathname === "/docs/migration-guide") {
+    const file = await Deno.readFile(new URL("./docs/migration-guide.md", projectRoot));
+    return new Response(file, { headers: { "content-type": "text/plain; charset=utf-8" } });
+  }
+
   const schemaMatch = url.pathname.match(/^\/schemas\/([\w.-]+\.schema\.json)$/);
   if (schemaMatch) {
     const file = await Deno.readFile(new URL(`./schemas/${schemaMatch[1]}`, projectRoot));

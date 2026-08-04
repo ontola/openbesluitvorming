@@ -171,6 +171,7 @@ export async function executeIngest(
         currentRun = await updateRun(run.id, {
           meeting_count: stats.meeting_count,
           document_count: stats.document_count,
+          motion_count: stats.motion_count ?? 0,
           cache_hits: stats.cache_hits,
           downloaded_count: stats.downloaded_count,
           issue_count: stats.issue_count,
@@ -182,6 +183,7 @@ export async function executeIngest(
         currentRun = await updateRun(run.id, {
           meeting_count: stats.meeting_count,
           document_count: stats.document_count,
+          motion_count: stats.motion_count ?? 0,
           cache_hits: stats.cache_hits,
           downloaded_count: stats.downloaded_count,
           issue_count: stats.issue_count,
@@ -249,6 +251,7 @@ export async function executeIngest(
       finished_at: new Date().toISOString(),
       meeting_count: extraction.stats.meeting_count,
       document_count: extraction.stats.document_count,
+      motion_count: extraction.stats.motion_count ?? 0,
       cache_hits: extraction.stats.cache_hits,
       downloaded_count: extraction.stats.downloaded_count,
       issue_count: extraction.stats.issue_count,
