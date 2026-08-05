@@ -1,5 +1,6 @@
 import { XMLParser } from "npm:fast-xml-parser";
 import { setDefaultResultOrder } from "node:dns";
+import { ibabsRateLimiter } from "./rate_limit.ts";
 import type {
   DocumentEntity,
   IbabsDocument,
@@ -489,8 +490,13 @@ async function fetchText(url: string, init: RequestInit): Promise<string> {
   let transportAttempts = 0;
   let throttleAttempts = 0;
 
+  const limiter = ibabsRateLimiter();
+
   while (true) {
     try {
+      // Paced and gated fleet-wide: one worker meeting a 403 stops the rest
+      // too, which per-connection backoff could never do.
+      await limiter.acquire();
       const client = getProxyClient();
       const response = await fetch(url, {
         ...init,
@@ -498,12 +504,17 @@ async function fetchText(url: string, init: RequestInit): Promise<string> {
         ...(client ? { client } : {}),
       });
       if (!response.ok) {
-        throw new IbabsHttpError(
+        const failure = new IbabsHttpError(
           response.status,
           url,
           parseRetryAfter(response.headers.get("retry-after")),
         );
+        if (isThrottleError(failure)) {
+          limiter.recordThrottle();
+        }
+        throw failure;
       }
+      limiter.recordSuccess();
       return await response.text();
     } catch (error) {
       lastError = error;
@@ -648,6 +659,10 @@ export class IbabsClient {
       throw new Error("Document has no download URL");
     }
 
+    const limiter = ibabsRateLimiter();
+    // Downloads go to api1.ibabs.eu rather than the SOAP host, but the block
+    // that hit us on 2026-08-05 covered both — it is one IP budget.
+    await limiter.acquire();
     const client = getProxyClient();
     // Same rationale as the SOAP fetch: an open but unresponsive connection
     // would otherwise wedge a document concurrency slot indefinitely.
@@ -660,8 +675,12 @@ export class IbabsClient {
       ...(client ? { client } : {}),
     });
     if (!response.ok) {
+      if (response.status === 403 || response.status === 429) {
+        limiter.recordThrottle();
+      }
       throw new Error(`Request failed ${response.status} for ${document.original_url}`);
     }
+    limiter.recordSuccess();
 
     return new Uint8Array(await response.arrayBuffer());
   }

@@ -134,6 +134,18 @@ services:
       # imports are idempotent, so a cheaper run plus a mop-up pass beats a run
       # that never finishes. 3s keeps ~45s of patience without the stalling.
       WOOZI_IBABS_THROTTLE_BASE_MS: ${WOOZI_IBABS_THROTTLE_BASE_MS:-3000}
+      # Fleet-wide brake, added after the motion backfill got the production IP
+      # blocked outright on 2026-08-05 — SOAP, WSDL and the document host all
+      # returned 403 for every source, not just the ones being backfilled.
+      #
+      # Per worker, so the fleet ceiling is this times the worker count: at 1
+      # rps and four workers, four requests a second. Deliberately low; the
+      # backfill is not urgent and a second block is far more expensive than a
+      # slow import. The breaker path lives on the shared volume so a 403 seen
+      # by one worker pauses all of them.
+      WOOZI_IBABS_MAX_RPS: ${WOOZI_IBABS_MAX_RPS:-1}
+      WOOZI_IBABS_COOLDOWN_MS: ${WOOZI_IBABS_COOLDOWN_MS:-60000}
+      WOOZI_IBABS_BREAKER_PATH: /data/ibabs-breaker.json
       OTEL_DENO: ${OTEL_DENO:-true}
       OTEL_SERVICE_NAME: woozi-worker
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318

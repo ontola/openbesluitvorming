@@ -1,6 +1,12 @@
-// The throttle base delay is read from the environment at module load, so it
-// has to be set before the client is imported.
+// Read at module load, so these have to be set before the client is imported.
 Deno.env.set("WOOZI_IBABS_THROTTLE_BASE_MS", "1");
+// The client shares one rate limiter, and stubbing a 403 opens its breaker for
+// real. Left at production values a single test would sleep 30s and the next
+// 60s, so pace and cooldown are collapsed here; IbabsRateLimiter's own
+// behaviour is covered in ibabs_rate_limit.test.ts.
+Deno.env.set("WOOZI_IBABS_MAX_RPS", "100000");
+Deno.env.set("WOOZI_IBABS_COOLDOWN_MS", "1");
+Deno.env.set("WOOZI_IBABS_MAX_COOLDOWN_MS", "2");
 
 const { __test__ } = await import("../src/ibabs/client.ts");
 
