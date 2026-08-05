@@ -117,6 +117,42 @@ async function queueRun(
   }
 }
 
+/** Refuse to plan while imports are running.
+ *
+ * The planner probes all 166 sources before it queues anything, and those
+ * probes hit the same throttled endpoint the running imports do. Started
+ * alongside a live queue it lost 58 sources to 403s and starved the workers
+ * meanwhile; started against an empty queue it completes cleanly. That is a
+ * precondition, not a matter of judgement, so check it rather than remember
+ * it. */
+async function assertQueueIdle(apiBase: string): Promise<void> {
+  if (hasFlag("force")) {
+    console.log("warning: --force, planning while imports may be running\n");
+    return;
+  }
+
+  let summary;
+  try {
+    const response = await fetch(`${apiBase}/api/admin/summary`);
+    summary = (await response.json()).summary;
+  } catch (error) {
+    throw new Error(
+      `Cannot reach ${apiBase} to check the queue: ${
+        error instanceof Error ? error.message : error
+      }. Pass --force to plan anyway.`,
+    );
+  }
+
+  const busy = (summary?.queuedCount ?? 0) + (summary?.runningCount ?? 0);
+  if (busy > 0) {
+    throw new Error(
+      `${busy} run(s) still queued or running. The planner competes with them for the ` +
+        `same throttled iBabs endpoint and will lose sources to 403s. Wait for the queue ` +
+        `to drain, or pass --force.`,
+    );
+  }
+}
+
 async function main(): Promise<void> {
   const apply = hasFlag("apply");
   const fromYear = Number(argValue("from") ?? DEFAULT_FROM_YEAR);
@@ -129,6 +165,8 @@ async function main(): Promise<void> {
   const sources = listSources()
     .filter((source): source is IbabsSourceDefinition => source.supplier === "ibabs")
     .filter((source) => !only || source.key === only);
+
+  await assertQueueIdle(apiBase);
 
   console.log(`planning ${sources.length} iBabs sources, from ${fromYear}, cap ${cap}/run`);
   console.log(`mode: ${apply ? "APPLY — queues runs" : "dry run"}\n`);
