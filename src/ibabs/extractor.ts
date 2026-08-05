@@ -169,13 +169,7 @@ export class IbabsMeetingExtractor {
       retainIssues?: boolean;
     } = {},
   ): Promise<ExtractionBundle> {
-    const meetingTypes = await this.client.getMeetingTypes(source);
-    const meetingTypeMap = new Map(
-      meetingTypes.map((meetingType) => [
-        meetingType.Id,
-        meetingType.Description ?? meetingType.Meetingtype ?? meetingType.Id,
-      ]),
-    );
+    const meetingTypeMap = new Map<string, string>();
     const retainEntities = options.retainEntities ?? true;
     const retainIssues = options.retainIssues ?? true;
     const meetings: MeetingEntity[] = [];
@@ -207,6 +201,38 @@ export class IbabsMeetingExtractor {
       }
       await options.onIssue?.(issue, currentStats());
     };
+
+    // Meeting types name every meeting, so this is the first call of a run —
+    // and it used to be the only unguarded one. A throttle here killed whole
+    // sources outright (berkelland, bergen op zoom, 2026-08-04).
+    //
+    // How bad losing it is depends on the mode, so they diverge. In a full run
+    // the map supplies each meeting's name; continuing would write hundreds of
+    // meetings called "Vergadering <date>", and bad names are worse than a
+    // retryable failure. In motions_only nothing is named from it — it only
+    // sharpens which meeting a motion links to, and MeetingIndex already falls
+    // back to matching within the same day.
+    try {
+      for (const meetingType of await this.client.getMeetingTypes(source)) {
+        meetingTypeMap.set(
+          meetingType.Id,
+          meetingType.Description ?? meetingType.Meetingtype ?? meetingType.Id,
+        );
+      }
+    } catch (error) {
+      if (options.executionMode !== "motions_only") {
+        throw error;
+      }
+      await registerIssue({
+        severity: "warning",
+        step: "list_motions",
+        entity_id: source.key,
+        message: `iBabs GetMeetingtypes failed for ${source.ibabsSitename}; continuing without ` +
+          `meeting-type names, so motion links fall back to same-day matching: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+      });
+    }
 
     const documentConcurrency = Number(
       Deno.env.get("WOOZI_DOCUMENT_CONCURRENCY") ?? `${DEFAULT_DOCUMENT_CONCURRENCY}`,

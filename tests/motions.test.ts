@@ -495,3 +495,48 @@ Deno.test("the backfill planner splits only where the cap demands it", async () 
     "planner and extractor select the same registries",
   );
 });
+
+Deno.test("a throttled meeting-type call fails a full run but not a motions_only one", async () => {
+  const source = getIbabsSource("utrecht");
+
+  class ThrottlingTypes extends FakeIbabsClient {
+    override getMeetingTypes(): Promise<never> {
+      return Promise.reject(new Error("Request failed 403 for https://wcf.ibabs.eu/api/Public.svc"));
+    }
+  }
+
+  const entries = [
+    { EntryId: "e1", MutationDate: "2026-07-15T10:00:00", agendapunt: "Gemeenteraad 7-11-2024\\n5 Programmabegroting" },
+  ];
+  const meetings = {
+    "2024-11-07": [{ Id: "m", MeetingDate: "2024-11-07T19:30:00", Title: "Programmabegroting" }],
+  };
+
+  // motions_only: the run survives and still imports the motion.
+  const lenient = new ThrottlingTypes(meetings, entries);
+  const motions: MotionEntity[] = [];
+  // deno-lint-ignore no-explicit-any
+  const bundle = await new IbabsMeetingExtractor(lenient as any, () => Promise.resolve(undefined))
+    .extractForDateRange(source, "2026-07-14", "2026-07-18", {
+      executionMode: "motions_only",
+      retainEntities: false,
+      onEntity: (entity) => {
+        if (entity.type === "Motion") motions.push(entity);
+      },
+    });
+  assertEquals(motions.length, 1, "the motion is still imported");
+  assert(bundle.stats.issue_count >= 1, "and the failure is reported, not swallowed");
+
+  // full: the same failure stops the run, because every meeting name comes
+  // from that call and writing hundreds of generic names is worse.
+  const strict = new ThrottlingTypes(meetings, entries);
+  let thrown: unknown;
+  try {
+    // deno-lint-ignore no-explicit-any
+    await new IbabsMeetingExtractor(strict as any, () => Promise.resolve(undefined))
+      .extractForDateRange(source, "2026-07-14", "2026-07-18", { retainEntities: false });
+  } catch (error) {
+    thrown = error;
+  }
+  assert(String(thrown).includes("403"), "a full run still fails loudly");
+});
