@@ -88,6 +88,9 @@ Current implemented slices:
 - Search result shaping belongs in [`web/search_api.ts`](web/search_api.ts), not in the browser.
 - Prefer grouped document-level results even when the underlying search unit is a PDF page chunk.
 - Keep projection versioning explicit so rebuilds do not leak duplicate results into search.
+- **Ordering and date filtering must be pushed down to Quickwit, never applied only app-side.** The scan window is capped (`max_hits`), so sorting the fetched rows can at best reorder the wrong ones: the index's `timestamp_field` is `time` (the ingest time), so an unsorted scan returns whatever was imported last. That was issue #184 — results ordered by import date. Sorting and range filtering need a mapped **fast field**; a dynamic field silently ignores both.
+- A mapped `datetime` field that fails to parse makes Quickwit **discard the entire document**, with a successful-looking ingest response. Normalize dates through `toIndexDateTime` (`src/quickwit/project.ts`) and let bad values fall back to `undefined` — one unsorted row beats an entity that is missing from search.
+- Quickwit's `sort_by` direction is the opposite of the usual convention: bare field name = descending, `-` prefix = ascending. Missing values sort last either way.
 
 ### Extraction and documents
 

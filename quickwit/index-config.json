@@ -61,6 +61,13 @@
         "fast": true
       },
       {
+        "name": "start_date",
+        "type": "datetime",
+        "input_formats": ["rfc3339", "%Y-%m-%d"],
+        "indexed": true,
+        "fast": true
+      },
+      {
         "name": "classification",
         "type": "array<text>"
       },

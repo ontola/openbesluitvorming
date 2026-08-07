@@ -30,6 +30,10 @@ export default defineConfig({
         target: apiTarget,
         changeOrigin: true,
       },
+      "/docs": {
+        target: apiTarget,
+        changeOrigin: true,
+      },
       "/schemas": {
         target: apiTarget,
         changeOrigin: true,

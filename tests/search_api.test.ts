@@ -530,40 +530,39 @@ Deno.test("getEntityContent prefers stored markdown from the newest hit", async 
   }
 });
 
-Deno.test("documentMonthTerms enumerates months and rejects unusable ranges", async () => {
-  const { documentMonthTerms } = await import("../web/search_api.ts");
+Deno.test("startDateRangeClause bounds the range on whole days", async () => {
+  const { startDateRangeClause } = await import("../web/search_api.ts");
 
   assert(
-    JSON.stringify(documentMonthTerms("2024-01-15", "2024-03-02")) ===
-      JSON.stringify(["2024-01", "2024-02", "2024-03"]),
-    "range should cover the months of both bounds inclusive",
+    startDateRangeClause("2024-01-15", "2024-03-02") ===
+      "start_date:[2024-01-15T00:00:00Z TO 2024-03-02T23:59:59Z]",
+    "both bounds are inclusive, and 'to' covers the whole day",
   );
   assert(
-    documentMonthTerms("2024-05-01", "2024-05-31")?.length === 1,
-    "single-month range yields one term",
+    startDateRangeClause("2026-01-01", "") === "start_date:[2026-01-01T00:00:00Z TO *]",
+    "open-ended 'to' still pushes down",
   );
-
-  const openEnded = documentMonthTerms("2026-01-01", "");
-  assert(openEnded !== null && openEnded[0] === "2026-01", "open-ended 'to' still pushes down");
-
-  assert(documentMonthTerms("2002-01-01", "2021-12-31") === null, "multi-decade range stays app-side");
-  assert(documentMonthTerms("2024-06-01", "2024-01-01") === null, "inverted range is rejected");
-  assert(documentMonthTerms("geen-datum", "2024-01-01") === null, "garbage input is rejected");
+  assert(
+    startDateRangeClause("", "2026-01-01") === "start_date:[* TO 2026-01-01T23:59:59Z]",
+    "'to' alone still pushes down",
+  );
+  assert(startDateRangeClause("", "") === null, "no bounds means no clause");
+  assert(startDateRangeClause("geen-datum", "") === null, "garbage input is rejected");
 });
 
-Deno.test("date-filtered search does not exempt meetings from the month filter", async () => {
-  // Regression guard. `entity_type:Meeting OR document_month:...` matched every
-  // meeting of every year, so the relevance-ranked sample filled with
-  // out-of-range meetings and the app-side day filter discarded all of them.
+Deno.test("date-filtered search pushes a start_date range down for every type", async () => {
+  // Regression guard for #184's sibling bug. The date filter used to enumerate
+  // document_month terms, which only Documents carry, so meetings and motions
+  // had to be exempted and never showed up in a date-filtered search at all.
   // Measured in production 2026-07-31 on dateFrom=2026-01-01: 40 of the first
   // 40 hits were meetings dated 2018-2019 and zero rows were returned, which
   // reads to a user as "nothing exists after 2020".
   const originalFetch = globalThis.fetch;
-  let capturedQuery = "";
+  const capturedQueries: string[] = [];
 
   globalThis.fetch = async (input, init) => {
     const body = JSON.parse(String((init as { body?: string } | undefined)?.body ?? "{}"));
-    capturedQuery = String(body.query ?? "");
+    capturedQueries.push(String(body.query ?? ""));
     return new Response(JSON.stringify({ num_hits: 0, hits: [] }), {
       status: 200,
       headers: { "content-type": "application/json" },
@@ -571,23 +570,59 @@ Deno.test("date-filtered search does not exempt meetings from the month filter",
   };
 
   try {
-    await searchMeetings({
-      query: "begroting",
-      dateFrom: "2026-01-01",
-      dateTo: "2026-03-31",
-      offset: 0,
-      limit: 24,
-    });
+    for (const entityType of ["", "Meeting", "Motion", "Document"]) {
+      await searchMeetings({
+        query: "begroting",
+        entityType,
+        dateFrom: "2026-01-01",
+        dateTo: "2026-03-31",
+        offset: 0,
+        limit: 24,
+      });
+    }
   } finally {
     globalThis.fetch = originalFetch;
   }
 
-  assert(
-    capturedQuery.includes("document_month:2026-01"),
-    `date filter should push month terms into Quickwit, got: ${capturedQuery}`,
-  );
-  assert(
-    !/entity_type:Meeting\s+OR\s+document_month/.test(capturedQuery),
-    `meetings must not be exempted from the date filter, got: ${capturedQuery}`,
-  );
+  assert(capturedQueries.length === 4, `expected one query per type, got ${capturedQueries.length}`);
+  for (const query of capturedQueries) {
+    assert(
+      query.includes("start_date:[2026-01-01T00:00:00Z TO 2026-03-31T23:59:59Z]"),
+      `every type must push the date range down, got: ${query}`,
+    );
+    assert(!query.includes("document_month"), `month enumeration is gone, got: ${query}`);
+  }
+});
+
+Deno.test("search asks Quickwit to order by meeting date, not ingest time", async () => {
+  // #184. The index's timestamp_field is `time` (the ingest time), so an
+  // unsorted request returns whatever was written last and the app-side sort
+  // could only reorder that already-wrong window. Sorting has to be pushed
+  // down for the window itself to hold the newest meetings.
+  //
+  // Direction is inverted in Quickwit 0.8.1: bare = descending, `-` = ascending.
+  const originalFetch = globalThis.fetch;
+  const captured: Array<string | undefined> = [];
+
+  globalThis.fetch = async (input, init) => {
+    const body = JSON.parse(String((init as { body?: string } | undefined)?.body ?? "{}"));
+    captured.push(body.sort_by);
+    return new Response(JSON.stringify({ num_hits: 0, hits: [] }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  };
+
+  try {
+    for (const sort of ["date_desc", "date_asc", "title_asc", ""]) {
+      await searchMeetings({ query: "begroting", sort, offset: 0, limit: 24 });
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+
+  assert(captured[0] === "start_date", `date_desc should sort newest first, got ${captured[0]}`);
+  assert(captured[1] === "-start_date", `date_asc should sort oldest first, got ${captured[1]}`);
+  assert(captured[2] === undefined, "title sort has no fast field and stays app-side");
+  assert(captured[3] === "start_date", `default sort is newest first, got ${captured[3]}`);
 });

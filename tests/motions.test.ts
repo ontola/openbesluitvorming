@@ -479,6 +479,30 @@ Deno.test("a motion projects into a searchable Quickwit document", async () => {
   assertEquals(projected.start_date, "2026-01-29T00:00:00Z", "sorts on the meeting date");
 });
 
+Deno.test("an unparseable date is dropped rather than passed to the index", async () => {
+  // #184. start_date is a mapped datetime field, and Quickwit parses those
+  // strictly: an unparseable value makes it discard the whole document, with a
+  // successful-looking ingest response. Verified against 0.8.1 — "onzin", ""
+  // and "2024-13-45" all reduced the indexed document count silently. So a bad
+  // date must cost one unsorted row, never the entity's presence in search.
+  const cases: Array<[string, string | undefined]> = [
+    ["2026-01-29T00:00:00Z", "2026-01-29T00:00:00Z"],
+    ["2026-01-29", "2026-01-29T00:00:00Z"],
+    ["2026-01-29T10:15:30+01:00", "2026-01-29T09:15:30Z"],
+    ["onzin", undefined],
+    ["2024-13-45", undefined],
+    ["", undefined],
+    ["   ", undefined],
+  ];
+
+  for (const [raw, expected] of cases) {
+    const meeting = meetingFixture("meeting:ibabs:gemeente:utrecht:m9", "Gemeenteraad", raw);
+    const event = await buildEntityCommitEvent(meeting);
+    const [projected] = projectEntityCommitToQuickwitDocuments(event);
+    assertEquals(projected.start_date, expected, `start_date for input ${JSON.stringify(raw)}`);
+  }
+});
+
 Deno.test("the backfill planner splits only where the cap demands it", async () => {
   const { __test__: planner } = await import("../scripts/plan_motion_backfill.ts");
 

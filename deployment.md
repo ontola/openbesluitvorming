@@ -375,6 +375,53 @@ Treat this as a projection migration:
 
 Do not assume old search data under `indexes/woozi-events` will automatically appear under `indexes-prod/woozi-events-prod`.
 
+### Projection v3: sorting on the meeting date
+
+`search-v3-meeting-date` maps `start_date` as a `datetime` fast field so search
+can order and range-filter on the meeting date. Before it, `start_date` was a
+dynamic text field: Quickwit could neither sort nor range on it, so results came
+back in ingest order and date filters silently ignored meetings and motions
+(issue #184).
+
+This is a doc-mapping change, and **doc mappings are fixed at index creation**.
+Editing `quickwit/index-config.json` does nothing to a live index —
+`QuickwitClient.ensureIndex` returns early when the index id already exists, and
+existing splits keep the mapping they were written with. Migrating means a new
+index, not an upgraded one.
+
+v3 is therefore **opt-in**: the code default is still `search-v2-pages`, so
+deploying it changes nothing on its own. Quickwit ignores `sort_by` and a range
+clause on a field its mapping does not declare (verified on 0.8.1 — no error,
+no empty result), so the v3 code running against the v2 index behaves exactly
+as before, just without the ordering fix.
+
+Cut over deliberately, when there is time for the reindex to finish:
+
+1. set a new `QUICKWIT_INDEX_ID` (e.g. `woozi-events-prod-v3`) **and**
+   `WOOZI_PROJECTION_VERSION=search-v3-meeting-date`, then restart
+2. let `ensureIndex` create it with the v3 mapping
+3. `reindex_only` every source — it replays from the export log, not from the
+   supplier APIs, and `start_date` is already in the stored payloads
+4. keep the old index around until the new one is verified, then delete it
+
+Search is scoped to `projection_version`, so the old index's documents cannot
+leak into v3 results even if both exist. The flip side is that **search returns
+nothing for a source until its reindex has run**: between step 1 and the end of
+step 3 the v3 index is empty by construction. Do not start the cutover without
+budgeting for the full reindex across all sources.
+
+Two things to know before touching the mapping again:
+
+- **A datetime field that fails to parse silently drops the whole document.**
+  Not the field — the document. Quickwit 0.8.1 accepts the ingest, reports
+  success, and indexes nothing, so the entity vanishes from search with no
+  error anywhere. `toIndexDateTime` in `src/quickwit/project.ts` normalizes and
+  gives up to `undefined` for exactly this reason; anything writing a mapped
+  datetime field must do the same.
+- **Sort direction is inverted from the usual convention.** A bare field name
+  in `sort_by` sorts *descending*; a `-` prefix sorts *ascending*. Documents
+  missing the field sort last in both directions.
+
 ## Hetzner Cloud
 
 Current tested provisioning path:

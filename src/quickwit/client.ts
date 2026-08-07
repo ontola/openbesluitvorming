@@ -77,6 +77,12 @@ type QuickwitSearchRequest = {
   snippet_fields?: string;
   count_all?: boolean;
   aggs?: Record<string, unknown>;
+  /** Fast field to order by. Beware the direction convention, which is the
+   * opposite of the usual one: a bare (or `+`-prefixed) field name sorts
+   * **descending**, and a `-` prefix sorts **ascending**. Verified against
+   * Quickwit 0.8.1 on both `time` and `start_date`. Documents missing the
+   * field sort last in either direction. */
+  sort_by?: string;
 };
 
 export class QuickwitClient {
