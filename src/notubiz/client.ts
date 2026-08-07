@@ -1,4 +1,5 @@
 import type {
+  NotubizMedia,
   NotubizModule,
   NotubizModuleItem,
   NotubizOrganizationAttributes,
@@ -76,6 +77,45 @@ async function fetchJson<T>(url: string): Promise<T> {
       }
 
       return (await response.json()) as T;
+    } catch (error) {
+      lastError = error;
+      if (attempt === MAX_RETRIES || !isRetryableError(error)) {
+        throw describeTransportError(url, error);
+      }
+      await sleep(RETRY_DELAY_MS * attempt);
+    }
+  }
+
+  throw describeTransportError(url, lastError);
+}
+
+/** Notubiz returns media URLs without a scheme, and with raw spaces in the
+ * `file=` parameter ("api.notubiz.nl/media/download?folder=X&file=10.06 en
+ * 11.06.26 RAAD.mp4"). Both have to be fixed before the URL is usable. */
+export function notubizMediaUrl(value: string): string {
+  const absolute = /^https?:\/\//i.test(value) ? value : `https://${value}`;
+  // Only encode what is already unescaped, so calling this twice is harmless.
+  return encodeURI(decodeURI(absolute));
+}
+
+async function fetchText(url: string): Promise<string> {
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt += 1) {
+    try {
+      const response = await fetch(url, {
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+        headers: {
+          accept: "text/plain,*/*",
+          "user-agent": "woozi/0.1",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Request failed ${response.status} for ${url}`);
+      }
+
+      return await response.text();
     } catch (error) {
       lastError = error;
       if (attempt === MAX_RETRIES || !isRetryableError(error)) {
@@ -251,6 +291,27 @@ export class NotubizClient {
       }),
     );
     return Array.isArray(data.items) ? data.items : [];
+  }
+
+  /** Video/audio registrations of one meeting.
+   *
+   * There is no bulk variant: `organisation_id` is rejected with "Required
+   * parameter: event_id", so this is one call per meeting. Meetings without a
+   * registration return an empty list, which is the normal case for roughly
+   * half of them. */
+  async listMedia(meetingId: number): Promise<NotubizMedia[]> {
+    const data = await fetchJson<{ media?: NotubizMedia[] }>(
+      buildUrl("media", { event_id: meetingId }),
+    );
+    return Array.isArray(data.media) ? data.media : [];
+  }
+
+  /** The SRT transcript belonging to a media file, as text. */
+  async downloadSubtitles(media: NotubizMedia): Promise<string> {
+    if (!media.subtitles_url) {
+      throw new Error(`Media ${media.id} has no subtitles URL`);
+    }
+    return await fetchText(notubizMediaUrl(media.subtitles_url));
   }
 
   async downloadDocument(document: unknown): Promise<Uint8Array> {

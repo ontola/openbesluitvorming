@@ -6,6 +6,7 @@ import type {
   MotionEntity,
   PartyEntity,
   PersonEntity,
+  RecordingEntity,
   WooziEntity,
 } from "../types.ts";
 import { currentProjectionVersion } from "../pipeline/versioning.ts";
@@ -43,6 +44,34 @@ export interface QuickwitSearchDocument {
 
 function documentReferenceDate(payload?: DocumentEntity): string | undefined {
   return payload?.last_discussed_at ?? payload?.date_modified;
+}
+
+/** `start_date` is a mapped `datetime` fast field (it has to be, or search
+ * cannot sort or range-filter on the meeting date — see issue #184). Quickwit
+ * parses mapped datetime fields strictly and **silently drops the entire
+ * document** when the value does not parse: no error, no partial index, the
+ * entity simply never appears in search. Verified against 0.8.1 — feeding
+ * "onzin", "" and "2024-13-45" reduced the indexed count with a successful
+ * ingest response.
+ *
+ * Suppliers do emit junk here (and motions fall back to a bare `date`), so
+ * normalize to RFC3339 and give up to `undefined` rather than pass anything
+ * through unchecked. A missing value costs one badly-sorted row — it sorts
+ * last in both directions — where an unparseable one costs the whole entity. */
+function toIndexDateTime(value?: string): string | undefined {
+  const trimmed = value?.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  const parsed = new Date(trimmed);
+  if (Number.isNaN(parsed.getTime())) {
+    return undefined;
+  }
+
+  // Second precision, matching the shape the suppliers already emit, so the
+  // projected value stays comparable to the raw one in fixtures and logs.
+  return `${parsed.toISOString().slice(0, 19)}Z`;
 }
 
 function toDocumentMonth(value?: string): string | undefined {
@@ -140,6 +169,38 @@ function projectMotionContent(payload?: MotionEntity): string | undefined {
   return content || undefined;
 }
 
+/** What a recording contributes to search.
+ *
+ * Phase A of the media slice: the whole transcript goes into `content` as one
+ * document, which costs roughly one row per recording. Splitting the
+ * transcript into per-segment sub-documents (the `DocumentPage` pattern) would
+ * rank snippets more precisely, but at ~90 segments per meeting that is tens of
+ * millions of extra rows on an index that already holds 40M document pages.
+ * Do that only once measurement shows this is not good enough — and it can be
+ * done as a pure projection change, because `derived_content.transcript_key`
+ * lets `reindex_only` rehydrate the text from object storage without going back
+ * to the supplier. */
+function projectRecordingContent(payload?: RecordingEntity): string | undefined {
+  if (!payload) {
+    return undefined;
+  }
+
+  const content = [
+    payload.name,
+    ...(payload.classification ?? []),
+    ...(payload.chapters ?? []).map((chapter) => chapter.title),
+    // Speaker names make a recording findable by who was at the microphone,
+    // which is the question the transcript alone answers badly: ASR mangles
+    // names far more often than the speaker list does.
+    ...new Set((payload.speakers ?? []).map((speaker) => speaker.name)),
+    ...(payload.segments ?? []).map((segment) => segment.text),
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  return content || undefined;
+}
+
 function projectGenericEntityContent(
   payload?: CommitteeEntity | PartyEntity | PersonEntity,
 ): string | undefined {
@@ -213,6 +274,34 @@ export function compactEntityPayload(payload?: WooziEntity): unknown {
     };
   }
 
+  if (payload.type === "Recording") {
+    // `segments` is deliberately absent: the transcript lives in object
+    // storage, and inlining it here would repeat ~30 KB in every stored hit.
+    // `derived_content.transcript_key` is how the detail view finds it.
+    return {
+      type: payload.type,
+      name: payload.name,
+      classification: payload.classification,
+      media_type: payload.media_type,
+      meeting: payload.meeting,
+      start_date: payload.start_date,
+      duration_seconds: payload.duration_seconds,
+      platform: payload.platform,
+      player_url: payload.player_url,
+      media_url: payload.media_url,
+      stream_url: payload.stream_url,
+      content_type: payload.content_type,
+      size_in_bytes: payload.size_in_bytes,
+      transcript_language: payload.transcript_language,
+      transcript_kind: payload.transcript_kind,
+      chapters: payload.chapters,
+      speakers: payload.speakers,
+      derived_content: payload.derived_content,
+      organization: payload.organization,
+      last_discussed_at: payload.last_discussed_at,
+    };
+  }
+
   if (payload.type === "Motion") {
     return {
       type: payload.type,
@@ -279,7 +368,7 @@ function projectDocumentPageDocuments(
     name: payload.name,
     classification: payload.classification,
     file_name: payload.file_name,
-    start_date: payload.last_discussed_at,
+    start_date: toIndexDateTime(payload.last_discussed_at),
     organization: payload.organization,
     content: page.markdown,
     parent_entity_id: event.data.entity_id,
@@ -301,7 +390,9 @@ export function projectEntityCommitToQuickwitDocuments(
         ? projectMeetingContent(payload)
         : payload?.type === "Motion"
           ? projectMotionContent(payload)
-          : projectGenericEntityContent(payload);
+          : payload?.type === "Recording"
+            ? projectRecordingContent(payload)
+            : projectGenericEntityContent(payload);
 
   const primaryDocument: QuickwitSearchDocument = {
     time: event.time,
@@ -324,20 +415,25 @@ export function projectEntityCommitToQuickwitDocuments(
     name: payload?.name,
     classification: (payload as { classification?: string[] } | undefined)?.classification,
     file_name: payload?.type === "Document" ? payload.file_name : undefined,
-    start_date:
+    start_date: toIndexDateTime(
       payload?.type === "Meeting"
         ? payload.start_date
         : payload?.type === "Document"
           ? documentReferenceDate(payload)
           : payload?.type === "Motion"
             ? (payload.last_discussed_at ?? payload.date)
-            : undefined,
+            : payload?.type === "Recording"
+              ? (payload.start_date ?? payload.last_discussed_at)
+              : undefined,
+    ),
     end_date: payload?.type === "Meeting" ? payload.end_date : undefined,
     organization: (payload as { organization?: string } | undefined)?.organization,
     committee: payload?.type === "Meeting" ? payload.committee : undefined,
-    // Motions hang off the meeting they were decided in, the same way document
-    // pages hang off their document, so the meeting view can fetch them.
-    parent_entity_id: payload?.type === "Motion" ? payload.meeting : undefined,
+    // Motions and recordings hang off the meeting they belong to, the same way
+    // document pages hang off their document, so the meeting view can fetch
+    // them.
+    parent_entity_id:
+      payload?.type === "Motion" || payload?.type === "Recording" ? payload.meeting : undefined,
     content,
     projection_version: projectionVersion,
     payload: compactEntityPayload(payload),

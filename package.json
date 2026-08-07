@@ -29,6 +29,7 @@
     "check-format": "oxfmt --check src tests web/src/*.ts web/*.html web/*.css vite.config.ts tsconfig.json"
   },
   "dependencies": {
+    "hls.js": "^1.6.17",
     "pdfjs-dist": "^5.6.205"
   },
   "devDependencies": {

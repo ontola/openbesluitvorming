@@ -9,11 +9,26 @@
   /** Motions decided in this meeting, keyed by agenda item id. Passed whole
    * through the recursion so nested items get theirs too. */
   export let motionsByAgendaItem: Record<string, MeetingMotion[]> = {};
+  /** Where each agenda item starts in the recording, in seconds, keyed by
+   * agenda item id. Only items that were actually on camera appear here — the
+   * recording drops zero-length offsets — so a missing entry means "no video
+   * for this point", not "unknown". */
+  export let playheadByAgendaItem: Record<string, number> = {};
 
   const dispatch = createEventDispatcher<{
     opendocument: { entityId: string };
     documentpreview: { entityId: string };
+    seek: { seconds: number };
   }>();
+
+  function formatClock(seconds: number): string {
+    const total = Math.max(0, Math.round(seconds));
+    const hours = Math.floor(total / 3600);
+    const minutes = Math.floor((total % 3600) / 60);
+    const secs = total % 60;
+    const pad = (value: number) => String(value).padStart(2, "0");
+    return hours > 0 ? `${hours}:${pad(minutes)}:${pad(secs)}` : `${minutes}:${pad(secs)}`;
+  }
   let expandedDocumentId: string | null = null;
   let loadingDocumentId: string | null = null;
   let documentMarkdown: Record<string, string | null> = {};
@@ -104,6 +119,17 @@
             {/if}
             <div class="meeting-agenda__title-group">
               <h3 class="meeting-agenda__title">{item.title ?? "Agendapunt"}</h3>
+              {#if playheadByAgendaItem[item.id] !== undefined}
+                <button
+                  type="button"
+                  class="meeting-agenda__play"
+                  aria-label={`Speel de video af vanaf ${item.title ?? "dit agendapunt"}`}
+                  on:click={() => dispatch("seek", { seconds: playheadByAgendaItem[item.id] })}
+                >
+                  <span aria-hidden="true">▶</span>
+                  <span>{formatClock(playheadByAgendaItem[item.id])}</span>
+                </button>
+              {/if}
               {#if item.start_date}
                 <p class="meeting-agenda__time">
                   {new Intl.DateTimeFormat("nl-NL", {
@@ -210,8 +236,10 @@
               <svelte:self
                 items={item.agenda_items}
                 {motionsByAgendaItem}
+                {playheadByAgendaItem}
                 on:opendocument={(event) => dispatch("opendocument", event.detail)}
                 on:documentpreview={(event) => dispatch("documentpreview", event.detail)}
+                on:seek={(event) => dispatch("seek", event.detail)}
               />
             </div>
           {/if}

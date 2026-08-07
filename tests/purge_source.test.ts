@@ -1,6 +1,8 @@
 import { ExportChangesLog } from "../src/exports/log.ts";
 import { DatabaseSync } from "node:sqlite";
 import { buildEntityCommitEvent } from "../src/events/entity_commit.ts";
+import { sourceStoragePrefixes } from "../src/storage/prefixes.ts";
+import { transcriptKey } from "../src/recordings/storage.ts";
 import type { DocumentEntity, MeetingEntity, MotionEntity } from "../src/types.ts";
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -73,7 +75,10 @@ function motion(key: string, id: string): MotionEntity {
   };
 }
 
-async function record(log: ExportChangesLog, entity: MeetingEntity | DocumentEntity | MotionEntity) {
+async function record(
+  log: ExportChangesLog,
+  entity: MeetingEntity | DocumentEntity | MotionEntity,
+) {
   log.recordCommit(await buildEntityCommitEvent(entity));
 }
 
@@ -163,6 +168,42 @@ Deno.test("object storage prefixes cannot collide between sources", () => {
     waterBoard,
     "documents/ibabs/waterschap/waterschap_limburg/",
     "prefix shape is what the purge expects",
+  );
+});
+
+Deno.test("a purge covers every root a source actually writes to", async () => {
+  // The guard against the bug this fixes: the purge cleared `documents/` only,
+  // so a purged source kept its transcripts. Rather than trusting two string
+  // literals to stay in step, take a real key from each writer and assert the
+  // purge would cover it.
+  const source = { supplier: "notubiz", organizationType: "gemeente", key: "nunspeet" };
+  const prefixes = sourceStoragePrefixes(source);
+
+  const transcriptPath = transcriptKey({
+    id: "recording:notubiz:gemeente:nunspeet:392881",
+    type: "Recording",
+    name: "Vergadering",
+    media_type: "video",
+    source_info: { supplier: "notubiz", source: "nunspeet", organization_type: "gemeente" },
+    raw: {},
+  });
+  const documentPath = "documents/notubiz/gemeente/nunspeet/document:x/v1/stuk.pdf";
+
+  for (const [label, key] of [
+    ["transcript", transcriptPath],
+    ["document", documentPath],
+  ]) {
+    assert(
+      prefixes.some((prefix) => key.startsWith(prefix)),
+      `the purge must cover the ${label} key ${key} — prefixes: ${prefixes.join(", ")}`,
+    );
+  }
+
+  // And still not reach a neighbouring source.
+  const neighbour = sourceStoragePrefixes({ ...source, key: "nunspeet_west" });
+  assert(
+    !neighbour.some((prefix) => transcriptPath.startsWith(prefix)),
+    "a source with a longer name must not swallow this one",
   );
 });
 

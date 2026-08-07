@@ -38,7 +38,7 @@ The recommended search endpoint. Returns grouped, deduplicated results with docu
 |-----------|------|-------------|
 | `query` | string | Search query (required) |
 | `organization` | string | Filter by source key (e.g. `soest`, `amsterdam`) |
-| `entityType` | string | Filter by type: `Meeting`, `Document` or `Motion` |
+| `entityType` | string | Filter by type: `Meeting`, `Document`, `Motion` or `Recording` (spoken word; matches resolve to their meeting) |
 | `sort` | string | Sort order: `date_desc` (default), `date_asc`, or `relevance` |
 | `dateFrom` | string | Start date filter (ISO 8601, e.g. `2024-01-01`) |
 | `dateTo` | string | End date filter |

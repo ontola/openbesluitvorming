@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openraadsinformatie.nl/schemas/recording.schema.json",
+  "title": "Recording",
+  "description": "A video or audio recording of a meeting, with the timeline that makes it navigable: chapters per agenda item, speaker segments, and — where the supplier publishes one — a transcript. The media bytes themselves are never stored by us; only URLs and derived text.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "id": {
+      "$ref": "common.schema.json#/$defs/id"
+    },
+    "type": {
+      "const": "Recording"
+    },
+    "name": {
+      "type": "string"
+    },
+    "classification": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "media_type": {
+      "type": "string",
+      "enum": ["video", "audio"]
+    },
+    "meeting": {
+      "$ref": "common.schema.json#/$defs/entityRef",
+      "description": "The meeting this recording covers. Recordings hang off their meeting the same way motions do."
+    },
+    "start_date": {
+      "type": "string",
+      "description": "Start of the recording. Not always identical to the meeting's start_date: recording usually starts a few minutes early."
+    },
+    "duration_seconds": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "platform": {
+      "type": "string",
+      "description": "Which video platform serves this recording, e.g. \"notubiz\" or \"companywebcast\". Not the same as the agenda supplier: iBabs sources are served by Company Webcast."
+    },
+    "player_url": {
+      "type": "string",
+      "description": "Stable page a visitor can watch this on. Prefer this over media_url in any user-facing link — media URLs carry expiring signatures."
+    },
+    "media_url": {
+      "type": "string",
+      "description": "Direct mp4/mp3 URL as published by the platform. Recorded for provenance, never downloaded: a single two-day council meeting is ~10 GB. Not necessarily seekable — Notubiz answers a Range request with a plain 200."
+    },
+    "stream_url": {
+      "type": "string",
+      "description": "Adaptive stream (HLS). The seekable one, so this is what a timestamp deep-link has to play."
+    },
+    "content_type": { "type": "string" },
+    "size_in_bytes": { "type": "integer", "minimum": 0 },
+    "transcript_language": {
+      "type": "string",
+      "description": "BCP-47-ish language tag of the transcript, e.g. \"nl\" or \"fy\"."
+    },
+    "transcript_kind": {
+      "type": "string",
+      "enum": ["asr", "corrected"],
+      "description": "Whether the transcript is raw speech recognition or a human-corrected track. Company Webcast distinguishes these (\"nl\" versus \"NLcorrectie\"); Notubiz publishes ASR only."
+    },
+    "chapters": {
+      "type": "array",
+      "description": "Agenda items placed on the recording's timeline.",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "start_seconds": { "type": "number", "minimum": 0 },
+          "end_seconds": { "type": "number", "minimum": 0 },
+          "title": { "type": "string" },
+          "agenda_item": { "$ref": "common.schema.json#/$defs/entityRef" }
+        },
+        "required": ["start_seconds"]
+      }
+    },
+    "speakers": {
+      "type": "array",
+      "description": "Who spoke when. Best effort: available for roughly half of our sources, and absent is a normal outcome rather than an error.",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "start_seconds": { "type": "number", "minimum": 0 },
+          "end_seconds": { "type": "number", "minimum": 0 },
+          "name": { "type": "string" },
+          "person": { "$ref": "common.schema.json#/$defs/entityRef" },
+          "party": { "type": "string" }
+        },
+        "required": ["start_seconds"]
+      }
+    },
+    "derived_content": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Pointers to derived artefacts in object storage. The transcript itself is not inlined in the entity payload, for the same reason document markdown is not: the payload is stored per search hit.",
+      "properties": {
+        "transcript_key": { "type": "string" },
+        "raw_transcript_key": { "type": "string" },
+        "segment_count": { "type": "integer", "minimum": 0 },
+        "speaker_count": { "type": "integer", "minimum": 0 },
+        "chapter_count": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "organization": {
+      "$ref": "common.schema.json#/$defs/entityRef"
+    },
+    "last_discussed_at": {
+      "type": "string"
+    },
+    "source_info": {
+      "$ref": "common.schema.json#/$defs/sourceInfo"
+    }
+  },
+  "required": ["id", "type", "name", "media_type", "source_info"]
+}

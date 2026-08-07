@@ -30,6 +30,7 @@ import { getExportLog } from "../src/exports/log.ts";
 import { QuickwitClient } from "../src/quickwit/client.ts";
 import { getSource } from "../src/sources/index.ts";
 import { ObjectStorageClient } from "../src/storage/s3.ts";
+import { sourceStoragePrefixes } from "../src/storage/prefixes.ts";
 import type { ExportChangeRecord } from "../src/types.ts";
 
 const PAGE_SIZE = 500;
@@ -86,15 +87,23 @@ async function main(): Promise<void> {
     console.log(`  ${type.padEnd(14)} ${count}`);
   }
 
-  const storagePrefix = `documents/${source.supplier}/${source.organizationType}/${source.key}/`;
+  // Every prefix this source writes to. Recordings live under their own root,
+  // so purging only `documents/` left a source's transcripts behind — text that
+  // a purge or a takedown is supposed to remove.
+  const storagePrefixes = sourceStoragePrefixes(source);
   const storage = await ObjectStorageClient.fromEnvironment();
-  console.log(`\nobject storage prefix: ${storagePrefix}`);
+  console.log(`\nobject storage prefixes:`);
+  for (const prefix of storagePrefixes) {
+    console.log(`  ${prefix}`);
+  }
   if (!storage) {
     console.log("  (no object storage configured — skipping)");
   }
 
   const deleteQuery = `source_key:"${source.key}"`;
-  console.log(`quickwit: ${purgeQuickwit ? `delete-by-query ${deleteQuery}` : "left alone (pass --quickwit)"}`);
+  console.log(
+    `quickwit: ${purgeQuickwit ? `delete-by-query ${deleteQuery}` : "left alone (pass --quickwit)"}`,
+  );
 
   if (!apply) {
     console.log("\nDry run — nothing changed. Re-run with --apply to execute.");
@@ -127,24 +136,30 @@ async function main(): Promise<void> {
   let storageComplete = true;
   if (storage && !keepStorage) {
     let deletedTotal = 0;
-    for (let attempt = 1; attempt <= 5; attempt += 1) {
-      try {
-        const deleted = await storage.deleteByPrefix(storagePrefix);
-        deletedTotal += deleted.length;
-        if (deleted.length === 0) {
+    for (const storagePrefix of storagePrefixes) {
+      // Each prefix retries on its own: a bucket that 504s while clearing
+      // documents must not leave recordings untouched and unreported.
+      for (let attempt = 1; attempt <= 5; attempt += 1) {
+        try {
+          const deleted = await storage.deleteByPrefix(storagePrefix);
+          deletedTotal += deleted.length;
+          // deleteByPrefix returns once the prefix is empty; a result that did
+          // not throw means it finished this pass.
           break;
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          console.log(
+            `  storage delete attempt ${attempt}/5 failed for ${storagePrefix}: ${message.slice(
+              0,
+              120,
+            )}`,
+          );
+          if (attempt === 5) {
+            storageComplete = false;
+            break;
+          }
+          await new Promise((resolve) => setTimeout(resolve, 2000 * 2 ** (attempt - 1)));
         }
-        // deleteByPrefix returns once the prefix is empty; a non-empty result
-        // that did not throw means it finished this pass.
-        break;
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        console.log(`  storage delete attempt ${attempt}/5 failed: ${message.slice(0, 120)}`);
-        if (attempt === 5) {
-          storageComplete = false;
-          break;
-        }
-        await new Promise((resolve) => setTimeout(resolve, 2000 * 2 ** (attempt - 1)));
       }
     }
     console.log(

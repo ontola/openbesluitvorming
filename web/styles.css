@@ -1877,6 +1877,397 @@ select {
   margin-top: 1.25rem;
 }
 
+.detail-sheet__recordings {
+  display: grid;
+  gap: 0.6rem;
+  margin-bottom: 1.5rem;
+}
+
+/* The recording sits above the agenda, so it has to earn its height: video on
+   the left, the spoken word on the right, and one column on a narrow sheet. */
+.recording {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  gap: 1rem;
+  /* Both columns share the row height so the transcript ends where the video
+     ends, instead of running on past it. */
+  align-items: stretch;
+  /* Floor for audio-only recordings, where the player is a strip of controls
+     and there is no picture to set the height. */
+  min-height: 16rem;
+  margin-top: 0.6rem;
+}
+
+.recording__media {
+  min-width: 0;
+}
+
+/* The aspect ratio makes the video's height predictable, which is what the
+   transcript column matches itself to. */
+.recording__video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  max-height: 30rem;
+  border-radius: 0.7rem;
+  background: #000;
+}
+
+/* Audio has no picture to fill, so the row height comes from the transcript
+   instead and the player collapses to its controls. */
+.recording__video--audio {
+  aspect-ratio: auto;
+  height: 3rem;
+}
+
+/* Agenda items appear as headings inside the transcript, in play order — the
+   agenda tree below carries the same jump points in document order. */
+.recording__chapter-heading {
+  margin: 0.5rem 0 0.15rem;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  /* The sticky heading has to be opaque or the segments scroll through it, but
+     a square opaque bar reads as a seam across the panel — hence the radius on
+     the chip itself and a transparent strip around it. */
+  background: linear-gradient(
+    to bottom,
+    var(--surface, #fff) 0%,
+    var(--surface, #fff) 82%,
+    transparent 100%
+  );
+  padding-bottom: 0.15rem;
+}
+
+.recording__chapter-heading:first-child {
+  margin-top: 0;
+}
+
+.recording__chapter-heading button {
+  display: flex;
+  gap: 0.45rem;
+  align-items: baseline;
+  width: 100%;
+  /* Room on the right for the floating controls, which sit exactly where the
+     sticky heading rests. */
+  padding: 0.3rem 5rem 0.3rem 0.55rem;
+  border: 0;
+  border-radius: 0.5rem;
+  background: color-mix(in srgb, var(--accent-deep) 8%, transparent);
+  color: inherit;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+.recording__chapter-heading button:hover,
+.recording__chapter-heading button:focus-visible {
+  background: color-mix(in srgb, var(--accent-deep) 16%, transparent);
+  outline: none;
+}
+
+/* The jump point on an agenda item. Absent when the item was never on camera:
+   the recording drops zero-length offsets rather than sending the viewer to a
+   meaningless second. */
+.meeting-agenda__play {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  /* The title group stretches its children, so the pill has to opt out or it
+     spans the whole card and stops reading as a button. */
+  align-self: start;
+  justify-self: start;
+  width: fit-content;
+  margin-top: 0.2rem;
+  padding: 0.15rem 0.45rem;
+  border: 1px solid color-mix(in srgb, var(--accent-deep) 30%, transparent);
+  border-radius: 999px;
+  background: none;
+  color: var(--accent-deep);
+  font: inherit;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.meeting-agenda__play:hover,
+.meeting-agenda__play:focus-visible {
+  background: color-mix(in srgb, var(--accent-deep) 12%, transparent);
+  outline: none;
+}
+
+.recording__transcript {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  border: 1px solid var(--line);
+  border-radius: 0.7rem;
+  padding: 0.6rem 0.7rem 0.55rem;
+  min-width: 0;
+  position: relative;
+  /* Fill the row without sizing it. A plain `height: 100%` would still let the
+     transcript's own content grow the row — with a full meeting in there, that
+     stretched the video column to thousands of pixels. Contributing zero height
+     and then filling with min-height leaves the video as the only thing that
+     decides how tall this row is. */
+  height: 0;
+  min-height: 100%;
+}
+
+.recording__source {
+  margin: 0.4rem 0 0;
+  font-size: 0.85rem;
+}
+
+.recording__source a {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.recording__source a:hover,
+.recording__source a:focus-visible {
+  color: var(--accent-deep);
+  text-decoration: underline;
+}
+
+.recording__source-host {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.8;
+}
+
+/* Floats over the transcript instead of taking a row of its own: the controls
+   are two icons, and the panel's height is capped by the video, so a dedicated
+   row costs a paragraph of readable text for nothing. The sticky chapter
+   heading keeps space free on its right so the two never collide. */
+.recording__transcript-bar {
+  position: absolute;
+  top: 0.55rem;
+  /* Clear of the scroll thumb, which lives at the scroller's right edge and is
+     ~11px wide once `scrollbar-width: thin` applies. */
+  right: 1.6rem;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.25rem;
+}
+
+/* Open, it is a real overlay over the text, so it needs its own surface. */
+.recording__transcript-bar--open {
+  left: 0.6rem;
+  padding: 0.2rem;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  background: var(--surface, #fff);
+  box-shadow: 0 6px 16px rgb(15 23 42 / 12%);
+}
+
+.recording__warning {
+  position: relative;
+  display: inline-flex;
+}
+
+/* A note, not an alarm: the transcript being machine-made is context a reader
+   should be able to find, not a warning that something is wrong. */
+.recording__warning .recording__search-toggle {
+  cursor: help;
+}
+
+.recording__tooltip {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  right: 0;
+  z-index: 4;
+  width: max-content;
+  max-width: 15rem;
+  padding: 0.4rem 0.55rem;
+  border-radius: 0.45rem;
+  background: #101827;
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.35;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--motion-fast, 150ms) ease;
+  pointer-events: none;
+}
+
+.recording__warning:hover .recording__tooltip,
+.recording__warning:focus-within .recording__tooltip {
+  opacity: 1;
+  visibility: visible;
+}
+
+.recording__search-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 0.45rem;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+}
+
+/* Inline SVG rather than unicode glyphs: ⓘ, ⌕ and ✕ come from whichever font
+   happens to carry them, so they arrived at different weights and optical
+   sizes and never lined up. One viewBox and one stroke width fixes that. */
+.recording__icon {
+  width: 1.05rem;
+  height: 1.05rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.recording__search-toggle:hover,
+.recording__search-toggle:focus-visible {
+  border-color: var(--line);
+  color: var(--accent-deep);
+  outline: none;
+}
+
+.recording__search {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0.32rem 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: 0.45rem;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 0.92rem;
+}
+
+.recording__count,
+.recording__empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+/* Takes whatever height the video leaves and scrolls inside it.
+ *
+ * The scrollbar is styled rather than left to the platform: the default one is
+ * drawn hard against the panel's edge, where it cut across the rounded corner
+ * and sat underneath the floating controls. A thin inset thumb keeps both the
+ * corner and the buttons clear. */
+.recording__segments {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  display: grid;
+  gap: 0.4rem;
+  align-content: start;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--muted) 40%, transparent) transparent;
+}
+
+.recording__segments::-webkit-scrollbar {
+  width: 0.6rem;
+}
+
+.recording__segments::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.recording__segments::-webkit-scrollbar-thumb {
+  border: 0.18rem solid transparent;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--muted) 38%, transparent);
+  background-clip: content-box;
+}
+
+.recording__segments::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--muted) 60%, transparent);
+  background-clip: content-box;
+}
+
+.recording__segment {
+  margin: 0;
+  padding: 0.3rem 0.35rem;
+  border-radius: 0.4rem;
+  line-height: 1.55;
+}
+
+.recording__segment--active {
+  background: color-mix(in srgb, var(--accent-deep) 12%, transparent);
+}
+
+.recording__time {
+  font-variant-numeric: tabular-nums;
+  color: var(--accent-deep);
+  font-size: 0.85rem;
+}
+
+.recording__time--button {
+  border: 0;
+  padding: 0;
+  margin-right: 0.35rem;
+  background: none;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent-deep);
+  cursor: pointer;
+}
+
+.recording__speaker {
+  margin-right: 0.35rem;
+  font-weight: 600;
+}
+
+.recording__segment mark {
+  background: color-mix(in srgb, #f7c948 45%, transparent);
+  color: inherit;
+  border-radius: 0.2rem;
+}
+
+/* The one the find bar is pointing at, distinct from the other hits so
+   stepping through actually shows where you landed. */
+.recording__segment mark.recording__mark--active {
+  background: #f7a10a;
+  box-shadow: 0 0 0 2px #f7a10a;
+}
+
+.recording__count--empty {
+  color: #b45309;
+}
+
+.recording__search-toggle:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.recording__search-toggle:disabled:hover {
+  border-color: transparent;
+  color: var(--muted);
+}
+
+@media (max-width: 900px) {
+  .recording {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .recording__segments {
+    max-height: 18rem;
+  }
+}
+
 .pdf-document {
   --pdf-page-aspect-ratio: 0.707214;
   height: 100%;

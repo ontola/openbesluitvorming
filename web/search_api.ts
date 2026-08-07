@@ -5,6 +5,7 @@ import type {
   EntityContentResponse,
   MeetingAgendaItem,
   MeetingMotion,
+  MeetingRecording,
   SearchResponse,
   SearchResult,
 } from "../src/types.ts";
@@ -16,6 +17,7 @@ import { currentProjectionVersion } from "../src/pipeline/versioning.ts";
 import { QuickwitClient } from "../src/quickwit/client.ts";
 import { getSource, listSources } from "../src/sources/index.ts";
 import { ObjectStorageClient } from "../src/storage/s3.ts";
+import { readTranscript } from "../src/recordings/storage.ts";
 import { pdfPageCacheKey } from "../src/documents/thumbnails.ts";
 
 type SearchHit = {
@@ -43,7 +45,16 @@ type SearchHit = {
     derived_content?: {
       markdown_key?: string;
       page_count?: number;
+      transcript_key?: string;
     };
+    media_type?: "video" | "audio";
+    stream_url?: string;
+    media_url?: string;
+    player_url?: string;
+    duration_seconds?: number;
+    transcript_kind?: MeetingRecording["transcript_kind"];
+    chapters?: MeetingRecording["chapters"];
+    speakers?: MeetingRecording["speakers"];
     is_referenced_by?: string;
     agenda?: MeetingAgendaItem[];
     motion_type?: string;
@@ -187,46 +198,6 @@ function expandDutchGovernanceTerms(query: string): string[] {
   return [...terms];
 }
 
-/** Date ranges wider than this stay app-side: the OR-clause grows per month
- * and a multi-year range barely narrows the candidate set anyway. */
-const MAX_PUSHDOWN_MONTHS = 60;
-
-/** Months ("YYYY-MM") covered by the date range, for pushing the date filter
- * into Quickwit as exact document_month terms (raw-tokenized fast field —
- * range syntax tokenizes the bounds and matches nonsense, so enumerate).
- * Documents without document_month also lack start_date (same source,
- * documentReferenceDate) and are dropped by the exact app-side date filter
- * regardless, so excluding them here does not change results. Meetings carry
- * no document_month and so cannot be date-filtered at all -- do NOT OR this
- * with entity_type:Meeting, which silently disables the whole filter (see the
- * caller). Returns null when the range is unusable or too broad to be
- * selective. */
-export function documentMonthTerms(dateFrom: string, dateTo: string): string[] | null {
-  const from = dateFrom.trim().slice(0, 7);
-  // Open-ended "from" ranges still push down: cap at a few months ahead
-  // (agenda documents can be future-dated).
-  const fallbackTo = new Date();
-  fallbackTo.setUTCMonth(fallbackTo.getUTCMonth() + 6);
-  const to = (dateTo.trim() || fallbackTo.toISOString()).slice(0, 7);
-  if (!/^\d{4}-\d{2}$/.test(from) || !/^\d{4}-\d{2}$/.test(to)) {
-    return null;
-  }
-  const cursor = new Date(`${from}-01T00:00:00Z`);
-  const end = new Date(`${to}-01T00:00:00Z`);
-  if (Number.isNaN(cursor.getTime()) || Number.isNaN(end.getTime()) || cursor > end) {
-    return null;
-  }
-  const months: string[] = [];
-  while (cursor <= end) {
-    if (months.length >= MAX_PUSHDOWN_MONTHS) {
-      return null;
-    }
-    months.push(cursor.toISOString().slice(0, 7));
-    cursor.setUTCMonth(cursor.getUTCMonth() + 1);
-  }
-  return months;
-}
-
 function buildQuickwitQuery(
   query: string,
   organization: string,
@@ -242,13 +213,18 @@ function buildQuickwitQuery(
       ? "entity_type:Meeting"
       : entityType === "Motion"
         ? "entity_type:Motion"
-        : entityType === "Document"
-          ? query
-            ? "(entity_type:Document OR entity_type:DocumentPage)"
-            : "entity_type:Document"
-          : query
-            ? "(entity_type:Meeting OR entity_type:Document OR entity_type:DocumentPage OR entity_type:Motion)"
-            : "(entity_type:Meeting OR entity_type:Document OR entity_type:Motion)";
+        : // Recordings only carry text worth matching when there is a transcript,
+          // so without a query the type is pointless to list: it would return
+          // recordings by date and tell the reader nothing.
+          entityType === "Recording"
+          ? "entity_type:Recording"
+          : entityType === "Document"
+            ? query
+              ? "(entity_type:Document OR entity_type:DocumentPage)"
+              : "entity_type:Document"
+            : query
+              ? "(entity_type:Meeting OR entity_type:Document OR entity_type:DocumentPage OR entity_type:Motion OR entity_type:Recording)"
+              : "(entity_type:Meeting OR entity_type:Document OR entity_type:Motion)";
   const parts = [`projection_version:${escapeTerm(currentProjectionVersion())}`, typeQuery];
 
   if (organization) {
@@ -264,46 +240,61 @@ function buildQuickwitQuery(
     }
   }
 
-  // Push the date filter into Quickwit at month granularity; the exact
-  // day-level filter stays app-side. Without this, a narrow date range made
-  // the search loop page through (and discard) up to the full scan cap.
+  // Push the date filter into Quickwit as a real range over start_date, which
+  // projection v3 maps as a datetime fast field.
   //
-  // Meetings are deliberately NOT exempted here any more. They carry no
-  // document_month, so `entity_type:Meeting OR ...` matched every meeting of
-  // every year and defeated the filter entirely.
+  // This used to enumerate document_month terms instead, because start_date
+  // was a dynamic text field and range queries against it were silently
+  // ignored (2019 / 2026 / unfiltered all returned the identical 1138409
+  // hits). That workaround could only cover Documents: meetings and motions
+  // carry no document_month, so they had to be exempted from date filtering
+  // altogether and simply never appeared in a date-filtered search.
   //
-  // Why that is so destructive: this index sets timestamp_field: time (the
-  // *ingest* time), so Quickwit scans the most recently written splits first
-  // and stops once max_hits is satisfied. The capped window therefore holds
-  // whatever was ingested last -- not the best matches, and not the newest
-  // documents by their own date. While the full-history backfill runs, that
-  // means the window is full of whichever historical year the backfill
-  // happens to be replaying.
-  //
-  // Measured 2026-07-31 with the backfill replaying 2018: every hit had
-  // time=2026-07-31 but start_date=2018, so a dateFrom=2026-01-01 search
-  // reported totalCount 523231 and returned *zero* rows, while the index held
-  // 1539484 documents for 2026. To users the visible date ceiling looked like
-  // "nothing after 2020" and it silently moved as the backfill progressed.
-  // Pushing the month terms down scopes the split scan correctly and returned
-  // 2026 documents immediately.
-  //
-  // Meetings therefore no longer appear in date-filtered searches at all --
-  // they cannot: start_date is a dynamic text field, so range queries against
-  // it are silently ignored (all three of 2019/2026/unfiltered return the
-  // identical 1138409 hits). Making meetings date-filterable needs a
-  // meeting-month term or a proper fast field, i.e. the reindex.
-  // Motions carry no document_month either (the projection only sets it for
-  // Documents), so a date filter would silently exclude every one of them.
-  if (dateFrom.trim() && entityType !== "Meeting" && entityType !== "Motion") {
-    const months = documentMonthTerms(dateFrom, dateTo);
-    if (months) {
-      const monthClause = months.map((month) => `document_month:${month}`).join(" OR ");
-      parts.push(`(${monthClause})`);
-    }
+  // Both restrictions are gone with the mapped field, so the filter applies to
+  // every entity type. Entities whose start_date did not parse carry no value
+  // and drop out of the range — matching the app-side filter, which also drops
+  // rows without a date.
+  const rangeClause = startDateRangeClause(dateFrom, dateTo);
+  if (rangeClause) {
+    parts.push(rangeClause);
   }
 
   return parts.join(" AND ");
+}
+
+/** Quickwit range clause over the mapped `start_date` datetime field, or null
+ * when neither bound is usable. `dateTo` is inclusive of the whole day, the
+ * same way the app-side filter compares on the date part only. */
+export function startDateRangeClause(dateFrom: string, dateTo: string): string | null {
+  const from = dateFrom.trim().slice(0, 10);
+  const to = dateTo.trim().slice(0, 10);
+  const hasFrom = /^\d{4}-\d{2}-\d{2}$/.test(from);
+  const hasTo = /^\d{4}-\d{2}-\d{2}$/.test(to);
+  if (!hasFrom && !hasTo) {
+    return null;
+  }
+
+  const lower = hasFrom ? `${from}T00:00:00Z` : "*";
+  const upper = hasTo ? `${to}T23:59:59Z` : "*";
+  return `start_date:[${lower} TO ${upper}]`;
+}
+
+/** Ordering pushed down to Quickwit, so the scan window holds the newest (or
+ * oldest) rows *by meeting date* instead of whatever was ingested last.
+ *
+ * Note the inverted direction convention: a bare field name sorts descending
+ * and a `-` prefix sorts ascending. Verified against 0.8.1, see the client.
+ *
+ * Title sorting has no fast field to sort on and stays app-side, so it still
+ * only orders the fetched window rather than the whole result set. */
+export function quickwitSortBy(sort: string): string | undefined {
+  if (sort === "date_asc") {
+    return "-start_date";
+  }
+  if (sort === "title_asc") {
+    return undefined;
+  }
+  return "start_date";
 }
 
 function entityTypeLabel(entityType?: string): string {
@@ -316,14 +307,31 @@ function entityTypeLabel(entityType?: string): string {
   if (entityType === "Motion") {
     return "Motie";
   }
+  if (entityType === "Recording") {
+    return "Opname";
+  }
   return "Resultaat";
+}
+
+/** Rows whose date did not survive projection sort last whichever way the list
+ * is ordered, matching how Quickwit orders documents that are missing the sort
+ * field. Comparing on `?? ""` instead would drag them to the top of an
+ * ascending sort and undo the pushdown's ordering. */
+function compareSortDate(left: SearchResult, right: SearchResult, ascending: boolean): number {
+  const leftDate = left.sortDate ?? "";
+  const rightDate = right.sortDate ?? "";
+  if (!leftDate || !rightDate) {
+    return leftDate === rightDate ? 0 : leftDate ? -1 : 1;
+  }
+
+  return ascending ? leftDate.localeCompare(rightDate) : rightDate.localeCompare(leftDate);
 }
 
 function sortResults(results: SearchResult[], sort: string): SearchResult[] {
   const items = [...results];
 
   if (sort === "date_asc") {
-    items.sort((a, b) => (a.sortDate ?? "").localeCompare(b.sortDate ?? ""));
+    items.sort((a, b) => compareSortDate(a, b, true));
     return items;
   }
 
@@ -332,7 +340,7 @@ function sortResults(results: SearchResult[], sort: string): SearchResult[] {
     return items;
   }
 
-  items.sort((a, b) => (b.sortDate ?? "").localeCompare(a.sortDate ?? ""));
+  items.sort((a, b) => compareSortDate(a, b, false));
   return items;
 }
 
@@ -494,19 +502,47 @@ function dedupeLatestIndexedHits(items: IndexedHit[]): IndexedHit[] {
   return [...byEntityId.values()].filter((item) => item.hit.op !== "delete");
 }
 
+/** A hit is presented as the thing a reader wants to open, which is not always
+ * the thing that matched: a page belongs to its document, and a transcript
+ * belongs to its meeting — that is where the player and the spoken text are. */
 function searchResultEntityId(hit: SearchHit): string {
-  return hit.entity_type === "DocumentPage"
-    ? (hit.parent_entity_id ?? hit.entity_id ?? "")
-    : (hit.entity_id ?? "");
+  if (hit.entity_type === "DocumentPage" || hit.entity_type === "Recording") {
+    return hit.parent_entity_id ?? hit.entity_id ?? "";
+  }
+  return hit.entity_id ?? "";
 }
 
 function searchResultEntityType(hit: SearchHit): string {
-  return hit.entity_type === "DocumentPage" ? "Document" : (hit.entity_type ?? "Unknown");
+  if (hit.entity_type === "DocumentPage") {
+    return "Document";
+  }
+  if (hit.entity_type === "Recording") {
+    return "Meeting";
+  }
+  return hit.entity_type ?? "Unknown";
 }
 
 function preferIndexedHit(existing: IndexedHit | undefined, candidate: IndexedHit): boolean {
   if (!existing) {
     return true;
+  }
+
+  // A transcript and its meeting collapse onto the same result. Decide that
+  // pair on which one actually matched, before the recency rule gets to it:
+  // recency exists to pick the newest projection of one entity, and by this
+  // point every entity has already been reduced to its latest commit. Between
+  // two *different* entities it is just noise, and it would hand the summary to
+  // whichever happened to be committed a millisecond later — losing the spoken
+  // sentence that made the meeting surface.
+  const existingIsRecording = existing.hit.entity_type === "Recording";
+  const candidateIsRecording = candidate.hit.entity_type === "Recording";
+  if (existingIsRecording !== candidateIsRecording) {
+    const existingMatched = Boolean(existing.snippet?.content?.[0]);
+    const candidateMatched = Boolean(candidate.snippet?.content?.[0]);
+    if (existingMatched !== candidateMatched) {
+      return candidateMatched;
+    }
+    return candidateIsRecording;
   }
 
   const recency = compareRecency(existing.hit.time, candidate.hit.time);
@@ -620,6 +656,7 @@ async function collectSearchWindow(
     options.dateFrom,
     options.dateTo,
   );
+  const sortBy = quickwitSortBy(options.sort);
   const isDirectWindow = !options.query.trim();
   const targetCount = isDirectWindow ? options.limit + 1 : options.offset + options.limit + 1;
   const maxRawHits = isDirectWindow
@@ -649,6 +686,7 @@ async function collectSearchWindow(
       max_hits: requestMaxHits,
       start_offset: rawOffset,
       count_all: false,
+      ...(sortBy ? { sort_by: sortBy } : {}),
       ...(snippetFields.length > 0 ? { snippet_fields: snippetFields.join(",") } : {}),
     });
     quickwitMs += performance.now() - quickwitStart;
@@ -956,6 +994,8 @@ export async function getEntityContent(entityId: string): Promise<EntityContentR
   }
 
   const motions = hit.entity_type === "Meeting" ? await getMeetingMotions(entityId) : undefined;
+  const recordings =
+    hit.entity_type === "Meeting" ? await getMeetingRecordings(entityId) : undefined;
   const motion = hit.entity_type === "Motion" ? motionFromHit(hit) : undefined;
 
   return {
@@ -977,6 +1017,7 @@ export async function getEntityContent(entityId: string): Promise<EntityContentR
     meetingId: hit.payload?.is_referenced_by ?? hit.payload?.meeting,
     agenda,
     motions: motions && motions.length > 0 ? motions : undefined,
+    recordings: recordings && recordings.length > 0 ? recordings : undefined,
     motion,
   };
 }
@@ -999,6 +1040,60 @@ function motionFromHit(hit: SearchHit): MeetingMotion {
     agenda_item: hit.payload?.agenda_item,
     agenda_item_hint: hit.payload?.agenda_item_hint,
   };
+}
+
+/** Recordings of a meeting, with their transcript read back from storage.
+ *
+ * The transcript is deliberately absent from the search payload — it is ~30 KB
+ * and would be repeated in every stored hit — so the detail endpoint is the one
+ * place that pays for reading it. A recording whose transcript cannot be read
+ * is still returned: the player and its agenda timeline work without it. */
+async function getMeetingRecordings(meetingId: string): Promise<MeetingRecording[]> {
+  const quickwit = new QuickwitClient();
+  const response = await quickwit.search(
+    `projection_version:${escapeTerm(currentProjectionVersion())}` +
+      ` AND entity_type:Recording AND parent_entity_id:${escapeTerm(meetingId)}`,
+    20,
+  );
+
+  const hits = dedupeLatestHits(response.hits as SearchHit[]).filter((hit) => hit.entity_id);
+  if (hits.length === 0) {
+    return [];
+  }
+
+  let storage: ObjectStorageClient | undefined;
+  const transcriptKeys = hits.map((hit) => hit.payload?.derived_content?.transcript_key);
+  if (transcriptKeys.some(Boolean)) {
+    try {
+      storage = await ObjectStorageClient.fromEnvironment();
+    } catch {
+      storage = undefined;
+    }
+  }
+
+  return await Promise.all(
+    hits.map(async (hit, index) => {
+      const payload = hit.payload ?? {};
+      const key = transcriptKeys[index];
+      const stored = storage && key ? await readTranscript(storage, key) : undefined;
+
+      return {
+        id: hit.entity_id ?? "",
+        name: hit.name ?? "Opname",
+        media_type: payload.media_type === "audio" ? "audio" : "video",
+        stream_url: payload.stream_url,
+        // A recording carries a single `media_url`; `media_urls` is the
+        // Document shape and is always empty here.
+        media_url: payload.media_url,
+        player_url: payload.player_url,
+        duration_seconds: payload.duration_seconds,
+        transcript_kind: payload.transcript_kind,
+        chapters: stored?.chapters ?? payload.chapters,
+        speakers: stored?.speakers ?? payload.speakers,
+        segments: stored?.segments,
+      } satisfies MeetingRecording;
+    }),
+  );
 }
 
 /** Motions decided in a meeting.
@@ -1235,4 +1330,10 @@ async function computeIndexStats(): Promise<IndexStats> {
   };
 }
 
-export const __test__ = { buildQuickwitQuery, entityTypeLabel };
+export const __test__ = {
+  buildQuickwitQuery,
+  entityTypeLabel,
+  searchResultEntityId,
+  searchResultEntityType,
+  preferIndexedHit,
+};

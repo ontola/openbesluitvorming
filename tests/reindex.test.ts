@@ -69,7 +69,10 @@ function meetingRecord(id: string): ExportChangeRecord {
   };
 }
 
-function documentRecord(id: string, keys: { markdown?: string; chunks?: string }): ExportChangeRecord {
+function documentRecord(
+  id: string,
+  keys: { markdown?: string; chunks?: string },
+): ExportChangeRecord {
   return {
     seq: 2,
     op: "upsert",
@@ -127,7 +130,100 @@ Deno.test("reindex projects stored entities without touching any supplier API", 
   assertEquals(ingested.length, 2, "one quickwit document per meeting");
   assertEquals(ingested[0].entity_type, "Meeting", "projected type");
   assert(ingested[0].content?.includes("Gemeenteraad"), "meeting stays searchable");
-  assert(ingested[0].content?.includes("Programmabegroting"), "agenda text survives the round trip");
+  assert(
+    ingested[0].content?.includes("Programmabegroting"),
+    "agenda text survives the round trip",
+  );
+});
+
+function recordingRecord(id: string, transcriptKey?: string): ExportChangeRecord {
+  return {
+    seq: 3,
+    op: "upsert",
+    time: "2026-01-29T10:00:00.000Z",
+    entity_id: id,
+    entity_type: "Recording",
+    source_key: "utrecht",
+    supplier: "ibabs",
+    commit_id: `commit:${id}:abc`,
+    content_hash: "sha256:rec",
+    // Exactly what compactEntityPayload writes: chapters and speakers survive,
+    // `segments` does not.
+    payload: {
+      type: "Recording",
+      name: "Gemeenteraad",
+      media_type: "video",
+      meeting: "meeting:ibabs:gemeente:utrecht:m1",
+      start_date: "2026-01-29T19:30:00Z",
+      chapters: [{ start_seconds: 0, title: "1 Opening" }],
+      derived_content: transcriptKey ? { transcript_key: transcriptKey } : undefined,
+    },
+  };
+}
+
+Deno.test("a transcript is rehydrated on reindex, not silently dropped", async () => {
+  // The export record deliberately omits the transcript, so without rehydration
+  // a reindex would re-project the recording with only its title and chapters —
+  // the spoken word would vanish from search while the row still looked fine.
+  const transcript = JSON.stringify({
+    segments: [
+      { start_seconds: 10, end_seconds: 40, text: "Van harte welkom in deze raadzaal" },
+      { start_seconds: 40, end_seconds: 90, text: "Aan de orde is de woningbouwopgave" },
+    ],
+    chapters: [{ start_seconds: 0, title: "1 Opening" }],
+    speakers: [{ start_seconds: 10, name: "Halsema" }],
+  });
+  const storage = new FakeStorage({ "recordings/rec-1/transcript.json": transcript });
+  const log = new FakeExportLog([
+    recordingRecord("recording:ibabs:gemeente:utrecht:r1", "recordings/rec-1/transcript.json"),
+  ]);
+  const ingested: QuickwitSearchDocument[] = [];
+
+  const stats = await reindexSource("utrecht", {
+    // deno-lint-ignore no-explicit-any
+    exportLog: log as any,
+    // deno-lint-ignore no-explicit-any
+    storage: storage as any,
+    batchSize: 64,
+    ingest: (documents) => {
+      ingested.push(...documents);
+      return Promise.resolve();
+    },
+  });
+
+  assertEquals(stats.rehydrated_count, 1, "one transcript rehydrated");
+  assertEquals(storage.reads, ["recordings/rec-1/transcript.json"], "read the stored transcript");
+  assertEquals(ingested.length, 1, "one row per recording, as in phase A");
+  assert(
+    ingested[0].content?.includes("woningbouwopgave"),
+    `spoken text must survive the round trip, got: ${ingested[0].content}`,
+  );
+  assert(ingested[0].content?.includes("Halsema"), "speakers come back too");
+  assertEquals(
+    ingested[0].parent_entity_id,
+    "meeting:ibabs:gemeente:utrecht:m1",
+    "and it still hangs off its meeting",
+  );
+});
+
+Deno.test("a recording without a stored transcript reindexes without failing", async () => {
+  const log = new FakeExportLog([recordingRecord("recording:ibabs:gemeente:utrecht:r2")]);
+  const ingested: QuickwitSearchDocument[] = [];
+
+  const stats = await reindexSource("utrecht", {
+    // deno-lint-ignore no-explicit-any
+    exportLog: log as any,
+    storage: undefined,
+    batchSize: 64,
+    ingest: (documents) => {
+      ingested.push(...documents);
+      return Promise.resolve();
+    },
+  });
+
+  assertEquals(stats.issue_count, 0, "a recording with no transcript is normal, not an issue");
+  assertEquals(stats.rehydrated_count, 0, "nothing to rehydrate");
+  assert(ingested[0].content?.includes("Opening"), "the chapters still make it searchable");
 });
 
 Deno.test("document text is rehydrated from object storage, not lost", async () => {
@@ -188,7 +284,8 @@ Deno.test("a document falls back to markdown when there are no page chunks", asy
 
 Deno.test("reindex pages through the whole source and batches its writes", async () => {
   const records = Array.from({ length: 25 }, (_, index) =>
-    meetingRecord(`meeting:ibabs:gemeente:utrecht:m${String(index).padStart(3, "0")}`));
+    meetingRecord(`meeting:ibabs:gemeente:utrecht:m${String(index).padStart(3, "0")}`),
+  );
   const log = new FakeExportLog(records);
   const batches: number[] = [];
 
@@ -205,7 +302,11 @@ Deno.test("reindex pages through the whole source and batches its writes", async
   });
 
   assertEquals(stats.entity_count, 25, "every entity reindexed exactly once");
-  assertEquals(batches.reduce((a, b) => a + b, 0), 25, "and written exactly once");
+  assertEquals(
+    batches.reduce((a, b) => a + b, 0),
+    25,
+    "and written exactly once",
+  );
   assert(batches.length > 1, "writes are batched rather than one giant request");
   assert(log.pageRequests.length >= 4, "paged through the source with a cursor");
   // Cursor advances rather than repeating: a stuck cursor would loop forever.

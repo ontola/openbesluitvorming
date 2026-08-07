@@ -1327,6 +1327,7 @@
             <div><strong>Vergaderingen</strong><p>{openRun.meeting_count}</p></div>
             <div><strong>Documenten</strong><p>{openRun.document_count}</p></div>
             <div><strong>Moties</strong><p>{openRun.motion_count ?? 0}</p></div>
+            <div><strong>Opnames</strong><p>{openRun.recording_count ?? 0}</p></div>
             <div><strong>Documentfouten</strong><p>{failedDocumentCount(openRun)}</p></div>
             <div><strong>Cache hits</strong><p>{openRun.cache_hits}</p></div>
             <div><strong>Downloads</strong><p>{openRun.downloaded_count}</p></div>

@@ -8,6 +8,8 @@ import {
   normalizeNotubizMotion,
   normalizeNotubizMotionDocuments,
 } from "./motions.ts";
+import { normalizeNotubizRecording } from "./recordings.ts";
+import { storeTranscript } from "../recordings/storage.ts";
 import { MeetingIndex } from "../motions/normalize.ts";
 import { ObjectStorageClient } from "../storage/s3.ts";
 import { mapLimit } from "../util/map_limit.ts";
@@ -22,6 +24,7 @@ import type {
   NotubizModule,
   NotubizModuleItem,
   NotubizSourceDefinition,
+  RecordingEntity,
   WooziEntity,
   IngestExecutionMode,
 } from "../types.ts";
@@ -137,12 +140,14 @@ export class NotubizMeetingExtractor {
     const meetings: MeetingEntity[] = [];
     const documents: DocumentEntity[] = [];
     const motions: MotionEntity[] = [];
+    const recordings: RecordingEntity[] = [];
     const issues: ExtractionIssue[] = [];
     let cacheHits = 0;
     let downloadedCount = 0;
     let meetingCount = 0;
     let documentCount = 0;
     let motionCount = 0;
+    let recordingCount = 0;
     let issueCount = 0;
     let page = 1;
     const storage = await this.storageProvider();
@@ -161,6 +166,7 @@ export class NotubizMeetingExtractor {
       downloaded_count: downloadedCount,
       issue_count: issueCount,
       motion_count: motionCount,
+      recording_count: recordingCount,
     });
 
     const registerIssue = async (issue: ExtractionIssue): Promise<void> => {
@@ -229,6 +235,20 @@ export class NotubizMeetingExtractor {
             }
             await options.onProgress?.(currentStats());
             await options.onEntity?.(meeting);
+
+            await this.extractRecordings(source, meeting, meetingResponse.meeting, {
+              storage,
+              registerIssue,
+              onRecording: async (recording) => {
+                recordingCount += 1;
+                if (retainEntities) {
+                  recordings.push(recording);
+                }
+                await options.onProgress?.(currentStats());
+                await options.onEntity?.(recording);
+              },
+            });
+
             return meeting;
           } catch (error) {
             if (isSkippableMeetingError(error)) {
@@ -343,9 +363,91 @@ export class NotubizMeetingExtractor {
       meetings,
       documents,
       motions,
+      recordings,
       issues,
       stats: currentStats(),
     };
+  }
+
+  /** Import the video/audio registration of one meeting, with its transcript.
+   *
+   * Reported but never fatal, like motions: roughly half the meetings are never
+   * streamed, and a meeting is worth importing either way. The chapters come
+   * from `agenda_items[].start_offset` in the detail response we already have,
+   * so they cost no extra call. */
+  private async extractRecordings(
+    source: NotubizSourceDefinition,
+    meeting: MeetingEntity,
+    rawMeeting: unknown,
+    context: {
+      storage?: ObjectStorageClient;
+      registerIssue: (issue: ExtractionIssue) => Promise<void>;
+      onRecording: (recording: RecordingEntity) => Promise<void>;
+    },
+  ): Promise<void> {
+    const meetingId = Number(meeting.id.split(":").at(-1));
+    if (!Number.isFinite(meetingId)) {
+      return;
+    }
+
+    let media: Awaited<ReturnType<NotubizClient["listMedia"]>>;
+    try {
+      media = await this.client.listMedia(meetingId);
+    } catch (error) {
+      await context.registerIssue({
+        severity: "warning",
+        step: "list_media",
+        entity_id: meeting.id,
+        message: `Media unavailable for ${meeting.id}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      });
+      return;
+    }
+
+    for (const item of media) {
+      let transcript: string | undefined;
+      if (item.subtitles_url) {
+        try {
+          transcript = await this.client.downloadSubtitles(item);
+        } catch (error) {
+          // A missing transcript still leaves a playable recording with its
+          // agenda timeline, so this degrades rather than skips.
+          await context.registerIssue({
+            severity: "warning",
+            step: "download_transcript",
+            entity_id: meeting.id,
+            message: `Transcript download failed: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          });
+        }
+      }
+
+      const recording = normalizeNotubizRecording(source, meeting, rawMeeting, item, {
+        transcript,
+      });
+
+      try {
+        await context.onRecording(
+          await storeTranscript(recording, {
+            storage: context.storage,
+            rawTranscript: transcript,
+            rawExtension: "srt",
+          }),
+        );
+      } catch (error) {
+        await context.registerIssue({
+          severity: "warning",
+          step: "upload_s3",
+          entity_id: recording.id,
+          message: `Storing the transcript failed: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        });
+        await context.onRecording(recording);
+      }
+    }
   }
 
   /** Import moties/amendementen from the organisation's registry modules.
@@ -414,7 +516,12 @@ export class NotubizMeetingExtractor {
     dateTo: string,
   ): Promise<Array<EntityCommitEvent<WooziEntity>>> {
     const bundle = await this.extractForDateRange(source, dateFrom, dateTo);
-    const entities = [...bundle.meetings, ...bundle.documents, ...(bundle.motions ?? [])];
+    const entities = [
+      ...bundle.meetings,
+      ...bundle.documents,
+      ...(bundle.motions ?? []),
+      ...(bundle.recordings ?? []),
+    ];
     return await Promise.all(entities.map((entity) => buildEntityCommitEvent(entity)));
   }
 }

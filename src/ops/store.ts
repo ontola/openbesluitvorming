@@ -64,6 +64,7 @@ async function getDatabase(): Promise<DatabaseSync> {
           downloaded_count INTEGER NOT NULL DEFAULT 0,
           issue_count INTEGER NOT NULL DEFAULT 0,
           motion_count INTEGER NOT NULL DEFAULT 0,
+          recording_count INTEGER NOT NULL DEFAULT 0,
           quickwit_index_id TEXT,
           error_message TEXT
         );
@@ -128,6 +129,11 @@ async function getDatabase(): Promise<DatabaseSync> {
       }
       try {
         db.exec("ALTER TABLE ingest_run ADD COLUMN motion_count INTEGER NOT NULL DEFAULT 0");
+      } catch {
+        // Column already exists on initialized databases.
+      }
+      try {
+        db.exec("ALTER TABLE ingest_run ADD COLUMN recording_count INTEGER NOT NULL DEFAULT 0");
       } catch {
         // Column already exists on initialized databases.
       }
@@ -215,6 +221,7 @@ function normalizeExecutionMode(mode: string): IngestExecutionMode {
     mode === "rederive_cached" ||
     mode === "reindex_only" ||
     mode === "motions_only" ||
+    mode === "media_only" ||
     mode === "retry_failed_documents"
   ) {
     return mode;
@@ -248,6 +255,7 @@ function sqliteCreateRunParams(record: IngestRunRecord): Record<string, string |
     meeting_count: record.meeting_count,
     document_count: record.document_count,
     motion_count: record.motion_count ?? 0,
+    recording_count: record.recording_count ?? 0,
     cache_hits: record.cache_hits,
     downloaded_count: record.downloaded_count,
     issue_count: record.issue_count,
@@ -272,6 +280,7 @@ function sqliteUpdateRunParams(record: IngestRunRecord): Record<string, string |
     meeting_count: record.meeting_count,
     document_count: record.document_count,
     motion_count: record.motion_count ?? 0,
+    recording_count: record.recording_count ?? 0,
     cache_hits: record.cache_hits,
     downloaded_count: record.downloaded_count,
     issue_count: record.issue_count,
@@ -289,6 +298,7 @@ export async function createRun(
     | "meeting_count"
     | "document_count"
     | "motion_count"
+    | "recording_count"
     | "cache_hits"
     | "downloaded_count"
     | "issue_count"
@@ -311,6 +321,7 @@ export async function createRun(
     meeting_count: 0,
     document_count: 0,
     motion_count: 0,
+    recording_count: 0,
     cache_hits: 0,
     downloaded_count: 0,
     issue_count: 0,
@@ -320,11 +331,13 @@ export async function createRun(
     `INSERT INTO ingest_run (
       id, source_key, supplier, date_from, date_to, trigger_mode, status, started_at,
       execution_mode, parent_run_id, projection_version, derivation_version,
-      meeting_count, document_count, cache_hits, downloaded_count, issue_count, motion_count
+      meeting_count, document_count, cache_hits, downloaded_count, issue_count, motion_count,
+      recording_count
     ) VALUES (
       @id, @source_key, @supplier, @date_from, @date_to, @trigger, @status, @started_at,
       @execution_mode, @parent_run_id, @projection_version, @derivation_version,
-      @meeting_count, @document_count, @cache_hits, @downloaded_count, @issue_count, @motion_count
+      @meeting_count, @document_count, @cache_hits, @downloaded_count, @issue_count, @motion_count,
+      @recording_count
     )`,
   ).run(sqliteCreateRunParams(record));
 
@@ -363,6 +376,7 @@ export async function updateRun(
       meeting_count=@meeting_count,
       document_count=@document_count,
       motion_count=@motion_count,
+      recording_count=@recording_count,
       cache_hits=@cache_hits,
       downloaded_count=@downloaded_count,
       issue_count=@issue_count,
@@ -402,7 +416,7 @@ export async function findActiveRun(options: {
       `SELECT
         id, source_key, supplier, date_from, date_to, trigger_mode as trigger,
         execution_mode, parent_run_id, projection_version, derivation_version, status,
-        started_at, finished_at, meeting_count, document_count, cache_hits, downloaded_count, motion_count,
+        started_at, finished_at, meeting_count, document_count, cache_hits, downloaded_count, motion_count, recording_count,
         issue_count, quickwit_index_id, error_message
        FROM ingest_run
        WHERE source_key = @source_key
@@ -462,7 +476,7 @@ export async function reconcileInterruptedRuns(): Promise<IngestRunRecord[]> {
       `SELECT
         id, source_key, supplier, date_from, date_to, trigger_mode as trigger,
         execution_mode, parent_run_id, projection_version, derivation_version, status,
-        started_at, finished_at, meeting_count, document_count, cache_hits, downloaded_count, motion_count,
+        started_at, finished_at, meeting_count, document_count, cache_hits, downloaded_count, motion_count, recording_count,
         issue_count, quickwit_index_id, error_message, interrupted_count
        FROM ingest_run
        WHERE status = 'running' AND started_at < ?
@@ -583,7 +597,7 @@ export async function claimQueuedRun(runId: string): Promise<IngestRunRecord | n
        RETURNING id, source_key, supplier, date_from, date_to, trigger_mode as trigger,
          execution_mode, parent_run_id, projection_version, derivation_version, status,
          started_at, finished_at, meeting_count, document_count, cache_hits, motion_count,
-         downloaded_count, issue_count, quickwit_index_id, error_message`,
+         recording_count, downloaded_count, issue_count, quickwit_index_id, error_message`,
     )
     .get({ id: runId }) as IngestRunRecord | undefined;
   return row ? normalizeRunRecord(row) : null;
@@ -597,7 +611,7 @@ export async function listQueuedRuns(): Promise<IngestRunRecord[]> {
         `SELECT
         id, source_key, supplier, date_from, date_to, trigger_mode as trigger,
         execution_mode, parent_run_id, projection_version, derivation_version, status,
-        started_at, finished_at, meeting_count, document_count, cache_hits, downloaded_count, motion_count,
+        started_at, finished_at, meeting_count, document_count, cache_hits, downloaded_count, motion_count, recording_count,
         issue_count, quickwit_index_id, error_message
        FROM ingest_run
        WHERE status = 'queued'
@@ -637,7 +651,7 @@ export async function listRuns(
         `SELECT
         id, source_key, supplier, date_from, date_to, trigger_mode as trigger,
         execution_mode, parent_run_id, projection_version, derivation_version, status,
-        started_at, finished_at, meeting_count, document_count, cache_hits, downloaded_count, motion_count,
+        started_at, finished_at, meeting_count, document_count, cache_hits, downloaded_count, motion_count, recording_count,
         issue_count, quickwit_index_id, error_message
        FROM ingest_run
        ${where}
@@ -693,7 +707,7 @@ export async function getRunSummary(): Promise<AdminRunSummary> {
       `SELECT
         id, source_key, supplier, date_from, date_to, trigger_mode as trigger,
         execution_mode, parent_run_id, projection_version, derivation_version, status,
-        started_at, finished_at, meeting_count, document_count, cache_hits, downloaded_count, motion_count,
+        started_at, finished_at, meeting_count, document_count, cache_hits, downloaded_count, motion_count, recording_count,
         issue_count, quickwit_index_id, error_message
        FROM ingest_run
        WHERE status = 'running'
@@ -707,7 +721,7 @@ export async function getRunSummary(): Promise<AdminRunSummary> {
       `SELECT
         id, source_key, supplier, date_from, date_to, trigger_mode as trigger,
         execution_mode, parent_run_id, projection_version, derivation_version, status,
-        started_at, finished_at, meeting_count, document_count, cache_hits, downloaded_count, motion_count,
+        started_at, finished_at, meeting_count, document_count, cache_hits, downloaded_count, motion_count, recording_count,
         issue_count, quickwit_index_id, error_message
        FROM ingest_run
        WHERE status = 'queued'
@@ -772,7 +786,7 @@ export async function getRunCoverage(
       `SELECT
       id, source_key, supplier, date_from, date_to, trigger_mode as trigger,
       execution_mode, parent_run_id, projection_version, derivation_version, status,
-      started_at, finished_at, meeting_count, document_count, cache_hits, downloaded_count, motion_count,
+      started_at, finished_at, meeting_count, document_count, cache_hits, downloaded_count, motion_count, recording_count,
       issue_count, quickwit_index_id, error_message
      FROM ingest_run
      WHERE execution_mode = @execution_mode
@@ -863,7 +877,7 @@ export async function getRunDetails(runId: string): Promise<RunDetails | null> {
       `SELECT
         id, source_key, supplier, date_from, date_to, trigger_mode as trigger,
         execution_mode, parent_run_id, projection_version, derivation_version, status,
-        started_at, finished_at, meeting_count, document_count, cache_hits, downloaded_count, motion_count,
+        started_at, finished_at, meeting_count, document_count, cache_hits, downloaded_count, motion_count, recording_count,
         issue_count, quickwit_index_id, error_message
        FROM ingest_run
        WHERE id = ?`,

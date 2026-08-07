@@ -1,7 +1,4 @@
-import {
-  IbabsMeetingExtractor,
-  __test__ as ibabsExtractorTest,
-} from "../src/ibabs/extractor.ts";
+import { IbabsMeetingExtractor, __test__ as ibabsExtractorTest } from "../src/ibabs/extractor.ts";
 import { __test__ as ibabsClientTest } from "../src/ibabs/client.ts";
 import { getIbabsSource } from "../src/sources/index.ts";
 import { normalizeIbabsDocuments, normalizeIbabsMeeting } from "../src/ibabs/normalize.ts";
@@ -52,6 +49,33 @@ Deno.test("iBabs SOAP parsers extract meeting types and meetings from fixture XM
   assert(
     meetings[0].MeetingItems?.[0]?.Documents?.[0]?.Id === "doc-43",
     "expected nested documents",
+  );
+  // The webcast code is the entry point to the video, the transcript and the
+  // speaker timeline, and it rides along in this response for free. Dropping it
+  // is how it stayed unnoticed until now.
+  assert(
+    meetings[0].WebcastCode === "haarlem/20250114_1",
+    `expected the webcast code, got ${meetings[0].WebcastCode}`,
+  );
+});
+
+Deno.test("a meeting without a webcast reports no code rather than an empty one", () => {
+  const xml =
+    '<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body>' +
+    '<GetMeetingsByDateRangeResponse xmlns="http://tempuri.org/">' +
+    '<GetMeetingsByDateRangeResult xmlns:a="http://schemas.datacontract.org/2004/07/iBabsWCFObjects.Public">' +
+    '<Message xmlns="http://schemas.datacontract.org/2004/07/iBabsWCFObjects.Base">OK</Message>' +
+    '<Status xmlns="http://schemas.datacontract.org/2004/07/iBabsWCFObjects.Base">OK</Status>' +
+    "<a:Meetings><a:iBabsMeeting><a:Id>m1</a:Id>" +
+    "<a:MeetingDate>2025-01-14T19:30:00</a:MeetingDate>" +
+    "</a:iBabsMeeting></a:Meetings>" +
+    "</GetMeetingsByDateRangeResult></GetMeetingsByDateRangeResponse></s:Body></s:Envelope>";
+
+  const [meeting] = ibabsClientTest.parseMeetingsXml(xml);
+  assert(meeting.Id === "m1", "meeting still parses");
+  assert(
+    meeting.WebcastCode === undefined,
+    `a meeting that was never streamed must be distinguishable, got ${JSON.stringify(meeting.WebcastCode)}`,
   );
 });
 
@@ -142,8 +166,14 @@ Deno.test("splitDateRange splits ranges on month boundaries with no overlap or g
 
   const year = splitDateRange("2023-01-01", "2023-12-31", 6);
   assert(year.length === 2, "expected two 6-month chunks for a calendar year");
-  assert(year[0][0] === "2023-01-01" && year[0][1] === "2023-06-30", "first chunk should end 2023-06-30");
-  assert(year[1][0] === "2023-07-01" && year[1][1] === "2023-12-31", "second chunk should start 2023-07-01");
+  assert(
+    year[0][0] === "2023-01-01" && year[0][1] === "2023-06-30",
+    "first chunk should end 2023-06-30",
+  );
+  assert(
+    year[1][0] === "2023-07-01" && year[1][1] === "2023-12-31",
+    "second chunk should start 2023-07-01",
+  );
 
   const short = splitDateRange("2024-06-01", "2024-06-15", 6);
   assert(short.length === 1, "sub-chunk ranges stay single");
@@ -207,15 +237,9 @@ Deno.test("listMeetingsAdaptive stops splitting below the floor and rethrows", a
   let splits = 0;
   let caught = false;
   try {
-    await listMeetingsAdaptive(
-      fakeClient,
-      source,
-      "2025-01-01",
-      "2025-01-10",
-      async () => {
-        splits += 1;
-      },
-    );
+    await listMeetingsAdaptive(fakeClient, source, "2025-01-01", "2025-01-10", async () => {
+      splits += 1;
+    });
   } catch (error) {
     caught = true;
     assert(error instanceof Error && error.name === "TimeoutError", "rethrows the timeout");

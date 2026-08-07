@@ -332,6 +332,10 @@ function parseMeetingsXml(xml: string): IbabsMeeting[] {
       Chairman: textValue(meeting, "Chairman"),
       Explanation: textValue(meeting, "Explanation"),
       PublishDate: textValue(meeting, "PublishDate"),
+      // Comes along in the response we already fetch, so reading it costs no
+      // extra SOAP call. It is the entry point to Company Webcast, which holds
+      // the video, the transcript and the speaker timeline for iBabs sources.
+      WebcastCode: textValue(valueForLocalName(meeting, "Webcast"), "Code"),
       Invitees: parseUsers(valueForLocalName(meeting, "Invitees")),
       Attendees: parseUsers(valueForLocalName(meeting, "Attendees")),
       MeetingItems: parseMeetingItems(valueForLocalName(meeting, "MeetingItems")),
@@ -341,10 +345,7 @@ function parseMeetingsXml(xml: string): IbabsMeeting[] {
 }
 
 function escapeXml(value: string): string {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;");
+  return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 }
 
 function soapEnvelope(operation: string, params: Record<string, string>): string {

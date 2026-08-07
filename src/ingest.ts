@@ -133,6 +133,18 @@ export async function executeIngest(
     throw new Error(`Execution mode "${options.executionMode}" is not implemented yet.`);
   }
 
+  // The mode, its persistence and its counter exist so a media backfill can be
+  // queued and reported on; the per-supplier extraction is the next slice.
+  // It has to be a *known* mode from the start: `normalizeExecutionMode` reads
+  // anything it does not recognise back as "full", so a queued media run would
+  // otherwise resume as a full import and re-download every document we
+  // already hold.
+  if (options.executionMode === "media_only") {
+    throw new Error(
+      'Execution mode "media_only" is not implemented yet: no extractor imports recordings.',
+    );
+  }
+
   if (options.executionMode === "reindex_only") {
     return await executeReindexOnly(run, sourceKey, options);
   }
@@ -172,6 +184,7 @@ export async function executeIngest(
           meeting_count: stats.meeting_count,
           document_count: stats.document_count,
           motion_count: stats.motion_count ?? 0,
+          recording_count: stats.recording_count ?? 0,
           cache_hits: stats.cache_hits,
           downloaded_count: stats.downloaded_count,
           issue_count: stats.issue_count,
@@ -184,6 +197,7 @@ export async function executeIngest(
           meeting_count: stats.meeting_count,
           document_count: stats.document_count,
           motion_count: stats.motion_count ?? 0,
+          recording_count: stats.recording_count ?? 0,
           cache_hits: stats.cache_hits,
           downloaded_count: stats.downloaded_count,
           issue_count: stats.issue_count,
@@ -191,10 +205,15 @@ export async function executeIngest(
       },
       onEntity: async (entity) => {
         options.onHeartbeat?.();
-        // Blocklisted documents (taken down, e.g. BSN) are neither indexed nor
-        // exported. materializeDocument also refuses to re-materialize them,
-        // but this guard covers every extractor path centrally.
-        if (entity.type === "Document" && (await isDocumentBlocklisted(entity.id))) {
+        // Blocklisted entities (taken down, e.g. BSN) are neither indexed nor
+        // exported. materializeDocument also refuses to re-materialize
+        // documents, but this guard covers every extractor path centrally.
+        // Recordings are checked too: a transcript is free text like document
+        // markdown, so it is the same takedown surface.
+        if (
+          (entity.type === "Document" || entity.type === "Recording") &&
+          (await isDocumentBlocklisted(entity.id))
+        ) {
           console.log(`[blocklist] ${sourceKey} skipped ${entity.id}`);
           return;
         }
@@ -252,6 +271,7 @@ export async function executeIngest(
       meeting_count: extraction.stats.meeting_count,
       document_count: extraction.stats.document_count,
       motion_count: extraction.stats.motion_count ?? 0,
+      recording_count: extraction.stats.recording_count ?? 0,
       cache_hits: extraction.stats.cache_hits,
       downloaded_count: extraction.stats.downloaded_count,
       issue_count: extraction.stats.issue_count,

@@ -3,12 +3,14 @@ import type {
   EntityCommitEvent,
   ExportChangeRecord,
   ExtractionIssue,
+  RecordingEntity,
   WooziEntity,
 } from "../types.ts";
 import type { ExportChangesLog } from "../exports/log.ts";
 import type { ObjectStorageClient } from "../storage/s3.ts";
 import type { QuickwitSearchDocument } from "../quickwit/project.ts";
 import { projectEntityCommitToQuickwitDocuments } from "../quickwit/project.ts";
+import { readTranscript } from "../recordings/storage.ts";
 
 /** How many live entities to pull from the export log per page. */
 const DEFAULT_PAGE_SIZE = 500;
@@ -91,6 +93,36 @@ async function rehydrateDocumentText(
   return false;
 }
 
+/** Put a recording's transcript back on the payload.
+ *
+ * Same trap as documents, and easier to miss: `compactEntityPayload` leaves
+ * `segments` out of the export record on purpose — a transcript is ~30 KB and
+ * would be repeated in every stored hit — so a reindex would re-project the
+ * recording with only its title, chapters and speakers. The spoken word, which
+ * is the entire reason the entity exists, would silently disappear from search
+ * while the row still looked fine. */
+async function rehydrateTranscript(
+  payload: RecordingEntity,
+  storage: ObjectStorageClient | undefined,
+): Promise<boolean> {
+  const key = payload.derived_content?.transcript_key;
+  if (!storage || !key) {
+    return false;
+  }
+
+  const stored = await readTranscript(storage, key);
+  if (!stored?.segments?.length) {
+    return false;
+  }
+
+  payload.segments = stored.segments;
+  // Chapters and speakers do survive compaction, but the stored timeline is
+  // the one the segments were cut against; prefer it when it is there.
+  payload.chapters = stored.chapters ?? payload.chapters;
+  payload.speakers = stored.speakers ?? payload.speakers;
+  return true;
+}
+
 /**
  * Re-project every live entity of a source into Quickwit, without touching the
  * supplier APIs.
@@ -148,6 +180,12 @@ export async function reindexSource(
           stats.document_count += 1;
         }
 
+        if (payload?.type === "Recording") {
+          if (await rehydrateTranscript(payload, context.storage)) {
+            stats.rehydrated_count += 1;
+          }
+        }
+
         pending.push(...projectEntityCommitToQuickwitDocuments(event));
         stats.entity_count += 1;
 
@@ -181,4 +219,4 @@ export async function reindexSource(
   return stats;
 }
 
-export const __test__ = { toCommitEvent, rehydrateDocumentText };
+export const __test__ = { toCommitEvent, rehydrateDocumentText, rehydrateTranscript };

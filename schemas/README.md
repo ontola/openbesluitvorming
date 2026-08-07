@@ -20,6 +20,7 @@ Current scope:
 - `Document`
 - `Committee`
 - `Motion`
+- `Recording`
 - `Vote`
 - `entity.commit`
 
@@ -30,6 +31,12 @@ Notes:
 - `Motion` covers moties/amendementen from iBabs list entries and Notubiz module
   items, including the outcome and — where the source publishes it — the
   per-member vote breakdown.
+- `Recording` covers the video/audio registration of a meeting, plus the
+  timeline that makes it navigable: chapters per agenda item, speaker segments,
+  and the transcript where the supplier publishes one. The media bytes are
+  never stored — a single two-day council meeting is ~10 GB — and the
+  transcript itself lives in object storage rather than in the payload, for the
+  same reason document markdown does.
 - `Vote` exists in the current ontology/model layer but is not emitted as a
   standalone entity. Per-member votes live in `Motion.votes`, shaped after this
   schema, because a vote is only meaningful together with its motion.

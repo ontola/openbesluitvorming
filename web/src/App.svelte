@@ -14,6 +14,7 @@
   import vngLogo from "../vng-logo.svg";
   import PdfDocumentView from "./PdfDocumentView.svelte";
   import MeetingAgendaTree from "./MeetingAgendaTree.svelte";
+  import MeetingRecordingPlayer from "./MeetingRecordingPlayer.svelte";
   import MotionCard from "./MotionCard.svelte";
   import ReaderLoading from "./ReaderLoading.svelte";
   import SourcePicker from "./SourcePicker.svelte";
@@ -431,8 +432,18 @@
     )].sort((left, right) => right.length - left.length);
   }
 
+  /** The transcript owns its own marks.
+   *
+   * This highlighter rewrites the DOM in place, and the recording panel is
+   * rendered by Svelte with its own find bar and its own <mark> elements.
+   * Stripping and re-inserting nodes underneath Svelte detaches the ones it is
+   * tracking: the observed result was a transcript that reported "2 / 3" while
+   * only one highlight survived in the DOM. */
+  const OWN_HIGHLIGHTS_SELECTOR = ".recording";
+
   function clearHighlightedText(root: HTMLElement): void {
     for (const mark of root.querySelectorAll("mark")) {
+      if (mark.closest(OWN_HIGHLIGHTS_SELECTOR)) continue;
       const parent = mark.parentNode;
       if (!parent) continue;
       parent.replaceChild(document.createTextNode(mark.textContent ?? ""), mark);
@@ -453,6 +464,7 @@
       const node = walker.currentNode as Text;
       const parent = node.parentElement;
       if (!parent || parent.closest("mark, script, style")) continue;
+      if (parent.closest(OWN_HIGHLIGHTS_SELECTOR)) continue;
       if (!node.nodeValue?.trim()) continue;
       nodes.push(node);
     }
@@ -1276,6 +1288,34 @@
   $: unplacedMotions = (detailContent?.motions ?? []).filter(
     (motion) => !motion.agenda_item || !agendaItemIds.has(motion.agenda_item),
   );
+
+  let recordingPlayers: Array<{ seek: (seconds: number) => void } | undefined> = [];
+
+  /** Jumping from an agenda item scrolls the player into view first: the
+   * agenda sits below the video, so seeking without scrolling would start
+   * playback somewhere off screen. */
+  function seekPrimaryRecording(seconds: number): void {
+    const player = recordingPlayers[0];
+    if (!player) {
+      return;
+    }
+    player.seek(seconds);
+    detailMeetingEl?.querySelector(".recording")?.scrollIntoView({
+      block: "start",
+      behavior: "smooth",
+    });
+  }
+
+  /** The first recording drives the agenda's play buttons. Meetings with more
+   * than one media file are rare (none in a 66-meeting sample, though
+   * Amsterdam's two-day sittings have them), and pointing the agenda at two
+   * different timelines at once would be worse than pointing it at the first. */
+  $: primaryRecording = detailContent?.recordings?.[0];
+  $: playheadByAgendaItem = Object.fromEntries(
+    (primaryRecording?.chapters ?? [])
+      .filter((chapter) => chapter.agenda_item)
+      .map((chapter) => [chapter.agenda_item as string, chapter.start_seconds]),
+  );
   $: loadMoreSkeletonCount = totalCount !== null
     ? Math.max(1, Math.min(PAGE_SIZE, totalCount - results.length))
     : PAGE_SIZE;
@@ -1438,6 +1478,7 @@
                   <option value="Document">Documenten</option>
                   <option value="Meeting">Vergaderingen</option>
                   <option value="Motion">Moties</option>
+                  <option value="Recording">Gesproken woord</option>
                 </select>
               </label>
 
@@ -1906,6 +1947,20 @@
               class="detail-sheet__surface detail-sheet__meeting"
               tabindex="-1"
             >
+              {#if !detailLoading && detailContent?.recordings?.length}
+                <div class="detail-sheet__recordings">
+                  <p class="detail-sheet__meeting-label">
+                    {detailContent.recordings[0].media_type === "audio" ? "Audio" : "Video"}
+                  </p>
+                  {#each detailContent.recordings as recording, index (recording.id)}
+                    <MeetingRecordingPlayer
+                      {recording}
+                      bind:this={recordingPlayers[index]}
+                    />
+                  {/each}
+                </div>
+              {/if}
+
               <div class="detail-sheet__meeting-intro">
                 <p class="detail-sheet__meeting-label">Agenda</p>
                 {#if !detailLoading && detailContent?.agenda?.length}
@@ -1920,8 +1975,10 @@
                 <MeetingAgendaTree
                   items={detailContent.agenda}
                   {motionsByAgendaItem}
+                  {playheadByAgendaItem}
                   on:opendocument={handleAgendaDocumentOpen}
                   on:documentpreview={() => void refreshDetailHighlights()}
+                  on:seek={(event) => seekPrimaryRecording(event.detail.seconds)}
                 />
               {:else}
                 <p class="detail-sheet__meeting-empty">Geen agenda beschikbaar.</p>
