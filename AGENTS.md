@@ -120,7 +120,7 @@ Current implemented slices:
   High concurrency settings (`INGEST_CONCURRENCY` > 8 combined with
   `WOOZI_DOCUMENT_CONCURRENCY` > 10) can saturate the event loop with outbound
   HTTP connections.
-- The import worker is expected to run permanently: `deploy-beta.sh` defaults
+- The import worker is expected to run permanently: `deploy-production.sh` defaults
   `WORKER_REPLICAS` to 1 and the production monitor alerts when it is missing.
   (It used to default to 0, which silently froze all imports for 11 days in
   July 2026.)

@@ -26,7 +26,7 @@ QUEUE_STUCK_MINUTES="${WOOZI_MONITOR_QUEUE_STUCK_MINUTES:-30}"
 # New extract/download failures per monitor interval (default: per 2 min).
 EXTRACT_FAIL_WARN="${WOOZI_MONITOR_EXTRACT_FAIL_WARN:-50}"
 EXTRACT_FAIL_CRITICAL="${WOOZI_MONITOR_EXTRACT_FAIL_CRITICAL:-300}"
-# The import worker is expected to run at all times since deploy-beta.sh
+# The import worker is expected to run at all times since deploy-production.sh
 # defaults WORKER_REPLICAS to 1. Set to 0 during an intentional scale-down.
 EXPECT_WORKER="${WOOZI_MONITOR_EXPECT_WORKER:-1}"
 # Alert when the last successful state backup is older than this; 0 disables.

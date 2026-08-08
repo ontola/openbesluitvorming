@@ -27,7 +27,7 @@ DEPLOY_IMAGE="${DEPLOY_IMAGE:-${IMAGE_REPOSITORY}:sha-${DEPLOY_REF}}"
 # 0 replicas, concurrency 1 — disabled or crippled imports after every deploy;
 # the queue grew unattended for 11 days in July 2026 before anyone noticed.)
 # Precedence:
-#   1. caller env (WORKER_REPLICAS=... pnpm run deploy:beta)
+#   1. caller env (WORKER_REPLICAS=... pnpm run deploy:production)
 #   2. WOOZI_WORKER_REPLICAS in /opt/woozi/.env on the server
 #   3. default: 1 replica
 # INGEST_CONCURRENCY / WOOZI_DOCUMENT_CONCURRENCY are only forwarded when the
@@ -68,7 +68,7 @@ fi
 # env var were "deployed" but inactive until synced by hand). The infra script
 # rsyncs Caddyfile/compose/quickwit.yaml/monitor and reloads Caddy in place.
 DEPLOY_HOST="$DEPLOY_HOST" DEPLOY_DIR="$DEPLOY_DIR" COMPOSE_FILE="$COMPOSE_FILE" \
-  bash "$(dirname "$0")/deploy-beta-infra.sh"
+  bash "$(dirname "$0")/deploy-production-infra.sh"
 
 ssh "$DEPLOY_HOST" "
   set -e

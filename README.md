@@ -99,7 +99,7 @@ That setup is intended for:
 
 with external S3-compatible object storage from `.env`.
 
-Preferred beta deploy flow:
+Preferred production deploy flow:
 
 ```sh
 git push origin main
@@ -111,32 +111,28 @@ That triggers the GitHub Actions workflow in [.github/workflows/publish-openbesl
 - `ghcr.io/ontola/openbesluitvorming:sha-<git-sha>`
 - `ghcr.io/ontola/openbesluitvorming:latest`
 
-Then update beta to the exact current commit image:
+A successful publish then triggers [.github/workflows/deploy-production.yml](.github/workflows/deploy-production.yml) automatically, which deploys that image. **Pushing to `main` is the deploy** — there is no separate manual step in the normal flow.
+
+Run it by hand only to deploy a specific revision, or when the automatic deploy did not run:
 
 ```sh
-pnpm run deploy:beta
+pnpm run deploy:production
 ```
 
-`deploy:beta` now does one thing: over SSH, it tells the server to pull `ghcr.io/ontola/openbesluitvorming:sha-<short-git-sha>` and restart the app container.
+`deploy:production` does two things: it syncs the runtime config (compose, Caddyfile, quickwit.yaml) to the server, and over SSH tells it to pull `ghcr.io/ontola/openbesluitvorming:sha-<short-git-sha>` and restart the app and worker containers.
 
-Before it deploys, it checks the running server for active imports and refuses to restart the app if any imports are still `running`.
+It refuses to run with uncommitted changes, because CI only publishes an image for a committed revision. It does **not** wait for imports to finish: the worker hands claimed runs back to the queue on SIGTERM, so a deploy during an import is safe by design.
 
-To override that safety check:
-
-```sh
-FORCE=1 pnpm run deploy:beta
-```
-
-By default, `deploy:beta` derives the GHCR owner from your `origin` remote. If you need to override it explicitly:
+By default, `deploy:production` derives the GHCR owner from your `origin` remote. If you need to override it explicitly:
 
 ```sh
-IMAGE_REPOSITORY=ghcr.io/your-org/openbesluitvorming pnpm run deploy:beta
+IMAGE_REPOSITORY=ghcr.io/your-org/openbesluitvorming pnpm run deploy:production
 ```
 
 When production infra files change, sync those separately:
 
 ```sh
-pnpm run deploy:beta:infra
+pnpm run deploy:production:infra
 ```
 
 That is only for runtime config such as:

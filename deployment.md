@@ -114,7 +114,7 @@ The current flow is:
 The workflow lives in:
 
 - [publish-openbesluitvorming.yml](.github/workflows/publish-openbesluitvorming.yml)
-- [deploy-beta.yml](.github/workflows/deploy-beta.yml)
+- [deploy-production.yml](.github/workflows/deploy-production.yml)
 
 The published image repository currently follows the GitHub repo owner. In the current setup that means:
 
@@ -126,13 +126,13 @@ If the package owner changes, treat the repository path as configurable rather t
 
 ### Normal Deploy
 
-The current setup now supports automatic beta deployment after a successful image publish on `main`.
+The current setup now supports automatic production deployment after a successful image publish on `main`.
 
-The `deploy-beta.yml` workflow:
+The `deploy-production.yml` workflow:
 
 - waits for `Publish OpenBesluitvorming Image` to finish successfully
 - checks out the exact published commit
-- connects to the beta server over SSH
+- connects to the production server over SSH
 - syncs the runtime config files (compose, Caddyfile, quickwit.yaml, monitor
   script) and reloads Caddy — `/opt/woozi` is a plain copy, not a checkout,
   so this step is what makes config changes in git actually land
@@ -146,7 +146,7 @@ That means the normal CD path is now:
 
 1. push to `main`
 2. GitHub Actions publishes the image
-3. GitHub Actions automatically deploys the published image to beta
+3. GitHub Actions automatically deploys the published image to production
 
 Required GitHub secret for this workflow:
 
@@ -158,7 +158,7 @@ Required GitHub secret for this workflow:
 After CI has published the current commit image:
 
 ```sh
-pnpm run deploy:beta
+pnpm run deploy:production
 ```
 
 That script:
@@ -175,7 +175,7 @@ The script does **not** block on imports-in-progress. The daily scheduler enqueu
 
 The script is:
 
-- [scripts/deploy-beta.sh](scripts/deploy-beta.sh)
+- [scripts/deploy-production.sh](scripts/deploy-production.sh)
 
 Useful overrides:
 
@@ -194,16 +194,16 @@ Production still depends on a small set of repo-managed runtime files on the ser
 - [Caddyfile](Caddyfile)
 - [quickwit/quickwit.yaml](quickwit/quickwit.yaml)
 
-`deploy-beta.sh` runs this sync automatically at the start of every deploy.
+`deploy-production.sh` runs this sync automatically at the start of every deploy.
 To push a config-only change without a code deploy, run it directly:
 
 ```sh
-pnpm run deploy:beta:infra
+pnpm run deploy:production:infra
 ```
 
 That helper is:
 
-- [scripts/deploy-beta-infra.sh](scripts/deploy-beta-infra.sh)
+- [scripts/deploy-production-infra.sh](scripts/deploy-production-infra.sh)
 
 It rsyncs the three files, then runs `caddy validate` and `caddy reload`
 inside the running Caddy container so a Caddyfile change takes effect
@@ -221,8 +221,8 @@ ssh root@91.98.32.151 'cd /opt/woozi && docker compose -f docker-compose.product
 
 So the operational split is:
 
-- code changes: publish image, then `deploy:beta` (which also syncs config)
-- config-only changes without a new image: `deploy:beta:infra`
+- code changes: publish image, then `deploy:production` (which also syncs config)
+- config-only changes without a new image: `deploy:production:infra`
 
 Operational rule:
 
@@ -609,7 +609,7 @@ Planned next:
   ACME HTTP-01 challenge will fail and Caddy may rate-limit retries)
 
 Adding a new domain is a Caddyfile change committed to the repo, then
-`pnpm run deploy:beta:infra` to sync + validate + reload. There is no env-var
+`pnpm run deploy:production:infra` to sync + validate + reload. There is no env-var
 indirection for the site addresses anymore — they are listed verbatim in the
 Caddyfile so the canonical list lives in version control.
 
@@ -653,7 +653,7 @@ The expected public endpoint is the Caddy domain, not port `8787` directly.
 Current preferred deployment flow is image-based from the local machine:
 
 ```sh
-pnpm run deploy:beta
+pnpm run deploy:production
 ```
 
 Manual recovery on the server should normally be:
@@ -681,7 +681,7 @@ First DNS step (when adding a new public hostname):
   (e.g. `openraadsinformatie.nl`) are managed elsewhere — confirm with
   the zone owner before assuming Netlify
 - wait for DNS to resolve, *then* commit the new hostname into the
-  Caddyfile and run `pnpm run deploy:beta:infra` — adding it before DNS
+  Caddyfile and run `pnpm run deploy:production:infra` — adding it before DNS
   is live causes Caddy's ACME HTTP-01 challenge to fail and Let's Encrypt
   may rate-limit further attempts
 

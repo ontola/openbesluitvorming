@@ -2,7 +2,7 @@
 
 # This cloud-init is only used for initial provisioning.
 # After first boot, the ingest server is managed via docker compose
-# and the deploy workflow (deploy-beta.yml).
+# and the deploy workflow (deploy-production.yml).
 #
 # The extraction worker IPs are passed to the app container as
 # WOOZI_EXTRACTION_SERVICE_URL (comma-separated list).

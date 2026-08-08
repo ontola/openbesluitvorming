@@ -1,4 +1,4 @@
-name: Deploy Beta
+name: Deploy Production
 
 on:
   workflow_run:
@@ -16,7 +16,7 @@ permissions:
 # down (July 2026 outage). Serialize; never cancel a deploy that is already
 # rewriting containers, and let the newest queued one supersede older waiters.
 concurrency:
-  group: deploy-beta
+  group: deploy-production
   cancel-in-progress: false
 
 jobs:
@@ -27,6 +27,10 @@ jobs:
         github.event.workflow_run.head_branch == 'main'
       }}
     runs-on: ubuntu-latest
+    # `beta` is the GitHub Environment name, which owns the deploy secret and
+    # any protection rules. It is deliberately not renamed with the rest: that
+    # name lives in GitHub's settings, not in this file, and changing it here
+    # alone would deploy without the environment's secrets.
     environment: beta
 
     steps:
@@ -40,15 +44,15 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.BETA_DEPLOY_SSH_KEY }}
 
-      - name: Trust beta host key
+      - name: Trust production host key
         run: |
           mkdir -p ~/.ssh
           ssh-keyscan -H 91.98.32.151 >> ~/.ssh/known_hosts
 
-      - name: Deploy published image to beta
+      - name: Deploy published image to production
         env:
           DEPLOY_REF: ${{ github.event.workflow_run.head_sha }}
           IMAGE_REPOSITORY: ghcr.io/${{ github.event.workflow_run.repository.owner.login }}/openbesluitvorming
         run: |
           export DEPLOY_REF="${DEPLOY_REF:0:7}"
-          bash scripts/deploy-beta.sh
+          bash scripts/deploy-production.sh
