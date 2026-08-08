@@ -6,6 +6,27 @@ function assert(condition: unknown, message: string): asserts condition {
   }
 }
 
+/** Run a test against the v3 projection.
+ *
+ * The date pushdown is mapping-dependent: v2 stores start_date as a dynamic
+ * string, where Quickwit rejects both the sort and the range instead of
+ * ignoring them (the 2026-08-08 search outage). These tests describe v3
+ * behaviour, so they have to say so.
+ */
+async function withV3Projection(fn: () => Promise<void> | void): Promise<void> {
+  const original = Deno.env.get("WOOZI_PROJECTION_VERSION");
+  Deno.env.set("WOOZI_PROJECTION_VERSION", "search-v3-meeting-date");
+  try {
+    await fn();
+  } finally {
+    if (original === undefined) {
+      Deno.env.delete("WOOZI_PROJECTION_VERSION");
+    } else {
+      Deno.env.set("WOOZI_PROJECTION_VERSION", original);
+    }
+  }
+}
+
 Deno.test("searchMeetings dedupes to the latest hit and keeps the newest snippet", async () => {
   const originalFetch = globalThis.fetch;
 
@@ -531,98 +552,107 @@ Deno.test("getEntityContent prefers stored markdown from the newest hit", async 
 });
 
 Deno.test("startDateRangeClause bounds the range on whole days", async () => {
-  const { startDateRangeClause } = await import("../web/search_api.ts");
+  await withV3Projection(async () => {
+    const { startDateRangeClause } = await import("../web/search_api.ts");
 
-  assert(
-    startDateRangeClause("2024-01-15", "2024-03-02") ===
-      "start_date:[2024-01-15T00:00:00Z TO 2024-03-02T23:59:59Z]",
-    "both bounds are inclusive, and 'to' covers the whole day",
-  );
-  assert(
-    startDateRangeClause("2026-01-01", "") === "start_date:[2026-01-01T00:00:00Z TO *]",
-    "open-ended 'to' still pushes down",
-  );
-  assert(
-    startDateRangeClause("", "2026-01-01") === "start_date:[* TO 2026-01-01T23:59:59Z]",
-    "'to' alone still pushes down",
-  );
-  assert(startDateRangeClause("", "") === null, "no bounds means no clause");
-  assert(startDateRangeClause("geen-datum", "") === null, "garbage input is rejected");
+    assert(
+      startDateRangeClause("2024-01-15", "2024-03-02") ===
+        "start_date:[2024-01-15T00:00:00Z TO 2024-03-02T23:59:59Z]",
+      "both bounds are inclusive, and 'to' covers the whole day",
+    );
+    assert(
+      startDateRangeClause("2026-01-01", "") === "start_date:[2026-01-01T00:00:00Z TO *]",
+      "open-ended 'to' still pushes down",
+    );
+    assert(
+      startDateRangeClause("", "2026-01-01") === "start_date:[* TO 2026-01-01T23:59:59Z]",
+      "'to' alone still pushes down",
+    );
+    assert(startDateRangeClause("", "") === null, "no bounds means no clause");
+    assert(startDateRangeClause("geen-datum", "") === null, "garbage input is rejected");
+  });
 });
 
 Deno.test("date-filtered search pushes a start_date range down for every type", async () => {
-  // Regression guard for #184's sibling bug. The date filter used to enumerate
-  // document_month terms, which only Documents carry, so meetings and motions
-  // had to be exempted and never showed up in a date-filtered search at all.
-  // Measured in production 2026-07-31 on dateFrom=2026-01-01: 40 of the first
-  // 40 hits were meetings dated 2018-2019 and zero rows were returned, which
-  // reads to a user as "nothing exists after 2020".
-  const originalFetch = globalThis.fetch;
-  const capturedQueries: string[] = [];
+  await withV3Projection(async () => {
+    // Regression guard for #184's sibling bug. The date filter used to enumerate
+    // document_month terms, which only Documents carry, so meetings and motions
+    // had to be exempted and never showed up in a date-filtered search at all.
+    // Measured in production 2026-07-31 on dateFrom=2026-01-01: 40 of the first
+    // 40 hits were meetings dated 2018-2019 and zero rows were returned, which
+    // reads to a user as "nothing exists after 2020".
+    const originalFetch = globalThis.fetch;
+    const capturedQueries: string[] = [];
 
-  globalThis.fetch = async (input, init) => {
-    const body = JSON.parse(String((init as { body?: string } | undefined)?.body ?? "{}"));
-    capturedQueries.push(String(body.query ?? ""));
-    return new Response(JSON.stringify({ num_hits: 0, hits: [] }), {
-      status: 200,
-      headers: { "content-type": "application/json" },
-    });
-  };
-
-  try {
-    for (const entityType of ["", "Meeting", "Motion", "Document"]) {
-      await searchMeetings({
-        query: "begroting",
-        entityType,
-        dateFrom: "2026-01-01",
-        dateTo: "2026-03-31",
-        offset: 0,
-        limit: 24,
+    globalThis.fetch = async (input, init) => {
+      const body = JSON.parse(String((init as { body?: string } | undefined)?.body ?? "{}"));
+      capturedQueries.push(String(body.query ?? ""));
+      return new Response(JSON.stringify({ num_hits: 0, hits: [] }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
       });
-    }
-  } finally {
-    globalThis.fetch = originalFetch;
-  }
+    };
 
-  assert(capturedQueries.length === 4, `expected one query per type, got ${capturedQueries.length}`);
-  for (const query of capturedQueries) {
+    try {
+      for (const entityType of ["", "Meeting", "Motion", "Document"]) {
+        await searchMeetings({
+          query: "begroting",
+          entityType,
+          dateFrom: "2026-01-01",
+          dateTo: "2026-03-31",
+          offset: 0,
+          limit: 24,
+        });
+      }
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+
     assert(
-      query.includes("start_date:[2026-01-01T00:00:00Z TO 2026-03-31T23:59:59Z]"),
-      `every type must push the date range down, got: ${query}`,
+      capturedQueries.length === 4,
+      `expected one query per type, got ${capturedQueries.length}`,
     );
-    assert(!query.includes("document_month"), `month enumeration is gone, got: ${query}`);
-  }
+    for (const query of capturedQueries) {
+      assert(
+        query.includes("start_date:[2026-01-01T00:00:00Z TO 2026-03-31T23:59:59Z]"),
+        `every type must push the date range down, got: ${query}`,
+      );
+      assert(!query.includes("document_month"), `month enumeration is gone, got: ${query}`);
+    }
+  });
 });
 
 Deno.test("search asks Quickwit to order by meeting date, not ingest time", async () => {
-  // #184. The index's timestamp_field is `time` (the ingest time), so an
-  // unsorted request returns whatever was written last and the app-side sort
-  // could only reorder that already-wrong window. Sorting has to be pushed
-  // down for the window itself to hold the newest meetings.
-  //
-  // Direction is inverted in Quickwit 0.8.1: bare = descending, `-` = ascending.
-  const originalFetch = globalThis.fetch;
-  const captured: Array<string | undefined> = [];
+  await withV3Projection(async () => {
+    // #184. The index's timestamp_field is `time` (the ingest time), so an
+    // unsorted request returns whatever was written last and the app-side sort
+    // could only reorder that already-wrong window. Sorting has to be pushed
+    // down for the window itself to hold the newest meetings.
+    //
+    // Direction is inverted in Quickwit 0.8.1: bare = descending, `-` = ascending.
+    const originalFetch = globalThis.fetch;
+    const captured: Array<string | undefined> = [];
 
-  globalThis.fetch = async (input, init) => {
-    const body = JSON.parse(String((init as { body?: string } | undefined)?.body ?? "{}"));
-    captured.push(body.sort_by);
-    return new Response(JSON.stringify({ num_hits: 0, hits: [] }), {
-      status: 200,
-      headers: { "content-type": "application/json" },
-    });
-  };
+    globalThis.fetch = async (input, init) => {
+      const body = JSON.parse(String((init as { body?: string } | undefined)?.body ?? "{}"));
+      captured.push(body.sort_by);
+      return new Response(JSON.stringify({ num_hits: 0, hits: [] }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    };
 
-  try {
-    for (const sort of ["date_desc", "date_asc", "title_asc", ""]) {
-      await searchMeetings({ query: "begroting", sort, offset: 0, limit: 24 });
+    try {
+      for (const sort of ["date_desc", "date_asc", "title_asc", ""]) {
+        await searchMeetings({ query: "begroting", sort, offset: 0, limit: 24 });
+      }
+    } finally {
+      globalThis.fetch = originalFetch;
     }
-  } finally {
-    globalThis.fetch = originalFetch;
-  }
 
-  assert(captured[0] === "start_date", `date_desc should sort newest first, got ${captured[0]}`);
-  assert(captured[1] === "-start_date", `date_asc should sort oldest first, got ${captured[1]}`);
-  assert(captured[2] === undefined, "title sort has no fast field and stays app-side");
-  assert(captured[3] === "start_date", `default sort is newest first, got ${captured[3]}`);
+    assert(captured[0] === "start_date", `date_desc should sort newest first, got ${captured[0]}`);
+    assert(captured[1] === "-start_date", `date_asc should sort oldest first, got ${captured[1]}`);
+    assert(captured[2] === undefined, "title sort has no fast field and stays app-side");
+    assert(captured[3] === "start_date", `default sort is newest first, got ${captured[3]}`);
+  });
 });

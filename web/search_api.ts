@@ -13,7 +13,10 @@ import { getConfigValue } from "../src/config.ts";
 import { getExportLog } from "../src/exports/log.ts";
 import { NotubizClient } from "../src/notubiz/client.ts";
 import { normalizeNotubizAgendaItems } from "../src/notubiz/normalize.ts";
-import { currentProjectionVersion } from "../src/pipeline/versioning.ts";
+import {
+  currentProjectionVersion,
+  projectionSupportsDateSort,
+} from "../src/pipeline/versioning.ts";
 import { QuickwitClient } from "../src/quickwit/client.ts";
 import { getSource, listSources } from "../src/sources/index.ts";
 import { ObjectStorageClient } from "../src/storage/s3.ts";
@@ -266,6 +269,14 @@ function buildQuickwitQuery(
  * when neither bound is usable. `dateTo` is inclusive of the whole day, the
  * same way the app-side filter compares on the date part only. */
 export function startDateRangeClause(dateFrom: string, dateTo: string): string | null {
+  // Same mapping dependency as the sort. The range was believed to be ignored
+  // on an unmapped field, but that belief already cost one outage for sort_by,
+  // so it is not trusted for range either. Dropping the pushdown does not drop
+  // the filter: filterResultsByDateRange still applies it app-side, which is
+  // what happened before v3 anyway.
+  if (!projectionSupportsDateSort()) {
+    return null;
+  }
   const from = dateFrom.trim().slice(0, 10);
   const to = dateTo.trim().slice(0, 10);
   const hasFrom = /^\d{4}-\d{2}-\d{2}$/.test(from);
@@ -288,6 +299,12 @@ export function startDateRangeClause(dateFrom: string, dateTo: string): string |
  * Title sorting has no fast field to sort on and stays app-side, so it still
  * only orders the fetched window rather than the whole result set. */
 export function quickwitSortBy(sort: string): string | undefined {
+  // Only an index that maps start_date can sort on it. Against the v2 mapping
+  // the field is a dynamic string and Quickwit fails the whole query rather
+  // than ignoring the clause — see projectionSupportsDateSort.
+  if (!projectionSupportsDateSort()) {
+    return undefined;
+  }
   if (sort === "date_asc") {
     return "-start_date";
   }
@@ -1331,6 +1348,8 @@ async function computeIndexStats(): Promise<IndexStats> {
 }
 
 export const __test__ = {
+  quickwitSortBy,
+  startDateRangeClause,
   buildQuickwitQuery,
   entityTypeLabel,
   searchResultEntityId,

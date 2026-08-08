@@ -6,10 +6,23 @@ export function currentProjectionVersion(): string {
   // reindexed empties search for as long as the reindex takes. Set it together
   // with a new QUICKWIT_INDEX_ID — see deployment.md.
   //
-  // Deploying the v3 code against a v2 index is safe on its own: Quickwit
-  // ignores both sort_by and a range clause on a field its mapping does not
-  // declare (verified on 0.8.1, no error), so search behaves exactly as before.
   return Deno.env.get("WOOZI_PROJECTION_VERSION")?.trim() || "search-v2-pages";
+}
+
+/** Whether the index this projection queries maps `start_date` as a datetime
+ * fast field, and can therefore be asked to sort on it.
+ *
+ * This guard exists because the opposite was assumed and was wrong. The claim
+ * was that Quickwit ignores `sort_by` on a field the mapping does not declare,
+ * so v3 code against a v2 index would behave as before. It does not ignore it:
+ * in a v2 index `start_date` still exists, as a *dynamic string*, and 0.8.1
+ * answers every query with
+ *   500 "Unsupported sort field type `Str`".
+ * Deploying that combination took search down completely (2026-08-08). Sorting
+ * therefore has to be tied to the mapping, not left to the engine to shrug off.
+ */
+export function projectionSupportsDateSort(): boolean {
+  return currentProjectionVersion() !== "search-v2-pages";
 }
 
 export function currentDerivationVersion(): string {

@@ -389,11 +389,24 @@ Editing `quickwit/index-config.json` does nothing to a live index —
 existing splits keep the mapping they were written with. Migrating means a new
 index, not an upgraded one.
 
-v3 is therefore **opt-in**: the code default is still `search-v2-pages`, so
-deploying it changes nothing on its own. Quickwit ignores `sort_by` and a range
-clause on a field its mapping does not declare (verified on 0.8.1 — no error,
-no empty result), so the v3 code running against the v2 index behaves exactly
-as before, just without the ordering fix.
+v3 is therefore **opt-in**: the code default is still `search-v2-pages`.
+
+This paragraph used to claim that Quickwit ignores `sort_by` and a range clause
+on a field its mapping does not declare, so v3 code against a v2 index would
+behave exactly as before. **That is wrong, and it took search down on
+2026-08-08.** `start_date` is not undeclared in a v2 index — it lands in the
+dynamic field as a *string*, and 0.8.1 answers every query with
+
+```
+500 internal error: tantivy error: An invalid argument was passed:
+'Unsupported sort field type `Str`.'
+```
+
+Both the sort and the range are therefore gated on the projection version
+(`projectionSupportsDateSort`), not left to the engine to shrug off. Under v2
+the pushdown is skipped and the date filter is applied app-side, exactly as it
+was before v3. Do not remove that guard without a live query against a v2
+index.
 
 Cut over deliberately, when there is time for the reindex to finish:
 

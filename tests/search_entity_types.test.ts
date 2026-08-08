@@ -118,18 +118,31 @@ Deno.test("date filtering applies to every searchable type", () => {
   // field, so the range applies uniformly. The old document_month enumeration
   // only worked for Documents and had to exempt the rest, which made meetings
   // and motions vanish from any date-filtered search.
-  for (const type of [...SEARCHABLE_TYPES, ""]) {
-    const q = build("", "", type, "2026-01-01", "2026-06-30");
-    assert(
-      q.includes("start_date:[2026-01-01T00:00:00Z TO 2026-06-30T23:59:59Z]"),
-      `${type || "unfiltered"} must push the date filter down: ${q}`,
-    );
-  }
+  //
+  // Under v3 only: the v2 index maps start_date as a string, where the clause
+  // is not merely useless but fatal. See the pushdown guard test below.
+  const original = Deno.env.get("WOOZI_PROJECTION_VERSION");
+  Deno.env.set("WOOZI_PROJECTION_VERSION", "search-v3-meeting-date");
+  try {
+    for (const type of [...SEARCHABLE_TYPES, ""]) {
+      const q = build("", "", type, "2026-01-01", "2026-06-30");
+      assert(
+        q.includes("start_date:[2026-01-01T00:00:00Z TO 2026-06-30T23:59:59Z]"),
+        `${type || "unfiltered"} must push the date filter down: ${q}`,
+      );
+    }
 
-  assert(
-    !build("", "", "", "", "").includes("start_date:"),
-    "an unbounded search must not carry a date clause",
-  );
+    assert(
+      !build("", "", "", "", "").includes("start_date:"),
+      "an unbounded search must not carry a date clause",
+    );
+  } finally {
+    if (original === undefined) {
+      Deno.env.delete("WOOZI_PROJECTION_VERSION");
+    } else {
+      Deno.env.set("WOOZI_PROJECTION_VERSION", original);
+    }
+  }
 });
 
 Deno.test("the projection version always scopes the query", () => {
@@ -146,4 +159,39 @@ Deno.test("motions get a Dutch label", () => {
   assertEquals(__test__.entityTypeLabel("Recording"), "Opname", "Recording label");
   assertEquals(__test__.entityTypeLabel("Meeting"), "Vergadering", "Meeting label unchanged");
   assertEquals(__test__.entityTypeLabel("Document"), "Document", "Document label unchanged");
+});
+
+Deno.test("date sorting is only pushed down when the index maps the field", () => {
+  // Regression guard for the 2026-08-08 outage. `start_date` exists in a v2
+  // index as a dynamic *string*, and Quickwit 0.8.1 does not ignore a sort on
+  // it — it fails every query with "Unsupported sort field type `Str`".
+  // Deploying the v3 code against the v2 index took search down completely.
+  const original = Deno.env.get("WOOZI_PROJECTION_VERSION");
+  try {
+    Deno.env.delete("WOOZI_PROJECTION_VERSION");
+    assertEquals(
+      __test__.quickwitSortBy("date_desc"),
+      undefined,
+      "the v2 default must not ask Quickwit to sort on an unmapped field",
+    );
+    assertEquals(
+      __test__.startDateRangeClause("2026-01-01", "2026-06-30"),
+      null,
+      "and must not range on it either",
+    );
+
+    Deno.env.set("WOOZI_PROJECTION_VERSION", "search-v3-meeting-date");
+    assertEquals(__test__.quickwitSortBy("date_desc"), "start_date", "v3 sorts descending");
+    assertEquals(__test__.quickwitSortBy("date_asc"), "-start_date", "v3 sorts ascending");
+    assert(
+      __test__.startDateRangeClause("2026-01-01", "2026-06-30")?.startsWith("start_date:["),
+      "and pushes the range down",
+    );
+  } finally {
+    if (original === undefined) {
+      Deno.env.delete("WOOZI_PROJECTION_VERSION");
+    } else {
+      Deno.env.set("WOOZI_PROJECTION_VERSION", original);
+    }
+  }
 });
