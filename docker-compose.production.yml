@@ -71,7 +71,12 @@ services:
       DENO_V8_FLAGS: --max-old-space-size=1024
       PORT: 8787
       QUICKWIT_URL: http://quickwit:7280
+      # Which index this container reads, and which projection it scopes
+      # queries to. WOOZI_PROJECTION_VERSION used to be absent here entirely,
+      # so setting it in .env reached nothing and the documented v3 cutover
+      # would have been a no-op. Empty falls back to the code default.
       QUICKWIT_INDEX_ID: ${QUICKWIT_INDEX_ID:-woozi-events-prod}
+      WOOZI_PROJECTION_VERSION: ${WOOZI_PROJECTION_VERSION:-}
       WOOZI_KV_PATH: /data/woozi-ops.sqlite3
       WOOZI_EXPORT_LOG_PATH: /data/woozi-export-log.sqlite3
       WOOZI_STATS_CACHE_PATH: /data/woozi-stats-cache.json
@@ -107,7 +112,14 @@ services:
     environment:
       DENO_V8_FLAGS: --max-old-space-size=4096
       QUICKWIT_URL: http://quickwit:7280
-      QUICKWIT_INDEX_ID: ${QUICKWIT_INDEX_ID:-woozi-events-prod}
+      # The worker can be pointed at a different index than the one being
+      # served, which is what makes a projection cutover possible without the
+      # site going blank. Point the workers at the new index, reindex every
+      # source into it while the web container keeps serving the old one, and
+      # only switch the reader once the new index is verified. Both fall back
+      # to the served values, so unset changes nothing.
+      QUICKWIT_INDEX_ID: ${WORKER_QUICKWIT_INDEX_ID:-${QUICKWIT_INDEX_ID:-woozi-events-prod}}
+      WOOZI_PROJECTION_VERSION: ${WORKER_PROJECTION_VERSION:-${WOOZI_PROJECTION_VERSION:-}}
       QUICKWIT_BATCH_SIZE: ${QUICKWIT_BATCH_SIZE:-64}
       WOOZI_KV_PATH: /data/woozi-ops.sqlite3
       WOOZI_EXPORT_LOG_PATH: /data/woozi-export-log.sqlite3

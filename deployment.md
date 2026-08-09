@@ -408,20 +408,42 @@ the pushdown is skipped and the date filter is applied app-side, exactly as it
 was before v3. Do not remove that guard without a live query against a v2
 index.
 
-Cut over deliberately, when there is time for the reindex to finish:
+### Cutting over without emptying search
 
-1. set a new `QUICKWIT_INDEX_ID` (e.g. `woozi-events-prod-v3`) **and**
-   `WOOZI_PROJECTION_VERSION=search-v3-meeting-date`, then restart
-2. let `ensureIndex` create it with the v3 mapping
-3. `reindex_only` every source — it replays from the export log, not from the
-   supplier APIs, and `start_date` is already in the stored payloads
-4. keep the old index around until the new one is verified, then delete it
+Switching both containers at once empties search for as long as the reindex
+takes, and that is not minutes. Measured 2026-08-08: **5.48M live entities**
+across 330 sources, of which ~57% carry stored text, so the reindex performs
+roughly **3.1M object-storage reads** — one per document, sequentially within
+a source (`reindexSource` awaits each `rehydrateDocumentText`).
+
+Because the worker and the web container take their index and projection from
+separate variables, the reindex can run against the new index while the old one
+is still being served:
+
+1. create the new index by pointing **only the workers** at it:
+
+   ```sh
+   # /opt/woozi/.env
+   WORKER_QUICKWIT_INDEX_ID=woozi-events-prod-v3
+   WORKER_PROJECTION_VERSION=search-v3-meeting-date
+   ```
+
+   then restart the workers. `ensureIndex` creates it with the v3 mapping.
+2. `reindex_only` every source. It replays from the export log, never from the
+   supplier APIs, and `start_date` is already in the stored payloads.
+3. verify the new index: row counts per entity type, and a query that sorts and
+   date-filters.
+4. switch the reader by setting `QUICKWIT_INDEX_ID` and
+   `WOOZI_PROJECTION_VERSION` to the same values and restarting the web
+   container. That is the only moment users notice anything.
+5. keep the old index until you are satisfied, then delete it.
+
+The cost of doing it this way: between step 1 and step 4, freshly imported
+material lands only in the new index, so new meetings are not searchable until
+the switch. That is a far smaller hole than everything being unsearchable.
 
 Search is scoped to `projection_version`, so the old index's documents cannot
-leak into v3 results even if both exist. The flip side is that **search returns
-nothing for a source until its reindex has run**: between step 1 and the end of
-step 3 the v3 index is empty by construction. Do not start the cutover without
-budgeting for the full reindex across all sources.
+leak into new results even while both exist.
 
 Two things to know before touching the mapping again:
 
