@@ -1877,6 +1877,13 @@ select {
   margin-top: 1.25rem;
 }
 
+/* The motion's own page: outcome and votes above its text. Not inside
+   .prose-detail's typography, hence the reset. */
+.detail-sheet__motion-summary {
+  margin-bottom: 1.5rem;
+  font-family: var(--font-sans);
+}
+
 .detail-sheet__recordings {
   display: grid;
   gap: 0.6rem;

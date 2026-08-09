@@ -2006,6 +2006,14 @@
               {#if detailLoading}
                 <ReaderLoading label="Tekst wordt geladen…" lines={7} />
               {:else}
+                <!-- The outcome and the vote breakdown are the reason to open a
+                     motion, so they go above its text rather than only being
+                     reachable from the meeting. -->
+                {#if detailContent?.motion}
+                  <div class="detail-sheet__motion-summary">
+                    <MotionCard motion={detailContent.motion} />
+                  </div>
+                {/if}
                 {@html detailMarkdownHtml}
               {/if}
             </div>

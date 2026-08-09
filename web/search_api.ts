@@ -73,6 +73,7 @@ type SearchHit = {
     meeting?: string;
     agenda_item?: string;
     agenda_item_hint?: string;
+    attachment?: string[];
   };
 };
 
@@ -956,7 +957,13 @@ export async function searchMeetings(
   });
 }
 
-export async function getEntityContent(entityId: string): Promise<EntityContentResponse | null> {
+export async function getEntityContent(
+  entityId: string,
+  /** Internal: stops a motion's attachment lookup from recursing. An
+   * attachment that itself advertises one would otherwise loop forever, and a
+   * self-referential id is enough to hang the request. */
+  resolveAttachment = true,
+): Promise<EntityContentResponse | null> {
   const quickwit = new QuickwitClient();
   const response = await quickwit.search(
     `projection_version:${escapeTerm(currentProjectionVersion())} AND entity_id:${escapeTerm(entityId)}`,
@@ -1015,6 +1022,16 @@ export async function getEntityContent(entityId: string): Promise<EntityContentR
     hit.entity_type === "Meeting" ? await getMeetingRecordings(entityId) : undefined;
   const motion = hit.entity_type === "Motion" ? motionFromHit(hit) : undefined;
 
+  // A motion carries its outcome and its votes, but the text people came to
+  // read lives in the PDF hanging off it — the motion entity itself has no
+  // derived content, so the reader fell through to "geen documenttekst
+  // beschikbaar" while the very same text sat one hop away on the attachment.
+  let motionAttachment: EntityContentResponse | null = null;
+  const attachmentId = hit.payload?.attachment?.[0];
+  if (motion && resolveAttachment && attachmentId && attachmentId !== entityId) {
+    motionAttachment = await getEntityContent(attachmentId, false);
+  }
+
   return {
     entityId: hit.entity_id ?? entityId,
     entityType: hit.entity_type ?? "Unknown",
@@ -1027,10 +1044,12 @@ export async function getEntityContent(entityId: string): Promise<EntityContentR
     organization: displayOrganization(hit),
     date: formatDate(hit.start_date),
     sortDate: hit.start_date,
-    markdownText,
-    downloadUrl,
-    contentType,
-    pdfUrl,
+    // Fall back to the attachment's text and file for a motion; its own
+    // fields are always empty.
+    markdownText: markdownText ?? motionAttachment?.markdownText,
+    downloadUrl: downloadUrl ?? motionAttachment?.downloadUrl,
+    contentType: contentType ?? motionAttachment?.contentType,
+    pdfUrl: pdfUrl ?? motionAttachment?.pdfUrl,
     meetingId: hit.payload?.is_referenced_by ?? hit.payload?.meeting,
     agenda,
     motions: motions && motions.length > 0 ? motions : undefined,

@@ -656,3 +656,119 @@ Deno.test("search asks Quickwit to order by meeting date, not ingest time", asyn
     assert(captured[3] === "start_date", `default sort is newest first, got ${captured[3]}`);
   });
 });
+
+Deno.test("a motion detail carries its outcome and inherits its attachment's file", async () => {
+  // A motion entity has no content of its own: the words people came to read
+  // sit in the PDF hanging off it. Without resolving that, the reader showed
+  // "geen documenttekst beschikbaar" while the text was one hop away.
+  //
+  // markdownText itself comes from object storage, so what is asserted here is
+  // the plumbing this change added — that the attachment is fetched and its
+  // content fields are spread onto the motion. The markdown rides the very
+  // same object.
+  const originalFetch = globalThis.fetch;
+  const motionId = "motion:ibabs:gemeente:culemborg:m11";
+  const attachmentId = "document:ibabs:gemeente:culemborg:pdf1";
+  const queried: string[] = [];
+
+  // Quickwit takes the query in the POST body, not the URL.
+  globalThis.fetch = (_input, init) => {
+    const body = typeof init?.body === "string" ? init.body : "";
+    queried.push(body);
+    const hit = body.includes(attachmentId)
+      ? {
+        time: "2026-03-31T10:00:00Z",
+        entity_id: attachmentId,
+        entity_type: "Document",
+        name: "Motie M11",
+        payload: { original_url: "https://example.test/motie-m11.pdf" },
+      }
+      : {
+        time: "2026-03-31T10:00:00Z",
+        entity_id: motionId,
+        entity_type: "Motion",
+        name: "7.2 Motie M11 Motie VVD CDA Pavijen Vijf Vrij",
+        payload: {
+          result: "verworpen",
+          status: "Moties verworpen",
+          tally: { in_favour: 7, against: 14 },
+          votes: [{ option: "tegen", group_name: "GroenLinks", voter_name: "Jansen" }],
+          attachment: [attachmentId],
+          meeting: "meeting:ibabs:gemeente:culemborg:m1",
+        },
+      };
+
+    return Promise.resolve(
+      new Response(JSON.stringify({ num_hits: 1, hits: [hit] }), {
+        headers: { "content-type": "application/json" },
+      }),
+    );
+  };
+
+  try {
+    const content = await getEntityContent(motionId);
+
+    assert(content?.entityType === "Motion", "the entity type survives");
+    assert(content?.motion?.result === "verworpen", "the outcome is returned");
+    assert(content?.motion?.votes?.length === 1, "so is the vote breakdown");
+    assert(
+      content?.motion?.tally?.against === 14,
+      "and the tally, which is what the page leads with",
+    );
+
+    // The part that was missing: the attachment is looked up at all, and its
+    // file surfaces on the motion.
+    assert(
+      queried.some((body) => body.includes(attachmentId)),
+      "the attachment should be fetched",
+    );
+    assert(
+      content?.downloadUrl === "https://example.test/motie-m11.pdf",
+      `the attachment's file should surface, got ${content?.downloadUrl}`,
+    );
+    assert(content?.pdfUrl !== undefined, "so the PDF view works on a motion too");
+    assert(
+      content?.meetingId === "meeting:ibabs:gemeente:culemborg:m1",
+      "the crumb back to the meeting still resolves",
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+Deno.test("a motion that points at itself does not hang the request", async () => {
+  // Resolving the attachment re-enters getEntityContent. An id that resolves
+  // to something advertising an attachment would recurse forever, and the
+  // first version of this did exactly that against a stub.
+  const originalFetch = globalThis.fetch;
+  const motionId = "motion:ibabs:gemeente:culemborg:loop";
+  let calls = 0;
+
+  globalThis.fetch = () => {
+    calls += 1;
+    return Promise.resolve(
+      new Response(
+        JSON.stringify({
+          num_hits: 1,
+          hits: [{
+            time: "2026-03-31T10:00:00Z",
+            entity_id: motionId,
+            entity_type: "Motion",
+            name: "Motie",
+            // Points at itself, and at a second motion that would point back.
+            payload: { result: "aangenomen", attachment: [motionId] },
+          }],
+        }),
+        { headers: { "content-type": "application/json" } },
+      ),
+    );
+  };
+
+  try {
+    const content = await getEntityContent(motionId);
+    assert(content?.motion?.result === "aangenomen", "it still returns the motion");
+    assert(calls <= 2, `at most one extra lookup, made ${calls}`);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
