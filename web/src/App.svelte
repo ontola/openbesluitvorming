@@ -1945,6 +1945,14 @@
       </div>
 
       <div class="detail-sheet__body">
+        <!-- Above the mode switch on purpose: the outcome and the vote
+             breakdown are why someone opens a motion, and they should not
+             disappear the moment the reader switches to the PDF. -->
+        {#if detailContent?.motion && !detailLoading}
+          <div class="detail-sheet__motion-summary">
+            <MotionCard motion={detailContent.motion} variant="row" />
+          </div>
+        {/if}
         {#if detailMode === "text"}
           {#if detailItem.entityType === "Meeting"}
             <div
@@ -2011,14 +2019,6 @@
               {#if detailLoading}
                 <ReaderLoading label="Tekst wordt geladen…" lines={7} />
               {:else}
-                <!-- The outcome and the vote breakdown are the reason to open a
-                     motion, so they go above its text rather than only being
-                     reachable from the meeting. -->
-                {#if detailContent?.motion}
-                  <div class="detail-sheet__motion-summary">
-                    <MotionCard motion={detailContent.motion} />
-                  </div>
-                {/if}
                 {@html detailMarkdownHtml}
               {/if}
             </div>

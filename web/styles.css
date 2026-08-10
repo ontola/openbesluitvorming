@@ -1877,10 +1877,14 @@ select {
   margin-top: 1.25rem;
 }
 
-/* The motion's own page: outcome and votes above its text. Not inside
-   .prose-detail's typography, hence the reset. */
+/* The motion's own page: outcome and votes above whichever pane is showing, so
+   they stay put when the reader switches between text and PDF. Outside
+   .prose-detail, hence the font reset; flex: none because the panes below are
+   the ones that should absorb the remaining height and scroll. */
 .detail-sheet__motion-summary {
-  margin-bottom: 1.5rem;
+  flex: none;
+  padding: 0.9rem var(--detail-inline-padding) 0;
+  background: var(--document-surface-muted);
   font-family: var(--font-sans);
 }
 

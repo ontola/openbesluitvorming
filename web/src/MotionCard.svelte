@@ -2,6 +2,10 @@
   import type { MeetingMotion } from "../../src/types.ts";
 
   export let motion: MeetingMotion;
+  /** "card" sits among agenda items, where a frame separates it from the
+   * surrounding content. "row" is for a motion's own page: the sheet is
+   * already a surface, so another bordered box reads as a card in a card. */
+  export let variant: "card" | "row" = "card";
 
   /** Group the per-member votes by fractie.
    *
@@ -32,10 +36,14 @@
   $: resultLabel = motion.result ? motion.result[0].toUpperCase() + motion.result.slice(1) : null;
 </script>
 
-<article class="motion">
+<article class="motion motion--{variant}">
   <header class="motion__header">
     <div class="motion__title-group">
-      <h4 class="motion__title">{motion.name}</h4>
+      <!-- On its own page the sheet heading already carries the title; a
+           second copy of it here is noise. -->
+      {#if variant === "card"}
+        <h4 class="motion__title">{motion.name}</h4>
+      {/if}
       <p class="motion__meta">
         {#if motion.motion_type}<span>{motion.motion_type}</span>{/if}
         {#if motion.parties?.length}<span>{motion.parties.join(", ")}</span>{/if}
@@ -104,10 +112,58 @@
   .motion {
     display: grid;
     gap: 0.5rem;
+  }
+
+  /* Framed, because it sits among agenda items and needs separating from them. */
+  .motion--card {
     padding: 0.75rem 0.9rem;
     border: 1px solid var(--line);
     border-radius: 0.7rem;
     background: var(--document-surface-muted);
+  }
+
+  /* One quiet line on a motion's own page. `display: contents` lets the chip,
+     the tally and the meta share a row without duplicating the markup, and a
+     single rule below the whole thing replaces the frame. */
+  .motion--row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: 0.75rem;
+    row-gap: 0.4rem;
+    padding-bottom: 0.9rem;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .motion--row .motion__header {
+    display: contents;
+  }
+
+  .motion--row .motion__result {
+    order: -1;
+  }
+
+  .motion--row .motion__meta {
+    margin: 0;
+  }
+
+  .motion--row .motion__parties,
+  .motion--row .motion__summary,
+  .motion--row .motion__proposers,
+  .motion--row .motion__hint {
+    flex-basis: 100%;
+  }
+
+  /* The per-fractie list carries its own rules in a card; on a page that
+     already reads as one block, spacing separates them well enough. */
+  .motion--row .motion__party {
+    border-bottom: 0;
+    padding: 0.1rem 0;
+  }
+
+  .motion--row .motion__parties {
+    margin-top: 0.15rem;
+    gap: 0.05rem;
   }
 
   .motion__header {
