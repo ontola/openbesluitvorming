@@ -7,7 +7,14 @@ quickwit/data/
 .zed/
 .claude/
 .env
-woozi-ops.sqlite3
+.DS_Store
+
+# Local runtime state, written by running the app or a seed script here. Only
+# woozi-ops was listed, so its siblings — and every SQLite WAL sidecar —
+# turned up as untracked noise on each run.
+woozi-ops.sqlite3*
+woozi-export-log.sqlite3*
+woozi-stats-cache.json
 
 # OpenTofu / Terraform
 infra/.terraform/
