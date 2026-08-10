@@ -1664,7 +1664,10 @@ select {
   gap: 0.4rem;
 }
 
-.meeting-agenda__document-pill {
+/* The pill is shared by everything that hangs off an agenda point — documents
+   and motions alike. They are the same kind of thing to a reader (open it,
+   read it, download it), so they get one look rather than two that drift. */
+.entity-pill {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: stretch;
@@ -1676,7 +1679,7 @@ select {
   overflow: hidden;
 }
 
-.meeting-agenda__document-main {
+.entity-pill__main {
   display: flex;
   align-items: center;
   gap: 0.55rem;
@@ -1696,11 +1699,11 @@ select {
     box-shadow var(--motion-fast) ease;
 }
 
-.meeting-agenda__document-main:hover {
+.entity-pill__main:hover {
   background: rgba(232, 239, 248, 1);
 }
 
-.meeting-agenda__document-pill-icon {
+.entity-pill__icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1710,7 +1713,7 @@ select {
   font-size: 0.95rem;
 }
 
-.meeting-agenda__document-pill-label {
+.entity-pill__label {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1719,7 +1722,18 @@ select {
   font-weight: 500;
 }
 
-.meeting-agenda__document-thumb {
+/* A filename survives being cut off; a motion's title is a sentence, and the
+   distinguishing part is usually not in the first few words. */
+.entity-pill__label--wrap {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  white-space: normal;
+  text-overflow: clip;
+}
+
+.entity-pill__thumb {
   position: relative;
   flex: 0 0 3.5rem;
   align-self: stretch;
@@ -1735,7 +1749,7 @@ select {
    images are ~1120px tall, and each one landing added 8px to its pill. Over a
    long agenda that shifted everything below by hundreds of pixels — enough to
    push the scrolled-to search hit back off screen. */
-.meeting-agenda__document-thumb img {
+.entity-pill__thumb img {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -1745,32 +1759,15 @@ select {
   display: block;
 }
 
-.meeting-agenda__document-actions {
+.entity-pill__actions {
   display: flex;
   flex-direction: column;
   border-left: 1px solid rgba(41, 88, 153, 0.1);
 }
 
-.meeting-agenda__document-download {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.38rem;
-  padding: 0 0.7rem;
-  flex: 1;
-  border-top: 1px solid rgba(41, 88, 153, 0.1);
-  color: var(--muted);
-  text-decoration: none;
-  background: rgba(233, 239, 246, 0.75);
-  white-space: nowrap;
-  position: relative;
-  z-index: 1;
-  transition:
-    background-color var(--motion-fast) ease,
-    color var(--motion-fast) ease;
-}
-
-.meeting-agenda__document-toggle {
+/* One rule for both the <button> and the <a>: they were near-identical copies,
+   and the pair drifted apart every time only one of them was touched. */
+.entity-pill__action {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1779,6 +1776,7 @@ select {
   flex: 1;
   border: 0;
   color: var(--muted);
+  text-decoration: none;
   background: rgba(233, 239, 246, 0.75);
   cursor: pointer;
   font: inherit;
@@ -1790,19 +1788,18 @@ select {
     color var(--motion-fast) ease;
 }
 
-.meeting-agenda__document-toggle:hover,
-.meeting-agenda__document-toggle[aria-expanded="true"] {
+/* Only between actions, so a pill with a single action has no stray rule. */
+.entity-pill__action + .entity-pill__action {
+  border-top: 1px solid rgba(41, 88, 153, 0.1);
+}
+
+.entity-pill__action:hover,
+.entity-pill__action[aria-expanded="true"] {
   background: rgba(223, 232, 243, 1);
   color: var(--accent-deep);
 }
 
-.meeting-agenda__document-download:hover {
-  background: rgba(223, 232, 243, 1);
-  color: var(--accent-deep);
-}
-
-.meeting-agenda__document-download span:first-child,
-.meeting-agenda__document-toggle span:first-child {
+.entity-pill__action span:first-child {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1812,8 +1809,7 @@ select {
   font-size: 0.95rem;
 }
 
-.meeting-agenda__document-download span:last-child,
-.meeting-agenda__document-toggle span:last-child {
+.entity-pill__action span:last-child {
   font-size: 0.84rem;
   font-weight: 600;
 }
@@ -1855,9 +1851,11 @@ select {
   padding-left: 0.9rem;
 }
 
+/* Wider than the gap inside a motion, so the tally and the proposers read as
+   belonging to the pill above them rather than to the next motion. */
 .meeting-agenda__motions {
   display: grid;
-  gap: 0.5rem;
+  gap: 1.1rem;
 }
 
 .meeting-agenda__motions-label {
@@ -1873,7 +1871,7 @@ select {
    so they stay visible. */
 .detail-sheet__motions {
   display: grid;
-  gap: 0.6rem;
+  gap: 1.1rem;
   margin-top: 1.25rem;
 }
 
@@ -2910,36 +2908,34 @@ select {
     color: var(--accent-deep);
   }
 
-  .meeting-agenda__document-pill {
+  .entity-pill {
     border-color: rgba(114, 163, 232, 0.16);
     background: rgba(18, 21, 27, 0.86);
   }
 
-  .meeting-agenda__document-main {
+  .entity-pill__main {
     background: transparent;
     color: var(--text);
   }
 
-  .meeting-agenda__document-toggle,
-  .meeting-agenda__document-download {
+  .entity-pill__action {
     background: rgba(14, 17, 22, 0.7);
     color: var(--muted);
     border-color: rgba(114, 163, 232, 0.12);
   }
 
-  .meeting-agenda__document-thumb {
+  .entity-pill__thumb {
     background: rgba(14, 17, 22, 0.5);
     border-color: rgba(114, 163, 232, 0.12);
   }
 
-  .meeting-agenda__document-actions {
+  .entity-pill__actions {
     border-color: rgba(114, 163, 232, 0.12);
   }
 
-  .meeting-agenda__document-main:hover,
-  .meeting-agenda__document-toggle:hover,
-  .meeting-agenda__document-toggle[aria-expanded="true"],
-  .meeting-agenda__document-download:hover {
+  .entity-pill__main:hover,
+  .entity-pill__action:hover,
+  .entity-pill__action[aria-expanded="true"] {
     background: rgba(27, 31, 39, 0.96);
   }
 

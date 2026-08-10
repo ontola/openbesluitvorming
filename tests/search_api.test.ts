@@ -778,3 +778,108 @@ Deno.test("a motion that points at itself does not hang the request", async () =
     globalThis.fetch = originalFetch;
   }
 });
+
+Deno.test("a meeting's motions get the download link of their own attachment", async () => {
+  const originalFetch = globalThis.fetch;
+  const meetingId = "meeting:ibabs:gemeente:utrecht:m1";
+  const attachmentQueries: string[] = [];
+
+  globalThis.fetch = async (_input, init) => {
+    const body = JSON.parse(String((init as { body?: string } | undefined)?.body ?? "{}"));
+    const query = String(body.query ?? "");
+
+    if (query.includes("entity_type:Motion")) {
+      return new Response(
+        JSON.stringify({
+          num_hits: 3,
+          hits: [
+            {
+              time: "2026-01-29T10:00:00Z",
+              entity_id: "motion:ibabs:gemeente:utrecht:a",
+              entity_type: "Motion",
+              name: "M1 Eerste",
+              payload: { attachment: ["document:ibabs:gemeente:utrecht:doc-a"] },
+            },
+            {
+              time: "2026-01-29T10:00:00Z",
+              entity_id: "motion:ibabs:gemeente:utrecht:b",
+              entity_type: "Motion",
+              name: "M2 Tweede",
+              payload: { attachment: ["document:ibabs:gemeente:utrecht:doc-b"] },
+            },
+            {
+              time: "2026-01-29T10:00:00Z",
+              entity_id: "motion:ibabs:gemeente:utrecht:c",
+              entity_type: "Motion",
+              name: "M3 Zonder bijlage",
+              payload: {},
+            },
+          ],
+        }),
+        { headers: { "content-type": "application/json" } },
+      );
+    }
+
+    if (query.includes("doc-a") || query.includes("doc-b")) {
+      attachmentQueries.push(query);
+      return new Response(
+        JSON.stringify({
+          num_hits: 2,
+          hits: [
+            // Deliberately returned in the opposite order to the motions, so a
+            // by-position mapping would hand each motion the other one's file.
+            {
+              time: "2026-01-29T10:00:00Z",
+              entity_id: "document:ibabs:gemeente:utrecht:doc-b",
+              entity_type: "Document",
+              file_name: "tweede.docx",
+              payload: { original_url: "https://example.org/tweede.docx" },
+            },
+            {
+              time: "2026-01-29T10:00:00Z",
+              entity_id: "document:ibabs:gemeente:utrecht:doc-a",
+              entity_type: "Document",
+              file_name: "eerste.pdf",
+              payload: { original_url: "https://example.org/eerste.pdf" },
+            },
+          ],
+        }),
+        { headers: { "content-type": "application/json" } },
+      );
+    }
+
+    return new Response(
+      JSON.stringify({
+        num_hits: 1,
+        hits: [{
+          time: "2026-01-29T10:00:00Z",
+          entity_id: meetingId,
+          entity_type: "Meeting",
+          name: "Gemeenteraad",
+          source_key: "utrecht",
+        }],
+      }),
+      { headers: { "content-type": "application/json" } },
+    );
+  };
+
+  try {
+    const content = await getEntityContent(meetingId);
+    const motions = content?.motions ?? [];
+    const first = motions.find((motion) => motion.id.endsWith(":a"));
+    const second = motions.find((motion) => motion.id.endsWith(":b"));
+    const third = motions.find((motion) => motion.id.endsWith(":c"));
+
+    assert(first?.download_url === "https://example.org/eerste.pdf", "first keeps its own file");
+    assert(second?.download_url === "https://example.org/tweede.docx", "second keeps its own file");
+    assert(first?.attachment_is_pdf === true, "a .pdf attachment can be rendered as a thumbnail");
+    assert(second?.attachment_is_pdf === false, "a .docx attachment cannot");
+    assert(third?.download_url === undefined, "a motion without an attachment gets no link");
+    assert(
+      attachmentQueries.length === 1,
+      `attachments resolve in one query, made ${attachmentQueries.length}`,
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

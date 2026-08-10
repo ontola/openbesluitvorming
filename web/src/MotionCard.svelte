@@ -1,5 +1,8 @@
 <script lang="ts">
+  import { createEventDispatcher } from "svelte";
   import type { MeetingMotion } from "../../src/types.ts";
+
+  const dispatch = createEventDispatcher<{ open: { entityId: string } }>();
 
   export let motion: MeetingMotion;
   /** "card" sits among agenda items, where a frame separates it from the
@@ -34,40 +37,102 @@
 
   $: parties = byParty(motion.votes);
   $: resultLabel = motion.result ? motion.result[0].toUpperCase() + motion.result.slice(1) : null;
+  $: hasMeta = Boolean(motion.motion_type) || Boolean(motion.parties?.length);
 </script>
 
 <article class="motion motion--{variant}">
-  <header class="motion__header">
-    <div class="motion__title-group">
-      <!-- On its own page the sheet heading already carries the title; a
-           second copy of it here is noise. -->
-      {#if variant === "card"}
-        <h4 class="motion__title">{motion.name}</h4>
-      {/if}
-      <p class="motion__meta">
-        {#if motion.motion_type}<span>{motion.motion_type}</span>{/if}
-        {#if motion.parties?.length}<span>{motion.parties.join(", ")}</span>{/if}
-      </p>
+  {#if variant === "card"}
+    <!-- Same pill as the documents above it: a motion is another thing you
+         open, read and download, so it should not look like a different
+         species of row. -->
+    <div class="entity-pill">
+      <button
+        type="button"
+        class="entity-pill__main"
+        on:click={() => dispatch("open", { entityId: motion.id })}
+      >
+        <span class="entity-pill__icon" aria-hidden="true">🗳</span>
+        <span class="entity-pill__label entity-pill__label--wrap">{motion.name}</span>
+        {#if resultLabel}
+          <span class="motion__result motion__result--{motion.result}" title={motion.status}>
+            {resultLabel}
+          </span>
+        {/if}
+        {#if motion.attachment_id && motion.attachment_is_pdf}
+          <div class="entity-pill__thumb" aria-hidden="true">
+            <img
+              src={`/api/entities/${encodeURIComponent(motion.attachment_id)}/pdf/page/1`}
+              alt=""
+              loading="lazy"
+            />
+          </div>
+        {/if}
+      </button>
+
+      <div class="entity-pill__actions">
+        {#if parties.length > 0}
+          <button
+            type="button"
+            class="entity-pill__action"
+            aria-expanded={showVotes}
+            aria-label={`${showVotes ? "Verberg" : "Toon"} stemmen per fractie voor ${motion.name}`}
+            on:click|stopPropagation={() => (showVotes = !showVotes)}
+          >
+            <span aria-hidden="true">{showVotes ? "−" : "≣"}</span>
+            <span>{showVotes ? "Sluit" : "Stemmen"}</span>
+          </button>
+        {/if}
+        {#if motion.download_url}
+          <a
+            class="entity-pill__action"
+            href={motion.download_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={`Download ${motion.name}`}
+            on:click|stopPropagation
+          >
+            <span aria-hidden="true">↓</span>
+            <span>Download</span>
+          </a>
+        {/if}
+      </div>
     </div>
-    {#if resultLabel}
-      <span class="motion__result motion__result--{motion.result}" title={motion.status}>
-        {resultLabel}
-      </span>
-    {/if}
-  </header>
+  {/if}
+
+  {#if hasMeta || (resultLabel && variant === "row")}
+    <header class="motion__header">
+      <!-- In a pill the chip sits beside the title; on the motion's own page
+           there is no pill, so it leads the row instead. -->
+      {#if resultLabel && variant === "row"}
+        <span class="motion__result motion__result--{motion.result}" title={motion.status}>
+          {resultLabel}
+        </span>
+      {/if}
+      {#if hasMeta}
+        <p class="motion__meta">
+          {#if motion.motion_type}<span>{motion.motion_type}</span>{/if}
+          {#if motion.parties?.length}<span>{motion.parties.join(", ")}</span>{/if}
+        </p>
+      {/if}
+    </header>
+  {/if}
 
   {#if motion.tally}
     <p class="motion__tally">
       <strong>{motion.tally.in_favour}</strong> voor ·
       <strong>{motion.tally.against}</strong> tegen
-      <button
-        type="button"
-        class="motion__toggle"
-        aria-expanded={showVotes}
-        on:click={() => (showVotes = !showVotes)}
-      >
-        {showVotes ? "Verberg stemmen" : "Toon stemmen per fractie"}
-      </button>
+      <!-- The card has this as a button in its action stack; here there is no
+           stack to put it in. -->
+      {#if variant === "row"}
+        <button
+          type="button"
+          class="motion__toggle"
+          aria-expanded={showVotes}
+          on:click={() => (showVotes = !showVotes)}
+        >
+          {showVotes ? "Verberg stemmen" : "Toon stemmen per fractie"}
+        </button>
+      {/if}
     </p>
   {/if}
 
@@ -114,12 +179,33 @@
     gap: 0.5rem;
   }
 
-  /* Framed, because it sits among agenda items and needs separating from them. */
+  /* The pill draws the frame, so the card itself only spaces things out. The
+     inline padding lines the details up with the title inside the pill. */
   .motion--card {
-    padding: 0.75rem 0.9rem;
-    border: 1px solid var(--line);
-    border-radius: 0.7rem;
-    background: var(--document-surface-muted);
+    gap: 0.35rem;
+  }
+
+  .motion--card .motion__header,
+  .motion--card .motion__tally,
+  .motion--card .motion__parties,
+  .motion--card .motion__summary,
+  .motion--card .motion__proposers,
+  .motion--card .motion__hint {
+    padding-inline: 0.9rem;
+  }
+
+  .motion--card .motion__tally {
+    margin-top: 0.1rem;
+  }
+
+  /* Pushed to the far end of the title row, and the thumbnail then follows it
+     directly rather than splitting the free space with it. */
+  .motion--card .motion__result {
+    margin-left: auto;
+  }
+
+  .motion--card .motion__result + .entity-pill__thumb {
+    margin-left: 0.55rem;
   }
 
   /* One quiet line on a motion's own page. `display: contents` lets the chip,
@@ -141,10 +227,6 @@
 
   .motion--row .motion__result {
     order: -1;
-  }
-
-  .motion--row .motion__meta {
-    margin: 0;
   }
 
   .motion--row .motion__parties,
@@ -169,18 +251,11 @@
   .motion__header {
     display: flex;
     gap: 0.75rem;
-    align-items: flex-start;
-    justify-content: space-between;
-  }
-
-  .motion__title {
-    margin: 0;
-    font-size: 0.97rem;
-    line-height: 1.35;
+    align-items: baseline;
   }
 
   .motion__meta {
-    margin: 0.15rem 0 0;
+    margin: 0;
     color: var(--muted);
     font-size: 0.85rem;
     display: flex;

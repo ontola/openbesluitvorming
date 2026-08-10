@@ -152,18 +152,18 @@
             <div class="meeting-agenda__documents">
               {#each item.documents as document}
                 <div class="meeting-agenda__document-row">
-                  <div class="meeting-agenda__document-pill">
+                  <div class="entity-pill">
                     <button
                       type="button"
-                      class="meeting-agenda__document-main"
+                      class="entity-pill__main"
                       on:click={() => {
                         dispatch("opendocument", { entityId: document.id });
                       }}
                     >
-                      <span class="meeting-agenda__document-pill-icon" aria-hidden="true">📄</span>
-                      <span class="meeting-agenda__document-pill-label">{document.name}</span>
+                      <span class="entity-pill__icon" aria-hidden="true">📄</span>
+                      <span class="entity-pill__label">{document.name}</span>
                       {#if isPdfDocument(document)}
-                        <div class="meeting-agenda__document-thumb" aria-hidden="true">
+                        <div class="entity-pill__thumb" aria-hidden="true">
                           <img
                             src={`/api/entities/${encodeURIComponent(document.id)}/pdf/page/1`}
                             alt=""
@@ -173,10 +173,10 @@
                       {/if}
                     </button>
 
-                    <div class="meeting-agenda__document-actions">
+                    <div class="entity-pill__actions">
                       <button
                         type="button"
-                        class="meeting-agenda__document-toggle"
+                        class="entity-pill__action"
                         aria-expanded={expandedDocumentId === document.id}
                         aria-label={`${expandedDocumentId === document.id ? "Verberg" : "Toon"} tekst van ${document.name}`}
                         on:click|stopPropagation={() => {
@@ -187,7 +187,7 @@
                         <span>{expandedDocumentId === document.id ? "Sluit" : "Tekst"}</span>
                       </button>
                       <a
-                        class="meeting-agenda__document-download"
+                        class="entity-pill__action"
                         href={document.original_url}
                         target="_blank"
                         rel="noopener noreferrer"
@@ -226,7 +226,10 @@
                 Moties en amendementen bij dit agendapunt
               </p>
               {#each motionsByAgendaItem[item.id] as motion (motion.id)}
-                <MotionCard {motion} />
+                <MotionCard
+                  {motion}
+                  on:open={(event) => dispatch("opendocument", event.detail)}
+                />
               {/each}
             </div>
           {/if}

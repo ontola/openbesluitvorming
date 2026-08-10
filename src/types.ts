@@ -737,6 +737,13 @@ export interface MeetingMotion {
   vote_summary?: string;
   agenda_item?: string;
   agenda_item_hint?: string;
+  /** The document the motion text lives in. A motion is a list entry with no
+   * file of its own, so both the thumbnail and the download come from here. */
+  attachment_id?: string;
+  download_url?: string;
+  /** Only a PDF has a page to render, and the thumbnail would otherwise be a
+   * broken image for the minority of motions published as .docx. */
+  attachment_is_pdf?: boolean;
 }
 
 /** A recording as the meeting detail view needs it: enough to play, to jump to

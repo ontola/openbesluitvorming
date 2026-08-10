@@ -1076,6 +1076,7 @@ function motionFromHit(hit: SearchHit): MeetingMotion {
     vote_summary: hit.payload?.vote_summary,
     agenda_item: hit.payload?.agenda_item,
     agenda_item_hint: hit.payload?.agenda_item_hint,
+    attachment_id: hit.payload?.attachment?.[0],
   };
 }
 
@@ -1145,9 +1146,71 @@ async function getMeetingMotions(meetingId: string): Promise<MeetingMotion[]> {
     100,
   );
 
-  return dedupeLatestHits(response.hits as SearchHit[])
+  const motions = dedupeLatestHits(response.hits as SearchHit[])
     .filter((hit) => hit.entity_id)
     .map(motionFromHit);
+
+  return await withAttachmentDownloads(motions);
+}
+
+/** Resolve every motion's download link in one query instead of one per motion.
+ *
+ * A budget debate carries dozens of motions and the detail sheet already waits
+ * on several round trips before it can paint, so this stays a single search
+ * however long the agenda is. Motions whose attachment cannot be resolved keep
+ * their other fields — the pill simply shows no download. */
+async function withAttachmentDownloads(motions: MeetingMotion[]): Promise<MeetingMotion[]> {
+  const ids = [
+    ...new Set(
+      motions.map((motion) => motion.attachment_id).filter((id): id is string => Boolean(id)),
+    ),
+  ];
+  if (ids.length === 0) {
+    return motions;
+  }
+
+  const quickwit = new QuickwitClient();
+  const clause = ids.map((id) => `entity_id:${escapeTerm(id)}`).join(" OR ");
+  let hits: SearchHit[] = [];
+  try {
+    const response = await quickwit.search(
+      `projection_version:${escapeTerm(currentProjectionVersion())} AND (${clause})`,
+      Math.min(ids.length * 3, 300),
+    );
+    hits = dedupeLatestHits(response.hits as SearchHit[]);
+  } catch (error) {
+    console.warn("kon bijlagen van moties niet ophalen", error);
+    return motions;
+  }
+
+  const byId = new Map<string, { url?: string; isPdf: boolean }>();
+  for (const hit of hits) {
+    if (!hit.entity_id) {
+      continue;
+    }
+    const mediaUrl = hit.payload?.media_urls?.[0];
+    const url = mediaUrl?.url ?? hit.payload?.original_url;
+    byId.set(hit.entity_id, {
+      url,
+      isPdf: looksLikePdf({
+        contentType: mediaUrl?.content_type ?? hit.content_type,
+        fileName: hit.file_name,
+        url,
+      }),
+    });
+  }
+
+  return motions.map((motion) => {
+    const attachment = motion.attachment_id ? byId.get(motion.attachment_id) : undefined;
+    if (!attachment) {
+      return motion;
+    }
+    return {
+      ...motion,
+      download_url: attachment.url,
+      attachment_is_pdf: attachment.isPdf,
+    };
+  });
 }
 
 export async function getEntityPdfInfo(entityId: string): Promise<{

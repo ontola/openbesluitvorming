@@ -876,15 +876,20 @@
     closePdfPageJump();
   }
 
-  async function openDetailById(entityId: string, updateUrl = true): Promise<void> {
+  async function openDetailById(
+    entityId: string,
+    updateUrl = true,
+    pageOverride: number | null = null,
+  ): Promise<void> {
     const existing = results.find((item) => item.entityId === entityId);
     if (existing) {
-      await openDetail(existing, updateUrl);
+      await openDetail(existing, updateUrl, pageOverride);
       return;
     }
 
     const content = await loadDetailContent(entityId);
     if (!content) {
+      closeDetail(false);
       return;
     }
 
@@ -898,7 +903,7 @@
       summary: "",
       sortDate: content.sortDate,
       downloadUrl: content.downloadUrl,
-    }, updateUrl);
+    }, updateUrl, pageOverride);
   }
 
   function handleAgendaDocumentOpen(event: CustomEvent<{ entityId: string }>): void {
@@ -987,7 +992,11 @@
         if (selected) {
           await openDetail(selected, false, parsePageNumber(detailPage));
         } else {
-          closeDetail(false);
+          // A shared link points at one thing; whether that thing happens to
+          // sit in the first page of results for the query it was shared with
+          // is an accident. Motions made this obvious — they are rarely their
+          // own top hit — but it silently broke every deep link.
+          await openDetailById(view, false, parsePageNumber(detailPage));
         }
       } else {
         closeDetail(false);
@@ -2005,7 +2014,7 @@
                       : "Moties en amendementen"}
                   </p>
                   {#each unplacedMotions as motion (motion.id)}
-                    <MotionCard {motion} />
+                    <MotionCard {motion} on:open={handleAgendaDocumentOpen} />
                   {/each}
                 </div>
               {/if}
