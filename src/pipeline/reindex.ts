@@ -10,10 +10,19 @@ import type { ExportChangesLog } from "../exports/log.ts";
 import type { ObjectStorageClient } from "../storage/s3.ts";
 import type { QuickwitSearchDocument } from "../quickwit/project.ts";
 import { projectEntityCommitToQuickwitDocuments } from "../quickwit/project.ts";
+import { mapLimit } from "../util/map_limit.ts";
 import { readTranscript } from "../recordings/storage.ts";
 
 /** How many live entities to pull from the export log per page. */
 const DEFAULT_PAGE_SIZE = 500;
+
+/** Object-storage reads in flight while rehydrating.
+ *
+ * Deliberately modest: each rehydrated document holds its page chunks in memory
+ * until the batch is flushed, and the worker runs with a 4 GB heap. Raise it
+ * only with a memory measurement to match — the reindex is bounded by storage
+ * latency, not by CPU, so the returns fall off well before the risk does. */
+const DEFAULT_REHYDRATE_CONCURRENCY = 8;
 
 export interface ReindexStats {
   entity_count: number;
@@ -143,9 +152,15 @@ export async function reindexSource(
     onProgress?: (stats: ReindexStats) => Promise<void> | void;
     onIssue?: (issue: ExtractionIssue) => Promise<void> | void;
     pageSize?: number;
+    rehydrateConcurrency?: number;
   },
 ): Promise<ReindexStats> {
   const pageSize = context.pageSize ?? DEFAULT_PAGE_SIZE;
+  const concurrency = Math.max(
+    1,
+    context.rehydrateConcurrency ??
+      Number(Deno.env.get("WOOZI_REINDEX_CONCURRENCY") ?? DEFAULT_REHYDRATE_CONCURRENCY),
+  );
   const stats: ReindexStats = {
     entity_count: 0,
     document_count: 0,
@@ -168,22 +183,63 @@ export async function reindexSource(
   while (true) {
     const page = context.exportLog.readSnapshot(sourceKey, { cursor, limit: pageSize });
 
-    for (const record of page.records) {
-      try {
-        const event = toCommitEvent(record);
-        const payload = event.data.payload;
+    // Rehydration is where a reindex spends its time — it is one object-storage
+    // read per document, and 57% of live entities carry stored text. Doing that
+    // one record at a time held a source to ~4 entities/second (measured on
+    // zaltbommel, 7500 entities in 1988s), which puts Amsterdam's 193k entities
+    // at ~14 hours on its own. A source cannot be split across workers, so that
+    // single number was the floor for the whole reindex no matter how many
+    // workers ran.
+    //
+    // The reads now go out in parallel; projecting and flushing stay in order
+    // afterwards, so the batching and its memory behaviour are unchanged. The
+    // slice is what bounds memory: a rehydrated document carries its page
+    // chunks, so only `concurrency` of them are ever held beyond `pending`.
+    for (let offset = 0; offset < page.records.length; offset += concurrency) {
+      const slice = page.records.slice(offset, offset + concurrency);
+      const prepared = await mapLimit(slice, concurrency, async (record) => {
+        try {
+          const event = toCommitEvent(record);
+          const payload = event.data.payload;
+          let rehydrated = false;
 
-        if (payload?.type === "Document") {
-          if (await rehydrateDocumentText(payload, context.storage)) {
-            stats.rehydrated_count += 1;
+          if (payload?.type === "Document") {
+            rehydrated = await rehydrateDocumentText(payload, context.storage);
+          } else if (payload?.type === "Recording") {
+            rehydrated = await rehydrateTranscript(payload, context.storage);
           }
-          stats.document_count += 1;
+
+          return { record, event, isDocument: payload?.type === "Document", rehydrated };
+        } catch (error) {
+          return { record, error };
+        }
+      });
+
+      for (const item of prepared) {
+        if ("error" in item && item.error) {
+          stats.issue_count += 1;
+          await context.onIssue?.({
+            severity: "warning",
+            step: "ingest_quickwit",
+            entity_id: item.record.entity_id,
+            message: `Reindex skipped ${item.record.entity_id}: ${
+              item.error instanceof Error ? item.error.message : String(item.error)
+            }`,
+          });
+          continue;
         }
 
-        if (payload?.type === "Recording") {
-          if (await rehydrateTranscript(payload, context.storage)) {
-            stats.rehydrated_count += 1;
-          }
+        const { event, isDocument, rehydrated } = item as {
+          event: EntityCommitEvent<WooziEntity>;
+          isDocument: boolean;
+          rehydrated: boolean;
+        };
+
+        if (isDocument) {
+          stats.document_count += 1;
+        }
+        if (rehydrated) {
+          stats.rehydrated_count += 1;
         }
 
         pending.push(...projectEntityCommitToQuickwitDocuments(event));
@@ -194,16 +250,6 @@ export async function reindexSource(
         if (pending.length >= context.batchSize) {
           await flush();
         }
-      } catch (error) {
-        stats.issue_count += 1;
-        await context.onIssue?.({
-          severity: "warning",
-          step: "ingest_quickwit",
-          entity_id: record.entity_id,
-          message: `Reindex skipped ${record.entity_id}: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
-        });
       }
     }
 

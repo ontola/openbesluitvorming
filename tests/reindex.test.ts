@@ -40,10 +40,28 @@ class FakeExportLog {
 
 class FakeStorage {
   readonly reads: string[] = [];
-  constructor(private readonly objects: Record<string, string>) {}
-  getObjectText(key: string): Promise<string> {
+  /** Highest number of reads in flight at once, so a test can tell a parallel
+   * rehydration from a sequential one. */
+  peakConcurrency = 0;
+  private inFlight = 0;
+  private readonly delayMs: number;
+
+  constructor(
+    private readonly objects: Record<string, string>,
+    delayMs = 0,
+  ) {
+    this.delayMs = delayMs;
+  }
+
+  async getObjectText(key: string): Promise<string> {
     this.reads.push(key);
-    return Promise.resolve(this.objects[key] ?? "");
+    this.inFlight += 1;
+    this.peakConcurrency = Math.max(this.peakConcurrency, this.inFlight);
+    if (this.delayMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, this.delayMs));
+    }
+    this.inFlight -= 1;
+    return this.objects[key] ?? "";
   }
 }
 
@@ -224,6 +242,89 @@ Deno.test("a recording without a stored transcript reindexes without failing", a
   assertEquals(stats.issue_count, 0, "a recording with no transcript is normal, not an issue");
   assertEquals(stats.rehydrated_count, 0, "nothing to rehydrate");
   assert(ingested[0].content?.includes("Opening"), "the chapters still make it searchable");
+});
+
+Deno.test("rehydration reads run in parallel, and the order still holds", async () => {
+  // The reindex is bounded by object-storage latency: one read per document,
+  // 57% of live entities carrying stored text. Doing them one at a time held a
+  // source to ~4 entities/second, which made Amsterdam alone a ~14 hour floor
+  // for the whole reindex — a source cannot be split across workers.
+  const objects: Record<string, string> = {};
+  const records: ExportChangeRecord[] = [];
+  for (let i = 0; i < 12; i += 1) {
+    const key = `text/doc-${i}/md.md`;
+    objects[key] = `inhoud van document ${i}`;
+    records.push(
+      documentRecord(`document:ibabs:gemeente:utrecht:d${String(i).padStart(2, "0")}`, {
+        markdown: key,
+      }),
+    );
+  }
+
+  const storage = new FakeStorage(objects, 15);
+  const log = new FakeExportLog(records);
+  const ingested: QuickwitSearchDocument[] = [];
+
+  const stats = await reindexSource("utrecht", {
+    // deno-lint-ignore no-explicit-any
+    exportLog: log as any,
+    // deno-lint-ignore no-explicit-any
+    storage: storage as any,
+    batchSize: 1000,
+    rehydrateConcurrency: 4,
+    ingest: (documents) => {
+      ingested.push(...documents);
+      return Promise.resolve();
+    },
+  });
+
+  assertEquals(stats.entity_count, 12, "every record is projected");
+  assertEquals(stats.rehydrated_count, 12, "every document is rehydrated");
+  assert(storage.peakConcurrency > 1, `reads must overlap, peak was ${storage.peakConcurrency}`);
+  assert(
+    storage.peakConcurrency <= 4,
+    `and must respect the limit, peak was ${storage.peakConcurrency}`,
+  );
+
+  // Parallel reads must not reshuffle what gets indexed.
+  const ids = ingested.map((doc) => doc.entity_id);
+  assertEquals([...ids].sort(), ids, `projection order must follow the export log: ${ids}`);
+  assert(ingested[0].content?.includes("inhoud van document 0"), "text arrives with its entity");
+});
+
+Deno.test("a failing rehydration is reported per record, not per slice", async () => {
+  // One unreadable object must cost one entity, not the whole parallel batch.
+  const log = new FakeExportLog([
+    documentRecord("document:ibabs:gemeente:utrecht:d1", { chunks: "text/ok.json" }),
+    documentRecord("document:ibabs:gemeente:utrecht:d2", { chunks: "text/kapot.json" }),
+    documentRecord("document:ibabs:gemeente:utrecht:d3", { chunks: "text/ok.json" }),
+  ]);
+  const storage = new FakeStorage({
+    "text/ok.json": JSON.stringify([{ page_number: 1, markdown: "prima" }]),
+    "text/kapot.json": "{ dit is geen json",
+  });
+  const issues: string[] = [];
+  const ingested: QuickwitSearchDocument[] = [];
+
+  const stats = await reindexSource("utrecht", {
+    // deno-lint-ignore no-explicit-any
+    exportLog: log as any,
+    // deno-lint-ignore no-explicit-any
+    storage: storage as any,
+    batchSize: 1000,
+    rehydrateConcurrency: 3,
+    ingest: (documents) => {
+      ingested.push(...documents);
+      return Promise.resolve();
+    },
+    onIssue: (issue) => {
+      issues.push(issue.entity_id ?? "");
+    },
+  });
+
+  assertEquals(stats.issue_count, 1, "exactly one record fails");
+  assertEquals(issues, ["document:ibabs:gemeente:utrecht:d2"], "and it is named");
+  assertEquals(stats.entity_count, 2, "the other two still land");
 });
 
 Deno.test("document text is rehydrated from object storage, not lost", async () => {
