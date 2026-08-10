@@ -5,8 +5,17 @@ listen_address: 0.0.0.0
 rest:
   listen_port: 7280
 data_dir: /quickwit/qwdata
+# The metastore is index *metadata* only — a few hundred KB — and stays local.
 metastore_uri: file:///quickwit/qwdata/${QUICKWIT_INDEX_ROOT_PREFIX}
-default_index_root_uri: file:///quickwit/qwdata/${QUICKWIT_INDEX_ROOT_PREFIX}
+# Splits go to object storage, which is where the live index has always been
+# (`woozi-events-prod` reports s3://…/indexes-prod/woozi-events-prod). This
+# default said `file://`, so every index created *since* then wrote its splits
+# to the root disk instead. That is not a small difference: the published index
+# is ~65 GB and the root disk has ~60 GB free, so any newly created index —
+# including the v3 projection — filled the disk and could never have finished,
+# at any speed. Splits belong in S3; the searcher split cache on its own volume
+# is what makes them fast to read.
+default_index_root_uri: s3://${S3_STORAGE_BUCKET_NAME}/${QUICKWIT_INDEX_ROOT_PREFIX}
 storage:
   s3:
     endpoint: ${S3_STORAGE_ENDPOINT}

@@ -408,6 +408,31 @@ the pushdown is skipped and the date filter is applied app-side, exactly as it
 was before v3. Do not remove that guard without a live query against a v2
 index.
 
+### Before any new index: check where its splits will land
+
+`quickwit.yaml` sets `default_index_root_uri`, and it decides this per index at
+creation time. It said `file:///quickwit/qwdata/…` while the live index had been
+created against S3, so every index made after that wrote its splits to the
+**root disk** instead of object storage.
+
+That is what killed the first v3 attempt (2026-08-10). The root disk lost ~2 GB
+per minute, and the diagnosis went through two wrong causes — the searcher cache
+(correctly on its own 147 GB volume) and indexer staging (which grew by 234 MB,
+not gigabytes) — before `du` on `indexes-prod` showed it going from 168 KB to
+8 GB. The published index is ~65 GB against ~60 GB of free root disk, so the
+reindex could never have finished at any speed or concurrency.
+
+It now points at `s3://${S3_STORAGE_BUCKET_NAME}/${QUICKWIT_INDEX_ROOT_PREFIX}`,
+matching where the live index already is. Two things to know:
+
+- **The deploy does not restart Quickwit.** `deploy-production.sh` brings up
+  `openbesluitvorming worker caddy otel-collector` only, so a synced
+  `quickwit.yaml` sits unread until Quickwit is restarted by hand. Restarting it
+  makes search unavailable for a few seconds.
+- **Existing indexes keep the URI they were created with.** This changes nothing
+  for `woozi-events-prod`; it only decides where the next index goes. Verify with
+  `GET /api/v1/indexes/<id>` and look at `index_uri` before trusting a rebuild.
+
 ### Cutting over without emptying search
 
 Switching both containers at once empties search for as long as the reindex
