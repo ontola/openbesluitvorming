@@ -727,6 +727,12 @@ Deno.test("a motion detail carries its outcome and inherits its attachment's fil
       `the attachment's file should surface, got ${content?.downloadUrl}`,
     );
     assert(content?.pdfUrl !== undefined, "so the PDF view works on a motion too");
+    // The viewer renders pages by entity id, and a motion has none of its own:
+    // pointing it at the motion returned 404 and showed a blank pane.
+    assert(
+      content?.pdfEntityId === attachmentId,
+      `the PDF viewer must be pointed at the attachment, got ${content?.pdfEntityId}`,
+    );
     assert(
       content?.meetingId === "meeting:ibabs:gemeente:culemborg:m1",
       "the crumb back to the meeting still resolves",

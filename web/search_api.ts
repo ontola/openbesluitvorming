@@ -1050,6 +1050,7 @@ export async function getEntityContent(
     downloadUrl: downloadUrl ?? motionAttachment?.downloadUrl,
     contentType: contentType ?? motionAttachment?.contentType,
     pdfUrl: pdfUrl ?? motionAttachment?.pdfUrl,
+    pdfEntityId: pdfUrl ? undefined : motionAttachment?.entityId,
     meetingId: hit.payload?.is_referenced_by ?? hit.payload?.meeting,
     agenda,
     motions: motions && motions.length > 0 ? motions : undefined,

@@ -776,6 +776,11 @@ export interface EntityContentResponse {
   motions?: MeetingMotion[];
   /** Video/audio registrations of this meeting, when the entity is a Meeting. */
   recordings?: MeetingRecording[];
+  /** Which entity's pages the PDF viewer should render. Normally the entity
+   * itself, but a motion has no PDF of its own — its file hangs off an
+   * attachment, and the page renderer resolves by id, so pointing the viewer
+   * at the motion returned 404 and a blank pane. */
+  pdfEntityId?: string;
   /** The motion itself, when the entity is a Motion. Without this the detail
    * endpoint would answer with a title and a date and silently drop the
    * outcome and the votes — the only reason to look a motion up. */

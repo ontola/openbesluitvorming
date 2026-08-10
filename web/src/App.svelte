@@ -810,11 +810,16 @@
     detailContent = content;
     detailLoading = false;
     const hasPdf = Boolean(content?.pdfUrl);
-    detailMode = !content?.markdownText?.trim() && hasPdf
-      ? "pdf"
-      : preferredDetailMode === "pdf" && hasPdf
+    // A motion opens on its text, whatever the stored preference says: the
+    // outcome and the vote breakdown only render there, and they are the
+    // reason to open a motion at all. The PDF stays one click away.
+    detailMode = content?.motion
+      ? "text"
+      : !content?.markdownText?.trim() && hasPdf
         ? "pdf"
-        : "text";
+        : preferredDetailMode === "pdf" && hasPdf
+          ? "pdf"
+          : "text";
 
     prefetchAdjacentDetails(item.entityId);
 
@@ -2074,7 +2079,7 @@
               <PdfDocumentView
                 initialPage={parsePageNumber(detailPage) ?? detailItem.matchedPage ?? null}
                 on:pagechange={handlePdfPageChange}
-                url={entityPdfProxyUrl(detailItem.entityId)}
+                url={entityPdfProxyUrl(detailContent?.pdfEntityId ?? detailItem.entityId)}
               />
             {/key}
           </div>
