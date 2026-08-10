@@ -33,10 +33,23 @@ interface RateBucket {
   loggedAt: number;
 }
 
+/** A rendered PDF page is a cached image, not a query, and one meeting page
+ * asks for as many as it has attachments. The Utrecht raad of 29 January 2026
+ * requests 190 of them; at a full unit each that drains a 60/minute budget
+ * before a third of the agenda has drawn, which is why most thumbnails on a
+ * long agenda were broken. A fraction lets a whole agenda through while a
+ * cold render -- the only genuinely expensive case -- still costs something. */
+const PDF_PAGE_COST = 1 / 8;
+
+const PDF_PAGE_PATH = /\/pdf\/page\/\d+$/;
+
 /** A heavy request is charged proportionally: `limit=100` costs 5 units, so
  * bulk scraping at the server-side cap drains the budget 5x faster than the
  * UI's default page while remaining possible. */
 export function requestCost(url: URL): number {
+  if (PDF_PAGE_PATH.test(url.pathname)) {
+    return PDF_PAGE_COST;
+  }
   if (url.pathname !== "/api/search") {
     return 1;
   }

@@ -118,3 +118,36 @@ Deno.test("idle clients are swept so the map stays bounded", () => {
   limiter.consume("current", 1);
   assertEquals(limiter.trackedClients, 1, "the long-idle bucket was dropped");
 });
+
+Deno.test("a full agenda of page thumbnails fits inside one minute's budget", () => {
+  const thumbnail = (id: string) =>
+    new URL(`https://openbesluitvorming.nl/api/entities/${encodeURIComponent(id)}/pdf/page/1`);
+
+  // The Utrecht raad of 29 January 2026: 151 document thumbnails and 39 motion
+  // thumbnails on a single meeting sheet. At a unit each, only a third drew.
+  const limiter = new RateLimiter(60, fakeClock().now);
+  let drawn = 0;
+  for (let index = 0; index < 190; index += 1) {
+    if (limiter.consume("browser", requestCost(thumbnail(`document:x:${index}`))).allowed) {
+      drawn += 1;
+    }
+  }
+  assertEquals(drawn, 190, "every thumbnail on a long agenda should be served");
+
+  // Still not free: a client doing nothing but thumbnails is bounded.
+  const exhausted = new RateLimiter(60, fakeClock().now);
+  let served = 0;
+  while (exhausted.consume("scraper", requestCost(thumbnail("document:x:1"))).allowed) {
+    served += 1;
+    if (served > 10_000) break;
+  }
+  assertEquals(served, 480, "the budget still runs out, eight thumbnails to the unit");
+
+  // A deeper page in the viewer is charged the same as the first.
+  assertEquals(
+    requestCost(thumbnail("document:x:1")),
+    requestCost(new URL("https://openbesluitvorming.nl/api/entities/doc/pdf/page/42")),
+  );
+  // The proxy that streams the whole file is not a thumbnail.
+  assertEquals(requestCost(new URL("https://openbesluitvorming.nl/api/entities/doc/pdf")), 1);
+});
