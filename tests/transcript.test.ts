@@ -111,3 +111,22 @@ Deno.test("the seekable HLS url is derived from the wowza coordinates", () => {
     "no streamer means no stream url, rather than a guessed one",
   );
 });
+
+Deno.test("a connection that cannot be established is retried, not fatal", async () => {
+  // 22 of 128 sources failed the first media backfill on this alone: Deno
+  // reports an unestablished connection as "error sending request", which the
+  // Notubiz client did not recognise as retryable even though the iBabs client
+  // already had. One dropped connection failed a whole source.
+  const { __test__ } = await import("../src/notubiz/client.ts");
+  const retryable = __test__.isRetryableError;
+
+  assert(
+    retryable(new TypeError("error sending request for url (https://api.notubiz.nl/events)")),
+    "an unestablished connection must be retried",
+  );
+  assert(retryable(new Error("connection reset by peer")), "existing cases still retry");
+  assert(
+    !retryable(new Error("Request failed 404 for https://api.notubiz.nl/x")),
+    "a real 404 must not be retried forever",
+  );
+});

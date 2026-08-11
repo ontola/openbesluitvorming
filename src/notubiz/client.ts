@@ -42,7 +42,12 @@ function isRetryableError(error: unknown): boolean {
     message.includes("dns error") ||
     message.includes("client error") ||
     message.includes("unknownerror") ||
-    message.includes("failed to fetch")
+    message.includes("failed to fetch") ||
+    // Deno's wording when the connection cannot be established at all. The
+    // iBabs client already learned this one; the same omission here cost 22 of
+    // 128 sources in the first media backfill (2026-08-11), where it was the
+    // only transport failure that got no retry and so failed the whole run.
+    message.includes("error sending request")
   );
 }
 
@@ -168,20 +173,18 @@ function fallbackDocumentUrl(document: unknown): string | undefined {
 }
 
 export class NotubizClient {
-  private mapOrganizationAttributes(
-    organization: {
-      settings?: {
-        folder?: {
-          fields?: {
-            field?: Array<{
-              "@attributes": { id: string };
-              label: string;
-            }>;
-          };
+  private mapOrganizationAttributes(organization: {
+    settings?: {
+      folder?: {
+        fields?: {
+          field?: Array<{
+            "@attributes": { id: string };
+            label: string;
+          }>;
         };
       };
-    },
-  ): NotubizOrganizationAttributes {
+    };
+  }): NotubizOrganizationAttributes {
     const fields = organization.settings?.folder?.fields?.field ?? [];
     const attributes: Record<string, string> = {};
     for (const field of fields) {
@@ -343,3 +346,4 @@ export class NotubizClient {
     }
   }
 }
+export const __test__ = { isRetryableError, notubizMediaUrl };
