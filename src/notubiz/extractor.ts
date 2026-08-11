@@ -120,6 +120,13 @@ export class NotubizMeetingExtractor {
       retainIssues?: boolean;
     } = {},
   ): Promise<ExtractionBundle> {
+    // Skips the document pass entirely: a media backfill runs over history we
+    // already hold, and re-downloading and re-extracting those PDFs is by far
+    // the expensive part of a full run. What it still needs is the events list
+    // (for the meeting ids) and the meeting detail, because the agenda offsets
+    // that place chapters on the recording's timeline live in that response.
+    const mediaOnly = options.executionMode === "media_only";
+
     if (options.executionMode === "motions_only") {
       // Notubiz motions reference their agenda item by id, and the only way we
       // resolve that to a meeting is from meetings imported in the same run.
@@ -187,7 +194,9 @@ export class NotubizMeetingExtractor {
       )) as NotubizEventsResponse;
 
       const events = Array.isArray(eventPage.events) ? eventPage.events : [];
-      console.log(`[timing] ${source.key} api=listEvents page=${page} events=${events.length} ${Math.round(performance.now() - tPage)}ms`);
+      console.log(
+        `[timing] ${source.key} api=listEvents page=${page} events=${events.length} ${Math.round(performance.now() - tPage)}ms`,
+      );
       if (events.length === 0) {
         break;
       }
@@ -234,7 +243,14 @@ export class NotubizMeetingExtractor {
               meetings.push(meeting);
             }
             await options.onProgress?.(currentStats());
-            await options.onEntity?.(meeting);
+            // A media backfill runs over meetings that were imported long ago.
+            // Re-emitting them would rewrite hundreds of thousands of unchanged
+            // entities for nothing; the recording only needs the meeting's id,
+            // which it already has. `meeting_count` still counts what was
+            // scanned, so the run reports the work it actually did.
+            if (!mediaOnly) {
+              await options.onEntity?.(meeting);
+            }
 
             await this.extractRecordings(source, meeting, meetingResponse.meeting, {
               storage,
@@ -266,9 +282,11 @@ export class NotubizMeetingExtractor {
       ).filter((meeting): meeting is NonNullable<typeof meeting> => Boolean(meeting));
 
       const documentsById = new Map<string, ReturnType<typeof normalizeNotubizDocuments>[number]>();
-      for (const meeting of pageMeetings) {
-        for (const document of normalizeNotubizDocuments(source, meeting)) {
-          documentsById.set(document.id, document);
+      if (!mediaOnly) {
+        for (const meeting of pageMeetings) {
+          for (const document of normalizeNotubizDocuments(source, meeting)) {
+            documentsById.set(document.id, document);
+          }
         }
       }
       const tDocs = performance.now();
@@ -304,7 +322,9 @@ export class NotubizMeetingExtractor {
         }
       });
 
-      console.log(`[timing] ${source.key} page=${page} meetings=${pageMeetings.length} docs=${documentsById.size} docs_time=${Math.round(performance.now() - tDocs)}ms`);
+      console.log(
+        `[timing] ${source.key} page=${page} meetings=${pageMeetings.length} docs=${documentsById.size} docs_time=${Math.round(performance.now() - tDocs)}ms`,
+      );
 
       if (!eventPage.pagination?.has_more_pages) {
         break;
@@ -314,50 +334,54 @@ export class NotubizMeetingExtractor {
     }
 
     // Motions run once all pages are in, so every meeting they could reference
-    // is already in the index.
-    await this.extractMotions(source, dateFrom, dateTo, {
-      meetingIndex,
-      registerIssue,
-      onMotion: async (motion, motionDocuments) => {
-        motionCount += 1;
-        if (retainEntities) {
-          motions.push(motion);
-        }
-        await options.onProgress?.(currentStats());
-        await options.onEntity?.(motion);
-
-        await mapLimit(motionDocuments, documentConcurrency, async (document) => {
-          try {
-            const materialized = await materializeDocument(document, {
-              download: (documentEntity) => this.client.downloadDocument(documentEntity),
-              storage,
-              executionMode: options.executionMode,
-            });
-            for (const issue of materialized.issues) {
-              await registerIssue(issue);
-            }
-            documentCount += 1;
-            if (retainEntities) {
-              documents.push(materialized.document);
-            }
-            if (materialized.cacheHit) {
-              cacheHits += 1;
-            } else {
-              downloadedCount += 1;
-            }
-            await options.onProgress?.(currentStats());
-            await options.onEntity?.(materialized.document);
-          } catch (error) {
-            await registerIssue({
-              severity: "error",
-              step: issueStepForDocumentError(error),
-              entity_id: document.id,
-              message: error instanceof Error ? error.message : "Document processing failed",
-            });
+    // is already in the index. A media backfill skips them: it is there for the
+    // recordings, and the registries were already imported by the run that
+    // brought in these meetings.
+    if (!mediaOnly) {
+      await this.extractMotions(source, dateFrom, dateTo, {
+        meetingIndex,
+        registerIssue,
+        onMotion: async (motion, motionDocuments) => {
+          motionCount += 1;
+          if (retainEntities) {
+            motions.push(motion);
           }
-        });
-      },
-    });
+          await options.onProgress?.(currentStats());
+          await options.onEntity?.(motion);
+
+          await mapLimit(motionDocuments, documentConcurrency, async (document) => {
+            try {
+              const materialized = await materializeDocument(document, {
+                download: (documentEntity) => this.client.downloadDocument(documentEntity),
+                storage,
+                executionMode: options.executionMode,
+              });
+              for (const issue of materialized.issues) {
+                await registerIssue(issue);
+              }
+              documentCount += 1;
+              if (retainEntities) {
+                documents.push(materialized.document);
+              }
+              if (materialized.cacheHit) {
+                cacheHits += 1;
+              } else {
+                downloadedCount += 1;
+              }
+              await options.onProgress?.(currentStats());
+              await options.onEntity?.(materialized.document);
+            } catch (error) {
+              await registerIssue({
+                severity: "error",
+                step: issueStepForDocumentError(error),
+                entity_id: document.id,
+                message: error instanceof Error ? error.message : "Document processing failed",
+              });
+            }
+          });
+        },
+      });
+    }
 
     return {
       meetings,
@@ -502,10 +526,7 @@ export class NotubizMeetingExtractor {
 
       for (const item of items) {
         const motion = normalizeNotubizMotion(source, module, item, context.meetingIndex);
-        await context.onMotion(
-          motion,
-          normalizeNotubizMotionDocuments(source, motion, item),
-        );
+        await context.onMotion(motion, normalizeNotubizMotionDocuments(source, motion, item));
       }
     }
   }

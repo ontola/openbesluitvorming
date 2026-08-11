@@ -133,18 +133,6 @@ export async function executeIngest(
     throw new Error(`Execution mode "${options.executionMode}" is not implemented yet.`);
   }
 
-  // The mode, its persistence and its counter exist so a media backfill can be
-  // queued and reported on; the per-supplier extraction is the next slice.
-  // It has to be a *known* mode from the start: `normalizeExecutionMode` reads
-  // anything it does not recognise back as "full", so a queued media run would
-  // otherwise resume as a full import and re-download every document we
-  // already hold.
-  if (options.executionMode === "media_only") {
-    throw new Error(
-      'Execution mode "media_only" is not implemented yet: no extractor imports recordings.',
-    );
-  }
-
   if (options.executionMode === "reindex_only") {
     return await executeReindexOnly(run, sourceKey, options);
   }

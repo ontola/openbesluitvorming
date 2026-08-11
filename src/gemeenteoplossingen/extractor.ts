@@ -86,14 +86,21 @@ export class GemeenteOplossingenExtractor {
     options: {
       onProgress?: (stats: ExtractionBundle["stats"]) => Promise<void> | void;
       onIssue?: (issue: ExtractionIssue, stats: ExtractionBundle["stats"]) => Promise<void> | void;
-      onEntity?: (
-        entity: ExtractedEntity,
-      ) => Promise<void> | void;
+      onEntity?: (entity: ExtractedEntity) => Promise<void> | void;
       executionMode?: IngestExecutionMode;
       retainEntities?: boolean;
       retainIssues?: boolean;
     } = {},
   ): Promise<ExtractionBundle> {
+    if (options.executionMode === "media_only") {
+      // Silence here would be worse than an error: the mode would fall through
+      // to a full import and re-download every document of a source that was
+      // only meant to be scanned for recordings.
+      throw new Error(
+        'Execution mode "media_only" is Notubiz-only for now: GemeenteOplossingen recordings are not implemented.',
+      );
+    }
+
     const retainEntities = options.retainEntities ?? true;
     const retainIssues = options.retainIssues ?? true;
 

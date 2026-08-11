@@ -102,12 +102,8 @@ function splitDateRange(
     const nextCursor = new Date(cursor);
     nextCursor.setUTCMonth(nextCursor.getUTCMonth() + chunkMonths);
 
-    const chunkEnd =
-      nextCursor > end ? end : new Date(nextCursor.getTime() - 86_400_000);
-    chunks.push([
-      cursor.toISOString().slice(0, 10),
-      chunkEnd.toISOString().slice(0, 10),
-    ]);
+    const chunkEnd = nextCursor > end ? end : new Date(nextCursor.getTime() - 86_400_000);
+    chunks.push([cursor.toISOString().slice(0, 10), chunkEnd.toISOString().slice(0, 10)]);
 
     cursor = nextCursor;
   }
@@ -169,6 +165,15 @@ export class IbabsMeetingExtractor {
       retainIssues?: boolean;
     } = {},
   ): Promise<ExtractionBundle> {
+    if (options.executionMode === "media_only") {
+      // Silence here would be worse than an error: the mode would fall through
+      // to a full import and re-download every document of a source that was
+      // only meant to be scanned for recordings.
+      throw new Error(
+        'Execution mode "media_only" is Notubiz-only for now: iBabs recordings are not implemented.',
+      );
+    }
+
     const meetingTypeMap = new Map<string, string>();
     const retainEntities = options.retainEntities ?? true;
     const retainIssues = options.retainIssues ?? true;
@@ -227,7 +232,8 @@ export class IbabsMeetingExtractor {
         severity: "warning",
         step: "list_motions",
         entity_id: source.key,
-        message: `iBabs GetMeetingtypes failed for ${source.ibabsSitename}; continuing without ` +
+        message:
+          `iBabs GetMeetingtypes failed for ${source.ibabsSitename}; continuing without ` +
           `meeting-type names, so motion links fall back to same-day matching: ${
             error instanceof Error ? error.message : String(error)
           }`,
@@ -248,9 +254,8 @@ export class IbabsMeetingExtractor {
     // works: extractMotions fetches the meeting day each motion references, so
     // it builds exactly the slice of the index it needs instead of relying on
     // meetings this run happened to import.
-    const chunks = options.executionMode === "motions_only"
-      ? []
-      : splitDateRange(dateFrom, dateTo, chunkMonths);
+    const chunks =
+      options.executionMode === "motions_only" ? [] : splitDateRange(dateFrom, dateTo, chunkMonths);
 
     for (const [chunkFrom, chunkTo] of chunks) {
       const rawMeetings = await listMeetingsAdaptive(
@@ -263,8 +268,7 @@ export class IbabsMeetingExtractor {
             severity: "warning",
             step: "list_events",
             entity_id: source.key,
-            message:
-              `iBabs SOAP timed out for ${source.ibabsSitename} ${splitFrom}..${splitTo}; halving chunk and retrying`,
+            message: `iBabs SOAP timed out for ${source.ibabsSitename} ${splitFrom}..${splitTo}; halving chunk and retrying`,
           });
         },
       );
