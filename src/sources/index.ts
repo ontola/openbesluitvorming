@@ -115,11 +115,36 @@ export function listAggregateAdminSourceOptions(): AdminSourceOption[] {
 }
 
 export function getSource(sourceKeyOrRef: string): SourceDefinition {
+  return resolveSource(sourceKeyOrRef, { requireRunnable: true });
+}
+
+/** A source as far as *reprojection* is concerned.
+ *
+ * `implemented: false` means "do not call this supplier again" -- it says
+ * nothing about the data already imported. Dongen is the live example: Notubiz
+ * reports the organisation as non-active so it was withdrawn from importing,
+ * while its 9,197 entities sit in the export log and answer searches perfectly
+ * well today.
+ *
+ * A reindex reads the export log and never touches a supplier API, so applying
+ * the import gate to it is simply the wrong check. It was: enqueuing the v3
+ * reindex rejected Dongen with "Unknown or unsupported source", which would
+ * have dropped a whole municipality out of search the moment the new index
+ * started serving -- with nothing failing and no warning anywhere
+ * (2026-08-12). */
+export function getProjectableSource(sourceKeyOrRef: string): SourceDefinition {
+  return resolveSource(sourceKeyOrRef, { requireRunnable: false });
+}
+
+function resolveSource(
+  sourceKeyOrRef: string,
+  { requireRunnable }: { requireRunnable: boolean },
+): SourceDefinition {
   const catalogSource = sourceKeyOrRef.includes(":")
     ? getCatalogSourceByRef(sourceKeyOrRef)
     : getCatalogSourceByKey(sourceKeyOrRef);
 
-  if (!isCatalogSourceRunnable(catalogSource)) {
+  if (requireRunnable && !isCatalogSourceRunnable(catalogSource)) {
     throw new Error(`Unknown or unsupported source "${sourceKeyOrRef}"`);
   }
 

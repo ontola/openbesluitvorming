@@ -19,7 +19,7 @@ import { QuickwitClient } from "./quickwit/client.ts";
 import { reindexSource } from "./pipeline/reindex.ts";
 import { ObjectStorageClient } from "./storage/s3.ts";
 import { currentDerivationVersion, currentProjectionVersion } from "./pipeline/versioning.ts";
-import { getSource } from "./sources/index.ts";
+import { getProjectableSource, getSource } from "./sources/index.ts";
 import { computeAllowedIngestConcurrency } from "./ingest_scheduler.ts";
 import type {
   EntityCommitEvent,
@@ -303,7 +303,9 @@ async function executeReindexOnly(
   options: { ingestToQuickwit?: boolean; onHeartbeat?: () => void },
 ): Promise<{ run: IngestRunRecord; quickwit_index_id?: string }> {
   try {
-    const source = getSource(sourceKey);
+    // Same reasoning as in startIngest: replaying the export log does not need
+    // the source to still be importable.
+    const source = getProjectableSource(sourceKey);
 
     if (!options.ingestToQuickwit) {
       throw new Error("Reindex needs Quickwit ingestion enabled; there is nothing else to write.");
@@ -455,8 +457,12 @@ export async function startIngest(
     parentRunId?: string;
   } = {},
 ): Promise<IngestRunRecord> {
-  const source = getSource(sourceKey);
   const executionMode = options.executionMode ?? "full";
+  // A reindex replays the export log and never calls a supplier, so a source
+  // that is no longer imported can still be reprojected. See
+  // getProjectableSource.
+  const source =
+    executionMode === "reindex_only" ? getProjectableSource(sourceKey) : getSource(sourceKey);
   const activeRun = await findActiveRun({
     sourceKey: source.key,
     dateFrom,

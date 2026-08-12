@@ -5,6 +5,8 @@ import {
   listImplementedCatalogSources,
 } from "../src/sources/catalog.ts";
 import {
+  getProjectableSource,
+  getSource,
   listAggregateAdminSourceOptions,
   listAggregateRunnableSourceRefs,
 } from "../src/sources/index.ts";
@@ -96,4 +98,39 @@ Deno.test("admin source options expose supplier aggregate choices", () => {
     options.every((option) => option.isAggregate),
     "aggregate source options should be marked as aggregate",
   );
+});
+
+/** A withdrawn source keeps its indexed data, so it must stay reprojectable.
+ *
+ * Dongen is withdrawn from importing because Notubiz reports the organisation
+ * as non-active, but its entities are in the export log and answer searches
+ * today. Enqueuing the v3 reindex rejected it outright, which would have
+ * dropped a municipality out of search the moment the new index started
+ * serving -- silently, with nothing failing. */
+Deno.test("a source that is no longer imported can still be reprojected", () => {
+  let importThrew = false;
+  try {
+    getSource("dongen");
+  } catch {
+    importThrew = true;
+  }
+  assert(importThrew, "dongen is not runnable for imports");
+
+  const projectable = getProjectableSource("dongen");
+  assert(projectable.key === "dongen", "but a reindex can still resolve it");
+});
+
+Deno.test("an unknown source is unknown to both lookups", () => {
+  for (const [name, lookup] of [
+    ["getSource", getSource],
+    ["getProjectableSource", getProjectableSource],
+  ] as const) {
+    let threw = false;
+    try {
+      lookup("bestaatniet999");
+    } catch {
+      threw = true;
+    }
+    assert(threw, `${name} should reject an unknown key`);
+  }
 });
