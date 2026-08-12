@@ -30,9 +30,17 @@ jobs:
       - name: Set up Deno
         uses: denoland/setup-deno@v2
         with:
-          # Matches the runtime in Dockerfile.web, so a test passing here means
-          # it passes on the image that gets deployed.
-          deno-version: 2.7.7
+          # Deliberately NOT the 2.7.7 in Dockerfile.web. The codebase does not
+          # type-check on 2.7.7: aws4fetch's fetch signature resolves without
+          # `method` there, giving 9 errors in src/storage/s3.ts. Verified by
+          # running deno check in both images — 2.7.7 fails, 2.8.3 is clean.
+          #
+          # Types are not enforced at runtime, so production is unaffected, but
+          # the runtime image and the version developers run have drifted apart.
+          # Worth closing by bumping Dockerfile.web; that is a change to what
+          # runs in production and belongs in its own commit, not smuggled into
+          # a CI fix.
+          deno-version: 2.8.3
 
       - name: Check types
         run: deno check src/main.ts src/worker.ts web/server.ts
