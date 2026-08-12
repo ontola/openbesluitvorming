@@ -37,7 +37,9 @@ Deno.test("searchMeetings dedupes to the latest hit and keeps the newest snippet
     }
 
     const body = JSON.parse(String((init as { body?: string } | undefined)?.body ?? "{}"));
-    assert(body.max_hits === 25, "search should fetch one bounded first-page window");
+    // Over-fetch on purpose: several index rows collapse into one result, so
+    // asking for exactly one page's worth returned a third of it (#193).
+    assert(body.max_hits >= 25, "search should over-fetch to fill a page after grouping");
     assert(body.count_all === false, "public search should skip full Quickwit hit counting");
 
     return new Response(
@@ -92,8 +94,15 @@ Deno.test("searchMeetings dedupes to the latest hit and keeps the newest snippet
     const results = response.results;
 
     assert(results.length === 2, "duplicate entity ids should collapse to one result");
-    assert(response.totalCount === 3, "quickwit total should be forwarded for UI estimates");
-    assert(response.totalIsApproximate === true, "forwarded total should be marked approximate");
+    // Three index rows, two results. totalCount used to forward Quickwit's raw
+    // row count, which is why it read 9,933 for a few thousand documents and
+    // moved between calls (#195). Having scanned the whole match set, the
+    // count is now simply exact -- and says so.
+    assert(response.totalCount === 2, "the count should describe results, not index rows");
+    assert(
+      response.totalIsApproximate === false,
+      "a fully scanned result set gives an exact count",
+    );
     assert(
       results[0].entityId === "document:notubiz:gemeente:haarlem:42",
       "newest document hit should be kept after dedupe",
@@ -273,7 +282,7 @@ Deno.test("searchMeetings supports offset paging and signals more results approx
 
   globalThis.fetch = async (_input, init) => {
     const body = JSON.parse(String((init as { body?: string } | undefined)?.body ?? "{}"));
-    assert(body.max_hits === 49, "search should fetch enough hits to cover the requested page");
+    assert(body.max_hits >= 49, "search should fetch enough hits to cover the requested page");
 
     const hits = Array.from({ length: 30 }, (_, index) => ({
       time: `2026-03-31T${String(index).padStart(2, "0")}:00:00Z`,
@@ -354,49 +363,61 @@ Deno.test("searchMeetings does not advertise more pages for empty grouped window
   }
 });
 
-Deno.test("searchMeetings avoids follow-up first-page batches after grouping", async () => {
+/** A window that collapses to almost nothing must be followed by another.
+ *
+ * This test used to assert the opposite -- exactly one request, no follow-ups
+ * -- which is precisely the behaviour that made a request for 24 results
+ * return 13 and made paging past them impossible (#193). Stopping after one
+ * window is cheap and wrong.
+ *
+ * What still has to hold is that it terminates: once the index runs out, the
+ * loop stops rather than asking again forever. The stub serves slices of a
+ * fixed pool the way Quickwit does, so "fewer rows than asked for" keeps its
+ * real meaning of "there are no more".
+ */
+Deno.test("a window that groups down to one result is followed by another", async () => {
   const originalFetch = globalThis.fetch;
-  const maxHitsByRequest: number[] = [];
+  const requests: Array<{ maxHits: number; startOffset: number }> = [];
+  const POOL_ROWS = 1200;
 
   globalThis.fetch = async (_input, init) => {
     const body = JSON.parse(String((init as { body?: string } | undefined)?.body ?? "{}"));
-    maxHitsByRequest.push(Number(body.max_hits));
-
     const startOffset = Number(body.start_offset ?? 0);
-    const hits =
-      startOffset === 0
-        ? Array.from({ length: 72 }, (_, index) => ({
-            time: `2026-03-31T${String(index % 24).padStart(2, "0")}:00:00Z`,
-            entity_id: "meeting:notubiz:gemeente:haarlem:duplicate",
-            entity_type: "Meeting",
-            name: `Vergadering duplicate ${index}`,
-            start_date: "2025-01-14T17:00:00Z",
-            source_key: "haarlem",
-            content: `Agenda duplicate ${index}`,
-          }))
-        : [];
+    const maxHits = Number(body.max_hits);
+    requests.push({ maxHits, startOffset });
 
-    return new Response(
-      JSON.stringify({
-        num_hits: 144,
-        hits,
-      }),
-      {
-        headers: { "content-type": "application/json" },
-      },
-    );
+    // Every row belongs to the same entity, so any window collapses to one
+    // result no matter how much of it is read.
+    const count = Math.max(0, Math.min(maxHits, POOL_ROWS - startOffset));
+    const hits = Array.from({ length: count }, (_, index) => ({
+      time: `2026-03-31T${String(index % 24).padStart(2, "0")}:00:00Z`,
+      entity_id: "meeting:notubiz:gemeente:haarlem:duplicate",
+      entity_type: "Meeting",
+      name: "Vergadering duplicate",
+      start_date: "2025-01-14T17:00:00Z",
+      source_key: "haarlem",
+      content: "Agenda duplicate",
+    }));
+
+    return new Response(JSON.stringify({ num_hits: POOL_ROWS, hits }), {
+      headers: { "content-type": "application/json" },
+    });
   };
 
   try {
-    await searchMeetings({
+    const response = await searchMeetings({
       query: "vergadering",
       organization: "haarlem",
       offset: 0,
       limit: 24,
     });
 
-    assert(maxHitsByRequest.length === 1, "grouped first page should not fetch follow-up batches");
-    assert(maxHitsByRequest[0] === 25, "initial first-page batch should fetch one page window");
+    assert(requests.length > 1, "a collapsed window should be followed by another request");
+    assert(requests.length <= 8, `the scan must terminate, made ${requests.length} requests`);
+    assert(requests[1].startOffset === requests[0].maxHits, "the next request continues after it");
+    assert(response.results.length === 1, "the duplicate rows are still one result");
+    assert(response.hasMore === false, "with the index exhausted there is no next page");
+    assert(response.totalCount === 1, "one entity is one result, whatever it costs in rows");
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -476,12 +497,11 @@ Deno.test("searchMeetings does not scan Quickwit for type-only filters", async (
   }
 });
 
-Deno.test("searchMeetings uses cheaper search settings for short queries", async () => {
+Deno.test("searchMeetings skips snippets for short queries", async () => {
   const originalFetch = globalThis.fetch;
 
   globalThis.fetch = async (_input, init) => {
     const body = JSON.parse(String((init as { body?: string } | undefined)?.body ?? "{}"));
-    assert(body.max_hits === 48, "two-character queries should not over-fetch as aggressively");
     assert(
       body.snippet_fields === undefined,
       "short queries should skip snippet generation to reduce search cost",
@@ -906,6 +926,84 @@ Deno.test("a meeting's motions get the download link of their own attachment", a
     assert(
       attachmentQueries.length === 1,
       `attachments resolve in one query, made ${attachmentQueries.length}`,
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+/** The reported defect, in the shape it was reported (#193).
+ *
+ * Soest + "begroting": a request for 24 results returned 13, for 50 returned
+ * 17, for 100 returned 31, and offset=20 returned an empty list while
+ * totalCount still claimed 9,933. The cause was that page rows collapse into
+ * their parent document *after* the scan window had been truncated, so the
+ * page was assembled from whatever few documents happened to be in it.
+ *
+ * The ratio here is the one measured on reindexed production data: 6.7 page
+ * rows per document, rounded to 7.
+ */
+Deno.test("a full page is delivered even when rows collapse seven to one", async () => {
+  const originalFetch = globalThis.fetch;
+  const DOCUMENTS = 200;
+  const PAGES_PER_DOCUMENT = 7;
+
+  globalThis.fetch = async (_input, init) => {
+    const body = JSON.parse(String((init as { body?: string } | undefined)?.body ?? "{}"));
+    const startOffset = Number(body.start_offset ?? 0);
+    const maxHits = Number(body.max_hits);
+    const totalRows = DOCUMENTS * PAGES_PER_DOCUMENT;
+    const count = Math.max(0, Math.min(maxHits, totalRows - startOffset));
+
+    const hits = Array.from({ length: count }, (_, index) => {
+      const row = startOffset + index;
+      const documentIndex = Math.floor(row / PAGES_PER_DOCUMENT);
+      const pageNumber = (row % PAGES_PER_DOCUMENT) + 1;
+      return {
+        time: "2026-03-31T11:00:00Z",
+        entity_id: `document:ibabs:gemeente:soest:${documentIndex}#page=${pageNumber}`,
+        parent_entity_id: `document:ibabs:gemeente:soest:${documentIndex}`,
+        page_number: pageNumber,
+        entity_type: "DocumentPage",
+        name: `Begroting ${documentIndex}`,
+        start_date: "2025-01-14T17:00:00Z",
+        source_key: "soest",
+        content: `Pagina ${pageNumber} van document ${documentIndex}`,
+      };
+    });
+
+    return new Response(JSON.stringify({ num_hits: totalRows, hits }), {
+      headers: { "content-type": "application/json" },
+    });
+  };
+
+  try {
+    const first = await searchMeetings({ query: "begroting", organization: "soest", limit: 24 });
+    assert(
+      first.results.length === 24,
+      `a page of 24 should hold 24 results, got ${first.results.length}`,
+    );
+    assert(first.hasMore === true, "there are 200 documents, so there is a next page");
+
+    const deep = await searchMeetings({
+      query: "begroting",
+      organization: "soest",
+      limit: 10,
+      offset: 100,
+    });
+    assert(
+      deep.results.length === 10,
+      `paging deep into the set must still fill a page, got ${deep.results.length}`,
+    );
+    assert(
+      deep.results[0].entityId === "document:ibabs:gemeente:soest:100",
+      `offset should land on the 101st document, got ${deep.results[0].entityId}`,
+    );
+
+    const wide = await searchMeetings({ query: "begroting", organization: "soest", limit: 100 });
+    assert(
+      wide.results.length === 100,
+      `limit=100 should return 100 results, got ${wide.results.length}`,
     );
   } finally {
     globalThis.fetch = originalFetch;

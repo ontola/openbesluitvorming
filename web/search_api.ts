@@ -94,6 +94,23 @@ type SearchTimingMetric = {
 
 type SearchTimingRecorder = (metric: SearchTimingMetric) => void;
 
+/** Rows pulled per Quickwit request while filling a page, and the ceiling on
+ * rows scanned for one search.
+ *
+ * A result is assembled from several index rows: one per page of a PDF, plus
+ * one per commit of the entity. Dedup and grouping collapse those into one
+ * result, so the scan has to over-fetch to fill a page. Measured on reindexed
+ * data: 6.7 page rows per document, which is where the initial estimate comes
+ * from -- it is refined per request from what actually comes back.
+ *
+ * The ceiling is what keeps a broad query from walking the whole index. When it
+ * is hit the response says so through `totalIsApproximate` and `hasMore`
+ * rather than quietly presenting a truncated set as complete. */
+const INITIAL_ROWS_PER_RESULT = 8;
+const MIN_SCAN_BATCH_ROWS = 32;
+const SCAN_BATCH_ROWS = 500;
+const MAX_SCAN_ROWS = 6000;
+
 const PREVIEW_HEAD_TIMEOUT_MS = 300;
 const PREVIEW_URL_CACHE_TTL_MS = 10 * 60_000;
 
@@ -650,45 +667,20 @@ function groupIndexedHits(items: IndexedHit[]): IndexedHit[] {
   return [...grouped.values()];
 }
 
+/** Which fields to ask Quickwit to snippet.
+ *
+ * Only a query long enough to be meaningful gets snippets; they are the
+ * expensive part of the response and a two-letter query highlights noise.
+ *
+ * This used to also return a `maxHits` cap, which is what truncated the scan
+ * window at 96 rows and left pages short (#193). Sizing the scan now belongs
+ * to the collection loop, which knows how many results it still needs. */
 function searchSamplingOptions(
   query: string,
-  offset: number,
-  limit: number,
-): {
-  maxHits: number;
-  snippetFields: string[];
-} {
-  const queryLength = query.trim().length;
-
-  if (queryLength >= 4) {
-    return {
-      maxHits: Math.min(Math.max(offset + limit + 1, 25), 96),
-      snippetFields: ["content", "name"],
-    };
-  }
-
-  if (queryLength >= 2) {
-    return {
-      maxHits: Math.min(Math.max((offset + limit) * 2, 48), 144),
-      snippetFields: [],
-    };
-  }
-
-  return {
-    maxHits: Math.min(Math.max(offset + limit, 24), 96),
-    snippetFields: [],
-  };
-}
-
-function maxRawSearchHits(query: string, offset: number, limit: number): number {
-  const { maxHits } = searchSamplingOptions(query, offset, limit);
-
-  if (!query.trim()) {
-    const targetCount = offset + limit + 1;
-    return Math.max(maxHits, targetCount + limit);
-  }
-
-  return maxHits;
+  _offset: number,
+  _limit: number,
+): { snippetFields: string[] } {
+  return { snippetFields: query.trim().length >= 4 ? ["content", "name"] : [] };
 }
 
 async function collectSearchWindow(
@@ -721,27 +713,36 @@ async function collectSearchWindow(
   const sortBy = quickwitSortBy(options.sort);
   const isDirectWindow = !options.query.trim();
   const targetCount = isDirectWindow ? options.limit + 1 : options.offset + options.limit + 1;
-  const maxRawHits = isDirectWindow
-    ? options.offset + options.limit + 1
-    : maxRawSearchHits(options.query, options.offset, options.limit);
+  // Scan until the page is full, not until a fixed number of rows is spent.
+  //
+  // The index holds several rows per result -- one per page of a PDF, plus one
+  // per commit -- and those rows collapse into one result by dedup and
+  // grouping. That collapse happened *after* the scan window was truncated at
+  // 96 rows, so a request for 24 results returned 13, a request for 100
+  // returned 31, and paging past that hit an empty list with hasMore still
+  // true (#193). Measured on the reindexed data: 6.7 page rows per document.
+  //
+  // The loop already knew how to keep going; only its budget was wrong.
+  const scanBudget = isDirectWindow ? options.offset + options.limit + 1 : MAX_SCAN_ROWS;
   const collected = new Map<string, SearchResult>();
   const previewKeys = new Map<string, string>();
   let rawOffset = isDirectWindow ? options.offset : 0;
-  let totalCount = 0;
+  let rawSeen = 0;
+  let rawNumHits = 0;
   let exhausted = false;
   let scanLimitReached = false;
   let quickwitMs = 0;
   let shapeMs = 0;
+  // Refined from what comes back, so a corpus with few pages per document does
+  // not pay for a pessimistic guess and one with many still fills its page.
+  let rowsPerResult = INITIAL_ROWS_PER_RESULT;
 
-  while (!exhausted && collected.size < targetCount && rawOffset < maxRawHits) {
-    const { maxHits, snippetFields } = searchSamplingOptions(
-      options.query,
-      options.offset,
-      options.limit,
-    );
+  while (!exhausted && collected.size < targetCount && rawSeen < scanBudget) {
+    const { snippetFields } = searchSamplingOptions(options.query, options.offset, options.limit);
+    const wanted = Math.ceil((targetCount - collected.size) * rowsPerResult);
     const requestMaxHits = isDirectWindow
-      ? Math.min(options.limit + 1, maxRawHits - rawOffset)
-      : Math.min(maxHits, maxRawHits - rawOffset);
+      ? Math.min(options.limit + 1, scanBudget - rawSeen)
+      : Math.min(Math.max(wanted, MIN_SCAN_BATCH_ROWS), SCAN_BATCH_ROWS, scanBudget - rawSeen);
     const quickwitStart = performance.now();
     const response = await quickwit.searchRequest({
       query: queryString,
@@ -753,7 +754,7 @@ async function collectSearchWindow(
     });
     quickwitMs += performance.now() - quickwitStart;
 
-    totalCount = response.num_hits;
+    rawNumHits = Math.max(rawNumHits, response.num_hits);
     const hits = response.hits as SearchHit[];
     if (hits.length === 0) {
       exhausted = true;
@@ -809,7 +810,11 @@ async function collectSearchWindow(
     }
 
     rawOffset += hits.length;
-    scanLimitReached = rawOffset >= maxRawHits && rawOffset < response.num_hits;
+    rawSeen += hits.length;
+    if (collected.size > 0) {
+      rowsPerResult = Math.max(1, rawSeen / collected.size);
+    }
+    scanLimitReached = rawSeen >= scanBudget && rawOffset < response.num_hits;
     exhausted = scanLimitReached || rawOffset >= response.num_hits || hits.length < requestMaxHits;
     shapeMs += performance.now() - shapeStart;
   }
@@ -844,10 +849,27 @@ async function collectSearchWindow(
   options.recordTiming?.({ name: "filter_sort", durationMs: filterSortMs });
   options.recordTiming?.({ name: "preview", durationMs: previewMs });
 
+  // Count results, not rows.
+  //
+  // totalCount was Quickwit's raw num_hits, which counts index rows: it read
+  // 9,933 where the source holds a few thousand documents, moved between 4,153
+  // and 9,933 across identical requests, and could rise when a filter was
+  // narrowed (#195). None of that is usable for "about N results", for paging,
+  // or for comparing two searches.
+  //
+  // When the scan reached the end of the matching set the grouped count is
+  // simply exact. When it stopped at the budget, scale the row count by the
+  // collapse ratio actually observed -- an estimate, and flagged as one.
+  const groupedCount = sortedResults.length;
+  const scannedEverything = exhausted && !scanLimitReached;
+  const totalCount = scannedEverything
+    ? groupedCount
+    : Math.max(groupedCount, Math.round(rawNumHits / Math.max(rowsPerResult, 1)));
+
   return {
     results: pageWindowResults,
     totalCount,
-    totalIsApproximate: true,
+    totalIsApproximate: !scannedEverything,
     hasMore:
       pageHasResults &&
       ((isDirectWindow
