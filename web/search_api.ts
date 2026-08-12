@@ -158,19 +158,54 @@ function cachedPublicPreviewUrl(url: string): Promise<string | undefined> {
   return promise;
 }
 
+/** Quote an exact value — an entity id, a source key, our own projection
+ * version. These are identifiers matched against `raw`-tokenized fields, where
+ * the whole string is a single token and quoting means "this exact value".
+ *
+ * The backslash has to go first: escaping only the double quote left a
+ * trailing `\` free to escape the closing quote we add, which turned the whole
+ * query into a syntax error (#197).
+ *
+ * Not for free text. See buildSearchClause. */
 function escapeTerm(term: string): string {
-  return `"${term.replaceAll('"', '\\"')}"`;
+  return `"${term.replaceAll("\\", "\\\\").replaceAll('"', '\\"')}"`;
 }
 
+/** A clause that parses and matches nothing.
+ *
+ * Needed when a query had content but none of it survived sanitising, e.g.
+ * `:::`. Pushing no clause at all would silently widen the search to every
+ * document the other filters allow, which reads as "your search matched
+ * everything" — the opposite of the truth. */
+const MATCHES_NOTHING = "entity_type:__geen_resultaat__";
+
+/** Turn user input into bare terms.
+ *
+ * This used to wrap each token in quotes, which looks like escaping but is not:
+ * quotes make it a *phrase* query. As long as the token was a single word that
+ * was harmless, but ordinary punctuation splits it — `14:30`, `kosten/baten`,
+ * `a+b` — and a multi-term phrase needs position data. `name` is indexed
+ * without positions, so Quickwit answered the whole request with a schema error
+ * and the API turned that into a 500 on entirely reasonable input (#197).
+ *
+ * Bare terms are the fix. Stripping everything that is not a letter or a digit
+ * matches how the default tokenizer splits text anyway, so `kosten/baten`
+ * becomes `kosten AND baten` and finds what the reader meant. Lowercasing
+ * doubles as protection against the query keywords: `AND`, `OR`, `NOT` and `TO`
+ * only bind in upper case, so a search for the word "not" stays a word. */
 function buildSearchClause(text: string): string {
-  const tokens = text.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const tokens = text
+    .toLowerCase()
+    // Unicode-aware: Dutch text is full of ë, ï and é, and those are letters.
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter(Boolean);
   if (tokens.length === 0) {
-    return "";
+    return text.trim() ? MATCHES_NOTHING : "";
   }
   if (tokens.length === 1) {
-    return escapeTerm(tokens[0]);
+    return tokens[0];
   }
-  return `(${tokens.map(escapeTerm).join(" AND ")})`;
+  return `(${tokens.join(" AND ")})`;
 }
 
 function expandDutchGovernanceTerms(query: string): string[] {
@@ -232,7 +267,13 @@ function buildQuickwitQuery(
   const parts = [`projection_version:${escapeTerm(currentProjectionVersion())}`, typeQuery];
 
   if (organization) {
-    parts.push(`source_key:${organization}`);
+    // Quoted, not interpolated raw. Unescaped this was a query injection:
+    // `organization=soest OR entity_type:Meeting` escaped its own clause and
+    // returned meetings from other municipalities. Everything in this index is
+    // public, so nothing confidential was reachable, but a caller could still
+    // shape an arbitrarily expensive query while the rate limiter charged it a
+    // single unit.
+    parts.push(`source_key:${escapeTerm(organization)}`);
   }
 
   if (query) {
@@ -240,7 +281,10 @@ function buildQuickwitQuery(
     if (expandedTerms.length === 1) {
       parts.push(buildSearchClause(expandedTerms[0]));
     } else {
-      parts.push(`(${expandedTerms.map(buildSearchClause).filter(Boolean).join(" OR ")})`);
+      const clauses = expandedTerms.map(buildSearchClause).filter(Boolean);
+      // Every expansion sanitising away would otherwise emit `()`, which is
+      // itself a parse error.
+      parts.push(clauses.length > 0 ? `(${clauses.join(" OR ")})` : MATCHES_NOTHING);
     }
   }
 

@@ -78,6 +78,36 @@ cost one unit per call.
 
 ---
 
+## Errors
+
+Errors are JSON. A failing search returns `500` with a generic message and a
+`request_id`:
+
+```json
+{
+  "error": "Zoeken mislukt. Probeer het opnieuw of meld deze fout met het request ID.",
+  "request_id": "3f9c1a2b"
+}
+```
+
+Quote that id when reporting a problem — the full detail is in the server log
+under the same id. The response deliberately does not carry it: an earlier
+version returned the search engine's own message, which exposed the generated
+query and internal identifiers while telling the caller nothing they could act
+on.
+
+### Punctuation in queries
+
+`query` is free text, not a query language. Punctuation is stripped and the
+remaining words are combined with AND, so `kosten/baten` finds documents
+containing both words, and `14:30` finds both parts. There is no phrase search:
+quoting a phrase has no special meaning.
+
+A query consisting only of punctuation returns zero results rather than
+everything.
+
+---
+
 ## Search
 
 ### `GET /api/search`

@@ -31,12 +31,7 @@ import {
 } from "./search_api.ts";
 import { ObjectStorageClient } from "../src/storage/s3.ts";
 import { pdfPageCacheKey, pdfPageMetaKey, renderPdfPageJpeg } from "../src/documents/thumbnails.ts";
-import {
-  RATE_LIMIT_PAGE_UNIT,
-  RateLimiter,
-  type RateVerdict,
-  requestCost,
-} from "./rate_limit.ts";
+import { RATE_LIMIT_PAGE_UNIT, RateLimiter, type RateVerdict, requestCost } from "./rate_limit.ts";
 
 const root = new URL("./", import.meta.url);
 const distRoot = new URL("./dist/", import.meta.url);
@@ -464,8 +459,7 @@ async function handleRequest(request: Request): Promise<Response> {
         if (payload.dateFrom?.trim() || payload.dateTo?.trim()) {
           return Response.json(
             {
-              error:
-                "Een herindexatie verwerkt altijd de volledige bron; laat de datums leeg.",
+              error: "Een herindexatie verwerkt altijd de volledige bron; laat de datums leeg.",
             },
             { status: 400 },
           );
@@ -578,10 +572,30 @@ async function handleRequest(request: Request): Promise<Response> {
 
       return withServerTiming(Response.json(results), requestStart, metrics);
     } catch (error) {
+      // Never hand the caller what went wrong verbatim. This used to return the
+      // search engine's own message, which carried the generated query with its
+      // field names and projection_version, and on the schema-error path an
+      // internal split_id (#197). None of that is a caller's business, and it
+      // made a bug in our query construction look like their mistake. The
+      // detail goes to the log under an id the reporter can quote.
+      const requestId = crypto.randomUUID().slice(0, 8);
+      console.error(
+        JSON.stringify({
+          level: "error",
+          event: "search_failed",
+          request_id: requestId,
+          // Same shape the performance log uses, which hashes the query rather
+          // than storing what people searched for. A failure is not a reason to
+          // start keeping that.
+          ...searchRequestMetadata(url),
+          message: error instanceof Error ? error.message : String(error),
+        }),
+      );
       return withServerTiming(
         Response.json(
           {
-            error: error instanceof Error ? error.message : "Zoeken mislukt",
+            error: "Zoeken mislukt. Probeer het opnieuw of meld deze fout met het request ID.",
+            request_id: requestId,
           },
           { status: 500 },
         ),
@@ -854,7 +868,10 @@ const rateLimiter = new RateLimiter(RATE_LIMIT_PER_MINUTE);
 function clientKey(request: Request, remoteAddr?: Deno.Addr): string {
   const forwarded = request.headers.get("x-forwarded-for");
   if (forwarded) {
-    const parts = forwarded.split(",").map((part) => part.trim()).filter(Boolean);
+    const parts = forwarded
+      .split(",")
+      .map((part) => part.trim())
+      .filter(Boolean);
     if (parts.length > 0) {
       return parts[parts.length - 1];
     }
@@ -874,12 +891,10 @@ function applyRateLimitHeaders(response: Response, verdict: RateVerdict): void {
 function rateLimitedResponse(verdict: RateVerdict): Response {
   const response = Response.json(
     {
-      error:
-        `Te veel verzoeken. Probeer het over ${verdict.retryAfterSeconds} seconde(n) opnieuw.`,
+      error: `Te veel verzoeken. Probeer het over ${verdict.retryAfterSeconds} seconde(n) opnieuw.`,
       limit_per_minute: verdict.limit,
       retry_after_seconds: verdict.retryAfterSeconds,
-      hint:
-        `Zware verzoeken tellen zwaarder: een zoekopdracht kost 1 eenheid per ${RATE_LIMIT_PAGE_UNIT} resultaten, dus limit=100 kost 5. Verlaag 'limit' of spreid je verzoeken. Elke API-response bevat RateLimit-Limit, RateLimit-Remaining en RateLimit-Reset.`,
+      hint: `Zware verzoeken tellen zwaarder: een zoekopdracht kost 1 eenheid per ${RATE_LIMIT_PAGE_UNIT} resultaten, dus limit=100 kost 5. Verlaag 'limit' of spreid je verzoeken. Elke API-response bevat RateLimit-Limit, RateLimit-Remaining en RateLimit-Reset.`,
       documentation: "https://openbesluitvorming.nl/#api",
     },
     { status: 429 },
@@ -892,9 +907,8 @@ function rateLimitedResponse(verdict: RateVerdict): Response {
 Deno.serve({ port }, async (request, info) => {
   const url = new URL(request.url);
   // /api/admin/* sits behind Caddy basic auth and is used by ops tooling.
-  const rateLimited = rateLimitEnabled &&
-    url.pathname.startsWith("/api/") &&
-    !url.pathname.startsWith("/api/admin/");
+  const rateLimited =
+    rateLimitEnabled && url.pathname.startsWith("/api/") && !url.pathname.startsWith("/api/admin/");
 
   let verdict: RateVerdict | null = null;
   if (rateLimited) {

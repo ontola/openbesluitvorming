@@ -236,13 +236,18 @@ Deno.test("searchMeetings avoids phrase queries for multi-word input", async () 
   globalThis.fetch = async (_input, init) => {
     const body = JSON.parse(String((init as { body?: string } | undefined)?.body ?? "{}"));
     const query = String(body.query ?? "");
+    // The tokens used to be quoted individually. That still split the words,
+    // but each quoted token was its own one-term phrase, and the moment
+    // punctuation split a token further it became a real phrase query against
+    // a field without positions -- a 500 on input as ordinary as `14:30`
+    // (#197). Bare terms carry the same meaning without that edge.
     assert(
-      query.includes('"test" AND "query"'),
-      "multi-word queries should be split into token clauses",
+      query.includes("(test AND query)"),
+      "multi-word queries should be split into bare token clauses",
     );
     assert(
-      !query.includes('"test query"'),
-      "multi-word queries should not be sent as a phrase query",
+      !query.includes('"test query"') && !query.includes('"test"'),
+      "no part of user input should reach the query in quotes",
     );
 
     return new Response(
