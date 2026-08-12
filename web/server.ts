@@ -493,7 +493,13 @@ async function handleRequest(request: Request): Promise<Response> {
         : [sourceSelector];
       const runs = await Promise.all(
         sourceRefs.map((sourceRef) =>
-          startIngest(sourceRef, payload.dateFrom, payload.dateTo, {
+          // Empty strings, not undefined. A reindex is rejected above if it
+          // carries dates, so the only valid way to ask for one is to leave
+          // them out -- and leaving them out reached SQLite as undefined and
+          // failed the insert with "Provided value cannot be bound to SQLite
+          // parameter 2". The endpoint's one correct input was the one that
+          // could not work (2026-08-12).
+          startIngest(sourceRef, payload.dateFrom ?? "", payload.dateTo ?? "", {
             ingestToQuickwit: true,
             trigger: "user",
             executionMode,

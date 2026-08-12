@@ -80,6 +80,21 @@ ssh "$DEPLOY_HOST" "
   docker compose -f \"$COMPOSE_FILE\" up -d --scale worker=${WORKER_REPLICAS} openbesluitvorming worker caddy otel-collector
   docker compose -f \"$COMPOSE_FILE\" ps openbesluitvorming worker caddy otel-collector
 
+  # Record the deployed image in .env so the host agrees with itself.
+  #
+  # The export above lives only inside this ssh session. Without persisting it,
+  # any later 'docker compose up' run by hand on the server falls back to the
+  # compose default of :main -- and :main on the host is whatever was pulled
+  # last, which is not what the deploy installed, because the deploy pulls the
+  # sha tag. Restarting the workers by hand therefore silently downgraded them
+  # to a day-old image, which then created a Quickwit index from a stale doc
+  # mapping (2026-08-12). Nothing warned; the containers came up healthy.
+  if grep -q '^OPENBESLUITVORMING_IMAGE=' .env 2>/dev/null; then
+    sed -i \"s|^OPENBESLUITVORMING_IMAGE=.*|OPENBESLUITVORMING_IMAGE=$DEPLOY_IMAGE|\" .env
+  else
+    printf '\\nOPENBESLUITVORMING_IMAGE=%s\\n' \"$DEPLOY_IMAGE\" >> .env
+  fi
+
   # Every deploy leaves a ~2GB sha-tagged image behind; they filled 43GB and
   # tripped the disk alert (July 2026). 72h retention re-tripped it within a
   # day: an active dev day produces ~7 deploys (~14GB) and three such days
