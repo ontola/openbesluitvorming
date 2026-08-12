@@ -130,3 +130,22 @@ Deno.test("a connection that cannot be established is retried, not fatal", async
     "a real 404 must not be retried forever",
   );
 });
+
+Deno.test("an answered request is not reported as a transport failure", async () => {
+  // Purmerend and Dongen both answered 404 with a JSON body, and both surfaced
+  // as "Request transport failed". That sent the diagnosis at connections and
+  // concurrency for half an hour while the server was replying fine.
+  const { NotubizHttpError } = await import("../src/notubiz/client.ts");
+  const error = new NotubizHttpError(
+    404,
+    "https://api.notubiz.nl/events?organisation_id=503",
+    '{"message": "This organisation is non-active."}',
+  );
+
+  assertEquals(error.status, 404, "the status is kept, not flattened into prose");
+  assert(!error.message.includes("transport"), `must not claim transport: ${error.message}`);
+  assert(
+    error.message.includes("non-active"),
+    `the server's own explanation must survive: ${error.message}`,
+  );
+});

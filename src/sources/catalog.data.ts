@@ -3277,7 +3277,13 @@ export const sourceCatalog = [
     notubizOrganizationId: 503,
     legacyConfigFile: "ori.notubiz.yaml",
     legacyConfigRoot: "ori.notubiz",
-    implemented: true,
+    // Notubiz answers every request for org 503 with
+    //   404 {"message": "This organisation is non-active."}
+    // — verified 2026-08-12 against /organisations/503 and /events over four
+    // different windows. The municipality is deactivated at the supplier, not
+    // temporarily broken, so a nightly run can only fail. Re-enable if Notubiz
+    // ever reactivates it.
+    implemented: false,
   },
   {
     sourceRef: "notubiz:gemeente:drechterland",

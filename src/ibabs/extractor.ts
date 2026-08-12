@@ -25,6 +25,7 @@ import {
 import { MeetingIndex, parseAgendaPointReference } from "../motions/normalize.ts";
 import { IbabsClient } from "./client.ts";
 import { mapLimit } from "../util/map_limit.ts";
+import { splitDateRange } from "../util/date_range.ts";
 
 const DEFAULT_DOCUMENT_CONCURRENCY = 3;
 const DEFAULT_DATE_CHUNK_MONTHS = 6;
@@ -83,32 +84,6 @@ async function listMeetingsAdaptive(
     const right = await listMeetingsAdaptive(client, source, midDate, to, onSplit);
     return [...left, ...right];
   }
-}
-
-function splitDateRange(
-  dateFrom: string,
-  dateTo: string,
-  chunkMonths: number,
-): Array<[string, string]> {
-  if (chunkMonths <= 0) {
-    return [[dateFrom, dateTo]];
-  }
-
-  const chunks: Array<[string, string]> = [];
-  const end = new Date(`${dateTo}T00:00:00Z`);
-  let cursor = new Date(`${dateFrom}T00:00:00Z`);
-
-  while (cursor <= end) {
-    const nextCursor = new Date(cursor);
-    nextCursor.setUTCMonth(nextCursor.getUTCMonth() + chunkMonths);
-
-    const chunkEnd = nextCursor > end ? end : new Date(nextCursor.getTime() - 86_400_000);
-    chunks.push([cursor.toISOString().slice(0, 10), chunkEnd.toISOString().slice(0, 10)]);
-
-    cursor = nextCursor;
-  }
-
-  return chunks;
 }
 
 function issueStepForDocumentError(error: unknown): ExtractionIssue["step"] {

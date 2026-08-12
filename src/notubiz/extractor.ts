@@ -13,6 +13,7 @@ import { storeTranscript } from "../recordings/storage.ts";
 import { MeetingIndex } from "../motions/normalize.ts";
 import { ObjectStorageClient } from "../storage/s3.ts";
 import { mapLimit } from "../util/map_limit.ts";
+import { splitDateRange } from "../util/date_range.ts";
 import type {
   EntityCommitEvent,
   DocumentEntity,
@@ -156,7 +157,14 @@ export class NotubizMeetingExtractor {
     let motionCount = 0;
     let recordingCount = 0;
     let issueCount = 0;
-    let page = 1;
+    // Notubiz answers a wide window for some organisations with
+    // `404 {"message": "An uncaught error has occurred"}` while serving a
+    // narrower one perfectly well — measured on Purmerend (org 1118), where a
+    // year failed and a quarter succeeded. The failure carries no hint that it
+    // is about size, so the window is chunked by default rather than after a
+    // run has already failed. iBabs learned the same lesson years earlier.
+    const chunkMonths = Number(Deno.env.get("WOOZI_NOTUBIZ_DATE_CHUNK_MONTHS") ?? "3");
+    const chunks = splitDateRange(dateFrom, dateTo, chunkMonths);
     const storage = await this.storageProvider();
     const meetingIndex = new MeetingIndex();
     const meetingConcurrency = Number(
@@ -184,153 +192,160 @@ export class NotubizMeetingExtractor {
       await options.onIssue?.(issue, currentStats());
     };
 
-    while (true) {
-      const tPage = performance.now();
-      const eventPage = (await this.client.listEvents(
-        source.notubizOrganizationId,
-        dateFrom,
-        dateTo,
-        page,
-      )) as NotubizEventsResponse;
+    for (const [chunkFrom, chunkTo] of chunks) {
+      let page = 1;
 
-      const events = Array.isArray(eventPage.events) ? eventPage.events : [];
-      console.log(
-        `[timing] ${source.key} api=listEvents page=${page} events=${events.length} ${Math.round(performance.now() - tPage)}ms`,
-      );
-      if (events.length === 0) {
-        break;
-      }
+      while (true) {
+        const tPage = performance.now();
+        const eventPage = (await this.client.listEvents(
+          source.notubizOrganizationId,
+          chunkFrom,
+          chunkTo,
+          page,
+        )) as NotubizEventsResponse;
 
-      const publicMeetingIds = events
-        .filter((item): item is Record<string, unknown> =>
-          Boolean(item && typeof item === "object"),
-        )
-        .filter((eventRecord) => eventRecord.permission_group === "public")
-        .map((eventRecord) => eventRecord.id)
-        .filter((meetingId): meetingId is number => typeof meetingId === "number");
+        const events = Array.isArray(eventPage.events) ? eventPage.events : [];
+        console.log(
+          `[timing] ${source.key} api=listEvents page=${page} events=${events.length} ${Math.round(performance.now() - tPage)}ms`,
+        );
+        if (events.length === 0) {
+          break;
+        }
 
-      const pageMeetings = (
-        await mapLimit(publicMeetingIds, meetingConcurrency, async (meetingId) => {
-          try {
-            const meetingResponse = (await this.client.getMeeting(
-              meetingId,
-            )) as NotubizMeetingResponse;
-            if (!meetingResponse.meeting) {
-              // Never drop this silently. A meeting that yields no detail is
-              // a document-coverage hole, and reporting nothing made runs
-              // finish "succeeded" with issue_count 0 while contributing no
-              // documents at all -- indistinguishable from an organisation
-              // that genuinely published none. Den Haag looked like that bug
-              // for a while (2026-08-02) before measurement showed its
-              // documents really are absent from the API.
-              const detail = describeMeetingResponseError(meetingResponse);
-              await registerIssue({
-                severity: "warning",
-                step: "get_meeting",
-                entity_id: canonicalMeetingId(source, meetingId),
-                message: `Meeting detail returned no meeting: ${detail}`,
+        const publicMeetingIds = events
+          .filter((item): item is Record<string, unknown> =>
+            Boolean(item && typeof item === "object"),
+          )
+          .filter((eventRecord) => eventRecord.permission_group === "public")
+          .map((eventRecord) => eventRecord.id)
+          .filter((meetingId): meetingId is number => typeof meetingId === "number");
+
+        const pageMeetings = (
+          await mapLimit(publicMeetingIds, meetingConcurrency, async (meetingId) => {
+            try {
+              const meetingResponse = (await this.client.getMeeting(
+                meetingId,
+              )) as NotubizMeetingResponse;
+              if (!meetingResponse.meeting) {
+                // Never drop this silently. A meeting that yields no detail is
+                // a document-coverage hole, and reporting nothing made runs
+                // finish "succeeded" with issue_count 0 while contributing no
+                // documents at all -- indistinguishable from an organisation
+                // that genuinely published none. Den Haag looked like that bug
+                // for a while (2026-08-02) before measurement showed its
+                // documents really are absent from the API.
+                const detail = describeMeetingResponseError(meetingResponse);
+                await registerIssue({
+                  severity: "warning",
+                  step: "get_meeting",
+                  entity_id: canonicalMeetingId(source, meetingId),
+                  message: `Meeting detail returned no meeting: ${detail}`,
+                });
+                return null;
+              }
+              const meeting = normalizeNotubizMeeting(
+                source,
+                organizationAttributes,
+                meetingResponse.meeting,
+              );
+              meetingCount += 1;
+              meetingIndex.add(meeting);
+              if (retainEntities) {
+                meetings.push(meeting);
+              }
+              await options.onProgress?.(currentStats());
+              // A media backfill runs over meetings that were imported long ago.
+              // Re-emitting them would rewrite hundreds of thousands of unchanged
+              // entities for nothing; the recording only needs the meeting's id,
+              // which it already has. `meeting_count` still counts what was
+              // scanned, so the run reports the work it actually did.
+              if (!mediaOnly) {
+                await options.onEntity?.(meeting);
+              }
+
+              await this.extractRecordings(source, meeting, meetingResponse.meeting, {
+                storage,
+                registerIssue,
+                onRecording: async (recording) => {
+                  recordingCount += 1;
+                  if (retainEntities) {
+                    recordings.push(recording);
+                  }
+                  await options.onProgress?.(currentStats());
+                  await options.onEntity?.(recording);
+                },
               });
-              return null;
+
+              return meeting;
+            } catch (error) {
+              if (isSkippableMeetingError(error)) {
+                await registerIssue({
+                  severity: "warning",
+                  step: "get_meeting",
+                  entity_id: canonicalMeetingId(source, meetingId),
+                  message: error instanceof Error ? error.message : "Meeting detail not accessible",
+                });
+                return null;
+              }
+              throw error;
             }
-            const meeting = normalizeNotubizMeeting(
-              source,
-              organizationAttributes,
-              meetingResponse.meeting,
-            );
-            meetingCount += 1;
-            meetingIndex.add(meeting);
+          })
+        ).filter((meeting): meeting is NonNullable<typeof meeting> => Boolean(meeting));
+
+        const documentsById = new Map<
+          string,
+          ReturnType<typeof normalizeNotubizDocuments>[number]
+        >();
+        if (!mediaOnly) {
+          for (const meeting of pageMeetings) {
+            for (const document of normalizeNotubizDocuments(source, meeting)) {
+              documentsById.set(document.id, document);
+            }
+          }
+        }
+        const tDocs = performance.now();
+
+        await mapLimit([...documentsById.values()], documentConcurrency, async (document) => {
+          try {
+            const materialized = await materializeDocument(document, {
+              download: (documentEntity) => this.client.downloadDocument(documentEntity),
+              storage,
+              executionMode: options.executionMode,
+            });
+            for (const issue of materialized.issues) {
+              await registerIssue(issue);
+            }
+            documentCount += 1;
             if (retainEntities) {
-              meetings.push(meeting);
+              documents.push(materialized.document);
+            }
+            if (materialized.cacheHit) {
+              cacheHits += 1;
+            } else {
+              downloadedCount += 1;
             }
             await options.onProgress?.(currentStats());
-            // A media backfill runs over meetings that were imported long ago.
-            // Re-emitting them would rewrite hundreds of thousands of unchanged
-            // entities for nothing; the recording only needs the meeting's id,
-            // which it already has. `meeting_count` still counts what was
-            // scanned, so the run reports the work it actually did.
-            if (!mediaOnly) {
-              await options.onEntity?.(meeting);
-            }
-
-            await this.extractRecordings(source, meeting, meetingResponse.meeting, {
-              storage,
-              registerIssue,
-              onRecording: async (recording) => {
-                recordingCount += 1;
-                if (retainEntities) {
-                  recordings.push(recording);
-                }
-                await options.onProgress?.(currentStats());
-                await options.onEntity?.(recording);
-              },
-            });
-
-            return meeting;
+            await options.onEntity?.(materialized.document);
           } catch (error) {
-            if (isSkippableMeetingError(error)) {
-              await registerIssue({
-                severity: "warning",
-                step: "get_meeting",
-                entity_id: canonicalMeetingId(source, meetingId),
-                message: error instanceof Error ? error.message : "Meeting detail not accessible",
-              });
-              return null;
-            }
-            throw error;
+            await registerIssue({
+              severity: "error",
+              step: issueStepForDocumentError(error),
+              entity_id: document.id,
+              message: error instanceof Error ? error.message : "Document processing failed",
+            });
           }
-        })
-      ).filter((meeting): meeting is NonNullable<typeof meeting> => Boolean(meeting));
+        });
 
-      const documentsById = new Map<string, ReturnType<typeof normalizeNotubizDocuments>[number]>();
-      if (!mediaOnly) {
-        for (const meeting of pageMeetings) {
-          for (const document of normalizeNotubizDocuments(source, meeting)) {
-            documentsById.set(document.id, document);
-          }
+        console.log(
+          `[timing] ${source.key} page=${page} meetings=${pageMeetings.length} docs=${documentsById.size} docs_time=${Math.round(performance.now() - tDocs)}ms`,
+        );
+
+        if (!eventPage.pagination?.has_more_pages) {
+          break;
         }
+
+        page += 1;
       }
-      const tDocs = performance.now();
-
-      await mapLimit([...documentsById.values()], documentConcurrency, async (document) => {
-        try {
-          const materialized = await materializeDocument(document, {
-            download: (documentEntity) => this.client.downloadDocument(documentEntity),
-            storage,
-            executionMode: options.executionMode,
-          });
-          for (const issue of materialized.issues) {
-            await registerIssue(issue);
-          }
-          documentCount += 1;
-          if (retainEntities) {
-            documents.push(materialized.document);
-          }
-          if (materialized.cacheHit) {
-            cacheHits += 1;
-          } else {
-            downloadedCount += 1;
-          }
-          await options.onProgress?.(currentStats());
-          await options.onEntity?.(materialized.document);
-        } catch (error) {
-          await registerIssue({
-            severity: "error",
-            step: issueStepForDocumentError(error),
-            entity_id: document.id,
-            message: error instanceof Error ? error.message : "Document processing failed",
-          });
-        }
-      });
-
-      console.log(
-        `[timing] ${source.key} page=${page} meetings=${pageMeetings.length} docs=${documentsById.size} docs_time=${Math.round(performance.now() - tDocs)}ms`,
-      );
-
-      if (!eventPage.pagination?.has_more_pages) {
-        break;
-      }
-
-      page += 1;
     }
 
     // Motions run once all pages are in, so every meeting they could reference

@@ -49,9 +49,17 @@ Deno.test("implemented catalog sources only use Woozi-supported suppliers", () =
   const sources = listImplementedCatalogSources();
   const supported = new Set(["notubiz", "ibabs", "gemeenteoplossingen", "parlaeus"]);
 
+  // Every source is implemented except the ones deliberately switched off, and
+  // that list is spelled out here so disabling one stays a conscious act rather
+  // than something a run quietly stops covering. Each entry carries its reason
+  // in catalog.data.ts.
+  const disabled = listCatalogSources()
+    .filter((source) => !source.implemented)
+    .map((source) => source.key)
+    .sort();
   assert(
-    sources.length === listCatalogSources().length,
-    "every catalog source should be marked implemented after the supplier-flag migration",
+    JSON.stringify(disabled) === JSON.stringify(["dongen"]),
+    `unexpected set of disabled sources: ${JSON.stringify(disabled)}`,
   );
   for (const source of sources) {
     assert(

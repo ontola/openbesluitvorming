@@ -51,7 +51,31 @@ function isRetryableError(error: unknown): boolean {
   );
 }
 
+/** An HTTP response that arrived and said no.
+ *
+ * Kept apart from transport failures because conflating the two sent a
+ * diagnosis down the wrong path for half an hour: Purmerend and Dongen were
+ * answering a clean `404` with a JSON body, and both were reported as
+ * "Request transport failed", so the investigation went looking at connections
+ * and concurrency while the server was replying perfectly well. */
+export class NotubizHttpError extends Error {
+  constructor(
+    readonly status: number,
+    readonly url: string,
+    readonly body: string,
+  ) {
+    const detail = body.trim().slice(0, 200);
+    super(`Request failed ${status} for ${url}${detail ? `: ${detail}` : ""}`);
+    this.name = "NotubizHttpError";
+  }
+}
+
 function describeTransportError(url: string, error: unknown): Error {
+  // An answered request is not a transport problem; hand it through unchanged.
+  if (error instanceof NotubizHttpError) {
+    return error;
+  }
+
   if (error instanceof Error) {
     const name = error.name?.trim() || "Error";
     const message = error.message?.trim();
@@ -78,7 +102,7 @@ async function fetchJson<T>(url: string): Promise<T> {
       });
 
       if (!response.ok) {
-        throw new Error(`Request failed ${response.status} for ${url}`);
+        throw new NotubizHttpError(response.status, url, await response.text().catch(() => ""));
       }
 
       return (await response.json()) as T;
@@ -117,7 +141,7 @@ async function fetchText(url: string): Promise<string> {
       });
 
       if (!response.ok) {
-        throw new Error(`Request failed ${response.status} for ${url}`);
+        throw new NotubizHttpError(response.status, url, await response.text().catch(() => ""));
       }
 
       return await response.text();
@@ -147,7 +171,7 @@ async function fetchBytes(url: string): Promise<Uint8Array> {
       });
 
       if (!response.ok) {
-        throw new Error(`Request failed ${response.status} for ${url}`);
+        throw new NotubizHttpError(response.status, url, await response.text().catch(() => ""));
       }
 
       return new Uint8Array(await response.arrayBuffer());
