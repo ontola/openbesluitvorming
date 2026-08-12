@@ -500,11 +500,29 @@ Deno.test("searchMeetings uses cheaper search settings for short queries", async
   }
 });
 
+/** Two commits of one document arrive; the detail view must render the newer.
+ *
+ * This test used to put the markdown inline in the indexed payload as
+ * `md_text`. That contract is gone: the search payload is compacted and the
+ * text now lives in object storage under `derived_content.markdown_key`, which
+ * getEntityContent reads back. The assertion that matters -- newest hit wins,
+ * and its metadata is what the detail view uses -- is unchanged; only the way
+ * the markdown reaches it is. The S3 read goes through globalThis.fetch, so
+ * the same stub covers both hops and the test stays hermetic. */
 Deno.test("getEntityContent prefers stored markdown from the newest hit", async () => {
   const originalFetch = globalThis.fetch;
+  const newestKey = "documents/notubiz/gemeente/haarlem/42/newest.pdf.pymupdf-v1.md";
+  const olderKey = "documents/notubiz/gemeente/haarlem/42/older.pdf.pymupdf-v1.md";
 
   globalThis.fetch = async (input) => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+
+    if (url.includes(newestKey)) {
+      return new Response("## Nieuwe markdown");
+    }
+    if (url.includes(olderKey)) {
+      return new Response("oude markdown");
+    }
     if (!url.includes("/api/v1/woozi-events/search")) {
       throw new Error(`Unexpected URL ${url}`);
     }
@@ -518,7 +536,8 @@ Deno.test("getEntityContent prefers stored markdown from the newest hit", async 
             entity_id: "document:notubiz:gemeente:haarlem:42",
             entity_type: "Document",
             payload: {
-              md_text: ["oude markdown"],
+              derived_content: { markdown_key: olderKey },
+              original_url: "https://example.test/older.pdf",
             },
           },
           {
@@ -526,7 +545,7 @@ Deno.test("getEntityContent prefers stored markdown from the newest hit", async 
             entity_id: "document:notubiz:gemeente:haarlem:42",
             entity_type: "Document",
             payload: {
-              md_text: ["## Nieuwe markdown"],
+              derived_content: { markdown_key: newestKey },
               original_url: "https://example.test/original.pdf",
             },
           },
@@ -677,26 +696,26 @@ Deno.test("a motion detail carries its outcome and inherits its attachment's fil
     queried.push(body);
     const hit = body.includes(attachmentId)
       ? {
-        time: "2026-03-31T10:00:00Z",
-        entity_id: attachmentId,
-        entity_type: "Document",
-        name: "Motie M11",
-        payload: { original_url: "https://example.test/motie-m11.pdf" },
-      }
+          time: "2026-03-31T10:00:00Z",
+          entity_id: attachmentId,
+          entity_type: "Document",
+          name: "Motie M11",
+          payload: { original_url: "https://example.test/motie-m11.pdf" },
+        }
       : {
-        time: "2026-03-31T10:00:00Z",
-        entity_id: motionId,
-        entity_type: "Motion",
-        name: "7.2 Motie M11 Motie VVD CDA Pavijen Vijf Vrij",
-        payload: {
-          result: "verworpen",
-          status: "Moties verworpen",
-          tally: { in_favour: 7, against: 14 },
-          votes: [{ option: "tegen", group_name: "GroenLinks", voter_name: "Jansen" }],
-          attachment: [attachmentId],
-          meeting: "meeting:ibabs:gemeente:culemborg:m1",
-        },
-      };
+          time: "2026-03-31T10:00:00Z",
+          entity_id: motionId,
+          entity_type: "Motion",
+          name: "7.2 Motie M11 Motie VVD CDA Pavijen Vijf Vrij",
+          payload: {
+            result: "verworpen",
+            status: "Moties verworpen",
+            tally: { in_favour: 7, against: 14 },
+            votes: [{ option: "tegen", group_name: "GroenLinks", voter_name: "Jansen" }],
+            attachment: [attachmentId],
+            meeting: "meeting:ibabs:gemeente:culemborg:m1",
+          },
+        };
 
     return Promise.resolve(
       new Response(JSON.stringify({ num_hits: 1, hits: [hit] }), {
@@ -756,14 +775,16 @@ Deno.test("a motion that points at itself does not hang the request", async () =
       new Response(
         JSON.stringify({
           num_hits: 1,
-          hits: [{
-            time: "2026-03-31T10:00:00Z",
-            entity_id: motionId,
-            entity_type: "Motion",
-            name: "Motie",
-            // Points at itself, and at a second motion that would point back.
-            payload: { result: "aangenomen", attachment: [motionId] },
-          }],
+          hits: [
+            {
+              time: "2026-03-31T10:00:00Z",
+              entity_id: motionId,
+              entity_type: "Motion",
+              name: "Motie",
+              // Points at itself, and at a second motion that would point back.
+              payload: { result: "aangenomen", attachment: [motionId] },
+            },
+          ],
         }),
         { headers: { "content-type": "application/json" } },
       ),
@@ -851,13 +872,15 @@ Deno.test("a meeting's motions get the download link of their own attachment", a
     return new Response(
       JSON.stringify({
         num_hits: 1,
-        hits: [{
-          time: "2026-01-29T10:00:00Z",
-          entity_id: meetingId,
-          entity_type: "Meeting",
-          name: "Gemeenteraad",
-          source_key: "utrecht",
-        }],
+        hits: [
+          {
+            time: "2026-01-29T10:00:00Z",
+            entity_id: meetingId,
+            entity_type: "Meeting",
+            name: "Gemeenteraad",
+            source_key: "utrecht",
+          },
+        ],
       }),
       { headers: { "content-type": "application/json" } },
     );

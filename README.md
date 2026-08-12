@@ -363,6 +363,7 @@ From [`woozi/`](.):
 - `pnpm run serve:web`
 - `pnpm run build:web`
 - `pnpm test`
+- `pnpm test:live`
 - `pnpm test:e2e`
 - `pnpm test:gui`
 - `pnpm test:quickwit`
@@ -371,6 +372,19 @@ From [`woozi/`](.):
 - `pnpm run lint`
 - `pnpm run format`
 - `pnpm run check-format`
+
+### Tests
+
+`pnpm test` is hermetic and runs in about ten seconds. It is what CI gates on.
+
+The integration tests are opt-in behind `WOOZI_RUN_LIVE_INTEGRATION=1`, which
+is what `pnpm test:live` (or the individual `test:e2e`, `test:gui`,
+`test:quickwit`) sets. They need Docker and minio, the live Notubiz API, and
+the PDF extraction fleet — and that fleet only accepts connections from the
+production host. Off production they do not fail quickly: each document waits
+out its retries first, so a run takes minutes and ends in
+`extraction_service_failed`. Run them from a machine that can reach the fleet,
+or not at all.
 
 Quickwit helpers live in [`quickwit/`](quickwit).
 

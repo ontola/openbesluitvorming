@@ -30,8 +30,17 @@ function useLocalS3(): void {
   Deno.env.set("S3_SECRET_KEY", "woozi-dev-secret");
 }
 
+/** Opt-in: these drive Docker, minio, the live Notubiz API and the PDF
+ * extraction fleet. That fleet is reachable from the production host and not
+ * from a developer machine, so off-prod these fail after ~76-230s of retries
+ * on `extraction_service_failed` -- which is why the suite sat red for weeks
+ * and why no CI job ever ran it. Set WOOZI_RUN_LIVE_INTEGRATION=1 to include
+ * them. */
+const LIVE = Deno.env.get("WOOZI_RUN_LIVE_INTEGRATION") === "1";
+
 Deno.test({
   name: "extracts one day of public Notubiz meetings for Haarlem",
+  ignore: !LIVE,
   sanitizeOps: false,
   sanitizeResources: false,
   fn: async () => {
@@ -117,6 +126,7 @@ Deno.test({
 
 Deno.test({
   name: "emits entity.commit events for one day of public Notubiz meetings for Haarlem",
+  ignore: !LIVE,
   sanitizeOps: false,
   sanitizeResources: false,
   fn: async () => {

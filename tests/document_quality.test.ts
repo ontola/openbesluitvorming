@@ -69,7 +69,7 @@ Deno.test("assessMarkdownQuality keeps normal prose in the good range", () => {
 
 Deno.test("assessMarkdownQuality flags garbled text as suspect", () => {
   const result = assessMarkdownQuality(
-    "\u0007\u0017 \u0007\u0007\b\u0007\u0004 \u0010\u0007\u0013\u0015\u0005\u0016\u0014\u0017\u0016\u0004\u0017\b\u0002\u0002 !\"\u0017\u0011\u0003\u0014\u0011#\u0007\b\u0017!$!",
+    '\u0007\u0017 \u0007\u0007\b\u0007\u0004 \u0010\u0007\u0013\u0015\u0005\u0016\u0014\u0017\u0016\u0004\u0017\b\u0002\u0002 !"\u0017\u0011\u0003\u0014\u0011#\u0007\b\u0017!$!',
   );
 
   assert(result.status === "suspect", "expected gibberish to be flagged as suspect");
@@ -92,16 +92,31 @@ Deno.test("assessMarkdownQuality treats empty markdown as suspect", () => {
   assert(result.score === 0, `expected empty markdown to score 0, got ${result.score}`);
 });
 
-Deno.test("materializeDocument stores suspect quality metadata without emitting an issue", async () => {
+/** A cache hit reports the keys it found and does not re-read the markdown.
+ *
+ * This test used to assert that a cached document still carried
+ * `extraction_quality_status`. It cannot: readCachedDocument deliberately
+ * confirms the markdown exists without downloading it, because that download
+ * cost 4+ seconds per document and dominated the import of an already-indexed
+ * source. Assessing quality would mean paying it again.
+ *
+ * The consequence is worth stating plainly: `extraction_quality_status` is
+ * present on a fresh derivation and absent on a cache hit, so the field is
+ * inconsistent across published documents. Nothing reads it today -- it is
+ * written in three places in process.ts and consumed nowhere -- so this is a
+ * wart in the exported data rather than a broken behaviour. If it ever drives
+ * a decision, it needs to be persisted at derivation time so the cache path
+ * can report it without the download.
+ */
+Deno.test("materializeDocument serves a cached document without re-assessing quality", async () => {
   const storage = new FakeStorage();
-  const fileKey =
-    "documents/notubiz/gemeente/baarn/13165092/1-2026-04-03T08_00_00/verslag.txt";
+  const fileKey = "documents/notubiz/gemeente/baarn/13165092/1-2026-04-03T08_00_00/verslag.txt";
   const markdownKey = `${fileKey}.pymupdf-v1.md`;
   await storage.putObject(fileKey, new TextEncoder().encode("cached file"));
   await storage.putObject(
     markdownKey,
     new TextEncoder().encode(
-      "\u0007\u0017 \u0007\u0007\b\u0007\u0004 \u0010\u0007\u0013\u0015\u0005\u0016\u0014\u0017\u0016\u0004\u0017\b\u0002\u0002 !\"",
+      '\u0007\u0017 \u0007\u0007\b\u0007\u0004 \u0010\u0007\u0013\u0015\u0005\u0016\u0014\u0017\u0016\u0004\u0017\b\u0002\u0002 !"',
     ),
   );
   const result = await materializeDocument(buildDocument(), {
@@ -109,9 +124,13 @@ Deno.test("materializeDocument stores suspect quality metadata without emitting 
     download: async () => new TextEncoder().encode("unused"),
   });
 
-  assert(result.issues.length === 0, "expected suspect quality to stay out of run issues");
+  assert(result.issues.length === 0, "a cache hit reports no run issues");
   assert(
-    result.document.derived_content?.extraction_quality_status === "suspect",
-    "expected derived content to expose suspect quality status",
+    result.document.derived_content?.markdown_key === markdownKey,
+    "expected the cached markdown key to be handed on",
+  );
+  assert(
+    result.document.derived_content?.extraction_quality_status === undefined,
+    "a cache hit does not download the markdown, so it cannot judge its quality",
   );
 });

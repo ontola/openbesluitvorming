@@ -1,0 +1,59 @@
+name: Tests
+
+# Nothing ran the test suite. Both existing workflows build and deploy, so a
+# red suite reached production unnoticed -- it had been red for weeks before
+# anyone looked. This gate runs the hermetic tests on every push and pull
+# request.
+#
+# The live integration tests stay out: they need Docker, minio, the Notubiz API
+# and the PDF extraction fleet, which is firewalled to the production host.
+# Run those with WOOZI_RUN_LIVE_INTEGRATION=1 from a machine that can reach it.
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v5
+
+      - name: Set up Deno
+        uses: denoland/setup-deno@v2
+        with:
+          # Matches the runtime in Dockerfile.web, so a test passing here means
+          # it passes on the image that gets deployed.
+          deno-version: 2.7.7
+
+      - name: Check types
+        run: deno check src/main.ts src/worker.ts web/server.ts
+
+      - name: Run tests
+        run: deno test -A tests/
+
+  web:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v5
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install
+        run: corepack enable && pnpm install --frozen-lockfile --config.strict-dep-builds=false
+
+      - name: Build the front end
+        run: pnpm run build:web

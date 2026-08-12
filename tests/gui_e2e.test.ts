@@ -1,5 +1,3 @@
-import { Window } from "npm:happy-dom";
-import { bootstrapSearchApp } from "../web/src/app.ts";
 import { QuickwitClient } from "../src/quickwit/client.ts";
 import { NotubizMeetingExtractor } from "../src/notubiz/extractor.ts";
 import { getNotubizSource } from "../src/sources/index.ts";
@@ -49,6 +47,27 @@ function localComposeS3Env(): Record<string, string> {
   };
 }
 
+/** Like waitFor, but hands back the first truthy value instead of discarding
+ * it, so a poll can double as the lookup. */
+async function waitFor2<T>(
+  produce: () => Promise<T | null> | T | null,
+  timeoutMs = 10000,
+  pollIntervalMs = 200,
+): Promise<T | null> {
+  const startedAt = Date.now();
+
+  while (Date.now() - startedAt < timeoutMs) {
+    const value = await produce();
+    if (value) {
+      return value;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+  }
+
+  return null;
+}
+
 async function waitFor(
   predicate: () => boolean | Promise<boolean>,
   timeoutMs = 10000,
@@ -67,8 +86,23 @@ async function waitFor(
   throw new Error("Timed out while waiting for condition");
 }
 
+/** End-to-end: a real Notubiz meeting, indexed, and then found through the
+ * HTTP surface the app actually calls.
+ *
+ * This used to drive `web/src/app.ts` -- the pre-Svelte GUI -- through
+ * happy-dom, asserting on `#search-form` and `#result-list`. Those elements
+ * stopped existing at the Svelte migration and nothing referenced that module
+ * any more, so the test was exercising an interface no visitor could reach.
+ * Asserting on /api/search keeps the part that carries the value (supplier ->
+ * extractor -> Quickwit -> served container) and drops only the dead GUI.
+ *
+ * Opt-in: it needs Docker, minio, the live Notubiz API and the PDF extraction
+ * fleet, which is reachable from production and not from a laptop. */
+const LIVE = Deno.env.get("WOOZI_RUN_LIVE_INTEGRATION") === "1";
+
 Deno.test({
-  name: "imports meetings into Quickwit and finds them through the OpenBesluitvorming GUI",
+  name: "imports meetings into Quickwit and serves them over the search API",
+  ignore: !LIVE,
   sanitizeOps: false,
   sanitizeResources: false,
   fn: async () => {
@@ -130,51 +164,24 @@ Deno.test({
         }
       }, 30000);
 
-      const html = await fetch(`http://127.0.0.1:${webPort}/`).then((response) => response.text());
-      const window = new Window();
-      window.document.write(html);
-      window.document.close();
+      const found = await waitFor2(async () => {
+        const response = await fetch(
+          `http://127.0.0.1:${webPort}/api/search?query=${encodeURIComponent(queryTerm)}` +
+            `&organization=${encodeURIComponent(source.key)}&limit=25`,
+        );
+        if (!response.ok) {
+          return null;
+        }
+        const body = (await response.json()) as {
+          results?: Array<{ name?: string; organization?: string }>;
+        };
+        return body.results?.find((result) => result.name === importedDocument.name) ?? null;
+      }, 30000);
 
-      await bootstrapSearchApp({
-        document: window.document as unknown as Document,
-        windowImpl: window,
-        fetchImpl: (input) => {
-          const url =
-            typeof input === "string" ? new URL(input, `http://127.0.0.1:${webPort}`) : input;
-
-          return fetch(url);
-        },
-      });
-
-      const form = window.document.querySelector("#search-form") as {
-        dispatchEvent: (event: Event) => boolean;
-      } | null;
-      const queryInput = window.document.querySelector("#query") as { value: string } | null;
-      const organizationSelect = window.document.querySelector("#organization") as {
-        value: string;
-      } | null;
-      const resultList = window.document.querySelector("#result-list");
-
-      assert(form, "expected search form");
-      assert(queryInput, "expected query input");
-      assert(organizationSelect, "expected organization select");
-      assert(resultList, "expected result list");
-
-      queryInput.value = queryTerm;
-      organizationSelect.value = source.key;
-      form.dispatchEvent(
-        new window.Event("submit", { bubbles: true, cancelable: true }) as unknown as Event,
-      );
-
-      await waitFor(() => resultList.textContent?.includes(importedDocument.name) ?? false);
-
+      assert(found, "expected the imported document to be findable through /api/search");
       assert(
-        resultList.textContent?.includes("Haarlem"),
-        "expected rendered GUI results to mention Haarlem",
-      );
-      assert(
-        resultList.textContent?.includes(importedDocument.name),
-        "expected rendered GUI results to mention the imported document title",
+        found.organization?.toLowerCase().includes("haarlem"),
+        `expected the hit to name Haarlem, got ${found.organization}`,
       );
     } finally {
       await runCommand(["docker", "compose", "down", "-v"], composeDir);

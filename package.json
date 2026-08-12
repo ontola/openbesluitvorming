@@ -18,15 +18,16 @@
     "monitor:prod": "deno run --allow-net --allow-env --allow-run --allow-read=/tmp --allow-write=/tmp scripts/monitor-production.ts",
     "build:web": "vite build",
     "test": "deno test -A",
-    "test:e2e": "deno test -A tests/notubiz.test.ts",
-    "test:quickwit": "deno test -A tests/quickwit.test.ts",
-    "test:gui": "deno test -A tests/gui_e2e.test.ts",
+    "test:e2e": "WOOZI_RUN_LIVE_INTEGRATION=1 deno test -A tests/notubiz.test.ts",
+    "test:quickwit": "WOOZI_RUN_LIVE_INTEGRATION=1 deno test -A tests/quickwit.test.ts",
+    "test:gui": "WOOZI_RUN_LIVE_INTEGRATION=1 deno test -A tests/gui_e2e.test.ts",
     "export:opub": "deno run -A src/integrations/opub/export.ts",
     "extract:haarlem": "deno run -A src/main.ts haarlem 2025-01-14 2025-01-15",
     "ingest:haarlem": "deno run -A src/main.ts --quickwit haarlem 2025-01-14 2025-01-15",
     "lint": "oxlint src tests web/src/*.ts vite.config.ts",
     "format": "oxfmt --write src tests web/src/*.ts web/*.html web/*.css vite.config.ts tsconfig.json",
-    "check-format": "oxfmt --check src tests web/src/*.ts web/*.html web/*.css vite.config.ts tsconfig.json"
+    "check-format": "oxfmt --check src tests web/src/*.ts web/*.html web/*.css vite.config.ts tsconfig.json",
+    "test:live": "WOOZI_RUN_LIVE_INTEGRATION=1 deno test -A tests/notubiz.test.ts tests/quickwit.test.ts tests/gui_e2e.test.ts"
   },
   "dependencies": {
     "hls.js": "^1.6.17",
