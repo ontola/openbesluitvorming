@@ -50,6 +50,16 @@ services:
       # rebuilding onto a new server.
       QUICKWIT_SPLIT_CACHE_MAX_NUM_BYTES: ${QUICKWIT_SPLIT_CACHE_MAX_NUM_BYTES:-120G}
       QUICKWIT_SPLIT_CACHE_NUM_CONCURRENT_DOWNLOADS: ${QUICKWIT_SPLIT_CACHE_NUM_CONCURRENT_DOWNLOADS:-4}
+    # Quickwit logs every search at INFO, including the full split list, and
+    # Docker's json-file driver does not rotate unless told to. The log had
+    # reached 1.2 GB on the root disk by the time anyone looked (2026-08-12),
+    # growing fastest exactly when the disk is most under pressure. Three
+    # rotations of 100 MB is more history than anyone reads.
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "3"
     volumes:
       - quickwit-data:/quickwit/qwdata
       # Dedicated 150GB Hetzner volume for the searcher split cache only. It
