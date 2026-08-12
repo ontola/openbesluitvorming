@@ -1,8 +1,21 @@
 <script lang="ts">
-  import { onDestroy, tick } from "svelte";
+  import { createEventDispatcher, onDestroy, tick } from "svelte";
   import type { MeetingRecording } from "../../src/types.ts";
+  import {
+    findMatches,
+    searchableSegments,
+    segmentOfMatch,
+    splitOnMatches,
+  } from "./transcript_search.ts";
 
   export let recording: MeetingRecording;
+  /** The site-wide search term that brought the reader here. When it occurs in
+   * the spoken word the find bar opens on it and the player is cued to the
+   * first hit — the transcript is the only place that match is visible, and
+   * hunting for it by hand in a three-hour meeting is not a search result. */
+  export let initialQuery = "";
+
+  const dispatch = createEventDispatcher<{ transcriptmatch: { seconds: number } }>();
 
   let videoEl: HTMLVideoElement | undefined;
   let hls: { destroy: () => void } | undefined;
@@ -17,6 +30,10 @@
   let searchOpen = false;
   let searchEl: HTMLInputElement | undefined;
   let activeMatch = 0;
+  let pendingSeek: { seconds: number; play: boolean } | undefined;
+  /** Which (recording, incoming query) pair the find bar was already primed
+   * for, so re-renders don't re-open a bar the reader just closed. */
+  let primedFor: string | undefined;
 
   async function openSearch(): Promise<void> {
     searchOpen = true;
@@ -67,15 +84,45 @@
     hls = instance;
   }
 
-  /** Bound by the parent so the agenda can drive the player: the agenda item
-   * is where a reader decides to jump, and it lives outside this component. */
-  export function seek(seconds: number): void {
+  /** Moves the playhead, holding the jump until there is a timeline to jump in.
+   *
+   * `currentTime` is silently dropped while the element is still at
+   * HAVE_NOTHING, which is exactly the state a search-driven cue arrives in:
+   * it is computed as the panel mounts, while hls.js is still parsing the
+   * manifest. Held jumps are applied on `loadedmetadata`.
+   *
+   * `play` separates the two callers: a click on a timestamp or an agenda item
+   * is a request to watch, while landing on a search hit is not — starting
+   * audio on its own the moment a meeting opens is a jump scare, not a
+   * feature. */
+  function moveTo(seconds: number, play: boolean): void {
     if (!videoEl) {
       return;
     }
     followPlayhead = true;
+    if (videoEl.readyState === HTMLMediaElement.HAVE_NOTHING) {
+      pendingSeek = { seconds, play };
+      return;
+    }
+    pendingSeek = undefined;
     videoEl.currentTime = seconds;
-    void videoEl.play();
+    if (play) {
+      void videoEl.play();
+    }
+  }
+
+  function applyPendingSeek(): void {
+    const held = pendingSeek;
+    pendingSeek = undefined;
+    if (held) {
+      moveTo(held.seconds, held.play);
+    }
+  }
+
+  /** Bound by the parent so the agenda can drive the player: the agenda item
+   * is where a reader decides to jump, and it lives outside this component. */
+  export function seek(seconds: number): void {
+    moveTo(seconds, true);
   }
 
   function hostnameOf(url?: string): string {
@@ -98,54 +145,11 @@
     return hours > 0 ? `${hours}:${pad(minutes)}:${pad(secs)}` : `${minutes}:${pad(secs)}`;
   }
 
-  /** Split on the query so a match can be wrapped in a <mark> without ever
-   * putting supplier text through {@html}.
-   *
-   * `offset` is the running match count of the segments before this one, so
-   * every occurrence in the transcript gets a stable number and the find bar
-   * can point at exactly one of them. */
-  function highlight(
-    text: string,
-    term: string,
-    offset = 0,
-  ): Array<{ text: string; matchIndex: number | null }> {
-    if (!term) {
-      return [{ text, matchIndex: null }];
+  function cueToActiveMatch(play: boolean): void {
+    const index = segmentOfMatch(matches, activeMatch);
+    if (index >= 0) {
+      moveTo(segments[index].start_seconds, play);
     }
-    const parts: Array<{ text: string; matchIndex: number | null }> = [];
-    const haystack = text.toLowerCase();
-    const needle = term.toLowerCase();
-    let index = 0;
-    let seen = 0;
-    while (index < text.length) {
-      const found = haystack.indexOf(needle, index);
-      if (found === -1) {
-        parts.push({ text: text.slice(index), matchIndex: null });
-        break;
-      }
-      if (found > index) {
-        parts.push({ text: text.slice(index, found), matchIndex: null });
-      }
-      parts.push({ text: text.slice(found, found + needle.length), matchIndex: offset + seen });
-      seen += 1;
-      index = found + needle.length;
-    }
-    return parts;
-  }
-
-  function countOccurrences(text: string, term: string): number {
-    if (!term) {
-      return 0;
-    }
-    const haystack = text.toLowerCase();
-    const needle = term.toLowerCase();
-    let count = 0;
-    let index = haystack.indexOf(needle);
-    while (index !== -1) {
-      count += 1;
-      index = haystack.indexOf(needle, index + needle.length);
-    }
-    return count;
   }
 
   function stepMatch(delta: number): void {
@@ -156,6 +160,54 @@
     // last hit — leaves the reader guessing whether they reached the end or
     // the button broke.
     activeMatch = (activeMatch + delta + matchCount) % matchCount;
+    // Stepping the find bar moves the video with it. A hit in the spoken word
+    // is a moment, not a line of text, so "next hit" that left the playhead
+    // behind would make the reader jump twice for every result.
+    cueToActiveMatch(false);
+  }
+
+  /** Opens the find bar on the term the reader searched for, if the spoken
+   * word actually contains it.
+   *
+   * Matches its own transcript rather than reading the reactive `searchable`
+   * and `matches`: this decides whether to assign `query` at all, so it needs
+   * the count for a term that has not been assigned yet — and it would
+   * otherwise depend on the order Svelte happens to run two reactive blocks in.
+   * It runs once per opened meeting, so the extra pass is free. */
+  /** Waits out the current update before priming.
+   *
+   * `query` is the root of a chain of derived values — the term, the match
+   * positions, the counter — that are all recomputed earlier in the very
+   * update this runs in. Assigning it from inside that update leaves them
+   * holding the previous value: the observed result was a find bar visibly
+   * filled with the search term and a transcript with nothing marked in it. */
+  async function primeOnce(id: string, incoming: string, segmentCount: number): Promise<void> {
+    const key = `${id}\n${incoming}`;
+    if (segmentCount === 0 || primedFor === key) {
+      return;
+    }
+    primedFor = key;
+    await tick();
+    primeFromQuery(incoming);
+  }
+
+  function primeFromQuery(incoming: string): void {
+    const trimmed = incoming.trim();
+    if (!trimmed) {
+      return;
+    }
+
+    const found = findMatches(searchableSegments(segments), trimmed.toLowerCase());
+    if (found.total === 0) {
+      return;
+    }
+
+    query = trimmed;
+    searchOpen = true;
+    activeMatch = 0;
+    const index = found.perSegment.findIndex((positions) => positions.length > 0);
+    moveTo(segments[index].start_seconds, false);
+    dispatch("transcriptmatch", { seconds: segments[index].start_seconds });
   }
 
   function scrollToActiveMatch(): void {
@@ -170,6 +222,17 @@
     void attach(videoEl, recording);
   }
 
+  /** Suppliers usually put the agenda number in the chapter title ("1 Opening
+   * en vaststellen agenda"), which next to the key cap reads as the same digit
+   * twice. Dropped only when the two agree: where play order and agenda order
+   * differ — about a quarter of meetings — the title's number is the one the
+   * agenda below uses, and losing it would leave the reader unable to line the
+   * two up at all. */
+  function chapterLabel(title: string, number: number): string {
+    const match = title.match(/^(\d+)[.)]?\s+(.*)$/s);
+    return match && Number(match[1]) === number ? match[2] : title;
+  }
+
   /** The transcript is the timeline, so the agenda items are folded into it as
    * headings in play order. That is deliberately not the agenda's own order:
    * the two differ in about a quarter of meetings, and here the video decides.
@@ -178,11 +241,11 @@
     list: typeof segments,
     chapters: MeetingRecording["chapters"],
   ): Array<
-    | { kind: "chapter"; key: string; title: string; start: number }
+    | { kind: "chapter"; key: string; title: string; start: number; number: number }
     | { kind: "segment"; key: string; index: number; segment: (typeof list)[number] }
   > {
     const rows: Array<
-      | { kind: "chapter"; key: string; title: string; start: number }
+      | { kind: "chapter"; key: string; title: string; start: number; number: number }
       | { kind: "segment"; key: string; index: number; segment: (typeof list)[number] }
     > = [];
     const pending = [...(chapters ?? [])].sort((a, b) => a.start_seconds - b.start_seconds);
@@ -196,11 +259,32 @@
           key: `c${chapter.start_seconds}-${next}`,
           title: chapter.title,
           start: chapter.start_seconds,
+          // The number the reader can type to jump here. Play order, which is
+          // why it is numbered here and not in the agenda tree: the two differ
+          // in about a quarter of meetings and the keyboard follows the video.
+          number: next + 1,
         });
         next += 1;
       }
       rows.push({ kind: "segment", key: `s${segment.start_seconds}`, index, segment });
     });
+
+    // Chapters that start after the last transcribed word — a closing item
+    // discussed once the subtitles stop, or a transcript that ends early — have
+    // no segment to be inserted before. Appending them keeps the numbering
+    // continuous, which is what the number keys address; dropping them made the
+    // last agenda item unreachable from the transcript entirely.
+    while (next < pending.length) {
+      const chapter = pending[next];
+      rows.push({
+        kind: "chapter",
+        key: `c${chapter.start_seconds}-${next}`,
+        title: chapter.title,
+        start: chapter.start_seconds,
+        number: next + 1,
+      });
+      next += 1;
+    }
 
     return rows;
   }
@@ -221,12 +305,10 @@
   // threw away exactly what makes a transcript worth reading — who said what
   // around the hit — and it hid the agenda headings that say where you are.
   $: rows = withChapterHeadings(segments, recording.chapters);
-  /** Running match count before each segment, so every occurrence has a number. */
-  $: matchOffsets = segments.reduce<number[]>((acc, segment, index) => {
-    acc[index] = index === 0 ? 0 : acc[index - 1] + countOccurrences(segments[index - 1].text, term);
-    return acc;
-  }, []);
-  $: matchCount = segments.reduce((total, segment) => total + countOccurrences(segment.text, term), 0);
+  // Recomputed only when the transcript itself changes, not per keystroke.
+  $: searchable = searchableSegments(segments);
+  $: matches = findMatches(searchable, term.toLowerCase());
+  $: matchCount = matches.total;
   // A new query starts at the first hit, and a shrinking result set must not
   // leave the cursor pointing past the end.
   $: if (term !== undefined && activeMatch >= matchCount) {
@@ -250,6 +332,11 @@
     node?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }
 
+  // Prime once per (recording, incoming term): re-running on every render would
+  // re-open a find bar the reader had just closed, and closing it clears the
+  // query, so it would fight them on every keystroke elsewhere on the page.
+  $: void primeOnce(recording.id, initialQuery, segments.length);
+
   onDestroy(() => hls?.destroy());
 </script>
 
@@ -263,6 +350,7 @@
       class:recording__video--audio={recording.media_type === "audio"}
       controls
       preload="metadata"
+      on:loadedmetadata={applyPendingSeek}
     ></video>
 
     {#if sourceUrl}
@@ -391,8 +479,13 @@
           {#if row.kind === "chapter"}
             <h4 class="recording__chapter-heading">
               <button type="button" on:click={() => seek(row.start)}>
+                <!-- The number doubles as the keyboard shortcut: typing it
+                     anywhere in the meeting jumps the video here. Shown on
+                     every chapter, because a shortcut nobody can see is one
+                     nobody uses. -->
+                <span class="recording__chapter-key" aria-hidden="true">{row.number}</span>
                 <span class="recording__time">{formatClock(row.start)}</span>
-                <span>{row.title}</span>
+                <span>{chapterLabel(row.title, row.number)}</span>
               </button>
             </h4>
           {:else}
@@ -412,7 +505,7 @@
                 <span class="recording__speaker">{row.segment.speaker}</span>
               {/if}
               <span class="recording__text">
-                {#each highlight(row.segment.text, term, matchOffsets[row.index]) as part}
+                {#each splitOnMatches( row.segment.text, matches.perSegment[row.index] ?? [], term.length, matches.offsets[row.index] ?? 0, ) as part}
                   {#if part.matchIndex !== null}<mark
                       class:recording__mark--active={part.matchIndex === activeMatch}
                       data-match={part.matchIndex}

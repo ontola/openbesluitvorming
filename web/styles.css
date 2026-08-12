@@ -2224,6 +2224,22 @@ select {
   font-size: 0.85rem;
 }
 
+/* Drawn as a key cap because it is one: typing this number jumps the video to
+   this agenda item. */
+.recording__chapter-key {
+  flex: none;
+  min-width: 1.4rem;
+  padding: 0.05rem 0.3rem;
+  border: 1px solid color-mix(in srgb, var(--accent-deep) 30%, transparent);
+  border-bottom-width: 2px;
+  border-radius: 0.3rem;
+  background: var(--surface, #fff);
+  color: var(--accent-deep);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
 .recording__time--button {
   border: 0;
   padding: 0;

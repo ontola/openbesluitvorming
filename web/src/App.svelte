@@ -157,6 +157,14 @@
   let detailPdfJumpValue = "";
   let detailSheetWidth: number | null = null;
   let detailSheetResizing = false;
+  /** The term this detail view was opened on. A snapshot, not `query` itself:
+   * the search bar stays live behind the overlay, and letting the transcript
+   * find bar follow it would re-cue the video on every keystroke of a search
+   * the reader has not run yet. */
+  let detailQuery = "";
+  /** Set when a recording panel reports that the term occurs in its spoken
+   * word, so the text highlighter leaves the scroll position to the player. */
+  let detailTranscriptHit = false;
 
   const detailCache = new Map<string, EntityContentResponse | null>();
   const detailRequests = new Map<string, Promise<EntityContentResponse | null>>();
@@ -799,7 +807,12 @@
     const surface = activeDetailTextSurface();
     if (!surface) return;
     highlightElementText(surface, query);
-    const firstMatch = surface.querySelector<HTMLElement>("mark");
+    // The recording panel mounts (and reports its hit) during the tick this
+    // function already waited for, so the flag is settled by now. When the term
+    // was spoken, that is the match the reader came for — scrolling the agenda
+    // to an incidental mention of the same word below the video would take the
+    // player off screen.
+    const firstMatch = detailTranscriptHit ? null : surface.querySelector<HTMLElement>("mark");
     if (firstMatch) {
       surface.classList.remove("detail-sheet__surface--highlighting");
       void surface.offsetWidth;
@@ -834,6 +847,8 @@
     detailLoading = true;
     detailOpen = true;
     detailContent = null;
+    detailQuery = query;
+    detailTranscriptHit = false;
     detailMode = "text";
     detailPage = `${pageOverride ?? item.matchedPage ?? 1}`;
     detailPdfPageCount = 0;
@@ -1236,7 +1251,53 @@
     void syncFromUrl(true);
   }
 
-  function handleEscape(event: KeyboardEvent): void {
+  /** Digits typed within this window build one number, so a meeting with more
+   * than nine agenda items is still reachable from the keyboard: "1" then "2"
+   * is chapter 12, while a lone "1" that is not followed by anything is
+   * chapter 1. */
+  const CHAPTER_KEY_WINDOW_MS = 700;
+  let chapterKeyBuffer = "";
+  let chapterKeyTimer: number | undefined;
+
+  function jumpToChapterNumber(number: number): void {
+    const chapter = orderedChapters[number - 1];
+    if (chapter) {
+      seekPrimaryRecording(chapter.start_seconds);
+    }
+  }
+
+  /** Number keys jump the video to that agenda item, numbered as the transcript
+   * shows them: play order, from the primary recording's chapters. */
+  function handleChapterKey(event: KeyboardEvent): boolean {
+    if (orderedChapters.length === 0 || !/^[0-9]$/.test(event.key)) {
+      return false;
+    }
+    if (event.ctrlKey || event.metaKey || event.altKey) {
+      return false;
+    }
+
+    chapterKeyBuffer += event.key;
+    window.clearTimeout(chapterKeyTimer);
+
+    const number = Number.parseInt(chapterKeyBuffer, 10);
+    // Nothing can extend this into a chapter that exists, so act now rather
+    // than make the reader wait out the window for a jump that is already
+    // decided.
+    if (number * 10 > orderedChapters.length) {
+      chapterKeyBuffer = "";
+      jumpToChapterNumber(number);
+      return true;
+    }
+
+    chapterKeyTimer = window.setTimeout(() => {
+      const pending = Number.parseInt(chapterKeyBuffer, 10);
+      chapterKeyBuffer = "";
+      jumpToChapterNumber(pending);
+    }, CHAPTER_KEY_WINDOW_MS);
+    return true;
+  }
+
+  function handleDetailKeydown(event: KeyboardEvent): void {
     if (!detailOpen) {
       return;
     }
@@ -1259,6 +1320,11 @@
     }
 
     if (isEditableKeyboardTarget(event.target)) {
+      return;
+    }
+
+    if (handleChapterKey(event)) {
+      event.preventDefault();
       return;
     }
 
@@ -1291,7 +1357,7 @@
       .catch(() => {});
     await loadSources();
     await syncFromUrl(true);
-    document.addEventListener("keydown", handleEscape);
+    document.addEventListener("keydown", handleDetailKeydown);
     window.addEventListener("resize", updateInitialLoadingCardCount);
     loadMoreObserver = new IntersectionObserver((entries) => {
       if (entries.some((entry) => entry.isIntersecting)) {
@@ -1309,7 +1375,8 @@
       debounceTimer = undefined;
     }
     searchAbortController?.abort();
-    document.removeEventListener("keydown", handleEscape);
+    window.clearTimeout(chapterKeyTimer);
+    document.removeEventListener("keydown", handleDetailKeydown);
     window.removeEventListener("resize", updateInitialLoadingCardCount);
     loadMoreObserver?.disconnect();
     loadMoreObserver = null;
@@ -1376,6 +1443,11 @@
    * Amsterdam's two-day sittings have them), and pointing the agenda at two
    * different timelines at once would be worse than pointing it at the first. */
   $: primaryRecording = detailContent?.recordings?.[0];
+  /** Play order, matching the numbers the transcript prints on its chapter
+   * headings — that is what a number key addresses. */
+  $: orderedChapters = [...(primaryRecording?.chapters ?? [])].sort(
+    (left, right) => left.start_seconds - right.start_seconds,
+  );
   $: playheadByAgendaItem = Object.fromEntries(
     (primaryRecording?.chapters ?? [])
       .filter((chapter) => chapter.agenda_item)
@@ -2028,7 +2100,9 @@
                   {#each detailContent.recordings as recording, index (recording.id)}
                     <MeetingRecordingPlayer
                       {recording}
+                      initialQuery={detailQuery}
                       bind:this={recordingPlayers[index]}
+                      on:transcriptmatch={() => (detailTranscriptHit = true)}
                     />
                   {/each}
                 </div>
