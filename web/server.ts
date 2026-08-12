@@ -32,6 +32,7 @@ import {
 import { ObjectStorageClient } from "../src/storage/s3.ts";
 import { pdfPageCacheKey, pdfPageMetaKey, renderPdfPageJpeg } from "../src/documents/thumbnails.ts";
 import { RATE_LIMIT_PAGE_UNIT, RateLimiter, type RateVerdict, requestCost } from "./rate_limit.ts";
+import { validateSearchParams } from "./search_params.ts";
 
 const root = new URL("./", import.meta.url);
 const distRoot = new URL("./dist/", import.meta.url);
@@ -555,6 +556,10 @@ async function handleRequest(request: Request): Promise<Response> {
 
   if (url.pathname === "/api/search") {
     const metrics: ServerTimingMetric[] = [];
+    const invalidParam = validateSearchParams(url);
+    if (invalidParam) {
+      return withServerTiming(invalidParam, requestStart, metrics);
+    }
     try {
       const results = await measureTiming(metrics, "search", () =>
         searchMeetings({

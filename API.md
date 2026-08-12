@@ -118,14 +118,18 @@ The recommended search endpoint. Returns grouped, deduplicated results with docu
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `query` | string | Search query (required) |
-| `organization` | string | Filter by source key (e.g. `soest`, `amsterdam`) |
-| `entityType` | string | Filter by type: `Meeting`, `Document`, `Motion` or `Recording` (spoken word; matches resolve to their meeting) |
+| `query` | string | Search query. Required **unless** `organization` is given — a source key on its own browses that source without a search term. |
+| `organization` | string | Filter by source key (e.g. `soest`, `amsterdam`). Case-sensitive; an unknown key returns `400`. See [`/api/sources`](#sources). |
+| `entityType` | string | Filter by type: `Meeting`, `Document`, `Motion` or `Recording` (spoken word; matches resolve to their meeting). Case-sensitive; any other value returns `400`. |
 | `sort` | string | Sort order: `date_desc` (default), `date_asc`, or `relevance` |
 | `dateFrom` | string | Start date filter (ISO 8601, e.g. `2024-01-01`) |
 | `dateTo` | string | End date filter |
-| `offset` | integer | Pagination offset (default: 0) |
-| `limit` | integer | Results per page (default: 24) |
+| `offset` | integer | Pagination offset (default: 0). Must be zero or greater. |
+| `limit` | integer | Results per page (default: 24, minimum 1, values above 100 are capped at 100). |
+
+Parameters that cannot be honoured are refused with `400` rather than ignored:
+an unknown `entityType` used to drop the filter and quietly return everything,
+which is harder to notice than an error.
 
 **Example:**
 
