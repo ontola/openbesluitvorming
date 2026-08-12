@@ -23,6 +23,58 @@ https://openbesluitvorming.nl
 No authentication is required. All endpoints are read-only.
 
 Looking for voting behaviour per party? See [Use case: voting data](#use-case-voting-data).
+Planning something that makes a lot of requests? See [Rate limits](#rate-limits).
+
+---
+
+## Rate limits
+
+`/api/*` is rate limited per client at **60 units per minute**, refilling
+continuously (a token bucket, not a fixed window — you do not have to wait for a
+minute boundary).
+
+Most requests cost **1 unit**. Two exceptions:
+
+| Request | Cost |
+|---------|------|
+| `/api/search` with `limit=24` or lower (the default) | 1 unit |
+| `/api/search` with a higher `limit` | 1 unit per 24 results, rounded up — so `limit=100` costs 5 |
+| `/api/entities/{id}/pdf/page/{n}` | 1/8 unit — a long agenda's thumbnails should not drain your budget |
+
+The charge is per *requested* page, so asking for the server-side maximum drains
+the budget five times faster than paging through the same results at the default
+size. Both are allowed; pick whichever suits you.
+
+Every response carries the current state, so you can pace yourself without
+guessing:
+
+```
+RateLimit-Limit: 60
+RateLimit-Remaining: 43
+RateLimit-Reset: 17
+```
+
+`RateLimit-Reset` is the number of seconds until the bucket is back at full
+capacity.
+
+Exceeding the limit returns **`429 Too Many Requests`** with a JSON body and a
+`Retry-After` header giving the seconds until *your* next request would fit:
+
+```json
+{
+  "error": "Te veel verzoeken. Probeer het over 3 seconde(n) opnieuw.",
+  "limit_per_minute": 60,
+  "retry_after_seconds": 3,
+  "hint": "Zware verzoeken tellen zwaarder: een zoekopdracht kost 1 eenheid per 24 resultaten, dus limit=100 kost 5. …",
+  "documentation": "https://openbesluitvorming.nl/#api"
+}
+```
+
+Treat `429` as "slow down", not as an error: honour `Retry-After` and continue.
+
+For bulk work, prefer the [export endpoints](#bulk-export) over paging through
+`/api/search` — they are built to hand over a whole source in one stream and
+cost one unit per call.
 
 ---
 

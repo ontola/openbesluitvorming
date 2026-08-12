@@ -92,13 +92,56 @@
   let showApiDocs = false;
   let apiDocsHtml = "";
 
-  async function openApiDocs() {
-    if (!apiDocsHtml) {
-      const res = await fetch("/API.md");
-      const text = await res.text();
-      apiDocsHtml = renderMarkdown(text);
+  /** The API documentation has its own address.
+   *
+   * It used to be reachable only by clicking, so it could not be linked to or
+   * shared — which is exactly what someone wants to do with API docs (#189).
+   * The hash is deliberate rather than a route: the overlay sits on top of
+   * whatever search the reader already has, and a hash leaves their query and
+   * filters in the URL untouched. */
+  const API_DOCS_HASH = "#api";
+
+  async function loadApiDocs(): Promise<void> {
+    if (apiDocsHtml) {
+      return;
     }
+    try {
+      const res = await fetch("/API.md");
+      if (!res.ok) {
+        throw new Error(`API.md gaf ${res.status}`);
+      }
+      apiDocsHtml = renderMarkdown(await res.text());
+    } catch (error) {
+      // Show the panel anyway. Failing silently was survivable when the docs
+      // could only be reached by clicking, but someone arriving on a shared
+      // #api link would otherwise get an ordinary homepage and no hint that
+      // they were meant to land somewhere.
+      console.error("Kon API-documentatie niet laden", error);
+      apiDocsHtml =
+        '<p>De API-documentatie kon niet worden geladen. ' +
+        'Je kunt het <a href="/API.md">bronbestand</a> rechtstreeks openen.</p>';
+    }
+  }
+
+  async function openApiDocs(updateHash = true) {
+    await loadApiDocs();
     showApiDocs = true;
+    if (updateHash && window.location.hash !== API_DOCS_HASH) {
+      const url = new URL(window.location.href);
+      url.hash = API_DOCS_HASH.slice(1);
+      window.history.pushState(null, "", url);
+    }
+  }
+
+  function closeApiDocs(): void {
+    showApiDocs = false;
+    if (window.location.hash === API_DOCS_HASH) {
+      const url = new URL(window.location.href);
+      url.hash = "";
+      // replaceState, not pushState: closing should not leave a step that the
+      // back button walks straight back into.
+      window.history.replaceState(null, "", url.toString().replace(/#$/, ""));
+    }
   }
 
   let detailOpen = false;
@@ -1164,6 +1207,14 @@
     const nextState = routeStateFromUrl(new URL(window.location.href));
     applyState(nextState);
 
+    // Follow the hash both ways, so a shared #api link opens the docs and the
+    // back button closes them again.
+    if (window.location.hash === API_DOCS_HASH) {
+      await openApiDocs(false);
+    } else if (showApiDocs) {
+      showApiDocs = false;
+    }
+
     if (!hasActiveSearchFilters() && !view) {
       searched = false;
       results = [];
@@ -2114,7 +2165,7 @@
       type="button"
       class="detail-overlay__backdrop"
       aria-label="Sluiten"
-      on:click={() => (showApiDocs = false)}
+      on:click={closeApiDocs}
     ></button>
     <div
       class="detail-sheet detail-sheet--reader"
@@ -2133,7 +2184,7 @@
               type="button"
               class="ghost-button"
               aria-label="Sluiten"
-              on:click={() => (showApiDocs = false)}
+              on:click={closeApiDocs}
             >✕</button>
           </div>
         </div>

@@ -880,7 +880,7 @@ function rateLimitedResponse(verdict: RateVerdict): Response {
       retry_after_seconds: verdict.retryAfterSeconds,
       hint:
         `Zware verzoeken tellen zwaarder: een zoekopdracht kost 1 eenheid per ${RATE_LIMIT_PAGE_UNIT} resultaten, dus limit=100 kost 5. Verlaag 'limit' of spreid je verzoeken. Elke API-response bevat RateLimit-Limit, RateLimit-Remaining en RateLimit-Reset.`,
-      documentation: "https://github.com/ontola/openbesluitvorming",
+      documentation: "https://openbesluitvorming.nl/#api",
     },
     { status: 429 },
   );
