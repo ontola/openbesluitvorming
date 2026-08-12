@@ -51,7 +51,8 @@
       },
       {
         "name": "name",
-        "type": "text"
+        "type": "text",
+        "record": "position"
       },
       {
         "name": "document_month",
@@ -73,7 +74,8 @@
       },
       {
         "name": "content",
-        "type": "text"
+        "type": "text",
+        "record": "position"
       }
     ]
   },
