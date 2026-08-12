@@ -1,4 +1,8 @@
-import { reindexSource, __test__ as reindexTest } from "../src/pipeline/reindex.ts";
+import {
+  parseStoredPageChunks,
+  reindexSource,
+  __test__ as reindexTest,
+} from "../src/pipeline/reindex.ts";
 import type { ExportChangeRecord } from "../src/types.ts";
 import type { QuickwitSearchDocument } from "../src/quickwit/project.ts";
 
@@ -328,10 +332,16 @@ Deno.test("a failing rehydration is reported per record, not per slice", async (
 });
 
 Deno.test("document text is rehydrated from object storage, not lost", async () => {
-  const chunks = JSON.stringify([
-    { page_number: 1, markdown: "Eerste pagina over de begroting" },
-    { page_number: 2, markdown: "Tweede pagina met de dekking" },
-  ]);
+  // The shape materializeDocument actually writes: an object with `pages`, at
+  // both of its write sites. This fixture used to be a bare array, which no
+  // production object has ever been -- so the test passed while the reindex
+  // silently restored nothing and every document lost its page rows.
+  const chunks = JSON.stringify({
+    pages: [
+      { page_number: 1, markdown: "Eerste pagina over de begroting" },
+      { page_number: 2, markdown: "Tweede pagina met de dekking" },
+    ],
+  });
   const storage = new FakeStorage({ "text/doc-1/chunks.json": chunks });
   const log = new FakeExportLog([
     documentRecord("document:ibabs:gemeente:utrecht:d1", { chunks: "text/doc-1/chunks.json" }),
@@ -442,4 +452,36 @@ Deno.test("one unreadable entity is reported, not fatal", async () => {
   assertEquals(issues, ["document:ibabs:gemeente:utrecht:d3"], "and identified");
   assertEquals(stats.entity_count, 1, "the healthy entity still went through");
   assertEquals(ingested.length, 1, "and was indexed");
+});
+
+/** The reader accepts a bare array too, so this fix cannot make an older object
+ * unreadable. Nothing is known to have written this shape; it costs one branch
+ * to keep, and losing page rows is not a failure that announces itself. */
+Deno.test("a bare array of page chunks is still readable", () => {
+  const pages = parseStoredPageChunks(
+    JSON.stringify([{ page_number: 1, markdown: "Eerste pagina" }]),
+  );
+  assertEquals(pages?.length, 1, "a bare array still parses");
+  assertEquals(pages?.[0].page_number, 1, "and keeps its page number");
+});
+
+Deno.test("stored page chunks are read out of the object they are stored in", () => {
+  const stored = JSON.stringify({
+    pages: [
+      { page_number: 1, markdown: "Eerste" },
+      { page_number: 2, markdown: "Tweede" },
+    ],
+  });
+  assertEquals(parseStoredPageChunks(stored)?.length, 2, "both pages come back");
+  assertEquals(parseStoredPageChunks("{}"), null, "an object without pages yields nothing");
+
+  // Corruption stays loud: the caller turns this into a per-record issue, so a
+  // damaged object is reported rather than quietly downgraded to markdown.
+  let threw = false;
+  try {
+    parseStoredPageChunks("{ geen json");
+  } catch {
+    threw = true;
+  }
+  assert(threw, "unparseable input throws rather than returning nothing");
 });

@@ -1,5 +1,6 @@
 import type {
   DocumentEntity,
+  DocumentPageChunk,
   EntityCommitEvent,
   ExportChangeRecord,
   ExtractionIssue,
@@ -65,6 +66,38 @@ function toCommitEvent(record: ExportChangeRecord): EntityCommitEvent<WooziEntit
   };
 }
 
+/** Read back what materializeDocument stored under `page_chunks_key`.
+ *
+ * It writes `JSON.stringify({ pages: pageChunks })` -- an object -- at both of
+ * its write sites. This reader accepted only a bare array, so the check never
+ * matched, page_chunks was never restored, and every reindexed document fell
+ * through to the markdown fallback instead.
+ *
+ * Nothing failed visibly. The run reported those documents as rehydrated,
+ * because the fallback genuinely succeeded and the text was there. What
+ * disappeared were the per-page rows built from page_chunks: measured on
+ * zaltbommel, the reindexed index held 13,961 rows and not one DocumentPage,
+ * against 106,334 of them in the live index. That costs page-level matching
+ * and the jump to the page a hit was found on -- silently, across every
+ * document, and only visible by counting rows afterwards (2026-08-12).
+ *
+ * A bare array is still accepted, so an older object cannot become unreadable
+ * on account of this fix. */
+export function parseStoredPageChunks(raw: string): DocumentPageChunk[] | null {
+  // Deliberately not caught: a stored object that will not parse is corruption,
+  // and the caller reports it per record. Swallowing it here would turn that
+  // into a silent fall back to markdown -- the same class of quiet degradation
+  // this function exists to fix.
+  const parsed: unknown = JSON.parse(raw);
+
+  if (Array.isArray(parsed)) {
+    return parsed as DocumentPageChunk[];
+  }
+
+  const pages = (parsed as { pages?: unknown } | null)?.pages;
+  return Array.isArray(pages) ? (pages as DocumentPageChunk[]) : null;
+}
+
 /** Put a document's extracted text back on the payload.
  *
  * Export records are compact by design: they carry `derived_content` keys
@@ -83,9 +116,9 @@ async function rehydrateDocumentText(
   if (derived.page_chunks_key) {
     const raw = await storage.getObjectText(derived.page_chunks_key);
     if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
-        payload.page_chunks = parsed;
+      const pages = parseStoredPageChunks(raw);
+      if (pages) {
+        payload.page_chunks = pages;
         return true;
       }
     }
