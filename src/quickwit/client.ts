@@ -5,6 +5,10 @@ import type { EntityCommitEvent, WooziEntity } from "../types.ts";
 const DEFAULT_INDEX_ID = "woozi-events";
 const DEFAULT_QUICKWIT_URL = "http://127.0.0.1:7280";
 const MAX_INGEST_PAYLOAD_BYTES = 8_000_000;
+// commit=wait_for makes Quickwit hold the response until the batch is
+// published. Without an explicit timeout the fetch can hang indefinitely if
+// Quickwit's ingest pipeline stalls, blocking the whole run.
+const INGEST_TIMEOUT_MS = 120_000;
 const DEFAULT_SEARCH_TIMEOUT_MS = 8_000;
 const DEFAULT_SEARCH_ATTEMPTS = 2;
 
@@ -28,15 +32,60 @@ function isRetryableSearchError(error: unknown): boolean {
   );
 }
 
+/** Whether an ingest is worth trying again.
+ *
+ * This used to match only "index not found". Everything else -- a timeout, a
+ * dropped connection, backpressure from the indexer -- ended the run that
+ * raised it, and a reindex run covers a whole source, so one transient
+ * rejection threw away hours of work. That is what happened to four of 325
+ * sources during the v3 reindex (2026-08-13): each died at an arbitrary point
+ * on `413 The request payload is too large` while 32 ingests ran at once.
+ *
+ * 413 is included deliberately. Our bodies are capped at 8 MB and Quickwit
+ * accepts 10 MiB -- measured, 10 MB answers, 11 MB is refused -- and the
+ * largest single row in the source that failed first is 0.11 MB. So the
+ * rejection was not about this request's size, and the same body sent again
+ * has every chance of landing. If it genuinely were too large, the batch is
+ * halved on the next attempt and shrinks until it fits or is reported.
+ *
+ * The same omission cost 22 of 128 sources in the Notubiz client three days
+ * earlier. A narrow retry predicate is expensive in exactly the places where
+ * the work is long. */
 function isRetryableIngestError(error: unknown): boolean {
   if (!(error instanceof Error)) {
     return false;
   }
 
+  if (error.name === "TimeoutError" || error.name === "AbortError") {
+    return true;
+  }
+
+  const message = `${error.name} ${error.message}`.toLowerCase();
   return (
-    (error.message.includes("index `") && error.message.includes("` not found")) ||
-    error.message.includes("Quickwit ingest failed 404")
+    (message.includes("index `") && message.includes("` not found")) ||
+    message.includes("quickwit ingest failed 404") ||
+    // Backpressure and transient server-side trouble.
+    message.includes("quickwit ingest failed 413") ||
+    message.includes("quickwit ingest failed 429") ||
+    message.includes("quickwit ingest failed 500") ||
+    message.includes("quickwit ingest failed 502") ||
+    message.includes("quickwit ingest failed 503") ||
+    message.includes("quickwit ingest failed 504") ||
+    // Transport-level failures, in Deno's wording. The list is deliberately the
+    // same one the Notubiz client arrived at the hard way.
+    message.includes("error sending request") ||
+    message.includes("error reading a body from connection") ||
+    message.includes("connection reset") ||
+    message.includes("connection closed") ||
+    message.includes("broken pipe") ||
+    message.includes("timed out")
   );
+}
+
+/** True when the batch should be split before trying again, rather than
+ * resent unchanged. */
+function shouldHalveBatch(error: unknown): boolean {
+  return error instanceof Error && error.message.includes("Quickwit ingest failed 413");
 }
 
 async function sleep(ms: number): Promise<void> {
@@ -159,41 +208,55 @@ export class QuickwitClient {
       bodies.push(currentLines.join("\n"));
     }
 
-    // commit=wait_for makes Quickwit hold the response until the batch is
-    // published. Without an explicit timeout the fetch can hang indefinitely
-    // if Quickwit's ingest pipeline stalls, blocking the whole run.
-    const INGEST_TIMEOUT_MS = 120_000;
-
     for (const body of bodies) {
-      for (let attempt = 1; attempt <= 5; attempt += 1) {
-        try {
-          const response = await fetch(
-            `${this.baseUrl}/api/v1/${this.indexId}/ingest?commit=wait_for`,
-            {
-              method: "POST",
-              headers: {
-                "content-type": "application/json",
-              },
-              signal: AbortSignal.timeout(INGEST_TIMEOUT_MS),
-              body,
-            },
-          );
-
-          if (!response.ok) {
-            throw new Error(`Quickwit ingest failed ${response.status}: ${await response.text()}`);
-          }
-
-          break;
-        } catch (error) {
-          if (attempt === 5 || !isRetryableIngestError(error)) {
-            throw error;
-          }
-          await sleep(500 * attempt);
-        }
-      }
+      await this.postIngestBody(body);
     }
 
     return;
+  }
+
+  /** Send one NDJSON body, retrying what is worth retrying.
+   *
+   * On 413 the body is halved and each half sent on its own. That covers both
+   * reasons Quickwit gives that answer: momentary backpressure, where the same
+   * bytes succeed shortly after, and a body that really is too big, where
+   * halving converges on something that fits. A single line that cannot be
+   * split any further is reported rather than silently dropped -- losing one
+   * document quietly is how a search index ends up subtly wrong. */
+  private async postIngestBody(body: string): Promise<void> {
+    for (let attempt = 1; attempt <= 5; attempt += 1) {
+      try {
+        const response = await fetch(
+          `${this.baseUrl}/api/v1/${this.indexId}/ingest?commit=wait_for`,
+          {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+            },
+            signal: AbortSignal.timeout(INGEST_TIMEOUT_MS),
+            body,
+          },
+        );
+
+        if (!response.ok) {
+          throw new Error(`Quickwit ingest failed ${response.status}: ${await response.text()}`);
+        }
+
+        return;
+      } catch (error) {
+        const lines = body.split("\n");
+        if (shouldHalveBatch(error) && lines.length > 1) {
+          const middle = Math.floor(lines.length / 2);
+          await this.postIngestBody(lines.slice(0, middle).join("\n"));
+          await this.postIngestBody(lines.slice(middle).join("\n"));
+          return;
+        }
+        if (attempt === 5 || !isRetryableIngestError(error)) {
+          throw error;
+        }
+        await sleep(500 * attempt);
+      }
+    }
   }
 
   /** Creates a Quickwit delete task (delete-by-query). Deletes are applied
@@ -290,3 +353,5 @@ export class QuickwitClient {
     throw new Error(`Quickwit search did not return ${minHits} hit(s) in time for query: ${query}`);
   }
 }
+
+export const __test__ = { isRetryableIngestError, shouldHalveBatch };
