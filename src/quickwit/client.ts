@@ -5,10 +5,22 @@ import type { EntityCommitEvent, WooziEntity } from "../types.ts";
 const DEFAULT_INDEX_ID = "woozi-events";
 const DEFAULT_QUICKWIT_URL = "http://127.0.0.1:7280";
 const MAX_INGEST_PAYLOAD_BYTES = 8_000_000;
-// commit=wait_for makes Quickwit hold the response until the batch is
-// published. Without an explicit timeout the fetch can hang indefinitely if
-// Quickwit's ingest pipeline stalls, blocking the whole run.
-const INGEST_TIMEOUT_MS = 120_000;
+/** How long to wait for an ingest that asked to be committed before returning.
+ *
+ * 120s was too short, and short in a way that made things worse rather than
+ * slower. `commit=wait_for` holds the response until the batch is published;
+ * aborting that request does not cancel the work, because the documents are
+ * already in Quickwit's ingest queue. The client then retried and sent the
+ * same documents again. Every timeout therefore added another copy of the
+ * batch to a queue that was already behind, until it refused with 413.
+ *
+ * The numbers this leaves behind are the giveaway: waalwijk holds 143,762
+ * document rows for 25,611 documents -- 5.6 copies -- while the same source
+ * range ingested by hand, without a timeout, came out at 1.1x (2026-08-13).
+ *
+ * A generous ceiling still guards against a genuinely wedged pipeline, but it
+ * has to be longer than a slow commit under load, not shorter. */
+const INGEST_TIMEOUT_MS = Number(Deno.env.get("WOOZI_INGEST_TIMEOUT_MS") ?? "900000");
 const INGEST_ATTEMPTS = 8;
 const INGEST_RETRY_BASE_MS = 1_000;
 const INGEST_RETRY_MAX_MS = 30_000;
