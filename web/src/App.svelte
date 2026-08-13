@@ -18,6 +18,7 @@
   import MotionCard from "./MotionCard.svelte";
   import ReaderLoading from "./ReaderLoading.svelte";
   import SourcePicker from "./SourcePicker.svelte";
+  import { withHeadingAnchors } from "./doc_anchors.ts";
 
   type SearchRouteState = {
     query: string;
@@ -101,6 +102,75 @@
    * filters in the URL untouched. */
   const API_DOCS_HASH = "#api";
 
+  let apiDocsEl: HTMLElement | null = null;
+
+  /** `#api` opens the docs, `#api/rate-limits` opens them at a section.
+   *
+   * One hash rather than a nested route, for the same reason as above: the
+   * overlay sits on top of the reader's search and should not disturb it.
+   * Returns null when the hash is not ours at all. */
+  function apiDocsSectionFromHash(hash: string): string | null {
+    if (hash === API_DOCS_HASH) {
+      return "";
+    }
+    return hash.startsWith(`${API_DOCS_HASH}/`) ? hash.slice(API_DOCS_HASH.length + 1) : null;
+  }
+
+  function writeApiDocsHash(section: string, mode: "push" | "replace"): void {
+    const next = section ? `${API_DOCS_HASH}/${section}` : API_DOCS_HASH;
+    if (window.location.hash === next) {
+      return;
+    }
+    const url = new URL(window.location.href);
+    url.hash = next.slice(1);
+    if (mode === "push") {
+      window.history.pushState(null, "", url);
+    } else {
+      window.history.replaceState(null, "", url);
+    }
+  }
+
+  function scrollApiDocsTo(section: string): void {
+    // The ids come from the document's own headings, so a hand-typed or stale
+    // link finds nothing and simply leaves the reader where they were.
+    const target = apiDocsEl?.querySelector(`#${CSS.escape(section)}`);
+    target?.scrollIntoView({ block: "start", behavior: "smooth" });
+  }
+
+  /** API.md links to its own sections. Followed as ordinary navigation the
+   * hash would become `#rate-limits`, which the router reads as "not the
+   * docs" — so clicking a link in the table of contents closed the very
+   * document it was pointing into. */
+  function handleApiDocsClick(event: MouseEvent): void {
+    const link = (event.target as Element | null)?.closest?.('a[href^="#"]');
+    if (!(link instanceof HTMLAnchorElement)) {
+      return;
+    }
+
+    const section = link.getAttribute("href")?.slice(1) ?? "";
+    if (!section) {
+      return;
+    }
+
+    event.preventDefault();
+    scrollApiDocsTo(section);
+    // replaceState, not push: a pushed entry would make the back button walk
+    // section by section, and each step re-runs the reader's search.
+    writeApiDocsHash(section, "replace");
+  }
+
+  /** Delegation, attached rather than declared: the container is not itself
+   * interactive — the anchors inside it are, and an `on:click` on the div
+   * would claim otherwise to both the compiler and a screen reader. Keyboard
+   * activation of a link arrives here as a click, so nothing extra is needed
+   * for it. */
+  function apiDocsSectionLinks(node: HTMLElement) {
+    node.addEventListener("click", handleApiDocsClick);
+    return {
+      destroy: () => node.removeEventListener("click", handleApiDocsClick),
+    };
+  }
+
   async function loadApiDocs(): Promise<void> {
     if (apiDocsHtml) {
       return;
@@ -110,7 +180,7 @@
       if (!res.ok) {
         throw new Error(`API.md gaf ${res.status}`);
       }
-      apiDocsHtml = renderMarkdown(await res.text());
+      apiDocsHtml = withHeadingAnchors(renderMarkdown(await res.text()));
     } catch (error) {
       // Show the panel anyway. Failing silently was survivable when the docs
       // could only be reached by clicking, but someone arriving on a shared
@@ -123,19 +193,22 @@
     }
   }
 
-  async function openApiDocs(updateHash = true) {
+  async function openApiDocs(updateHash = true, section = "") {
     await loadApiDocs();
     showApiDocs = true;
-    if (updateHash && window.location.hash !== API_DOCS_HASH) {
-      const url = new URL(window.location.href);
-      url.hash = API_DOCS_HASH.slice(1);
-      window.history.pushState(null, "", url);
+    if (updateHash) {
+      writeApiDocsHash(section, "push");
+    }
+    if (section) {
+      // The panel has to exist before it can be scrolled.
+      await tick();
+      scrollApiDocsTo(section);
     }
   }
 
   function closeApiDocs(): void {
     showApiDocs = false;
-    if (window.location.hash === API_DOCS_HASH) {
+    if (apiDocsSectionFromHash(window.location.hash) !== null) {
       const url = new URL(window.location.href);
       url.hash = "";
       // replaceState, not pushState: closing should not leave a step that the
@@ -1224,8 +1297,9 @@
 
     // Follow the hash both ways, so a shared #api link opens the docs and the
     // back button closes them again.
-    if (window.location.hash === API_DOCS_HASH) {
-      await openApiDocs(false);
+    const apiDocsSection = apiDocsSectionFromHash(window.location.hash);
+    if (apiDocsSection !== null) {
+      await openApiDocs(false, apiDocsSection);
     } else if (showApiDocs) {
       showApiDocs = false;
     }
@@ -2267,7 +2341,11 @@
         </div>
       </div>
       <div class="detail-sheet__body">
-        <div class="detail-sheet__surface detail-sheet__text prose-detail">
+        <div
+          bind:this={apiDocsEl}
+          use:apiDocsSectionLinks
+          class="detail-sheet__surface detail-sheet__text prose-detail"
+        >
           <!-- eslint-disable-next-line svelte/no-at-html-tags -->
           {@html apiDocsHtml}
         </div>

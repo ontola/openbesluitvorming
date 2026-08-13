@@ -548,7 +548,7 @@ curl "https://openbesluitvorming.nl/api/search?query=stikstof&entityType=Recordi
 ```
 
 Hits come back as the **meeting**, not the recording, with the spoken fragment
-as `summary` / `summaryHtml`:
+as `summary`:
 
 ```json
 {
@@ -556,9 +556,12 @@ as `summary` / `summaryHtml`:
   "entityType": "Meeting",
   "organization": "Putten",
   "date": "25 juni 2026",
-  "summaryHtml": "… voor ons als SGP is daarbij het <b>stikstof</b> plan van de voet"
+  "summary": "… voor ons als SGP is daarbij het stikstof plan van de voet"
 }
 ```
+
+`summaryHtml` carries the same fragment with the matched term wrapped in
+`<b>`, for highlighting.
 
 The result carries no timestamp. To place a fragment in time, fetch the meeting
 and find the matching entry in `recordings[].segments`, each of which has
