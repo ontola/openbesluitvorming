@@ -475,6 +475,15 @@ select {
   background-repeat: no-repeat;
 }
 
+/* The select itself is transparent so the wrapper's pill shows through, which
+   leaves the native dropdown panel on the light system default while the
+   near-white --text still reaches the options — invisible in dark mode.
+   Both colours have to be stated on the option itself. */
+.select-field select option {
+  background-color: var(--bg-strong);
+  color: var(--text);
+}
+
 .select-field--subtle {
   border-color: rgba(41, 88, 153, 0.08);
   background: rgba(255, 255, 255, 0.58);
