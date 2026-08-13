@@ -31,6 +31,9 @@ COPY quickwit ./quickwit
 COPY src ./src
 COPY web ./web
 COPY API.md ./
+# Served at /docs/*. Without this the migration guide's route has always
+# answered 500 in production -- the file simply was not in the image.
+COPY docs ./docs
 COPY schemas ./schemas
 COPY scripts ./scripts
 COPY --from=web-build /app/node_modules ./node_modules

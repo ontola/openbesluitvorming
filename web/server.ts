@@ -269,9 +269,24 @@ async function handleRequest(request: Request): Promise<Response> {
   const requestStart = performance.now();
   const url = new URL(request.url);
 
+  /** Markdown we publish as-is. A file that is not in the image is a 404, not
+   * a 500: /docs/migration-guide answered 500 for as long as it existed
+   * because `docs/` was never copied in, and a server error is the wrong way
+   * to say "that document is not here". */
+  async function serveMarkdown(relativePath: string): Promise<Response> {
+    try {
+      const file = await Deno.readFile(new URL(relativePath, projectRoot));
+      return new Response(file, { headers: { "content-type": "text/plain; charset=utf-8" } });
+    } catch (error) {
+      if (error instanceof Deno.errors.NotFound) {
+        return new Response("Niet gevonden", { status: 404 });
+      }
+      throw error;
+    }
+  }
+
   if (url.pathname === "/API.md") {
-    const file = await Deno.readFile(new URL("./API.md", projectRoot));
-    return new Response(file, { headers: { "content-type": "text/plain; charset=utf-8" } });
+    return await serveMarkdown("./API.md");
   }
 
   // The rendered page fetches this; it also stays the plain-text address the
@@ -279,8 +294,7 @@ async function handleRequest(request: Request): Promise<Response> {
   if (
     url.pathname === "/docs/migration-guide.md" || url.pathname === "/docs/migration-guide.txt"
   ) {
-    const file = await Deno.readFile(new URL("./docs/migration-guide.md", projectRoot));
-    return new Response(file, { headers: { "content-type": "text/plain; charset=utf-8" } });
+    return await serveMarkdown("./docs/migration-guide.md");
   }
 
   const schemaMatch = url.pathname.match(/^\/schemas\/([\w.-]+\.schema\.json)$/);
