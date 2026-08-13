@@ -733,7 +733,7 @@ async function collectSearchWindow(
   const previewKeys = new Map<string, string>();
   let rawOffset = isDirectWindow ? options.offset : 0;
   let rawSeen = 0;
-  let rawNumHits = 0;
+  let rawNumHits: number | undefined;
   let exhausted = false;
   let scanLimitReached = false;
   let quickwitMs = 0;
@@ -753,13 +753,25 @@ async function collectSearchWindow(
       query: queryString,
       max_hits: requestMaxHits,
       start_offset: rawOffset,
+      // Undocumented in Quickwit 0.8.1's search API, so possibly a no-op --
+      // but it was added deliberately, and if it does bind, dropping it turns
+      // on full hit counting for every public search. Left alone until someone
+      // measures it.
       count_all: false,
       ...(sortBy ? { sort_by: sortBy } : {}),
       ...(snippetFields.length > 0 ? { snippet_fields: snippetFields.join(",") } : {}),
     });
     quickwitMs += performance.now() - quickwitStart;
 
-    rawNumHits = Math.max(rawNumHits, response.num_hits);
+    // num_hits describes the query, not the window, so it is taken once. The
+    // running maximum this replaces made the count depend on how many
+    // iterations the loop happened to run: ingestion publishes splits
+    // continuously, so a later iteration can honestly report a larger number,
+    // and two identical requests were then counted differently depending on
+    // how quickly each filled its page (#195).
+    if (rawNumHits === undefined) {
+      rawNumHits = response.num_hits;
+    }
     const hits = response.hits as SearchHit[];
     if (hits.length === 0) {
       exhausted = true;
@@ -865,11 +877,20 @@ async function collectSearchWindow(
   // When the scan reached the end of the matching set the grouped count is
   // simply exact. When it stopped at the budget, scale the row count by the
   // collapse ratio actually observed -- an estimate, and flagged as one.
+  //
+  // That estimate is still a sample, and on the v2 projection the sample is
+  // drawn in an undefined order: quickwitSortBy() returns nothing there, so
+  // paginating with start_offset over an unsorted distributed query can show
+  // the same row in two windows or in none. The collapse ratio therefore still
+  // moves a little between identical requests. Quickwit 0.8.1 has no
+  // cardinality aggregation to ask for a distinct count instead, so this
+  // settles only when the v3 projection makes the scan order defined -- the
+  // same switch #184, #192 and #194 are waiting on.
   const groupedCount = sortedResults.length;
   const scannedEverything = exhausted && !scanLimitReached;
   const totalCount = scannedEverything
     ? groupedCount
-    : Math.max(groupedCount, Math.round(rawNumHits / Math.max(rowsPerResult, 1)));
+    : Math.max(groupedCount, Math.round((rawNumHits ?? 0) / Math.max(rowsPerResult, 1)));
 
   return {
     results: pageWindowResults,

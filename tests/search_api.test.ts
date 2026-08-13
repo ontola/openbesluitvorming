@@ -1009,3 +1009,76 @@ Deno.test("a full page is delivered even when rows collapse seven to one", async
     globalThis.fetch = originalFetch;
   }
 });
+
+/** #195: identical URLs answered with wildly different totals.
+ *
+ * The reported swing (4,153 / 8,358 / 9,933) came from forwarding Quickwit's
+ * raw row count, and that is gone. What remained was subtler: num_hits was
+ * accumulated as a running maximum across the scan's rounds. Ingestion
+ * publishes splits while a search runs, so a later round can honestly report a
+ * larger index than the round before it -- and the total then depended on how
+ * many rounds that particular request happened to take.
+ *
+ * The same search is run twice here against the same rows, differing only in
+ * whether the index grows underneath it. The answer has to be the same.
+ */
+Deno.test("a total is not inflated by rows that arrive mid-scan", async () => {
+  const originalFetch = globalThis.fetch;
+  const DOCUMENTS = 400;
+  const PAGES_PER_DOCUMENT = 20;
+  const TOTAL_ROWS = DOCUMENTS * PAGES_PER_DOCUMENT;
+
+  const serve = (growPerRound: number) => {
+    let round = 0;
+    return async (_input: unknown, init?: unknown) => {
+      const body = JSON.parse(String((init as { body?: string } | undefined)?.body ?? "{}"));
+      const startOffset = Number(body.start_offset ?? 0);
+      const maxHits = Number(body.max_hits);
+      const count = Math.max(0, Math.min(maxHits, TOTAL_ROWS - startOffset));
+      const numHits = TOTAL_ROWS + round * growPerRound;
+      round += 1;
+
+      const hits = Array.from({ length: count }, (_, index) => {
+        const row = startOffset + index;
+        const documentIndex = Math.floor(row / PAGES_PER_DOCUMENT);
+        const pageNumber = (row % PAGES_PER_DOCUMENT) + 1;
+        return {
+          time: "2026-03-31T11:00:00Z",
+          entity_id: `document:ibabs:gemeente:soest:${documentIndex}#page=${pageNumber}`,
+          parent_entity_id: `document:ibabs:gemeente:soest:${documentIndex}`,
+          page_number: pageNumber,
+          entity_type: "DocumentPage",
+          name: `Begroting ${documentIndex}`,
+          start_date: "2025-01-14T17:00:00Z",
+          source_key: "soest",
+          content: `Pagina ${pageNumber} van document ${documentIndex}`,
+        };
+      });
+
+      return new Response(JSON.stringify({ num_hits: numHits, hits }), {
+        headers: { "content-type": "application/json" },
+      });
+    };
+  };
+
+  const request = { query: "begroting", organization: "soest", limit: 10, offset: 60 };
+
+  try {
+    globalThis.fetch = serve(0) as typeof globalThis.fetch;
+    const staticIndex = await searchMeetings({ ...request });
+
+    globalThis.fetch = serve(5_000) as typeof globalThis.fetch;
+    const growingIndex = await searchMeetings({ ...request });
+
+    assert(
+      staticIndex.totalIsApproximate && growingIndex.totalIsApproximate,
+      "this scan stops at the budget, so both totals are estimates",
+    );
+    assert(
+      staticIndex.totalCount === growingIndex.totalCount,
+      `rows arriving mid-scan must not change the total, got ${staticIndex.totalCount} against ${growingIndex.totalCount}`,
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
