@@ -289,6 +289,45 @@
     return rows;
   }
 
+  /** Put each chapter and the segments under it in one block.
+   *
+   * Layout, not content. Every heading is `position: sticky`, and as flat
+   * siblings they all shared one containing block spanning the whole
+   * transcript — so each heading reached the top and stayed there, stacked on
+   * the ones before it. That looked like a single bar only because a later
+   * heading paints over an earlier one, which holds right up until a one-line
+   * heading follows a two-line one and leaves its second line showing below.
+   * A block per chapter ends each heading's containing block where the next
+   * chapter starts, so it is carried off screen as the next one arrives.
+   */
+  function groupIntoChapters(
+    list: ReturnType<typeof withChapterHeadings>,
+  ): Array<{
+    key: string;
+    chapter: Extract<(typeof list)[number], { kind: "chapter" }> | null;
+    segments: Array<Extract<(typeof list)[number], { kind: "segment" }>>;
+  }> {
+    const blocks: Array<{
+      key: string;
+      chapter: Extract<(typeof list)[number], { kind: "chapter" }> | null;
+      segments: Array<Extract<(typeof list)[number], { kind: "segment" }>>;
+    }> = [];
+
+    for (const row of list) {
+      if (row.kind === "chapter") {
+        blocks.push({ key: row.key, chapter: row, segments: [] });
+        continue;
+      }
+      if (blocks.length === 0) {
+        // Whatever was said before the first agenda item was reached.
+        blocks.push({ key: "opening", chapter: null, segments: [] });
+      }
+      blocks[blocks.length - 1].segments.push(row);
+    }
+
+    return blocks;
+  }
+
   /** Where this recording is published. The portal page, not the media file:
    * the file URL carries an expiring signature at some suppliers and is a
    * multi-gigabyte download at others, while the portal page keeps working and
@@ -305,6 +344,7 @@
   // threw away exactly what makes a transcript worth reading — who said what
   // around the hit — and it hid the agenda headings that say where you are.
   $: rows = withChapterHeadings(segments, recording.chapters);
+  $: chapterBlocks = groupIntoChapters(rows);
   // Recomputed only when the transcript itself changes, not per keystroke.
   $: searchable = searchableSegments(segments);
   $: matches = findMatches(searchable, term.toLowerCase());
@@ -475,45 +515,52 @@
         on:wheel={() => (followPlayhead = false)}
         role="log"
       >
-        {#each rows as row (row.key)}
-          {#if row.kind === "chapter"}
-            <h4 class="recording__chapter-heading">
-              <button type="button" on:click={() => seek(row.start)}>
-                <!-- The number doubles as the keyboard shortcut: typing it
-                     anywhere in the meeting jumps the video here. Shown on
-                     every chapter, because a shortcut nobody can see is one
-                     nobody uses. -->
-                <span class="recording__chapter-key" aria-hidden="true">{row.number}</span>
-                <span class="recording__time">{formatClock(row.start)}</span>
-                <span>{chapterLabel(row.title, row.number)}</span>
-              </button>
-            </h4>
-          {:else}
-            <p
-              class="recording__segment"
-              class:recording__segment--active={row.index === activeIndex && !term}
-              data-index={row.index}
-            >
-              <button
-                type="button"
-                class="recording__time recording__time--button"
-                on:click={() => seek(row.segment.start_seconds)}
+        {#each chapterBlocks as block (block.key)}
+          <!-- One section per chapter so the sticky heading is carried off by
+               the next one instead of piling up behind it. -->
+          <section class="recording__chapter">
+            {#if block.chapter}
+              <h4 class="recording__chapter-heading">
+                <button type="button" on:click={() => seek(block.chapter.start)}>
+                  <!-- The number doubles as the keyboard shortcut: typing it
+                       anywhere in the meeting jumps the video here. Shown on
+                       every chapter, because a shortcut nobody can see is one
+                       nobody uses. -->
+                  <span class="recording__chapter-key" aria-hidden="true"
+                    >{block.chapter.number}</span
+                  >
+                  <span class="recording__time">{formatClock(block.chapter.start)}</span>
+                  <span>{chapterLabel(block.chapter.title, block.chapter.number)}</span>
+                </button>
+              </h4>
+            {/if}
+            {#each block.segments as row (row.key)}
+              <p
+                class="recording__segment"
+                class:recording__segment--active={row.index === activeIndex && !term}
+                data-index={row.index}
               >
-                {formatClock(row.segment.start_seconds)}
-              </button>
-              {#if row.segment.speaker}
-                <span class="recording__speaker">{row.segment.speaker}</span>
-              {/if}
-              <span class="recording__text">
-                {#each splitOnMatches( row.segment.text, matches.perSegment[row.index] ?? [], term.length, matches.offsets[row.index] ?? 0, ) as part}
-                  {#if part.matchIndex !== null}<mark
-                      class:recording__mark--active={part.matchIndex === activeMatch}
-                      data-match={part.matchIndex}
-                    >{part.text}</mark>{:else}{part.text}{/if}
-                {/each}
-              </span>
-            </p>
-          {/if}
+                <button
+                  type="button"
+                  class="recording__time recording__time--button"
+                  on:click={() => seek(row.segment.start_seconds)}
+                >
+                  {formatClock(row.segment.start_seconds)}
+                </button>
+                {#if row.segment.speaker}
+                  <span class="recording__speaker">{row.segment.speaker}</span>
+                {/if}
+                <span class="recording__text">
+                  {#each splitOnMatches( row.segment.text, matches.perSegment[row.index] ?? [], term.length, matches.offsets[row.index] ?? 0, ) as part}
+                    {#if part.matchIndex !== null}<mark
+                        class:recording__mark--active={part.matchIndex === activeMatch}
+                        data-match={part.matchIndex}
+                      >{part.text}</mark>{:else}{part.text}{/if}
+                  {/each}
+                </span>
+              </p>
+            {/each}
+          </section>
         {/each}
       </div>
     {/if}

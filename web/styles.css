@@ -1938,6 +1938,17 @@ select {
   height: 3rem;
 }
 
+/* One block per agenda item. This exists to bound the sticky heading: as flat
+   siblings every heading shared a containing block spanning the whole
+   transcript, so each one stuck to the top and stayed there, and a heading
+   shorter than the one before it left the taller one showing underneath.
+   Repeats the parent's grid so the spacing between segments is unchanged. */
+.recording__chapter {
+  display: grid;
+  gap: 0.4rem;
+  align-content: start;
+}
+
 /* Agenda items appear as headings inside the transcript, in play order — the
    agenda tree below carries the same jump points in document order. */
 .recording__chapter-heading {
@@ -1957,7 +1968,7 @@ select {
   padding-bottom: 0.15rem;
 }
 
-.recording__chapter-heading:first-child {
+.recording__chapter:first-child .recording__chapter-heading {
   margin-top: 0;
 }
 
