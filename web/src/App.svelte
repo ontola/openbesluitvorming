@@ -180,7 +180,7 @@
       if (!res.ok) {
         throw new Error(`API.md gaf ${res.status}`);
       }
-      apiDocsHtml = withHeadingAnchors(renderMarkdown(await res.text()));
+      apiDocsHtml = withHeadingAnchors(renderOwnMarkdown(await res.text()));
     } catch (error) {
       // Show the panel anyway. Failing silently was survivable when the docs
       // could only be reached by clicking, but someone arriving on a shared
@@ -434,16 +434,30 @@
     return markdown.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
   }
 
+  function parseMarkdown(markdown: string): string {
+    return marked.parse(markdown, { async: false, breaks: true, gfm: true }) as string;
+  }
+
+  /** Document text, extracted from someone else's PDF and inserted with
+   * {@html}. Escaped before parsing, so nothing in it can become markup. */
   function renderMarkdown(markdown?: string): string {
     if (!markdown?.trim()) {
       return "<p>Geen documenttekst beschikbaar.</p>";
     }
 
-    return marked.parse(sanitizeMarkdownSource(markdown), {
-      async: false,
-      breaks: true,
-      gfm: true,
-    }) as string;
+    return parseMarkdown(sanitizeMarkdownSource(markdown));
+  }
+
+  /** Markdown we ship ourselves, currently only API.md.
+   *
+   * Not pre-escaped, because escaping it twice is what the reader sees:
+   * `sanitizeMarkdownSource` turns `&` into `&amp;`, then marked escapes that
+   * again inside a code block, so every curl example in the docs rendered
+   * `query=x&amp;limit=10` — copy it and the request is wrong. marked escapes
+   * code spans by itself, and a file in this repo carries the same trust as
+   * the code rendering it. */
+  function renderOwnMarkdown(markdown: string): string {
+    return parseMarkdown(markdown);
   }
 
   function collectAgendaItemIds(items?: MeetingAgendaItem[]): Set<string> {
