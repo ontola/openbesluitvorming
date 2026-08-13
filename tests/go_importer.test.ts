@@ -106,9 +106,11 @@ Deno.test("normalizeGoMeeting handles GO 'date' field with embedded time", () =>
     documents: [{ id: 900, filename: "stuk.pdf" }],
   } as never);
 
+  // 19:30 is a wall-clock reading in Europe/Amsterdam, and May is CEST, so the
+  // instant is two hours earlier (#203). It used to be stamped 19:30 UTC.
   assert(
-    meeting.start_date === "2026-05-19T19:30:00",
-    `expected ISO start_date, got ${meeting.start_date}`,
+    meeting.start_date === "2026-05-19T17:30:00Z",
+    `expected the Dutch wall clock as a UTC instant, got ${meeting.start_date}`,
   );
   assert(
     !Number.isNaN(new Date(meeting.start_date).getTime()),
@@ -117,7 +119,7 @@ Deno.test("normalizeGoMeeting handles GO 'date' field with embedded time", () =>
 
   const documents = normalizeGoDocuments(source, meeting);
   assert(
-    documents[0].last_discussed_at === "2026-05-19T19:30:00",
+    documents[0].last_discussed_at === "2026-05-19T17:30:00Z",
     "document last_discussed_at propagates parseable datetime",
   );
 });

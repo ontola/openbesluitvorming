@@ -9,6 +9,9 @@ const MAX_INGEST_PAYLOAD_BYTES = 8_000_000;
 // published. Without an explicit timeout the fetch can hang indefinitely if
 // Quickwit's ingest pipeline stalls, blocking the whole run.
 const INGEST_TIMEOUT_MS = 120_000;
+const INGEST_ATTEMPTS = 8;
+const INGEST_RETRY_BASE_MS = 1_000;
+const INGEST_RETRY_MAX_MS = 30_000;
 const DEFAULT_SEARCH_TIMEOUT_MS = 8_000;
 const DEFAULT_SEARCH_ATTEMPTS = 2;
 
@@ -224,7 +227,7 @@ export class QuickwitClient {
    * split any further is reported rather than silently dropped -- losing one
    * document quietly is how a search index ends up subtly wrong. */
   private async postIngestBody(body: string): Promise<void> {
-    for (let attempt = 1; attempt <= 5; attempt += 1) {
+    for (let attempt = 1; attempt <= INGEST_ATTEMPTS; attempt += 1) {
       try {
         const response = await fetch(
           `${this.baseUrl}/api/v1/${this.indexId}/ingest?commit=wait_for`,
@@ -251,10 +254,16 @@ export class QuickwitClient {
           await this.postIngestBody(lines.slice(middle).join("\n"));
           return;
         }
-        if (attempt === 5 || !isRetryableIngestError(error)) {
+        if (attempt === INGEST_ATTEMPTS || !isRetryableIngestError(error)) {
           throw error;
         }
-        await sleep(500 * attempt);
+        // Exponential, because the thing being waited out is a queue draining,
+        // not a blip. Quickwit publishes a split roughly every two seconds
+        // during a bulk reindex and its ingest queue had 90 MB of backlog when
+        // it started refusing; 500ms steps totalling seven seconds gave up
+        // while it was still catching up, and took a whole source down with
+        // them. This tops out around two minutes.
+        await sleep(Math.min(INGEST_RETRY_BASE_MS * 2 ** (attempt - 1), INGEST_RETRY_MAX_MS));
       }
     }
   }

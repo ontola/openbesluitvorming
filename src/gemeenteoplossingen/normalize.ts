@@ -13,6 +13,7 @@ import type {
   SourceDefinitionBase,
 } from "../types.ts";
 import type { GoCommittee, GoDocumentRef, GoMeeting, GoMeetingItem } from "./client.ts";
+import { supplierDateTimeToUtc } from "../util/local_time.ts";
 
 function goSourceInfo(source: SourceDefinitionBase): SourceDefinitionBase["supplier"] {
   return source.supplier;
@@ -128,14 +129,17 @@ function buildMeetingStartDate(rawDate: string | undefined, startTime: string | 
   // GO sometimes returns `date` as a full datetime ("YYYY-MM-DD HH:MM:SS")
   // and leaves `startTime` empty. Use the datetime directly in that case;
   // otherwise compose date + startTime.
+  // Both branches produce Dutch wall clock, which only becomes an instant once
+  // it is read in Europe/Amsterdam (#203).
   if (date.includes("T") || date.includes(" ")) {
-    return date.replace(" ", "T");
+    const wallClock = date.replace(" ", "T");
+    return supplierDateTimeToUtc(wallClock) ?? wallClock;
   }
   if (startTime && startTime.includes(":")) {
     const time = startTime.length === 5 ? `${startTime}:00` : startTime;
-    return `${date}T${time}`;
+    return supplierDateTimeToUtc(`${date}T${time}`) ?? `${date}T${time}`;
   }
-  return `${date}T00:00:00`;
+  return `${date}T00:00:00Z`;
 }
 
 export function normalizeGoMeeting(

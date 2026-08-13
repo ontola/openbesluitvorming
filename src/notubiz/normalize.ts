@@ -13,6 +13,7 @@ import {
   canonicalMeetingId,
   canonicalOrganizationId,
 } from "../ids.ts";
+import { supplierDateTimeToUtc } from "../util/local_time.ts";
 
 function collectAttachmentIds(
   source: NotubizSourceDefinition,
@@ -201,8 +202,10 @@ function normalizeDateTime(value: unknown): string | undefined {
     return undefined;
   }
 
-  const normalized = value.includes("T") ? value : value.replace(" ", "T");
-  return normalized.endsWith("Z") ? normalized : `${normalized}Z`;
+  // This used to append `Z` to anything not already ending in one, which
+  // turned Notubiz's own `2025-01-14T19:30:00+01:00` into
+  // `2025-01-14T19:30:00+01:00Z` — not a date at all.
+  return supplierDateTimeToUtc(value);
 }
 
 export function normalizeNotubizMeeting(
@@ -227,6 +230,11 @@ export function normalizeNotubizMeeting(
   if (typeof startDate !== "string") {
     throw new Error(`Meeting ${String(id)} has no planning start_date`);
   }
+
+  // Notubiz is not consistent about this: some organisations send
+  // `2025-01-14T19:30:00+01:00`, others a bare `2026-08-19 19:30:00` that is
+  // Dutch wall clock. Only the first was ever a real instant.
+  const startInstant = supplierDateTimeToUtc(startDate) ?? startDate;
 
   const rawAttributes = Array.isArray(record.attributes) ? record.attributes : [];
   const mappedAttributes: Record<string, string> = {};
@@ -265,9 +273,9 @@ export function normalizeNotubizMeeting(
     classification: ["Agenda"],
     status,
     location: mappedAttributes.Locatie,
-    start_date: startDate,
-    end_date: typeof endDate === "string" ? endDate : undefined,
-    last_discussed_at: startDate,
+    start_date: startInstant,
+    end_date: typeof endDate === "string" ? (supplierDateTimeToUtc(endDate) ?? endDate) : undefined,
+    last_discussed_at: startInstant,
     organization: canonicalOrganizationId(source),
     committee:
       typeof gremiumId === "number" || typeof gremiumId === "string"

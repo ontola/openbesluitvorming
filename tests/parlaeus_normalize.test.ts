@@ -117,8 +117,12 @@ Deno.test("normalizeParlaeusAgenda turns the API payload into a meeting + docume
   });
 
   assert(meeting.id === "meeting:parlaeus:gemeente:apeldoorn:agenda-1", "canonical meeting id");
-  assert(meeting.start_date === "2024-01-11T19:00:00", "compact date + time gets ISO formatted");
-  assert(meeting.end_date === "2024-01-11T20:30:00", "endtime gets ISO formatted");
+  // January is CET, so the Dutch wall clock is one hour ahead of UTC (#203).
+  assert(
+    meeting.start_date === "2024-01-11T18:00:00Z",
+    "compact date + time becomes a UTC instant",
+  );
+  assert(meeting.end_date === "2024-01-11T19:30:00Z", "endtime becomes a UTC instant");
   assert(meeting.status === "confirmed", "non-cancelled meeting is confirmed");
   assert(
     meeting.committee === "committee:parlaeus:gemeente:apeldoorn:committee-1",

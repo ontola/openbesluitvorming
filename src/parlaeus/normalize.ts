@@ -18,6 +18,7 @@ import type {
   ParlaeusCommittee,
   ParlaeusDocumentRef,
 } from "./client.ts";
+import { supplierDateTimeToUtc } from "../util/local_time.ts";
 
 function compactToIsoDate(date: string | undefined): string | undefined {
   if (!date || date.length !== 8) {
@@ -26,13 +27,16 @@ function compactToIsoDate(date: string | undefined): string | undefined {
   return `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}`;
 }
 
+/** Parlaeus sends `date` and `time` separately, both Dutch wall clock, so the
+ * composed reading has to be read in Europe/Amsterdam to become an instant. */
 function isoStartDate(date: string | undefined, time: string | undefined): string {
   const isoDate = compactToIsoDate(date) ?? "1970-01-01";
   if (time && /^\d{1,2}:\d{2}$/.test(time)) {
     const [hours, minutes] = time.split(":");
-    return `${isoDate}T${hours.padStart(2, "0")}:${minutes}:00`;
+    const wallClock = `${isoDate}T${hours.padStart(2, "0")}:${minutes}:00`;
+    return supplierDateTimeToUtc(wallClock) ?? wallClock;
   }
-  return `${isoDate}T00:00:00`;
+  return `${isoDate}T00:00:00Z`;
 }
 
 function isoEndDate(date: string | undefined, endtime: string | undefined): string | undefined {
@@ -44,7 +48,8 @@ function isoEndDate(date: string | undefined, endtime: string | undefined): stri
     return undefined;
   }
   const [hours, minutes] = endtime.split(":");
-  return `${isoDate}T${hours.padStart(2, "0")}:${minutes}:00`;
+  const wallClock = `${isoDate}T${hours.padStart(2, "0")}:${minutes}:00`;
+  return supplierDateTimeToUtc(wallClock) ?? wallClock;
 }
 
 // Parlaeus occasionally returns links of the form

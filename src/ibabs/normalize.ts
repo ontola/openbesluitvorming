@@ -33,30 +33,34 @@ import type {
   MotionEntity,
   MotionVote,
 } from "../types.ts";
+import { supplierDateTimeToUtc } from "../util/local_time.ts";
 
 function normalizeDateTime(value?: string): string | undefined {
-  if (!value) {
-    return undefined;
-  }
-
-  const normalized = value.includes("T") ? value : value.replace(" ", "T");
-  return normalized.endsWith("Z") || /[+-]\d{2}:\d{2}$/.test(normalized)
-    ? normalized
-    : `${normalized}Z`;
+  return supplierDateTimeToUtc(value);
 }
 
-function composeEndDate(startDate?: string, endTime?: string): string | undefined {
-  if (!startDate || !endTime) {
-    return startDate;
+/** Compose the end of a meeting from its *local* calendar day and `EndTime`.
+ *
+ * The day has to come from the raw MeetingDate rather than the normalised
+ * start: once the start is a UTC instant its date part can be the previous
+ * day, and an evening meeting would then end 24 hours before it began.
+ */
+function composeEndDate(
+  rawMeetingDate?: string,
+  endTime?: string,
+  normalizedStart?: string,
+): string | undefined {
+  if (!rawMeetingDate || !endTime) {
+    return normalizedStart;
   }
 
-  const [datePart] = startDate.split("T");
-  if (!datePart) {
-    return startDate;
+  const [localDay] = rawMeetingDate.trim().split(/[T ]/);
+  if (!localDay) {
+    return normalizedStart;
   }
 
   const normalizedTime = endTime.length === 5 ? `${endTime}:00` : endTime;
-  return `${datePart}T${normalizedTime}Z`;
+  return supplierDateTimeToUtc(`${localDay}T${normalizedTime}`) ?? normalizedStart;
 }
 
 function meetingTypeName(
@@ -133,7 +137,7 @@ export function normalizeIbabsMeeting(
     description: meeting.Explanation,
     location: meeting.Location,
     start_date: startDate,
-    end_date: composeEndDate(startDate, meeting.EndTime),
+    end_date: composeEndDate(meeting.MeetingDate, meeting.EndTime, startDate),
     last_discussed_at: startDate,
     organization: canonicalOrganizationId(source),
     committee:
