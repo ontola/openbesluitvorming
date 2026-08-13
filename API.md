@@ -67,7 +67,7 @@ Exceeding the limit returns **`429 Too Many Requests`** with a JSON body and a
   "limit_per_minute": 60,
   "retry_after_seconds": 3,
   "hint": "Zware verzoeken tellen zwaarder: een zoekopdracht kost 1 eenheid per 24 resultaten, dus limit=100 kost 5. …",
-  "documentation": "https://openbesluitvorming.nl/#api"
+  "documentation": "https://openbesluitvorming.nl/docs/api"
 }
 ```
 

@@ -15,6 +15,7 @@ export default defineConfig({
       input: {
         main: "web/index.html",
         admin: "web/admin.html",
+        docs: "web/docs.html",
       },
     },
   },

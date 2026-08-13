@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { marked } from "marked";
+  import { renderDocumentMarkdown } from "./markdown.ts";
   import { onDestroy, onMount, tick } from "svelte";
   import { fade, scale } from "svelte/transition";
   import type {
@@ -18,7 +18,6 @@
   import MotionCard from "./MotionCard.svelte";
   import ReaderLoading from "./ReaderLoading.svelte";
   import SourcePicker from "./SourcePicker.svelte";
-  import { withHeadingAnchors } from "./doc_anchors.ts";
 
   type SearchRouteState = {
     query: string;
@@ -90,132 +89,26 @@
 
   const highPriorityPreviewCount = 3;
 
-  let showApiDocs = false;
-  let apiDocsHtml = "";
-
-  /** The API documentation has its own address.
+  /** The API documentation used to be an overlay on the search, addressed by a
+   * #api hash. It is a document to read, so it is now a page of its own at
+   * /docs/api: the browser handles its anchors, its scrolling and the back
+   * button without any of the interception an overlay needed, and a search
+   * engine can index it.
    *
-   * It used to be reachable only by clicking, so it could not be linked to or
-   * shared — which is exactly what someone wants to do with API docs (#189).
-   * The hash is deliberate rather than a route: the overlay sits on top of
-   * whatever search the reader already has, and a hash leaves their query and
-   * filters in the URL untouched. */
-  const API_DOCS_HASH = "#api";
+   * Links shared while it was an overlay still arrive here, so they are
+   * forwarded rather than quietly landing on the homepage. */
+  const API_DOCS_PATH = "/docs/api";
 
-  let apiDocsEl: HTMLElement | null = null;
-
-  /** `#api` opens the docs, `#api/rate-limits` opens them at a section.
-   *
-   * One hash rather than a nested route, for the same reason as above: the
-   * overlay sits on top of the reader's search and should not disturb it.
-   * Returns null when the hash is not ours at all. */
-  function apiDocsSectionFromHash(hash: string): string | null {
-    if (hash === API_DOCS_HASH) {
-      return "";
+  function redirectLegacyApiDocsHash(): boolean {
+    const hash = window.location.hash;
+    if (hash !== "#api" && !hash.startsWith("#api/")) {
+      return false;
     }
-    return hash.startsWith(`${API_DOCS_HASH}/`) ? hash.slice(API_DOCS_HASH.length + 1) : null;
+    const section = hash.startsWith("#api/") ? hash.slice("#api/".length) : "";
+    window.location.replace(section ? `${API_DOCS_PATH}#${section}` : API_DOCS_PATH);
+    return true;
   }
 
-  function writeApiDocsHash(section: string, mode: "push" | "replace"): void {
-    const next = section ? `${API_DOCS_HASH}/${section}` : API_DOCS_HASH;
-    if (window.location.hash === next) {
-      return;
-    }
-    const url = new URL(window.location.href);
-    url.hash = next.slice(1);
-    if (mode === "push") {
-      window.history.pushState(null, "", url);
-    } else {
-      window.history.replaceState(null, "", url);
-    }
-  }
-
-  function scrollApiDocsTo(section: string): void {
-    // The ids come from the document's own headings, so a hand-typed or stale
-    // link finds nothing and simply leaves the reader where they were.
-    const target = apiDocsEl?.querySelector(`#${CSS.escape(section)}`);
-    target?.scrollIntoView({ block: "start", behavior: "smooth" });
-  }
-
-  /** API.md links to its own sections. Followed as ordinary navigation the
-   * hash would become `#rate-limits`, which the router reads as "not the
-   * docs" — so clicking a link in the table of contents closed the very
-   * document it was pointing into. */
-  function handleApiDocsClick(event: MouseEvent): void {
-    const link = (event.target as Element | null)?.closest?.('a[href^="#"]');
-    if (!(link instanceof HTMLAnchorElement)) {
-      return;
-    }
-
-    const section = link.getAttribute("href")?.slice(1) ?? "";
-    if (!section) {
-      return;
-    }
-
-    event.preventDefault();
-    scrollApiDocsTo(section);
-    // replaceState, not push: a pushed entry would make the back button walk
-    // section by section, and each step re-runs the reader's search.
-    writeApiDocsHash(section, "replace");
-  }
-
-  /** Delegation, attached rather than declared: the container is not itself
-   * interactive — the anchors inside it are, and an `on:click` on the div
-   * would claim otherwise to both the compiler and a screen reader. Keyboard
-   * activation of a link arrives here as a click, so nothing extra is needed
-   * for it. */
-  function apiDocsSectionLinks(node: HTMLElement) {
-    node.addEventListener("click", handleApiDocsClick);
-    return {
-      destroy: () => node.removeEventListener("click", handleApiDocsClick),
-    };
-  }
-
-  async function loadApiDocs(): Promise<void> {
-    if (apiDocsHtml) {
-      return;
-    }
-    try {
-      const res = await fetch("/API.md");
-      if (!res.ok) {
-        throw new Error(`API.md gaf ${res.status}`);
-      }
-      apiDocsHtml = withHeadingAnchors(renderOwnMarkdown(await res.text()));
-    } catch (error) {
-      // Show the panel anyway. Failing silently was survivable when the docs
-      // could only be reached by clicking, but someone arriving on a shared
-      // #api link would otherwise get an ordinary homepage and no hint that
-      // they were meant to land somewhere.
-      console.error("Kon API-documentatie niet laden", error);
-      apiDocsHtml =
-        '<p>De API-documentatie kon niet worden geladen. ' +
-        'Je kunt het <a href="/API.md">bronbestand</a> rechtstreeks openen.</p>';
-    }
-  }
-
-  async function openApiDocs(updateHash = true, section = "") {
-    await loadApiDocs();
-    showApiDocs = true;
-    if (updateHash) {
-      writeApiDocsHash(section, "push");
-    }
-    if (section) {
-      // The panel has to exist before it can be scrolled.
-      await tick();
-      scrollApiDocsTo(section);
-    }
-  }
-
-  function closeApiDocs(): void {
-    showApiDocs = false;
-    if (apiDocsSectionFromHash(window.location.hash) !== null) {
-      const url = new URL(window.location.href);
-      url.hash = "";
-      // replaceState, not pushState: closing should not leave a step that the
-      // back button walks straight back into.
-      window.history.replaceState(null, "", url.toString().replace(/#$/, ""));
-    }
-  }
 
   let detailOpen = false;
   let detailLoading = false;
@@ -430,35 +323,6 @@
     loadedPreviewImages = new Set([...loadedPreviewImages, previewLoadKey(item)]);
   }
 
-  function sanitizeMarkdownSource(markdown: string): string {
-    return markdown.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
-  }
-
-  function parseMarkdown(markdown: string): string {
-    return marked.parse(markdown, { async: false, breaks: true, gfm: true }) as string;
-  }
-
-  /** Document text, extracted from someone else's PDF and inserted with
-   * {@html}. Escaped before parsing, so nothing in it can become markup. */
-  function renderMarkdown(markdown?: string): string {
-    if (!markdown?.trim()) {
-      return "<p>Geen documenttekst beschikbaar.</p>";
-    }
-
-    return parseMarkdown(sanitizeMarkdownSource(markdown));
-  }
-
-  /** Markdown we ship ourselves, currently only API.md.
-   *
-   * Not pre-escaped, because escaping it twice is what the reader sees:
-   * `sanitizeMarkdownSource` turns `&` into `&amp;`, then marked escapes that
-   * again inside a code block, so every curl example in the docs rendered
-   * `query=x&amp;limit=10` — copy it and the request is wrong. marked escapes
-   * code spans by itself, and a file in this repo carries the same trust as
-   * the code rendering it. */
-  function renderOwnMarkdown(markdown: string): string {
-    return parseMarkdown(markdown);
-  }
 
   function collectAgendaItemIds(items?: MeetingAgendaItem[]): Set<string> {
     const ids = new Set<string>();
@@ -1309,13 +1173,8 @@
     const nextState = routeStateFromUrl(new URL(window.location.href));
     applyState(nextState);
 
-    // Follow the hash both ways, so a shared #api link opens the docs and the
-    // back button closes them again.
-    const apiDocsSection = apiDocsSectionFromHash(window.location.hash);
-    if (apiDocsSection !== null) {
-      await openApiDocs(false, apiDocsSection);
-    } else if (showApiDocs) {
-      showApiDocs = false;
+    if (redirectLegacyApiDocsHash()) {
+      return;
     }
 
     if (!hasActiveSearchFilters() && !view) {
@@ -1479,7 +1338,7 @@
   }
 
   $: {
-    const shouldLockBody = detailOpen || showApiDocs;
+    const shouldLockBody = detailOpen;
     document.body.classList.toggle("body--locked", shouldLockBody);
   }
 
@@ -1499,7 +1358,7 @@
   $: detailIndex = detailItem ? results.findIndex((item) => item.entityId === detailItem.entityId) : -1;
   $: hasPreviousDetail = detailIndex > 0;
   $: hasNextDetail = detailIndex >= 0 && (detailIndex < results.length - 1 || hasMore);
-  $: detailMarkdownHtml = renderMarkdown(detailContent?.markdownText);
+  $: detailMarkdownHtml = renderDocumentMarkdown(detailContent?.markdownText);
   $: agendaItemIds = collectAgendaItemIds(detailContent?.agenda);
   // A motion only renders inside the agenda when we resolved it to an item
   // that is actually on this agenda; the rest go in a section below, so a
@@ -1860,7 +1719,7 @@
           <p>
             De gegevens worden automatisch verzameld uit de openbare raads- en bestuursinformatiesystemen van
             deelnemende overheden en vervolgens als open data beschikbaar gesteld via een zoekmachine en
-            <button type="button" class="inline-link" on:click={() => void openApiDocs()}>API</button>.
+            <a class="inline-link" href={API_DOCS_PATH}>API</a>.
           </p>
           <p>
             Met OpenBesluitvorming kun je momenteel zoeken in meer dan
@@ -1877,7 +1736,7 @@
           </p>
           <p>
             Om de overgang naar de nieuwe API te faciliteren is een
-            <a href="https://github.com/ontola/openbesluitvorming/blob/main/docs/migration-guide.md" rel="noopener noreferrer" target="_blank">migration guide</a>
+            <a href="/docs/migration-guide">migration guide</a>
             beschikbaar gesteld. Mocht blijken dat iets in de API niet functioneert of beter kan, dan kunt u dit melden
             op de
             <a href="https://github.com/ontola/openbesluitvorming/issues" rel="noopener noreferrer" target="_blank"
@@ -1912,9 +1771,9 @@
             ontwikkeld door
             <a href="https://ontola.io/nl" rel="noopener noreferrer" target="_blank">Ontola</a>
             en wordt gebruikt door een breed netwerk van overheden en maatschappelijke organisaties. Via de beschikbare
-            <button type="button" class="inline-link" on:click={() => void openApiDocs()}>API-documentatie</button>
+            <a class="inline-link" href={API_DOCS_PATH}>API-documentatie</a>
             en
-            <a href="https://github.com/ontola/openbesluitvorming/blob/main/docs/migration-guide.md" rel="noopener noreferrer" target="_blank">migration guide</a>
+            <a href="/docs/migration-guide">migration guide</a>
             kunnen ontwikkelaars, onderzoekers en andere hergebruikers de gegevens eenvoudig integreren in eigen
             toepassingen.
           </p>
@@ -2318,52 +2177,5 @@
       on:pointerdown={(event) => startDetailSheetResize(event, 1)}
       on:dblclick={() => persistDetailSheetWidth(null)}
     ></div>
-  </section>
-{/if}
-
-{#if showApiDocs}
-  <section class="detail-overlay" transition:fade={{ duration: 160 }}>
-    <button
-      type="button"
-      class="detail-overlay__backdrop"
-      aria-label="Sluiten"
-      on:click={closeApiDocs}
-    ></button>
-    <div
-      class="detail-sheet detail-sheet--reader"
-      aria-modal="true"
-      role="dialog"
-      in:scale={{ duration: 200, start: 0.97 }}
-      out:scale={{ duration: 160, start: 0.985 }}
-    >
-      <div class="detail-sheet__header">
-        <div class="detail-sheet__header-bar">
-          <div class="detail-sheet__meta">
-            <span class="pill">API</span>
-          </div>
-          <div class="detail-sheet__header-actions">
-            <button
-              type="button"
-              class="ghost-button"
-              aria-label="Sluiten"
-              on:click={closeApiDocs}
-            >✕</button>
-          </div>
-        </div>
-        <div class="detail-sheet__header-top">
-          <h2 class="detail-sheet__title">Search API</h2>
-        </div>
-      </div>
-      <div class="detail-sheet__body">
-        <div
-          bind:this={apiDocsEl}
-          use:apiDocsSectionLinks
-          class="detail-sheet__surface detail-sheet__text prose-detail"
-        >
-          <!-- eslint-disable-next-line svelte/no-at-html-tags -->
-          {@html apiDocsHtml}
-        </div>
-      </div>
-    </div>
   </section>
 {/if}

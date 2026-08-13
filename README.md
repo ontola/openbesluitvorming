@@ -16,7 +16,8 @@ OpenBesluitvorming is de vervanger van [OpenRaadsinformatie](https://github.com/
 
 ## Use the API
 
-See [API.md](./API.md)
+See [API.md](./API.md), rendered at
+[openbesluitvorming.nl/docs/api](https://openbesluitvorming.nl/docs/api).
 
 ## Running locally
 

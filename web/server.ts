@@ -274,7 +274,11 @@ async function handleRequest(request: Request): Promise<Response> {
     return new Response(file, { headers: { "content-type": "text/plain; charset=utf-8" } });
   }
 
-  if (url.pathname === "/docs/migration-guide") {
+  // The rendered page fetches this; it also stays the plain-text address the
+  // route has always had, now with the extension it always was.
+  if (
+    url.pathname === "/docs/migration-guide.md" || url.pathname === "/docs/migration-guide.txt"
+  ) {
     const file = await Deno.readFile(new URL("./docs/migration-guide.md", projectRoot));
     return new Response(file, { headers: { "content-type": "text/plain; charset=utf-8" } });
   }
@@ -837,8 +841,18 @@ async function handleRequest(request: Request): Promise<Response> {
     }
   }
 
-  const pathname =
-    url.pathname === "/" ? "/index.html" : url.pathname === "/admin" ? "/admin.html" : url.pathname;
+  /** Addresses that are their own page rather than a file on disk. The docs
+   * ones share a single bundle that picks its document from the path — they
+   * are documents to read, so they get a real URL a search engine can index
+   * and a browser can anchor into, not an overlay on someone's search. */
+  const PAGES: Record<string, string> = {
+    "/": "/index.html",
+    "/admin": "/admin.html",
+    "/docs/api": "/docs.html",
+    "/docs/migration-guide": "/docs.html",
+  };
+
+  const pathname = PAGES[url.pathname] ?? url.pathname;
   const file = await readStaticFile(pathname);
 
   if (file) {
@@ -906,7 +920,7 @@ function rateLimitedResponse(verdict: RateVerdict): Response {
       limit_per_minute: verdict.limit,
       retry_after_seconds: verdict.retryAfterSeconds,
       hint: `Zware verzoeken tellen zwaarder: een zoekopdracht kost 1 eenheid per ${RATE_LIMIT_PAGE_UNIT} resultaten, dus limit=100 kost 5. Verlaag 'limit' of spreid je verzoeken. Elke API-response bevat RateLimit-Limit, RateLimit-Remaining en RateLimit-Reset.`,
-      documentation: "https://openbesluitvorming.nl/#api",
+      documentation: "https://openbesluitvorming.nl/docs/api",
     },
     { status: 429 },
   );

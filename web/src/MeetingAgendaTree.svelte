@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { marked } from "marked";
+  import { renderDocumentMarkdown } from "./markdown.ts";
   import { createEventDispatcher } from "svelte";
   import type { EntityContentResponse, MeetingAgendaItem, MeetingMotion } from "../../src/types.ts";
   import ReaderLoading from "./ReaderLoading.svelte";
@@ -34,27 +34,11 @@
   let documentMarkdown: Record<string, string | null> = {};
   let documentErrors: Record<string, string | null> = {};
 
-  function sanitizeMarkdownSource(markdown: string): string {
-    return markdown.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
-  }
-
   function isPdfDocument(document: { content_type?: string; file_name?: string; original_url?: string }): boolean {
     if (document.content_type?.toLowerCase().includes("application/pdf")) return true;
     if (document.file_name?.toLowerCase().endsWith(".pdf")) return true;
     if (document.original_url?.toLowerCase().includes(".pdf")) return true;
     return false;
-  }
-
-  function renderMarkdown(markdown?: string | null): string {
-    if (!markdown?.trim()) {
-      return "<p>Geen documenttekst beschikbaar.</p>";
-    }
-
-    return marked.parse(sanitizeMarkdownSource(markdown), {
-      async: false,
-      breaks: true,
-      gfm: true,
-    }) as string;
   }
 
   async function toggleDocumentText(entityId: string): Promise<void> {
@@ -208,7 +192,7 @@
                         <p class="meeting-agenda__document-preview-state">{documentErrors[document.id]}</p>
                       {:else if documentMarkdown[document.id]}
                         <div class="meeting-agenda__document-markdown prose-detail">
-                          {@html renderMarkdown(documentMarkdown[document.id])}
+                          {@html renderDocumentMarkdown(documentMarkdown[document.id])}
                         </div>
                       {:else}
                         <p class="meeting-agenda__document-preview-state">Geen documenttekst beschikbaar.</p>
