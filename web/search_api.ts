@@ -505,10 +505,15 @@ function formatDate(dateValue?: string): string {
     return dateValue;
   }
 
+  // Pinned to the zone the meetings are actually held in. Without it this
+  // formats in the container's zone (UTC), and a 21:00 meeting -- 19:00Z now
+  // that timestamps are real instants (#203) -- would still read correctly,
+  // but anything after midnight local would be dated to the previous day.
   return new Intl.DateTimeFormat("nl-NL", {
     day: "numeric",
     month: "long",
     year: "numeric",
+    timeZone: "Europe/Amsterdam",
   }).format(parsed);
 }
 
