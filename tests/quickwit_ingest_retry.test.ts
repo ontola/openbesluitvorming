@@ -64,3 +64,28 @@ Deno.test("only an oversized-payload rejection asks for a smaller batch", () => 
     "a server error should be retried as-is, not split",
   );
 });
+
+/** The status has to survive a rejection whose body cannot be read.
+ *
+ * Quickwit's 413 frequently arrives with the connection already closing, so
+ * reading the body throws. The old code built its error message by awaiting
+ * that read inline, so the throw replaced the whole message: the error became
+ * "error reading a body from connection" and the 413 was gone. The same source
+ * then appeared to fail two different ways on alternate runs, and the halving
+ * branch never fired because it was matching on a number that had been thrown
+ * away. */
+Deno.test("an unreadable rejection body still asks for a smaller batch", () => {
+  const readable = new Error('Quickwit ingest failed 413: {"message": "too large"}');
+  const unreadable = new Error("Quickwit ingest failed 413: (antwoord niet leesbaar)");
+
+  for (const error of [readable, unreadable]) {
+    assert(shouldHalveBatch(error), `413 should halve the batch: ${error.message}`);
+    assert(isRetryableIngestError(error), `413 should be retried: ${error.message}`);
+  }
+
+  // What the message used to collapse into, with no status left in it.
+  assert(
+    !shouldHalveBatch(new Error("error reading a body from connection")),
+    "a message with the status lost cannot ask for the right remedy",
+  );
+});

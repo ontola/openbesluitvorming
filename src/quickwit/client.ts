@@ -242,7 +242,17 @@ export class QuickwitClient {
         );
 
         if (!response.ok) {
-          throw new Error(`Quickwit ingest failed ${response.status}: ${await response.text()}`);
+          // Read the status before the body, and never let a failed body read
+          // replace it. Quickwit's rejection often arrives with the connection
+          // already closing, so `response.text()` throws -- and the thrown
+          // error then said "error reading a body from connection" while the
+          // status that actually mattered, 413, was lost. That is why the same
+          // source appeared to fail two different ways on alternate runs, and
+          // why shouldHalveBatch never fired: it was looking for a number that
+          // had been thrown away (2026-08-13).
+          const status = response.status;
+          const detail = await response.text().catch(() => "(antwoord niet leesbaar)");
+          throw new Error(`Quickwit ingest failed ${status}: ${detail}`);
         }
 
         return;
