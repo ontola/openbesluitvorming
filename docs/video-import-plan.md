@@ -1,5 +1,12 @@
 # Importplan: video, audio en gesproken tekst
 
+Status (2026-08-10): **de Notubiz-slice draait in productie** — 3.781
+`Recording`-entiteiten over 112 bronnen, waarvan in een steekproef van 400
+zo'n 88% een ASR-transcript heeft en 94% hoofdstukken per agendapunt. De
+iBabs-slice via Company Webcast (§5) is **niet gebouwd**: `src/companywebcast/`
+bestaat niet en elke recording in de index komt van Notubiz. De rest van dit
+document is het oorspronkelijke plan.
+
 Vervolg op [video-import-research.md](video-import-research.md), waarin per
 leverancier is uitgezocht wat er te halen valt. Dit plan beslaat **Notubiz en
 iBabs**: die twee hebben publiek beschikbare transcripts en dekken samen 294 van

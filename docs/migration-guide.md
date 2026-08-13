@@ -48,6 +48,10 @@ Quickwit-zoekprojectie. De belangrijkste verschillen:
 7. **Bulk export krijgt een eigen route.** Harvesten door de zoekindex leeg te
    pagineren wordt niet meer ondersteund; zie
    [Bulk harvesting](#recept-9-bulk-harvesting).
+8. **Twee soorten data die Classic niet had.** `Motion` (moties en
+   amendementen, met uitslag en — waar de raad digitaal stemt — de stem van
+   elk raadslid) en `Recording` (video/audio met een tijdlijn per agendapunt
+   en het transcript). Zie [Recept 4](#recept-4-alleen-documenten-of-alleen-vergaderingen).
 
 ## Base URL
 
@@ -197,6 +201,20 @@ Nieuw:
 curl "https://openbesluitvorming.nl/api/search?query=begroting&entityType=Document"
 curl "https://openbesluitvorming.nl/api/search?query=begroting&entityType=Meeting"
 ```
+
+Twee filterwaarden hebben geen tegenhanger in Classic, omdat de data er niet
+was:
+
+```bash
+# moties en amendementen, met uitslag en stem per raadslid
+curl "https://openbesluitvorming.nl/api/search?query=begroting&entityType=Motion"
+
+# gesproken woord: doorzoekt transcripts, geeft de vergadering terug
+curl "https://openbesluitvorming.nl/api/search?query=begroting&entityType=Recording"
+```
+
+Zie in [API.md](../API.md) "Use case: voting data" en "Use case: spoken word"
+voor de vorm van die antwoorden en wat je aan dekking kunt verwachten.
 
 ### Recept 5: Documentdetail en volledige tekst ophalen
 

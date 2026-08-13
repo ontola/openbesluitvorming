@@ -12,10 +12,10 @@ https://openbesluitvorming.nl
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/api/search` | GET | Search meetings, documents and motions (recommended) |
+| `/api/search` | GET | Search meetings, documents, motions and spoken word (recommended) |
 | `/api/stats` | GET | Index statistics (document count, organization count) |
 | `/api/sources` | GET | List available data sources |
-| `/api/entities/{entity_id}` | GET | Full entity detail (text, agenda, motion with votes, download URL) |
+| `/api/entities/{entity_id}` | GET | Full entity detail (text, agenda, motions with votes, recordings with transcript, download URL) |
 | `/api/entities/{entity_id}/pdf/page/{n}` | GET | Rendered PDF page as JPEG image |
 | `/api/export/snapshot` | GET | Bulk export: current state per source (NDJSON) |
 | `/api/export/changes` | GET | Bulk export: change feed per source (NDJSON) |
@@ -23,6 +23,7 @@ https://openbesluitvorming.nl
 No authentication is required. All endpoints are read-only.
 
 Looking for voting behaviour per party? See [Use case: voting data](#use-case-voting-data).
+Looking for what was actually said in a debate? See [Use case: spoken word](#use-case-spoken-word).
 Planning something that makes a lot of requests? See [Rate limits](#rate-limits).
 
 ---
@@ -220,7 +221,9 @@ Lists all configured data sources.
 
 ### `GET /api/entities/{entity_id}`
 
-Returns the full content for a meeting or document.
+Returns the full content for one entity. A document answers with its text and
+download URL, a meeting with its agenda plus the motions decided in it and the
+recordings of it, a motion with its outcome and votes.
 
 > **Note:** `entity_id` values contain colons. URL-encode them: `document:notubiz:gemeente:soest:12345` → `document%3Anotubiz%3Agemeente%3Asoest%3A12345`.
 
@@ -274,9 +277,45 @@ curl "https://openbesluitvorming.nl/api/entities/document%3Anotubiz%3Agemeente%3
       ],
       "agenda_items": []
     }
+  ],
+  "motions": [
+    {
+      "id": "motion:notubiz:gemeente:soest:...",
+      "name": "M1 Woningbouw Soesterberg",
+      "result": "aangenomen",
+      "tally": { "in_favour": 20, "against": 11 },
+      "votes": [],
+      "agenda_item": "agenda_item:notubiz:gemeente:soest:...",
+      "attachment_id": "document:notubiz:gemeente:soest:...",
+      "download_url": "https://..."
+    }
+  ],
+  "recordings": [
+    {
+      "id": "recording:notubiz:gemeente:soest:...",
+      "media_type": "video",
+      "stream_url": "https://...m3u8",
+      "duration_seconds": 12304,
+      "transcript_kind": "asr",
+      "chapters": [
+        {
+          "title": "1 Opening",
+          "start_seconds": 14,
+          "end_seconds": 166,
+          "agenda_item": "agenda_item:notubiz:gemeente:soest:..."
+        }
+      ],
+      "segments": [
+        { "start_seconds": 0, "end_seconds": 119.2, "text": "Goedenavond allemaal…" }
+      ]
+    }
   ]
 }
 ```
+
+`motions` and `recordings` are present only on a `Meeting`, and only when the
+source publishes them. See [voting data](#use-case-voting-data) and
+[spoken word](#use-case-spoken-word) below for what to expect from each.
 
 ---
 
@@ -284,17 +323,17 @@ curl "https://openbesluitvorming.nl/api/entities/document%3Anotubiz%3Agemeente%3
 
 ### `GET /api/entities/{entity_id}/pdf/page/{page_number}`
 
-Returns a rendered page of a PDF document as a PNG image. Pages are rendered at 96 DPI and cached permanently.
+Returns a rendered page of a PDF document as a JPEG image. Pages are rendered at 96 DPI and cached permanently.
 
 **Response headers:**
-- `Content-Type: image/png`
+- `Content-Type: image/jpeg`
 - `Cache-Control: public, max-age=31536000, immutable`
 - `X-Pdf-Page-Count: 12` (total pages in the document)
 
 **Example:**
 
 ```bash
-curl -o page1.png "https://openbesluitvorming.nl/api/entities/document%3Anotubiz%3Agemeente%3Asoest%3A12345/pdf/page/1"
+curl -o page1.jpg "https://openbesluitvorming.nl/api/entities/document%3Anotubiz%3Agemeente%3Asoest%3A12345/pdf/page/1"
 ```
 
 ---
@@ -434,6 +473,20 @@ The response carries a `motion` object:
 `result` is normalised to `aangenomen`, `verworpen`, `ingetrokken`,
 `aangehouden` or `overig`; `status` keeps the supplier's own wording.
 
+### The text of a motion
+
+A motion is a registry entry, not a file: its text lives in an attached
+document. Both routes to it are in the response.
+
+- Fetching **one motion** gives you `pdfUrl` and `downloadUrl` directly, and
+  `pdfEntityId` — the document id to pass to
+  [`/pdf/page/{n}`](#pdf-page-rendering) if you want rendered pages.
+- The **`motions[]` array on a meeting** gives each entry an `attachment_id`
+  and, where it resolves, a `download_url`.
+
+Around 40% of motions have no attachment at all; those carry the outcome and
+the votes but no text.
+
 ### Bulk: every motion of a source
 
 For analysis, use the export feed rather than paging search. Entity ids sort
@@ -481,6 +534,72 @@ imported sources:
   reference could not be resolved; `motion.agenda_item_hint` then holds the
   supplier's raw text.
 
+## Use case: spoken word
+
+Meetings are also published as `Recording` entities: the video or audio
+registration, a chapter per agenda item, and — where the supplier runs speech
+recognition — a transcript. This is what makes a debate searchable on what was
+actually said rather than only on what was written down afterwards.
+
+### Search what was said
+
+```bash
+curl "https://openbesluitvorming.nl/api/search?query=stikstof&entityType=Recording&limit=10"
+```
+
+Hits come back as the **meeting**, not the recording, with the spoken fragment
+as `summary` / `summaryHtml`:
+
+```json
+{
+  "entityId": "meeting:notubiz:gemeente:putten:1423776",
+  "entityType": "Meeting",
+  "organization": "Putten",
+  "date": "25 juni 2026",
+  "summaryHtml": "… voor ons als SGP is daarbij het <b>stikstof</b> plan van de voet"
+}
+```
+
+The result carries no timestamp. To place a fragment in time, fetch the meeting
+and find the matching entry in `recordings[].segments`, each of which has
+`start_seconds` and `end_seconds`.
+
+### Fetch a meeting's recordings
+
+```bash
+curl "https://openbesluitvorming.nl/api/entities/meeting%3Anotubiz%3Agemeente%3Amidden-groningen%3A1270344"
+```
+
+`recordings[]` holds, per registration:
+
+| Field | Meaning |
+|-------|---------|
+| `media_type` | `video` or `audio` |
+| `stream_url` | The seekable stream (HLS). Without it a player can only start at zero. |
+| `player_url` | The supplier's own player page |
+| `duration_seconds` | Length of the registration |
+| `transcript_kind` | `asr` where the transcript is machine-generated |
+| `chapters[]` | `title`, `start_seconds`, `end_seconds`, `agenda_item` — the timeline that ties the video to the agenda |
+| `segments[]` | `start_seconds`, `end_seconds`, `text` — the transcript itself |
+
+The media bytes are never stored or proxied: a two-day council meeting is
+~10 GB. `stream_url` and `player_url` point at the supplier.
+
+### What to expect
+
+Measured against the live index (2026-08-10), sampling 400 of 3,781 recordings:
+
+- **3,781 recordings across 112 sources.** Concentrated: Haarlem alone has 226.
+- **~88% carry a transcript** (`transcript_kind: asr`), **~94% carry chapters**.
+- **97% is video**, the rest audio-only.
+- Transcripts are speech recognition, not minutes: no punctuation you can rely
+  on, names are often mangled, and there is **no speaker attribution** —
+  `speakers[]` was empty in all 400 sampled. Treat a segment as "this was said
+  in this meeting at this moment", not as a quote attributable to a named
+  member.
+- The transcript is not in the search payload — it is ~30 KB per meeting — so
+  only `/api/entities/{id}` returns `segments`, never `/api/search`.
+
 ## Schemas
 
 Canonical entity schemas are published as JSON Schema documents:
@@ -491,6 +610,7 @@ Canonical entity schemas are published as JSON Schema documents:
 | [document.schema.json](/schemas/document.schema.json) | Attached document or media object |
 | [committee.schema.json](/schemas/committee.schema.json) | Committee or organisation |
 | [motion.schema.json](/schemas/motion.schema.json) | Motie/amendement with outcome and vote breakdown |
+| [recording.schema.json](/schemas/recording.schema.json) | Video/audio registration with chapters and transcript |
 | [vote.schema.json](/schemas/vote.schema.json) | Vote record (shape reused inside `Motion.votes`) |
 | [entity-commit.schema.json](/schemas/entity-commit.schema.json) | CloudEvents envelope |
 

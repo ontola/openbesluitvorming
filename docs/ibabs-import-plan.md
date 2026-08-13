@@ -1,16 +1,17 @@
 # iBabs Import Plan
 
-Status: **in production** since mid-2026. Sections below describe the
-original design/rollout plan; kept for the API exploration results and the
-still-unbuilt vote-import plan. See the "Production status" note under each
-section for what actually happened.
+Status: **in production** since mid-2026, motions and per-member votes
+included since 2026-08. Sections below describe the original design/rollout
+plan; kept for the API exploration results. See the "Production status" note
+under each section for what actually happened.
 
 ## Current State
 
 The iBabs integration is built and running in production:
 - SOAP client (`src/ibabs/client.ts`) — calls `wcf.ibabs.eu/api/Public.svc`, forces IPv4 DNS resolution (see "IPv4 Requirement" below)
-- Extractor (`src/ibabs/extractor.ts`) — fetches meetings, normalizes, materializes documents
-- Normalizer (`src/ibabs/normalize.ts`) — converts to canonical entities
+- Extractor (`src/ibabs/extractor.ts`) — fetches meetings, normalizes, materializes documents, and in a second pass walks the motie/amendement lists
+- Normalizer (`src/ibabs/normalize.ts`) — converts to canonical entities; `src/motions/normalize.ts` does the same for motions and their votes
+- Fleet-wide pacing (`src/ibabs/rate_limit.ts`) — shared token budget and circuit breaker across workers, added after the motion backfill got our production IP blocked
 - iBabs sources in the catalog (`src/sources/catalog.data.ts`), all marked `implemented: true`
 - Tests with XML fixtures, plus `tests/ibabs.test.ts` against the live client shape
 

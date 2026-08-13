@@ -21,7 +21,7 @@ Current scope:
 - `Committee`
 - `Motion`
 - `Recording`
-- `Vote`
+- `Vote` (shape only — see below)
 - `entity.commit`
 
 Notes:
@@ -39,6 +39,11 @@ Notes:
   same reason document markdown does.
 - `Vote` exists in the current ontology/model layer but is not emitted as a
   standalone entity. Per-member votes live in `Motion.votes`, shaped after this
-  schema, because a vote is only meaningful together with its motion.
+  schema, because a vote is only meaningful together with its motion. It is
+  therefore absent from the `entity_type` enum in `entity.commit`, which lists
+  only what an event can actually carry.
+- `Party` and `Person` are emitted — a vote references both — but have no
+  schema of their own yet. They are the fractie and the council member behind
+  `Motion.votes[].group` and `.voter`.
 - `entity.commit` is the first event schema and wraps these entity schemas in a
   CloudEvents-compatible envelope.

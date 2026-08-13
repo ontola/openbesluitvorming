@@ -168,7 +168,7 @@ Do not commit production code that depends on the proxy being set; production ru
 
 #### Public API operations actually wired up
 
-`src/ibabs/client.ts` currently implements only `GetMeetingtypes`, `GetMeetingsByDateRange`, and `downloadDocument`. The WSDL exposes ~28 operations including `GetMeetingsChangedSince` (delta sync), `GetLists` / `GetListEntry` / `GetListEntryVotes` (registries + votes), `GetUsers` / `GetUserVotes`, and `Search`. Several require authenticated (username/password) access on top of the IP whitelist — verify behavior before adding a method.
+`src/ibabs/client.ts` implements `GetMeetingtypes`, `GetMeetingsByDateRange`, `GetLists`, `GetListsEntriesByFilterRequest`, `GetListEntry`, `GetListEntryVotesByListEntryId`, and `downloadDocument` — the last four are what motions and per-member votes are built on. The WSDL exposes ~28 operations; still unwired are `GetMeetingsChangedSince` (delta sync), `GetUsers` / `GetUserVotes`, and `Search`. Several require authenticated (username/password) access on top of the IP whitelist — verify behavior before adding a method.
 
 Do not trust an `ERR` from one operation as evidence that a whole area is closed off: `GetListEntryVotes` is denied, but `GetListEntryVotesByListEntryId` returns the same per-member vote data publicly, and it takes an `<EntryId>` parameter despite the operation name (`<ListEntryId>` yields a misleading `System.Guid` cast error). See `docs/ibabs-import-plan.md`, "Per-member votes are public after all".
 

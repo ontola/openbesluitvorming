@@ -1,8 +1,10 @@
 # OpenBesluitvorming
 
-- Zoek door **meer dan 6 miljoen documenten** van meer dan 300 organisaties.
+- Zoek door **meer dan 5 miljoen documenten** van meer dan 300 organisaties.
 - PDF's worden weergegeven als afbeeldingen (laad zeer snel) of als markdown text (toegankelijk)
 - Vergaderingen zijn gekoppeld aan documenten voor context, losse agendapunten zichtbaar.
+- **Moties en amendementen** met hun uitslag, en waar de raad digitaal stemt de stem van elk raadslid met fractie.
+- **Gesproken woord**: video- en audioregistraties met hoofdstukken per agendapunt en, waar de leverancier die publiceert, het transcript — doorzoekbaar op wat er gezegd is.
 - Importeert dagelijks uit verschillende vergadersoftware (Notubiz, Ibabs, GemeenteOplossingen, Parlaeus)
 
 OpenBesluitvorming is de vervanger van [OpenRaadsinformatie](https://github.com/openstate/open-raadsinformatie/).
@@ -234,7 +236,11 @@ Instead, each source payload is transformed into a canonical entity such as:
 - `Meeting`
 - `Document`
 - `Committee`
-- `Motion`
+- `Motion` — motie/amendement, with its outcome and, where the council votes
+  digitally, the vote of every individual member
+- `Recording` — the video or audio registration of a meeting, with chapters per
+  agenda item and the transcript where the supplier publishes one
+- `Party` and `Person` — the fractie and the council member a vote points at
 
 The schemas in [`schemas/`](schemas) are the first version of those contracts.
 
@@ -343,9 +349,11 @@ This folder currently contains:
 - a first Deno-based Notubiz extractor slice
 - a Vite + TypeScript frontend with HMR for the public UI and admin UI
 - shared frontend/backend TypeScript API types
-- `entity.commit` events for canonical meetings and documents
+- `entity.commit` events for canonical meetings, documents, motions and recordings
 - attachment download into S3-compatible object storage
 - markdown extraction for PDF and Word-style documents
+- motions and per-member votes from iBabs list entries and Notubiz module items
+- video/audio registrations with an agenda-item timeline and ASR transcripts
 - a local Quickwit setup and projection client
 - a small admin UI for reruns and extraction run inspection
 - live e2e coverage that ingests Haarlem meetings and attached files into Quickwit and the GUI
