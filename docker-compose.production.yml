@@ -35,20 +35,33 @@ services:
       QUICKWIT_CLUSTER_ID: ${QUICKWIT_CLUSTER_ID:-woozi-prod}
       QUICKWIT_NODE_ID: ${QUICKWIT_NODE_ID:-quickwit-prod}
       QUICKWIT_INDEX_ROOT_PREFIX: ${QUICKWIT_INDEX_ROOT_PREFIX:-indexes-prod}
-      # 40G -> 55G (2026-07-23) -> 120G (2026-07-31). The index outgrew every
-      # budget the 150GB root disk could support: measured 65.6GB across 81
-      # published splits, one of them 24.9GB, so only ~35 splits fit in 55G and
-      # the rest were refetched from S3 on every cold query (1-5s, sometimes
-      # 12s+). The split cache now lives on a dedicated 150GB volume
-      # (/mnt/quickwit-cache, see the bind mount below) instead of competing
-      # with Docker images, the SQLite state and the extraction spillover for
-      # root-disk space, so the whole index fits with room for backfill growth.
+      # 40G -> 55G (2026-07-23) -> 120G (2026-07-31) -> 70G (2026-08-14).
+      #
+      # The 120G was sized for the dedicated 150GB volume this cache used to
+      # live on. It has moved back to the root disk's local NVMe, so the budget
+      # is sized to that again -- see the bind mount below for why.
+      #
+      # The earlier move away from root was made because the index outgrew the
+      # budget: 65.6GB across 81 splits against a 55G cache, so a third of it
+      # was refetched from S3 on every cold query (1-5s, sometimes 12s+). That
+      # constraint is why 70G matters rather than being a round number: the
+      # served index is 60.8GB across 9 published splits, four of them 12-18GB,
+      # and a split is cached whole. A budget that cannot hold every split
+      # means whole 18GB splits get refetched, which is the failure this number
+      # exists to prevent. Root has ~94GB free after pruning stale images, so
+      # 70G holds the index with the rest left for Docker, the SQLite state and
+      # the indexer's staging area.
+      #
+      # This is the number to check first when cold search gets slow again, and
+      # it needs raising -- or the index shrinking -- before the index passes
+      # 70GB. A clean reindex would take roughly 20% off today, which is the
+      # duplicate rows left by the failed v3 attempts.
       #
       # Rescaling the server was the obvious alternative but is not possible
       # here: fsn1-dc14 lists no affordable larger type in
       # available_for_migration, so the cheap big machines can only be had by
       # rebuilding onto a new server.
-      QUICKWIT_SPLIT_CACHE_MAX_NUM_BYTES: ${QUICKWIT_SPLIT_CACHE_MAX_NUM_BYTES:-120G}
+      QUICKWIT_SPLIT_CACHE_MAX_NUM_BYTES: ${QUICKWIT_SPLIT_CACHE_MAX_NUM_BYTES:-70G}
       QUICKWIT_SPLIT_CACHE_NUM_CONCURRENT_DOWNLOADS: ${QUICKWIT_SPLIT_CACHE_NUM_CONCURRENT_DOWNLOADS:-4}
     # Quickwit logs every search at INFO, including the full split list, and
     # Docker's json-file driver does not rotate unless told to. The log had
@@ -62,11 +75,17 @@ services:
         max-file: "3"
     volumes:
       - quickwit-data:/quickwit/qwdata
-      # Dedicated 150GB Hetzner volume for the searcher split cache only. It
-      # holds no durable state -- everything here is a local copy of splits
-      # that live in S3 -- so it can be wiped or lost without data loss, which
-      # is also why it is safe to keep off the backed-up root disk.
-      - /mnt/quickwit-cache:/quickwit/qwdata/searcher-split-cache
+      # The searcher split cache, on the root disk's local NVMe rather than the
+      # attached volume it used to sit on.
+      #
+      # It holds no durable state -- everything here is a local copy of splits
+      # that live in S3 -- so it can be wiped or lost without data loss. That
+      # was the argument for keeping it off the root disk; the argument against
+      # is that it is read on every query, and the attached volume is the
+      # slowest storage on the machine. Measured 2026-08-14, 4K random reads:
+      # 0.22ms on root against 2.01ms on /mnt/quickwit-cache -- 9x, on exactly
+      # the access pattern a term lookup performs.
+      - /var/quickwit-cache:/quickwit/qwdata/searcher-split-cache
       - ./quickwit/quickwit.yaml:/quickwit/config/quickwit.yaml:ro
 
   openbesluitvorming:
