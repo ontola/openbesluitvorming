@@ -1427,6 +1427,14 @@
     <div class="hero__frame">
       <div class="hero__masthead">
         <!-- Admin link removed — double-click "vergaderstukken" to access admin -->
+        <a
+          class="hero__vng"
+          href="https://www.vngrealisatie.nl/"
+          rel="noopener noreferrer"
+          target="_blank"
+        >
+          <img src={vngLogo} alt="VNG Realisatie" width="96" height="50" />
+        </a>
         <div bind:this={brandBlockEl} class="hero__brand-block">
           <h1 class="brand">
             <a
@@ -1439,6 +1447,8 @@
               <span class="brand__dark">Open</span><span class="brand__light">Besluitvorming</span>
             </a>
           </h1>
+
+          <p class="brand__alias">voorheen <strong>OpenRaadsinformatie</strong></p>
 
           <ul class="hero__meta">
             <li on:dblclick={() => { window.location.href = "/admin.html"; }}><strong>{(indexDocumentCount ?? fallbackDocumentCount).toLocaleString("nl-NL")}</strong> vergaderstukken</li>

@@ -170,6 +170,38 @@ select {
   gap: 0.08rem;
 }
 
+/* VNG is the initiator, so its logo opens the masthead — above the wordmark,
+   not beside it, so the home page stays one centred column at every width. */
+.hero__vng {
+  display: block;
+  line-height: 0;
+}
+
+.hero__vng img {
+  height: 3rem;
+  width: auto;
+}
+
+/* The collapsed search header only has room for the wordmark and the query
+   field; the logo and the alias live on the home page and in the about
+   section instead. */
+.hero--search .hero__vng,
+.hero--search .brand__alias {
+  display: none;
+}
+
+.brand__alias {
+  margin: 0;
+  color: var(--muted);
+  font-size: clamp(0.72rem, 1.6vw, 1.1rem);
+  letter-spacing: 0.02em;
+}
+
+.brand__alias strong {
+  color: #7d90ab;
+  font-weight: 700;
+}
+
 .hero__admin-link {
   margin: 0 0 0.75rem;
   text-align: center;
@@ -2807,10 +2839,12 @@ select {
 
   /* The VNG wordmark is navy (#004388) and vanishes on the dark background, so
      it gets a light plate instead of a filter that would break the brand colours. */
-  .home-about__logo {
+  .home-about__logo,
+  .hero__vng img {
     background: #ffffff;
     padding: 0.4rem 0.55rem;
     box-sizing: content-box;
+    border-radius: 0.6rem;
   }
 
   .brand__light {
