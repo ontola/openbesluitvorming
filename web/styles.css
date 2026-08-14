@@ -74,10 +74,7 @@ select {
   min-height: min(82vh, 56rem);
   transition:
     padding var(--motion-slow) ease,
-    min-height var(--motion-slow) ease,
-    background-color var(--motion-slow) ease,
-    box-shadow var(--motion-slow) ease,
-    backdrop-filter var(--motion-slow) ease;
+    min-height var(--motion-slow) ease;
 }
 
 .hero--search {
@@ -86,9 +83,45 @@ select {
   z-index: 12;
   min-height: 0;
   padding: 0.9rem 1.5rem 1rem;
+}
+
+/* The bar's surface, on a layer of its own so it can arrive by fading in at
+   the size it ends up. Painted on the hero it is that box, and a hero that
+   folds while the reader scrolls drags a screen-tall pane — shadow and all —
+   up across the text they are reading. */
+.hero::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  /* The hero's own height, except while the scroll fold is opening back up:
+     the box is a screenful again from the first frame, and the surface has to
+     fade out as the bar it was, not as the block it now sits in. */
+  height: var(--hero-surface-height, 100%);
+  z-index: -1;
+  opacity: 0;
   background: rgba(246, 248, 251, 0.86);
   box-shadow: 0 10px 24px rgba(23, 50, 92, 0.08);
   backdrop-filter: blur(18px);
+  pointer-events: none;
+  transition: opacity var(--motion-slow) ease;
+}
+
+.hero--search::after {
+  opacity: 1;
+}
+
+/* The scroll fold, unlike the one a query triggers, happens under a reader
+   who is looking at the page below rather than at the hero. So the hero takes
+   its collapsed shape at once and lets the surface fade and the flying brand
+   and field carry the change; there is nothing left to animate the box for.
+   The class is on the header for the one frame the shape changes in, and has
+   to beat the transition every part of the hero declares for itself further
+   down this sheet — hence the only !important here. */
+.hero--fold-snap,
+.hero--fold-snap * {
+  transition: none !important;
 }
 
 .hero__glow {
@@ -681,6 +714,20 @@ select {
 
 .content--home {
   padding-top: 1.2rem;
+  /* The spacer already keeps the page the same height across the hero's fold.
+     Scroll anchoring only sees the hero shrink, one frame before the spacer
+     grows, and would pay for that frame by moving the scroll offset — which
+     is the one thing the fold depends on staying put. */
+  overflow-anchor: none;
+}
+
+/* Holds open what the folding hero gives up. Sized from the hero's live
+   height rather than transitioned on its own, so the two always add up to the
+   page the reader was already scrolling. */
+.hero-fold-spacer {
+  height: 0;
+  pointer-events: none;
+  overflow-anchor: none;
 }
 
 .home-about {

@@ -84,6 +84,32 @@
   let loadingMore = false;
   let searched = initialRouteState ? routeHasSearchIntent(initialRouteState) : false;
   let filtersOpen = false;
+  /** Home page: the hero folds into the sticky search bar as it scrolls away,
+   * the same collapse the first query triggers. It folds at the moment the
+   * search field would leave the screen, so the field is where the eye
+   * already is when it flies up into the bar.
+   *
+   * The fold empties the hero's screen-tall box, which would drag the whole
+   * page up behind it. A spacer holds that height open instead, kept at
+   * exactly what the shrinking hero gives up, so the text below never moves
+   * and the scroll offset stays trustworthy — `heroUnfoldBelow` is a scroll
+   * offset, and it has to mean the same thing folded as unfolded. */
+  let heroPinned = false;
+  let heroSnapped = false;
+  let heroSurfaceHeight: number | null = null;
+  let heroEl: HTMLElement | null = null;
+  let heroSpacerEl: HTMLElement | null = null;
+  let heroFullHeight = 0;
+  let heroUnfoldBelow = 0;
+  let heroSettleAt = 0;
+  /** How close to the top edge the search field gets before it becomes the
+   * bar. A little short of the edge, so it is still whole when it takes off. */
+  const HERO_FOLD_AT = 48;
+  /** How far back up the reader has to scroll before the hero unfolds. Enough
+   * that the fold and the unfold cannot chase each other around one pixel. */
+  const HERO_UNFOLD_SLACK = 120;
+  /** Comfortably past the CSS transition the fold runs on. */
+  const HERO_FOLD_SETTLE_MS = 700;
   let searchRequestId = 0;
   let searchAbortController: AbortController | null = null;
 
@@ -279,8 +305,89 @@
     });
   }
 
+  function onWindowScroll(): void {
+    if (searched) {
+      return;
+    }
+    if (!heroPinned) {
+      // The unfolded search field is the thing being scrolled off the top;
+      // once it reaches the edge it becomes the bar instead of leaving.
+      const fieldTop = primarySearchFieldEl?.getBoundingClientRect().top ?? Number.POSITIVE_INFINITY;
+      if (fieldTop <= HERO_FOLD_AT) {
+        heroUnfoldBelow = Math.max(0, window.scrollY - HERO_UNFOLD_SLACK);
+        void snapHeroFold(() => {
+          // The folded hero hides the org picker, so leaving it open would
+          // strand it — and any focus inside it — behind a display:none.
+          homeOrgPickerOpen = false;
+          heroPinned = true;
+        });
+      }
+    } else if (window.scrollY <= heroUnfoldBelow) {
+      void snapHeroFold(() => {
+        heroPinned = false;
+      });
+    }
+  }
+
+  /** Folds or unfolds without transitioning the hero's box: the brand and the
+   * field still fly, and the bar's surface still fades, but the box itself is
+   * simply the other shape. The class only has to cover the frame in which
+   * the properties change, so it comes straight back off — leaving hovers
+   * inside the bar their own transitions. */
+  async function snapHeroFold(apply: () => void): Promise<void> {
+    heroSettleAt = performance.now() + HERO_FOLD_SETTLE_MS;
+    // Opening back up, the bar's surface keeps the height it is fading out
+    // from; folding, it is the hero's own box again — which by then is the bar.
+    heroSurfaceHeight = heroPinned ? (heroEl?.getBoundingClientRect().height ?? null) : null;
+    heroSnapped = true;
+    await animateModeChange(apply);
+    requestAnimationFrame(() => {
+      heroSnapped = false;
+    });
+  }
+
+  /** Keeps the spacer at exactly what the hero is currently not using, for
+   * every frame of the fold rather than only its end state.
+   *
+   * The height goes straight onto the node: routed through the reactive
+   * system it would land a frame late, and a frame in which hero and spacer
+   * disagree is a frame in which the page below jumps. */
+  function watchHeroHeight(element: HTMLElement): { destroy: () => void } {
+    heroEl = element;
+    const observer = new ResizeObserver(() => {
+      // Mid-fold heights say nothing about how tall the hero stands unfolded,
+      // so only measure once it has come to rest.
+      if (!heroPinned && !searched && performance.now() > heroSettleAt) {
+        heroFullHeight = element.getBoundingClientRect().height;
+      }
+      syncHeroFoldSpacer();
+    });
+    observer.observe(element);
+    return {
+      destroy() {
+        observer.disconnect();
+        heroEl = null;
+      },
+    };
+  }
+
+  function syncHeroFoldSpacer(): void {
+    if (!heroSpacerEl) {
+      return;
+    }
+    // Results stand under the bar on their own; there is no home page left
+    // below the hero for the spacer to hold in place.
+    const height = heroEl?.getBoundingClientRect().height ?? heroFullHeight;
+    heroSpacerEl.style.height = searched ? "0px" : `${Math.max(0, heroFullHeight - height)}px`;
+  }
+
   async function clearToHome(mode: "push" | "replace" = "push"): Promise<void> {
+    // The hero unfolds at the top of the page, so go there first — otherwise
+    // the scroll offset left behind by the results immediately refolds it.
+    window.scrollTo({ top: 0 });
+    heroSettleAt = performance.now() + HERO_FOLD_SETTLE_MS;
     await animateModeChange(() => {
+      heroPinned = false;
       query = "";
       organization = "";
       entityType = "";
@@ -1112,6 +1219,9 @@
     }
 
     if (!searched) {
+      // Searching from a folded hero starts at the results, not at whatever
+      // paragraph of the home page the reader had scrolled to.
+      window.scrollTo({ top: 0 });
       await animateModeChange(() => {
         searched = true;
       });
@@ -1358,6 +1468,14 @@
   $: detailIndex = detailItem ? results.findIndex((item) => item.entityId === detailItem.entityId) : -1;
   $: hasPreviousDetail = detailIndex > 0;
   $: hasNextDetail = detailIndex >= 0 && (detailIndex < results.length - 1 || hasMore);
+  // Once there are results the collapse is `searched`'s business, whichever
+  // way the search started. The home fold hands back the space it was holding
+  // open rather than leaving it above the results.
+  $: if (searched && heroPinned) {
+    heroPinned = false;
+    syncHeroFoldSpacer();
+  }
+
   $: detailMarkdownHtml = renderDocumentMarkdown(detailContent?.markdownText);
   $: agendaItemIds = collectAgendaItemIds(detailContent?.agenda);
   // A motion only renders inside the agenda when we resolved it to an item
@@ -1418,10 +1536,16 @@
   }
 </script>
 
-<svelte:window on:popstate={handlePopstate} />
+<svelte:window on:popstate={handlePopstate} on:scroll|passive={onWindowScroll} />
 
 <div class:page-shell--search={searched} class="page-shell">
-  <header class:hero--search={searched} class="hero">
+  <header
+    use:watchHeroHeight
+    class:hero--search={searched || heroPinned}
+    class:hero--fold-snap={heroSnapped}
+    class="hero"
+    style={heroSurfaceHeight === null ? "" : `--hero-surface-height: ${heroSurfaceHeight}px`}
+  >
     <div class="hero__glow hero__glow--left"></div>
     <div class="hero__glow hero__glow--right"></div>
     <div class="hero__frame">
@@ -1532,6 +1656,8 @@
       </form>
     </div>
   </header>
+
+  <div bind:this={heroSpacerEl} class="hero-fold-spacer" aria-hidden="true"></div>
 
   {#if searched}
     <main class="content content--search" transition:fade={{ duration: 180 }}>
