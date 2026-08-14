@@ -13,6 +13,7 @@ import {
 } from "./ops/store.ts";
 import { computeAllowedIngestConcurrency } from "./ingest_scheduler.ts";
 import { IngestStallError, raceStallWatchdog } from "./ingest_watchdog.ts";
+import { ingestStallTimeoutMs } from "./ingest_stall_timeout.ts";
 import type { IngestRunRecord } from "./types.ts";
 
 const POLL_INTERVAL_MS = 5000;
@@ -30,14 +31,15 @@ const ingestMinFreeMemoryMb = Math.max(
   256,
   Number(Deno.env.get("INGEST_MIN_FREE_MEMORY_MB") ?? "1024"),
 );
-// A run that emits no progress for this long is treated as wedged. `executeIngest`
-// can hang indefinitely without throwing (e.g. a stuck extraction-service
-// connection); without this watchdog that pins `activeCount` and silently
-// disables the worker. Default 10 min — well above any healthy inter-entity gap.
-const ingestStallTimeoutMs = Math.max(
-  60_000,
-  Number(Deno.env.get("INGEST_STALL_TIMEOUT_MS") ?? "600000"),
-);
+// A run that emits no progress for this long is treated as wedged.
+// `executeIngest` can hang indefinitely without throwing (e.g. a stuck
+// extraction-service connection); without this watchdog that pins
+// `activeCount` and silently disables the worker.
+//
+// Derived from the longest deliberate backoff rather than written as its own
+// number -- see ingest_stall_timeout.ts for what that cost when the two drifted
+// apart.
+const stallTimeoutMs = ingestStallTimeoutMs();
 
 let activeCount = 0;
 // Tracks currently-claimed runs so a deploy's SIGTERM can hand them back to
@@ -81,7 +83,7 @@ async function executeIngestWithWatchdog(
 ): Promise<void> {
   try {
     await raceStallWatchdog({
-      stallTimeoutMs: ingestStallTimeoutMs,
+      stallTimeoutMs,
       work: (heartbeat) =>
         executeIngest(runningRun, run.source_key, run.date_from, run.date_to, {
           ingestToQuickwit: true,
@@ -181,12 +183,14 @@ async function releaseActiveRunsAndExit(): Promise<void> {
   shuttingDown = true;
   const runs = [...activeRuns.values()];
   if (runs.length > 0) {
-    console.log(`[worker ${workerId}] SIGTERM: releasing ${runs.length} claimed run(s) back to the queue`);
+    console.log(
+      `[worker ${workerId}] SIGTERM: releasing ${runs.length} claimed run(s) back to the queue`,
+    );
     await Promise.all(
       runs.map((run) =>
         updateRun(run.id, { status: "queued", error_message: undefined }).catch((error) => {
           console.error(`[worker ${workerId}] could not release run ${run.id} on shutdown:`, error);
-        })
+        }),
       ),
     );
   }

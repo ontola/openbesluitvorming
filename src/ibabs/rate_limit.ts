@@ -24,7 +24,16 @@
 
 const DEFAULT_MAX_RPS = 2;
 const DEFAULT_COOLDOWN_MS = 30_000;
-const DEFAULT_MAX_COOLDOWN_MS = 15 * 60_000;
+/** Longest the breaker will hold every request in a process.
+ *
+ * Exported because the worker's stall watchdog has to outlast it. A run
+ * sleeping here is behaving exactly as designed, but it emits no progress
+ * while it waits, and the watchdog cannot tell that apart from a wedged
+ * connection. With the watchdog at 10 minutes and this at 15, every run that
+ * reached a full-length cooldown was abandoned before it could resume -- 90 of
+ * 90 scheduled iBabs imports, every night, with zero entities and no log line
+ * (measured 2026-08-14). */
+export const DEFAULT_MAX_COOLDOWN_MS = 15 * 60_000;
 /** How long a read of the shared breaker file is trusted, so pacing does not
  * turn into a stat() per request. */
 const SHARED_READ_TTL_MS = 1_000;
@@ -63,12 +72,14 @@ export class IbabsRateLimiter {
   private tail: Promise<void> = Promise.resolve();
 
   constructor(options: RateLimiterOptions = {}) {
-    const rps = options.maxRequestsPerSecond ??
+    const rps =
+      options.maxRequestsPerSecond ??
       Number(Deno.env.get("WOOZI_IBABS_MAX_RPS") ?? DEFAULT_MAX_RPS);
     this.minIntervalMs = rps > 0 ? 1000 / rps : 0;
-    this.cooldownMs = options.cooldownMs ??
-      Number(Deno.env.get("WOOZI_IBABS_COOLDOWN_MS") ?? DEFAULT_COOLDOWN_MS);
-    this.maxCooldownMs = options.maxCooldownMs ??
+    this.cooldownMs =
+      options.cooldownMs ?? Number(Deno.env.get("WOOZI_IBABS_COOLDOWN_MS") ?? DEFAULT_COOLDOWN_MS);
+    this.maxCooldownMs =
+      options.maxCooldownMs ??
       Number(Deno.env.get("WOOZI_IBABS_MAX_COOLDOWN_MS") ?? DEFAULT_MAX_COOLDOWN_MS);
     this.statePath = options.statePath ?? Deno.env.get("WOOZI_IBABS_BREAKER_PATH") ?? undefined;
     this.now = options.now ?? (() => Date.now());
