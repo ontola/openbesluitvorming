@@ -35,34 +35,31 @@ services:
       QUICKWIT_CLUSTER_ID: ${QUICKWIT_CLUSTER_ID:-woozi-prod}
       QUICKWIT_NODE_ID: ${QUICKWIT_NODE_ID:-quickwit-prod}
       QUICKWIT_INDEX_ROOT_PREFIX: ${QUICKWIT_INDEX_ROOT_PREFIX:-indexes-prod}
-      # 40G -> 55G (2026-07-23) -> 120G (2026-07-31) -> 70G (2026-08-14).
+      # 40G -> 55G (2026-07-23) -> 120G (2026-07-31), briefly 70G on 2026-08-14
+      # while the cache was moved to the root disk and back.
       #
-      # The 120G was sized for the dedicated 150GB volume this cache used to
-      # live on. It has moved back to the root disk's local NVMe, so the budget
-      # is sized to that again -- see the bind mount below for why.
+      # The budget has to be generous relative to the largest single split,
+      # not merely larger than the index. A split is cached whole, and the
+      # served index is 60.8GB across 9 published splits with four of them
+      # 12-18GB. Tried at 70G on the root disk (2026-08-14): the cache settled
+      # at 9.6GB, taking the 14 small splits and refusing all four large ones
+      # while 60GB of budget sat unused. At 120G the old cache had held a
+      # 24.9GB split without trouble -- the same ratio of split to budget that
+      # 70G denies.
       #
-      # The earlier move away from root was made because the index outgrew the
-      # budget: 65.6GB across 81 splits against a 55G cache, so a third of it
-      # was refetched from S3 on every cold query (1-5s, sometimes 12s+). That
-      # constraint is why 70G matters rather than being a round number: the
-      # served index is 60.8GB across 9 published splits, four of them 12-18GB,
-      # and a split is cached whole. A budget that cannot hold every split
-      # means whole 18GB splits get refetched, which is the failure this number
-      # exists to prevent. Root has ~94GB free after pruning stale images, so
-      # 70G holds the index with the rest left for Docker, the SQLite state and
-      # the indexer's staging area.
-      #
-      # This is the number to check first when cold search gets slow again, and
-      # it needs raising -- or the index shrinking -- before the index passes
-      # 70GB. A clean reindex would take roughly 20% off today, which is the
-      # duplicate rows left by the failed v3 attempts.
+      # So this number is about the ratio, and the volume is what makes the
+      # ratio affordable. This is the first thing to check when cold search
+      # gets slow, along with the split sizes it has to accommodate: if merges
+      # keep growing splits, the budget has to grow with them or the biggest
+      # ones silently stop being cached. Smaller splits would remove the
+      # problem rather than fund it.
       #
       # Rescaling the server was the obvious alternative but is not possible
       # here: fsn1-dc14 lists no affordable larger type in
       # available_for_migration, so the cheap big machines can only be had by
       # rebuilding onto a new server.
-      QUICKWIT_SPLIT_CACHE_MAX_NUM_BYTES: ${QUICKWIT_SPLIT_CACHE_MAX_NUM_BYTES:-70G}
-      QUICKWIT_SPLIT_CACHE_NUM_CONCURRENT_DOWNLOADS: ${QUICKWIT_SPLIT_CACHE_NUM_CONCURRENT_DOWNLOADS:-4}
+      QUICKWIT_SPLIT_CACHE_MAX_NUM_BYTES: ${QUICKWIT_SPLIT_CACHE_MAX_NUM_BYTES:-120G}
+      QUICKWIT_SPLIT_CACHE_NUM_CONCURRENT_DOWNLOADS: ${QUICKWIT_SPLIT_CACHE_NUM_CONCURRENT_DOWNLOADS:-1}
     # Quickwit logs every search at INFO, including the full split list, and
     # Docker's json-file driver does not rotate unless told to. The log had
     # reached 1.2 GB on the root disk by the time anyone looked (2026-08-12),
@@ -75,17 +72,21 @@ services:
         max-file: "3"
     volumes:
       - quickwit-data:/quickwit/qwdata
-      # The searcher split cache, on the root disk's local NVMe rather than the
-      # attached volume it used to sit on.
+      # Dedicated 150GB volume for the searcher split cache only. It holds no
+      # durable state -- everything here is a local copy of splits that live in
+      # S3 -- so it can be wiped or lost without data loss.
       #
-      # It holds no durable state -- everything here is a local copy of splits
-      # that live in S3 -- so it can be wiped or lost without data loss. That
-      # was the argument for keeping it off the root disk; the argument against
-      # is that it is read on every query, and the attached volume is the
-      # slowest storage on the machine. Measured 2026-08-14, 4K random reads:
-      # 0.22ms on root against 2.01ms on /mnt/quickwit-cache -- 9x, on exactly
-      # the access pattern a term lookup performs.
-      - /var/quickwit-cache:/quickwit/qwdata/searcher-split-cache
+      # This disk is slow: measured 2026-08-14, 4K random reads take 2.01ms
+      # here against 0.22ms on the root disk's NVMe, which is 9x on exactly the
+      # access pattern a term lookup performs. Moving the cache to root was
+      # tried that day for precisely that reason and moved back, because the
+      # root disk cannot spare enough space to hold the largest splits and an
+      # uncached 18GB split is fetched from S3 -- far worse than a slow local
+      # read. Capacity wins here as long as splits are this large.
+      #
+      # Worth revisiting if splits ever get smaller, or if the machine gets a
+      # bigger root disk.
+      - /mnt/quickwit-cache:/quickwit/qwdata/searcher-split-cache
       - ./quickwit/quickwit.yaml:/quickwit/config/quickwit.yaml:ro
 
   openbesluitvorming:
