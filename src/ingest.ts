@@ -320,12 +320,22 @@ async function executeReindexOnly(
     const exportLog = await getExportLog();
     const storage = await ObjectStorageClient.fromEnvironment();
     let currentRun = run;
+    const oversizedRows: string[] = [];
 
     const stats = await reindexSource(source.key, {
       exportLog,
       storage,
       batchSize: quickwitBatchSize,
-      ingest: (documents) => quickwit.ingestDocuments(documents),
+      ingest: (documents) =>
+        quickwit.ingestDocuments(documents, ({ entityId, bytes }) => {
+          // Surfaced as a run issue rather than swallowed: a row too large for
+          // the index to accept is a real gap in what is searchable, and the
+          // only place anyone would ever see it is here.
+          oversizedRows.push(
+            `${entityId ?? "(onbekende rij)"} overgeslagen: ${Math.round(bytes / 1_000_000)} MB, ` +
+              `boven de limiet van de zoekindex`,
+          );
+        }),
       onProgress: async (progress) => {
         options.onHeartbeat?.();
         currentRun = await updateRun(run.id, {
@@ -343,9 +353,15 @@ async function executeReindexOnly(
       },
     });
 
+    for (const message of oversizedRows) {
+      await appendRunIssue(run.id, { severity: "warning", step: "ingest_quickwit", message });
+      stats.issue_count += 1;
+    }
+
     console.log(
       `[reindex] ${sourceKey} entities=${stats.entity_count} documents=${stats.document_count} ` +
-        `rehydrated=${stats.rehydrated_count} issues=${stats.issue_count}`,
+        `rehydrated=${stats.rehydrated_count} issues=${stats.issue_count} ` +
+        `oversized=${oversizedRows.length}`,
     );
 
     const updated = await updateRun(run.id, {

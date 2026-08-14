@@ -200,7 +200,11 @@ export class QuickwitClient {
     await this.ingestDocuments(documents);
   }
 
-  async ingestDocuments(documents: QuickwitSearchDocument[]): Promise<void> {
+  /** Reported when one row is refused on its own and cannot be split further. */
+  async ingestDocuments(
+    documents: QuickwitSearchDocument[],
+    onOversized?: (info: { entityId?: string; bytes: number }) => void,
+  ): Promise<void> {
     const bodies: string[] = [];
     let currentLines: string[] = [];
     let currentBytes = 0;
@@ -224,7 +228,7 @@ export class QuickwitClient {
     }
 
     for (const body of bodies) {
-      await this.postIngestBody(body);
+      await this.postIngestBody(body, onOversized);
     }
 
     return;
@@ -238,7 +242,10 @@ export class QuickwitClient {
    * halving converges on something that fits. A single line that cannot be
    * split any further is reported rather than silently dropped -- losing one
    * document quietly is how a search index ends up subtly wrong. */
-  private async postIngestBody(body: string): Promise<void> {
+  private async postIngestBody(
+    body: string,
+    onOversized?: (info: { entityId?: string; bytes: number }) => void,
+  ): Promise<void> {
     for (let attempt = 1; attempt <= INGEST_ATTEMPTS; attempt += 1) {
       try {
         const response = await fetch(
@@ -272,8 +279,27 @@ export class QuickwitClient {
         const lines = body.split("\n");
         if (shouldHalveBatch(error) && lines.length > 1) {
           const middle = Math.floor(lines.length / 2);
-          await this.postIngestBody(lines.slice(0, middle).join("\n"));
-          await this.postIngestBody(lines.slice(middle).join("\n"));
+          await this.postIngestBody(lines.slice(0, middle).join("\n"), onOversized);
+          await this.postIngestBody(lines.slice(middle).join("\n"), onOversized);
+          return;
+        }
+
+        // One row, refused on its own: halving has nowhere left to go.
+        //
+        // Losing that row is bad; losing the source it belongs to is worse, and
+        // that is what happened. Leidschendam-Voorburg holds two rows of 11.1
+        // MB in 234,354 -- single PDF pages whose extracted text exceeds
+        // Quickwit's 10 MiB limit -- and the whole municipality stayed out of
+        // the index because of them (2026-08-13). Skip the row, name it, and
+        // let the other 234,352 through.
+        if (shouldHalveBatch(error) && lines.length === 1) {
+          let entityId: string | undefined;
+          try {
+            entityId = (JSON.parse(body) as { entity_id?: string }).entity_id;
+          } catch {
+            // A row we cannot even parse is still a row we are skipping.
+          }
+          onOversized?.({ entityId, bytes: new TextEncoder().encode(body).byteLength });
           return;
         }
         if (attempt === INGEST_ATTEMPTS || !isRetryableIngestError(error)) {
