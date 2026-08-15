@@ -2867,7 +2867,13 @@ select {
     background: linear-gradient(180deg, rgba(5, 6, 8, 0.78), rgba(5, 6, 8, 0) 24rem), transparent;
   }
 
-  .hero--search {
+  /* The surface lives on .hero::after, not on the hero. Overriding the hero
+     here left the light surface painting straight over it, which is what put
+     a pale bar across the top of a dark page (regression from 53b753e, which
+     moved the surface onto the pseudo-element so it could fade in). It also
+     reintroduced the screen-tall pane that pseudo-element exists to avoid:
+     the hero's own box is a full screen again while the fold opens. */
+  .hero::after {
     background: rgba(5, 6, 8, 0.86);
     box-shadow: 0 16px 32px rgba(0, 0, 0, 0.34);
   }
