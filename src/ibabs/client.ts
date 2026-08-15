@@ -53,6 +53,38 @@ class IbabsHttpError extends Error {
   }
 }
 
+/** iBabs has stopped answering this address at all, rather than asking us to
+ * slow down.
+ *
+ * Both arrive as 403, which is why the two were conflated. They behave
+ * nothing alike: a throttle clears on its own, a block does not clear at all.
+ * The production address was blocked on 2026-08-05 and was still blocked ten
+ * days later, during which every scheduled iBabs import failed -- 166 runs a
+ * night, 0 successes, for 90 municipalities. The rate limiter waited politely
+ * the whole time for a throttle that was never going to lift, and every run
+ * held a worker slot for the full stall timeout before being abandoned.
+ *
+ * Verified by making the identical SOAP call from two addresses: 403 "The
+ * request is blocked." in 43ms from the server, 200 with a valid response from
+ * elsewhere. Nothing in this codebase can fix that; a person has to ask iBabs
+ * to lift it. What this class buys is that the failure says so. */
+export class IbabsBlockedError extends Error {
+  constructor(readonly url: string) {
+    super(
+      `iBabs blocks requests from this host (403 "The request is blocked" for ${url}). ` +
+        `This is an address-level block, not throttling: it does not clear by waiting. ` +
+        `Ask iBabs to unblock this server's outbound IPv4 address.`,
+    );
+    this.name = "IbabsBlockedError";
+  }
+}
+
+/** The body iBabs' edge returns when it refuses an address outright. A throttle
+ * comes back without it. */
+function looksLikeHardBlock(body: string): boolean {
+  return body.includes("The request is blocked");
+}
+
 function isThrottleError(error: unknown): error is IbabsHttpError {
   return error instanceof IbabsHttpError && (error.status === 429 || error.status === 403);
 }
@@ -505,6 +537,16 @@ async function fetchText(url: string, init: RequestInit): Promise<string> {
         ...(client ? { client } : {}),
       });
       if (!response.ok) {
+        // A block has to be read apart from a throttle before the breaker sees
+        // it, or the fleet backs off for hours against something that will not
+        // lift.
+        if (response.status === 403) {
+          const body = await response.text().catch(() => "");
+          if (looksLikeHardBlock(body)) {
+            throw new IbabsBlockedError(url);
+          }
+        }
+
         const failure = new IbabsHttpError(
           response.status,
           url,
@@ -519,6 +561,12 @@ async function fetchText(url: string, init: RequestInit): Promise<string> {
       return await response.text();
     } catch (error) {
       lastError = error;
+
+      // Never retried and never backed off against: repeating it just burns
+      // the run's remaining time on the same answer.
+      if (error instanceof IbabsBlockedError) {
+        throw error;
+      }
 
       if (isThrottleError(error)) {
         throttleAttempts += 1;
@@ -689,6 +737,7 @@ export class IbabsClient {
 
 export const __test__ = {
   fetchText,
+  looksLikeHardBlock,
   isThrottleError,
   parseRetryAfter,
   throttleDelayMs,

@@ -239,6 +239,88 @@ async function checkDisk(alerts: Alert[]): Promise<void> {
   }
 }
 
+/** A whole supplier going quiet.
+ *
+ * Individual failing runs are normal and self-correcting: the window is seven
+ * days either side, so a source that misses one night is picked up the next.
+ * An entire supplier failing every night is not, and nothing was watching for
+ * it. iBabs blocked this server's address on 2026-08-05 and every scheduled
+ * iBabs import failed for the ten days that followed -- 166 runs a night, 0
+ * successes, 90 municipalities with no updates -- while the dashboards showed
+ * a busy, healthy pipeline. What was missing was anybody asking whether the
+ * work was landing.
+ *
+ * Reads the run records directly rather than an endpoint, because this has to
+ * keep working when the thing it is watching is broken.
+ */
+async function checkSupplierFreshness(alerts: Alert[]): Promise<void> {
+  if (Deno.env.get("WOOZI_MONITOR_REQUIRE_LOCAL_CHECKS") !== "1") {
+    return;
+  }
+
+  const staleHours = envNumber("WOOZI_MONITOR_SUPPLIER_STALE_HOURS", 36);
+  const since = new Date(Date.now() - staleHours * 3_600_000).toISOString();
+
+  const script = [
+    'import { DatabaseSync } from "node:sqlite";',
+    'const db = new DatabaseSync("/data/woozi-ops.sqlite3", { readOnly: true });',
+    "const rows = db.prepare(",
+    '  "select supplier, status, count(*) c from ingest_run where started_at > (?) group by supplier, status",',
+    `).all(${JSON.stringify(since)});`,
+    "const per = {};",
+    "for (const r of rows) {",
+    "  const p = (per[r.supplier] ??= { total: 0, ok: 0 });",
+    "  p.total += r.c;",
+    '  if (r.status === "succeeded" || r.status === "partial") p.ok += r.c;',
+    "}",
+    "console.log(JSON.stringify(per));",
+  ].join("\n");
+
+  try {
+    const output = await runText("docker", [
+      "compose",
+      "-f",
+      Deno.env.get("WOOZI_MONITOR_COMPOSE_FILE") ?? "/opt/woozi/docker-compose.production.yml",
+      "exec",
+      "-T",
+      "worker",
+      "deno",
+      "eval",
+      "--unstable-node-globals",
+      script,
+    ]);
+
+    const perSupplier = JSON.parse(output.trim().split("\n").at(-1) ?? "{}") as Record<
+      string,
+      { total: number; ok: number }
+    >;
+
+    for (const [supplier, counts] of Object.entries(perSupplier)) {
+      // Only meaningful once a supplier has genuinely been tried.
+      if (counts.total < 5 || counts.ok > 0) {
+        continue;
+      }
+      alert(
+        alerts,
+        `supplier_stale_${supplier}`,
+        "critical",
+        `No import from ${supplier} has succeeded`,
+        {
+          supplier,
+          runs: counts.total,
+          succeeded: counts.ok,
+          window_hours: staleHours,
+          hint: "every run failing points at the supplier or the network, not at one source",
+        },
+      );
+    }
+  } catch (error) {
+    alert(alerts, "supplier_freshness_check_failed", "warning", "Supplier freshness check failed", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
 async function checkDocker(alerts: Alert[]): Promise<void> {
   if (Deno.env.get("WOOZI_MONITOR_REQUIRE_LOCAL_CHECKS") !== "1") {
     return;
@@ -379,6 +461,7 @@ async function main(): Promise<void> {
   await checkSearch(alerts);
   await checkDisk(alerts);
   await checkDocker(alerts);
+  await checkSupplierFreshness(alerts);
 
   const result = {
     event: "monitor_run",
