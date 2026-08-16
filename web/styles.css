@@ -108,8 +108,19 @@ select {
   transition: opacity var(--motion-slow) ease;
 }
 
+/* Driven by the scroll fold rather than a transition: the bar's surface
+   arrives at the pace the reader brings it in. --hero-fold is 0 on the open
+   home page and 1 once folded, and a query sets it straight to 1, where the
+   opacity transition above still carries it. */
 .hero--search::after {
-  opacity: 1;
+  opacity: var(--hero-fold, 1);
+}
+
+/* While the fold is scrubbed its surface is set per frame from the scroll
+   offset, so the transition that carries the query-triggered fold would only
+   make it trail the reader by half a second. */
+.hero--scrubbed::after {
+  transition: none;
 }
 
 /* The scroll fold, unlike the one a query triggers, happens under a reader

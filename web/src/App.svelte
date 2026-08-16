@@ -95,24 +95,44 @@
    * The fold empties the hero's screen-tall box, which would drag the whole
    * page up behind it. A spacer holds that height open instead, kept at
    * exactly what the shrinking hero gives up, so the text below never moves
-   * and the scroll offset stays trustworthy — `heroUnfoldBelow` is a scroll
-   * offset, and it has to mean the same thing folded as unfolded. */
+   * and the scroll offset stays trustworthy — the fold range is measured in
+   * scroll offsets, and they have to mean the same thing folded as unfolded. */
   let heroPinned = false;
   let heroSnapped = false;
   let heroSurfaceHeight: number | null = null;
   let heroEl: HTMLElement | null = null;
   let heroSpacerEl: HTMLElement | null = null;
   let heroFullHeight = 0;
-  let heroUnfoldBelow = 0;
   let heroSettleAt = 0;
-  /** How close to the top edge the search field gets before it becomes the
-   * bar. A little short of the edge, so it is still whole when it takes off. */
-  const HERO_FOLD_AT = 48;
-  /** How far back up the reader has to scroll before the hero unfolds. Enough
-   * that the fold and the unfold cannot chase each other around one pixel. */
-  const HERO_UNFOLD_SLACK = 120;
   /** Comfortably past the CSS transition the fold runs on. */
   const HERO_FOLD_SETTLE_MS = 700;
+
+  /** The scroll fold is scrubbed, not played.
+   *
+   * It used to be a 500ms animation fired by a threshold, and the threshold
+   * was `scrollY - slack` recorded at the moment of folding: a boundary that
+   * moved with the reader instead of standing at a place on the page. Scroll
+   * up from deep in the page and it unfolds, which puts the field back below
+   * the fold line, which refolds it a pixel later, which moves the boundary up
+   * again — 12 fold/unfold pairs on one smooth scroll to the top.
+   *
+   * Progress is now a function of the scroll offset alone, so there is no
+   * boundary to chase and nothing to fire twice. The range comes from the
+   * geometry rather than a constant: it opens where the wordmark arrives at
+   * the height it occupies in the bar, and closes where the search field
+   * arrives at its own. Between those the field has exactly as far to travel
+   * as the reader scrolls, so it simply keeps moving up the screen at the
+   * speed of the page and comes to rest in the bar. */
+  let heroFoldProgress = 0;
+  let heroFoldStart = 0;
+  let heroFoldEnd = 0;
+  let heroScrubbed: Animation[] = [];
+  let heroFoldFrame = 0;
+  /** Where the wordmark and the field sit inside the folded bar. Measured on
+   * the first fold and exact from then on; these are only the opening guess,
+   * taken from the bar's padding. */
+  let heroBarBrandTop = 34;
+  let heroBarFieldTop = 14;
   let searchRequestId = 0;
   let searchAbortController: AbortController | null = null;
 
@@ -264,20 +284,34 @@
     );
   }
 
-  async function animateModeChange(apply: () => void): Promise<void> {
+  /** Swap layouts and carry the wordmark and the field across on their own
+   * transforms — measure, apply, invert, play.
+   *
+   * With `scrub`, the animations come back paused instead of running, for a
+   * caller that means to drive them from something other than the clock. */
+  async function flipModeChange(
+    apply: () => void,
+    options: { scrub?: boolean } = {},
+  ): Promise<{ animations: Animation[]; last: Map<Element, DOMRect> }> {
     const animatedElements = [brandBlockEl, primarySearchFieldEl].filter((element) => element !== null);
     const firstRects = animatedElements.map((element) => element.getBoundingClientRect());
 
     apply();
     await tick();
 
+    const animations: Animation[] = [];
+    // The settled geometry, before any transform is put on these elements —
+    // getBoundingClientRect reports what the transform does, so once the
+    // inverse is applied this is no longer readable from the DOM.
+    const last = new Map<Element, DOMRect>();
     animatedElements.forEach((element, index) => {
       const first = firstRects[index];
-      const last = element.getBoundingClientRect();
-      const deltaX = first.left - last.left;
-      const deltaY = first.top - last.top;
-      const scaleX = first.width > 0 && last.width > 0 ? first.width / last.width : 1;
-      const scaleY = first.height > 0 && last.height > 0 ? first.height / last.height : 1;
+      const lastRect = element.getBoundingClientRect();
+      last.set(element, lastRect);
+      const deltaX = first.left - lastRect.left;
+      const deltaY = first.top - lastRect.top;
+      const scaleX = first.width > 0 && lastRect.width > 0 ? first.width / lastRect.width : 1;
+      const scaleY = first.height > 0 && lastRect.height > 0 ? first.height / lastRect.height : 1;
 
       if (
         Math.abs(deltaX) < 0.5 &&
@@ -288,7 +322,7 @@
         return;
       }
 
-      element.animate(
+      const animation = element.animate(
         [
           {
             transformOrigin: "top left",
@@ -302,50 +336,133 @@
         {
           /** Should be the same as the motion-slow value in the CSS custom properties */
           duration: 500,
-          easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+          // Scrubbed, the easing would be applied to the reader's own scrolling,
+          // which already has its own. Linear keeps the field moving at the
+          // speed of the page.
+          easing: options.scrub ? "linear" : "cubic-bezier(0.22, 1, 0.36, 1)",
         },
       );
+      if (options.scrub) {
+        animation.pause();
+        animation.currentTime = 0;
+      }
+      animations.push(animation);
     });
+
+    return { animations, last };
   }
 
   function onWindowScroll(): void {
     if (searched) {
       return;
     }
+    // One update per frame: a scroll fires far more often than it paints, and
+    // every one of these reads layout.
+    if (heroFoldFrame) {
+      return;
+    }
+    heroFoldFrame = requestAnimationFrame(() => {
+      heroFoldFrame = 0;
+      updateHeroFold();
+    });
+  }
+
+  function updateHeroFold(): void {
+    if (searched) {
+      return;
+    }
+
     if (!heroPinned) {
-      // The unfolded search field is the thing being scrolled off the top;
-      // once it reaches the edge it becomes the bar instead of leaving.
-      const fieldTop = primarySearchFieldEl?.getBoundingClientRect().top ?? Number.POSITIVE_INFINITY;
-      if (fieldTop <= HERO_FOLD_AT) {
-        heroUnfoldBelow = Math.max(0, window.scrollY - HERO_UNFOLD_SLACK);
-        void snapHeroFold(() => {
-          // The folded hero hides the org picker, so leaving it open would
-          // strand it — and any focus inside it — behind a display:none.
-          homeOrgPickerOpen = false;
-          heroPinned = true;
-        });
+      // Still unfolded, so the geometry is readable: the fold opens when the
+      // wordmark reaches the height it will occupy in the bar.
+      const brandTop = brandBlockEl?.getBoundingClientRect().top ?? Number.POSITIVE_INFINITY;
+      if (brandTop > heroBarBrandTop) {
+        setHeroFoldProgress(0);
+        return;
       }
-    } else if (window.scrollY <= heroUnfoldBelow) {
-      void snapHeroFold(() => {
-        heroPinned = false;
-      });
+      void beginHeroFold();
+      return;
+    }
+
+    if (window.scrollY < heroFoldStart) {
+      endHeroFold();
+      return;
+    }
+
+    const span = Math.max(1, heroFoldEnd - heroFoldStart);
+    setHeroFoldProgress((window.scrollY - heroFoldStart) / span);
+  }
+
+  /** Hold the fold at `progress`, scrubbing the flight rather than playing it.
+   *
+   * The animations are paused the moment they are created, so their time is
+   * ours to set: the reader's scroll is the clock. */
+  function setHeroFoldProgress(progress: number): void {
+    const clamped = Math.min(1, Math.max(0, progress));
+    heroFoldProgress = clamped;
+    for (const animation of heroScrubbed) {
+      const duration = Number(animation.effect?.getTiming().duration ?? 0);
+      animation.currentTime = duration * clamped;
     }
   }
 
-  /** Folds or unfolds without transitioning the hero's box: the brand and the
-   * field still fly, and the bar's surface still fades, but the box itself is
-   * simply the other shape. The class only has to cover the frame in which
-   * the properties change, so it comes straight back off — leaving hovers
-   * inside the bar their own transitions. */
-  async function snapHeroFold(apply: () => void): Promise<void> {
+  /** Take the folded shape and pin the flight to the scroll offset.
+   *
+   * The bar's own measurements are only known once it exists, so the first
+   * fold opens on an estimate and corrects the range from what it finds. Every
+   * fold after that starts in the right place. */
+  async function beginHeroFold(): Promise<void> {
+    const brandRect = brandBlockEl?.getBoundingClientRect();
+    const fieldRect = primarySearchFieldEl?.getBoundingClientRect();
+    if (!brandRect || !fieldRect) {
+      return;
+    }
+    const brandDocTop = brandRect.top + window.scrollY;
+    const fieldDocTop = fieldRect.top + window.scrollY;
+
     heroSettleAt = performance.now() + HERO_FOLD_SETTLE_MS;
-    // Opening back up, the bar's surface keeps the height it is fading out
-    // from; folding, it is the hero's own box again — which by then is the bar.
-    heroSurfaceHeight = heroPinned ? (heroEl?.getBoundingClientRect().height ?? null) : null;
     heroSnapped = true;
-    await animateModeChange(apply);
+    const folded = await flipModeChange(
+      () => {
+        // The folded hero hides the org picker, so leaving it open would
+        // strand it — and any focus inside it — behind a display:none.
+        homeOrgPickerOpen = false;
+        heroPinned = true;
+      },
+      { scrub: true },
+    );
+    heroScrubbed = folded.animations;
+
+    const barBrand = brandBlockEl ? folded.last.get(brandBlockEl) : undefined;
+    const barField = primarySearchFieldEl ? folded.last.get(primarySearchFieldEl) : undefined;
+    if (barBrand && barField) {
+      heroBarBrandTop = barBrand.top;
+      heroBarFieldTop = barField.top;
+    }
+    heroFoldStart = Math.max(0, brandDocTop - heroBarBrandTop);
+    heroFoldEnd = Math.max(heroFoldStart + 1, fieldDocTop - heroBarFieldTop);
+    heroSurfaceHeight = heroEl?.getBoundingClientRect().height ?? null;
+
     requestAnimationFrame(() => {
       heroSnapped = false;
+    });
+    updateHeroFold();
+  }
+
+  function endHeroFold(): void {
+    for (const animation of heroScrubbed) {
+      animation.cancel();
+    }
+    heroScrubbed = [];
+    heroFoldProgress = 0;
+    heroSettleAt = performance.now() + HERO_FOLD_SETTLE_MS;
+    heroSurfaceHeight = null;
+    heroSnapped = true;
+    heroPinned = false;
+    void tick().then(() => {
+      requestAnimationFrame(() => {
+        heroSnapped = false;
+      });
     });
   }
 
@@ -389,7 +506,7 @@
     // the scroll offset left behind by the results immediately refolds it.
     window.scrollTo({ top: 0 });
     heroSettleAt = performance.now() + HERO_FOLD_SETTLE_MS;
-    await animateModeChange(() => {
+    await flipModeChange(() => {
       heroPinned = false;
       query = "";
       organization = "";
@@ -1230,7 +1347,7 @@
       // Searching from a folded hero starts at the results, not at whatever
       // paragraph of the home page the reader had scrolled to.
       window.scrollTo({ top: 0 });
-      await animateModeChange(() => {
+      await flipModeChange(() => {
         searched = true;
       });
     }
@@ -1552,9 +1669,12 @@
   <header
     use:watchHeroHeight
     class:hero--search={searched || heroPinned}
+    class:hero--scrubbed={heroPinned && !searched}
     class:hero--fold-snap={heroSnapped}
     class="hero"
-    style={heroSurfaceHeight === null ? "" : `--hero-surface-height: ${heroSurfaceHeight}px`}
+    style={`--hero-fold: ${searched ? 1 : heroFoldProgress}${
+      heroSurfaceHeight === null ? "" : `; --hero-surface-height: ${heroSurfaceHeight}px`
+    }`}
   >
     <div class="hero__glow hero__glow--left"></div>
     <div class="hero__glow hero__glow--right"></div>
@@ -1640,7 +1760,7 @@
         class="search-panel"
         on:submit|preventDefault={() => {
           // Route form submit through onQuerySearch so the home→results
-          // transition (animateModeChange + searched=true) runs before the
+          // transition (flipModeChange + searched=true) runs before the
           // fetch. Calling runSearch() directly here left searched=false,
           // so {#if searched} gated the results panel away until the input's
           // separate on:search event happened to fire a second runSearch.
