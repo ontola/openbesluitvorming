@@ -17,6 +17,10 @@ const RUNNABLE_SUPPLIERS = new Set<Supplier>([
   "parlaeus",
 ]);
 
+/** The full ORI catalog, implemented or not. Callers that want only what we
+ * actually import want listSources() or listRunnableCatalogSources(). */
+export { listCatalogSources };
+
 function isCatalogSourceRunnable(source: SourceCatalogEntry): boolean {
   return source.implemented;
 }
@@ -89,15 +93,16 @@ export function listAggregateRunnableSourceRefs(supplier?: Supplier): string[] {
     .map((source) => source.sourceRef);
 }
 
-export function listAggregateAdminSourceOptions(): AdminSourceOption[] {
-  const supplierLabels: Record<Supplier, string> = {
-    notubiz: "Notubiz",
-    ibabs: "iBabs",
-    gemeenteoplossingen: "GemeenteOplossingen",
-    parlaeus: "Parlaeus",
-    allmanak: "Allmanak",
-  };
+/** How each supplier writes its own name. */
+export const SUPPLIER_LABELS: Record<Supplier, string> = {
+  notubiz: "Notubiz",
+  ibabs: "iBabs",
+  gemeenteoplossingen: "GemeenteOplossingen",
+  parlaeus: "Parlaeus",
+  allmanak: "Allmanak",
+};
 
+export function listAggregateAdminSourceOptions(): AdminSourceOption[] {
   const catalog = listCatalogSources();
   const suppliers = [...new Set(catalog.map((source) => source.supplier))];
 
@@ -106,7 +111,7 @@ export function listAggregateAdminSourceOptions(): AdminSourceOption[] {
     .map((supplier) => ({
       key: `all_${supplier}`,
       sourceRef: `__supplier__:${supplier}`,
-      label: `Alle ${supplierLabels[supplier]}-bronnen`,
+      label: `Alle ${SUPPLIER_LABELS[supplier]}-bronnen`,
       supplier,
       organizationType: "verzameling",
       implemented: catalog.some((source) => source.supplier === supplier && source.implemented),

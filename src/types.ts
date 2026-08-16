@@ -816,3 +816,74 @@ export interface ExportPage {
   nextCursor: string;
   hasMore: boolean;
 }
+
+/** How current one organization's data is.
+ *
+ * `ok` and `stale` are about our own pipeline: a source that imported
+ * successfully within the freshness window is `ok` even if last night's run
+ * failed, because a single failure is self-correcting — the scheduler's window
+ * is seven days either side, so the next run picks up whatever was missed.
+ * `failing` is the case that is not self-correcting and that #205 made
+ * expensive: the last run failed *and* nothing has succeeded within the
+ * window. */
+export type SourceStatusState = "ok" | "stale" | "failing" | "never_imported" | "not_implemented";
+
+export interface SourceStatus {
+  sourceKey: string;
+  sourceRef: string;
+  label: string;
+  supplier: Supplier;
+  organizationType: OrganizationType;
+  cbsId?: string;
+  state: SourceStatusState;
+  /** When a full import last succeeded (or completed partially). Reindexes and
+   * other cache-only replays are excluded: they never contact the source
+   * system, so they say nothing about whether new data is arriving. */
+  lastSuccessAt?: string;
+  /** When a full import last started, whatever its outcome. */
+  lastRunAt?: string;
+  lastRunStatus?: IngestRunRecord["status"];
+  /** Why the last run failed, sanitised for publication. Absent unless the
+   * last run failed. */
+  lastErrorMessage?: string;
+  /** Newest meeting date held for this source. Often in the future: an agenda
+   * is published before the meeting happens. */
+  latestContentDate?: string;
+  /** When anything was last written to the search index for this source. */
+  lastIndexedAt?: string;
+}
+
+/** `down` is the shape of #205: every run against a supplier failing, for as
+ * long as anyone cares to look. `degraded` is a supplier that still lands some
+ * imports but fails most of them. */
+export type SupplierStatusState = "ok" | "degraded" | "down" | "idle";
+
+export interface SupplierStatus {
+  supplier: Supplier;
+  label: string;
+  state: SupplierStatusState;
+  /** Sources we import from this supplier. */
+  sourceCount: number;
+  /** Of those, how many are `ok`. */
+  okSourceCount: number;
+  /** Runs started within `windowHours`, and how they ended. */
+  runCount: number;
+  succeededCount: number;
+  failedCount: number;
+  /** When any source of this supplier last imported successfully. For a `down`
+   * supplier this is how long the outage has lasted. */
+  lastSuccessAt?: string;
+  lastErrorMessage?: string;
+}
+
+export interface StatusResponse {
+  generatedAt: string;
+  /** The window both `state` fields are judged against. */
+  windowHours: number;
+  /** False when the search index could not be reached, in which case
+   * `latestContentDate` and `lastIndexedAt` are absent everywhere. The
+   * import-run half of the answer is unaffected. */
+  indexActivityAvailable: boolean;
+  suppliers: SupplierStatus[];
+  sources: SourceStatus[];
+}

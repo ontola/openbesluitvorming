@@ -995,6 +995,89 @@ export async function getDocumentCoverage(monthCount = 12): Promise<AdminCoverag
   };
 }
 
+export interface SourceIndexActivity {
+  /** Newest `start_date` held for the source: the meeting furthest in the
+   * future whose agenda we already have. */
+  latestContentDate?: string;
+  /** Newest `time`: when we last wrote anything at all for the source. */
+  lastIndexedAt?: string;
+}
+
+/** Quickwit reports datetime metric aggregations as nanoseconds since the
+ * epoch, in a JSON number. At present-day timestamps that is ~19 digits
+ * against a float64's ~15-16 significant ones, so the value is only good to
+ * roughly the microsecond — three orders of magnitude finer than the second
+ * this ends up rendered at. */
+function fromAggregationTimestamp(value: unknown): string | undefined {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
+    return undefined;
+  }
+  const date = new Date(value / 1_000_000);
+  return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
+}
+
+/** When each source last received data, for all sources in one query.
+ *
+ * The point of the status endpoint is that a caller does not have to ask 330
+ * times; this must not become 330 questions on our side either. A terms
+ * aggregation with `size` above the number of distinct sources returns exact
+ * counts and every bucket, so one request covers the fleet.
+ *
+ * `start_date` is only a datetime fast field on projections that map it (see
+ * projectionSupportsDateSort) -- on v2 it is a dynamic string and a metric
+ * aggregation over it fails the whole request, which is how sorting took
+ * search down in August 2026. So it is only asked for where it exists. */
+export async function getSourceIndexActivity(): Promise<Map<string, SourceIndexActivity>> {
+  const quickwit = new QuickwitClient();
+  const withStartDate = projectionSupportsDateSort();
+
+  let response: Awaited<ReturnType<QuickwitClient["searchRequest"]>>;
+  try {
+    response = await quickwit.searchRequest({
+      query: `projection_version:${escapeTerm(currentProjectionVersion())}`,
+      max_hits: 0,
+      aggs: {
+        by_source: {
+          terms: { field: "source_key", size: 500 },
+          aggs: {
+            last_indexed: { max: { field: "time" } },
+            ...(withStartDate ? { latest_start_date: { max: { field: "start_date" } } } : {}),
+          },
+        },
+      },
+    });
+  } catch (error) {
+    // A fresh local stack has no index yet. Everything else -- Quickwit down,
+    // slow, mid-reindex -- is the caller's to handle: the status endpoint
+    // still has the import-run half of the answer, and dropping that too
+    // because search is unwell is exactly the failure this endpoint exists
+    // to make visible.
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes("could not find indexes matching")) {
+      return new Map();
+    }
+    throw error;
+  }
+
+  const buckets = ((response.aggregations?.by_source as { buckets?: unknown[] })?.buckets ??
+    []) as Array<{
+    key?: unknown;
+    last_indexed?: { value?: unknown };
+    latest_start_date?: { value?: unknown };
+  }>;
+
+  const activity = new Map<string, SourceIndexActivity>();
+  for (const bucket of buckets) {
+    const sourceKey = String(bucket.key ?? "");
+    if (!sourceKey) continue;
+    activity.set(sourceKey, {
+      lastIndexedAt: fromAggregationTimestamp(bucket.last_indexed?.value),
+      latestContentDate: fromAggregationTimestamp(bucket.latest_start_date?.value),
+    });
+  }
+  return activity;
+}
+
 export async function searchMeetings(
   options: {
     query?: string;

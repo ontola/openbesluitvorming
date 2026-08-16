@@ -15,6 +15,7 @@ https://openbesluitvorming.nl
 | `/api/search` | GET | Search meetings, documents, motions and spoken word (recommended) |
 | `/api/stats` | GET | Index statistics (document count, organization count) |
 | `/api/sources` | GET | List available data sources |
+| `/api/status` | GET | Import freshness per organization and per source system, in one call |
 | `/api/entities/{entity_id}` | GET | Full entity detail (text, agenda, motions with votes, recordings with transcript, download URL) |
 | `/api/entities/{entity_id}/pdf/page/{n}` | GET | Rendered PDF page as JPEG image |
 | `/api/export/snapshot` | GET | Bulk export: current state per source (NDJSON) |
@@ -214,6 +215,107 @@ Lists all configured data sources.
   ]
 }
 ```
+
+---
+
+## Status
+
+### `GET /api/status`
+
+How current our data is, for every organization and every source system, in a
+single call. Built for status dashboards: there is no need to ask 330 times.
+
+No parameters. Cached for 10 minutes.
+
+**Response:**
+
+```json
+{
+  "generatedAt": "2026-08-16T09:00:00.000Z",
+  "windowHours": 36,
+  "indexActivityAvailable": true,
+  "suppliers": [
+    {
+      "supplier": "ibabs",
+      "label": "iBabs",
+      "state": "down",
+      "sourceCount": 166,
+      "okSourceCount": 0,
+      "runCount": 332,
+      "succeededCount": 0,
+      "failedCount": 332,
+      "lastSuccessAt": "2026-08-05T23:14:02.118Z",
+      "lastErrorMessage": "iBabs blocks requests from this host (403 \"The request is blocked\")."
+    }
+  ],
+  "sources": [
+    {
+      "sourceKey": "soest",
+      "sourceRef": "ibabs:gemeente:soest",
+      "label": "Soest",
+      "supplier": "ibabs",
+      "organizationType": "gemeente",
+      "cbsId": "GM0342",
+      "state": "failing",
+      "lastSuccessAt": "2026-08-05T22:41:09.883Z",
+      "lastRunAt": "2026-08-16T00:00:00.396Z",
+      "lastRunStatus": "failed",
+      "lastErrorMessage": "iBabs blocks requests from this host (403 \"The request is blocked\").",
+      "latestContentDate": "2026-08-20T13:30:00.000Z",
+      "lastIndexedAt": "2026-08-05T22:40:51.000Z"
+    }
+  ]
+}
+```
+
+Every organization in the catalog is listed, including the handful we no longer
+import from — their data is still searchable.
+
+**Source states:**
+
+| `state` | Meaning |
+|---------|---------|
+| `ok` | An import succeeded within `windowHours` |
+| `stale` | No success within `windowHours`, but the last run did not fail (queued, running, or never finished) |
+| `failing` | The last run failed *and* nothing has succeeded within `windowHours` |
+| `never_imported` | In the catalog, but no import has ever run |
+| `not_implemented` | We no longer import from this organization; its existing data still answers searches |
+
+Only full imports count. Reindexes and other internal replays rebuild from data
+we already hold without contacting the source system, so a successful one says
+nothing about whether new data is arriving — counting it would report an
+organization as current in the middle of an outage.
+
+A single failed run does not make a source `failing`. Each import covers seven
+days either side of today, so a source that misses one night is picked up by the
+next — `ok` with `lastRunStatus: "failed"` is a normal, self-correcting state.
+`failing` is the state that does not fix itself on its own.
+
+**Source system states:**
+
+| `state` | Meaning |
+|---------|---------|
+| `ok` | Imports are landing |
+| `degraded` | More runs failed than succeeded within `windowHours` |
+| `down` | At least 5 runs attempted within `windowHours` and **none** succeeded |
+| `idle` | Nothing ran within `windowHours` |
+
+For a `down` source system, `lastSuccessAt` is when it last delivered anything
+at all — i.e. how long the outage has lasted.
+
+**Fields:**
+
+| Field | Meaning |
+|-------|---------|
+| `lastSuccessAt` | When a full import last succeeded. A partially successful import counts: it means the source was reached and most of it landed |
+| `lastRunAt` / `lastRunStatus` | The most recent full import attempt, whatever its outcome |
+| `lastErrorMessage` | Why the last run failed. Present only when it did. Query strings are stripped |
+| `latestContentDate` | Newest meeting date held for this organization. Often in the future — an agenda is published before the meeting happens |
+| `lastIndexedAt` | When anything was last written to the search index for this organization |
+
+`latestContentDate` and `lastIndexedAt` come from the search index. If it cannot
+be reached, `indexActivityAvailable` is `false` and both are omitted everywhere;
+the import half of the answer is unaffected.
 
 ---
 

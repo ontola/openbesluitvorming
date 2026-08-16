@@ -31,6 +31,7 @@ import {
 } from "./search_api.ts";
 import { ObjectStorageClient } from "../src/storage/s3.ts";
 import { pdfPageCacheKey, pdfPageMetaKey, renderPdfPageJpeg } from "../src/documents/thumbnails.ts";
+import { getStatus } from "./status_api.ts";
 import { RATE_LIMIT_PAGE_UNIT, RateLimiter, type RateVerdict, requestCost } from "./rate_limit.ts";
 import { validateSearchParams } from "./search_params.ts";
 
@@ -317,6 +318,24 @@ async function handleRequest(request: Request): Promise<Response> {
       implementedOnly ? source.implemented : true,
     );
     return Response.json({ sources } satisfies AdminSourcesResponse);
+  }
+
+  if (url.pathname === "/api/status" && request.method === "GET") {
+    try {
+      const status = await getStatus();
+      return Response.json(status, {
+        // Matches CACHE_TTL_MS in status_api.ts. Callers poll this on a timer
+        // -- besluitbron.nl every four hours -- so there is nothing to gain
+        // from a shorter one, and the underlying aggregation spans the whole
+        // index.
+        headers: { "cache-control": "public, max-age=600" },
+      });
+    } catch (error) {
+      return Response.json(
+        { error: error instanceof Error ? error.message : "Status ophalen mislukt" },
+        { status: 500 },
+      );
+    }
   }
 
   if (url.pathname === "/api/export/changes" && request.method === "GET") {

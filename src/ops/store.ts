@@ -137,6 +137,14 @@ async function getDatabase(): Promise<DatabaseSync> {
       } catch {
         // Column already exists on initialized databases.
       }
+      // getIngestStatus() asks for the newest full import per source. Without
+      // this the question is a scan of every run ever recorded (48k rows and
+      // one more per source per night), on the same single-threaded process
+      // that answers searches.
+      db.exec(
+        `CREATE INDEX IF NOT EXISTS ingest_run_mode_source_started
+         ON ingest_run(execution_mode, source_key, started_at DESC)`,
+      );
       return db;
     })();
   }
@@ -661,6 +669,162 @@ export async function listRuns(
       )
       .all(params) as unknown as IngestRunRecord[]
   ).map(normalizeRunRecord);
+}
+
+/** The newest run per source, plus that source's newest *successful* run.
+ * Both are needed: the newest run says what is happening now, the newest
+ * success says whether it matters. */
+export interface SourceRunStatus {
+  sourceKey: string;
+  supplier: string;
+  lastRunAt?: string;
+  lastRunStatus?: IngestRunRecord["status"];
+  lastErrorMessage?: string;
+  lastSuccessAt?: string;
+}
+
+export interface SupplierRunWindow {
+  supplier: string;
+  runCount: number;
+  succeededCount: number;
+  failedCount: number;
+  lastErrorMessage?: string;
+}
+
+export interface IngestStatusSnapshot {
+  sources: SourceRunStatus[];
+  supplierWindows: SupplierRunWindow[];
+}
+
+/** Only a `full` run answers "is new data arriving from the source system?".
+ *
+ * The other modes do not touch the supplier at all, or only a corner of it:
+ * `reindex_only` replays the export log, `rederive_cached` re-reads stored
+ * files, `motions_only` and `media_only` skip the meeting and document pass.
+ * Counting them would be actively misleading rather than merely generous —
+ * while iBabs had this server blocked, 164 iBabs sources recorded a
+ * *succeeded* `reindex_only` run (2026-08-12), which is exactly the "everything
+ * is fine" reading the status endpoint exists to prevent. */
+const SUPPLIER_POLLING_MODE = "full";
+
+/** Import state per source and per supplier, for the public status endpoint.
+ *
+ * A `partial` run counts as a success here. It means the source was reached
+ * and most of it landed; the alternative reading — that a single unreadable
+ * PDF marks a whole municipality as not updating — is the one that would make
+ * the status page useless. */
+export async function getIngestStatus(windowHours: number): Promise<IngestStatusSnapshot> {
+  const db = await getDatabase();
+  const since = new Date(Date.now() - windowHours * 3_600_000).toISOString();
+
+  const latestRows = db
+    .prepare(
+      `SELECT source_key, supplier, status, started_at, error_message
+       FROM (
+         SELECT source_key, supplier, status, started_at, error_message,
+                ROW_NUMBER() OVER (
+                  PARTITION BY source_key ORDER BY started_at DESC, rowid DESC
+                ) AS rn
+         FROM ingest_run
+         WHERE execution_mode = @mode
+       )
+       WHERE rn = 1`,
+    )
+    .all({ mode: SUPPLIER_POLLING_MODE }) as Array<{
+    source_key: string;
+    supplier: string;
+    status: IngestRunRecord["status"];
+    started_at: string;
+    error_message: string | null;
+  }>;
+
+  const successRows = db
+    .prepare(
+      `SELECT source_key, MAX(COALESCE(finished_at, started_at)) AS last_success_at
+       FROM ingest_run
+       WHERE status IN ('succeeded', 'partial') AND execution_mode = @mode
+       GROUP BY source_key`,
+    )
+    .all({ mode: SUPPLIER_POLLING_MODE }) as Array<{
+    source_key: string;
+    last_success_at: string;
+  }>;
+
+  const lastSuccessBySource = new Map(
+    successRows.map((row) => [row.source_key, row.last_success_at]),
+  );
+
+  const sources: SourceRunStatus[] = latestRows.map((row) => ({
+    sourceKey: row.source_key,
+    supplier: row.supplier,
+    lastRunAt: row.started_at,
+    lastRunStatus: row.status,
+    lastErrorMessage: row.error_message ?? undefined,
+    lastSuccessAt: lastSuccessBySource.get(row.source_key),
+  }));
+
+  const windowRows = db
+    .prepare(
+      `SELECT supplier, status, COUNT(*) AS run_count
+       FROM ingest_run
+       WHERE started_at > @since AND execution_mode = @mode
+       GROUP BY supplier, status`,
+    )
+    .all({ since, mode: SUPPLIER_POLLING_MODE }) as Array<{
+    supplier: string;
+    status: IngestRunRecord["status"];
+    run_count: number;
+  }>;
+
+  const windows = new Map<string, SupplierRunWindow>();
+  for (const row of windowRows) {
+    const window = windows.get(row.supplier) ?? {
+      supplier: row.supplier,
+      runCount: 0,
+      succeededCount: 0,
+      failedCount: 0,
+    };
+    window.runCount += row.run_count;
+    if (row.status === "succeeded" || row.status === "partial") {
+      window.succeededCount += row.run_count;
+    } else if (row.status === "failed") {
+      window.failedCount += row.run_count;
+    }
+    windows.set(row.supplier, window);
+  }
+
+  // One representative error per supplier, taken from the newest failure in
+  // the window. When a supplier is wholly down, every source carries the same
+  // message; repeating it 90 times in the response helps nobody.
+  const supplierErrorRows = db
+    .prepare(
+      `SELECT supplier, error_message
+       FROM (
+         SELECT supplier, error_message,
+                ROW_NUMBER() OVER (
+                  PARTITION BY supplier ORDER BY started_at DESC, rowid DESC
+                ) AS rn
+         FROM ingest_run
+         WHERE status = 'failed'
+           AND started_at > @since
+           AND execution_mode = @mode
+           AND error_message IS NOT NULL
+       )
+       WHERE rn = 1`,
+    )
+    .all({ since, mode: SUPPLIER_POLLING_MODE }) as Array<{
+    supplier: string;
+    error_message: string;
+  }>;
+
+  for (const row of supplierErrorRows) {
+    const window = windows.get(row.supplier);
+    if (window) {
+      window.lastErrorMessage = row.error_message;
+    }
+  }
+
+  return { sources, supplierWindows: [...windows.values()] };
 }
 
 export async function getRunSummary(): Promise<AdminRunSummary> {
