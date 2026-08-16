@@ -133,6 +133,12 @@
    * taken from the bar's padding. */
   let heroBarBrandTop = 34;
   let heroBarFieldTop = 14;
+  /** The logo, the alias and the counts have no place in the bar, and dropping
+   * them the instant the fold opens is a blink in the middle of a movement the
+   * reader is watching. They fade over the last stretch of scrolling before it,
+   * so that by the time the layout swaps there is nothing left to see go. */
+  let heroFadeProgress = 0;
+  const HERO_FADE_LEAD = 190;
   let searchRequestId = 0;
   let searchAbortController: AbortController | null = null;
 
@@ -187,6 +193,12 @@
   let queryInputEl: HTMLInputElement | null = null;
   let primarySearchFieldEl: HTMLLabelElement | null = null;
   let brandBlockEl: HTMLDivElement | null = null;
+  /** The wordmark itself. The block around it also holds the alias and the
+   * counts, which the fold drops — so the block's height collapses while its
+   * width barely moves, and flying *that* scales the wordmark by two different
+   * factors and visibly stretches it. The wordmark's own box only ever changes
+   * font size, so it scales evenly. */
+  let brandEl: HTMLHeadingElement | null = null;
   let detailDialogEl: HTMLDivElement | null = null;
   let detailTextEl: HTMLElement | null = null;
   let detailMeetingEl: HTMLElement | null = null;
@@ -293,7 +305,14 @@
     apply: () => void,
     options: { scrub?: boolean } = {},
   ): Promise<{ animations: Animation[]; last: Map<Element, DOMRect> }> {
-    const animatedElements = [brandBlockEl, primarySearchFieldEl].filter((element) => element !== null);
+    // The wordmark is text: it scales by font size, so both axes have to move
+    // together or the letterforms distort. The field is a box and can take the
+    // two factors its own geometry asks for.
+    const flying = [
+      { element: brandEl, uniform: true },
+      { element: primarySearchFieldEl, uniform: false },
+    ].filter((entry): entry is { element: HTMLElement; uniform: boolean } => entry.element !== null);
+    const animatedElements = flying.map((entry) => entry.element);
     const firstRects = animatedElements.map((element) => element.getBoundingClientRect());
 
     apply();
@@ -310,8 +329,11 @@
       last.set(element, lastRect);
       const deltaX = first.left - lastRect.left;
       const deltaY = first.top - lastRect.top;
-      const scaleX = first.width > 0 && lastRect.width > 0 ? first.width / lastRect.width : 1;
-      const scaleY = first.height > 0 && lastRect.height > 0 ? first.height / lastRect.height : 1;
+      let scaleX = first.width > 0 && lastRect.width > 0 ? first.width / lastRect.width : 1;
+      let scaleY = first.height > 0 && lastRect.height > 0 ? first.height / lastRect.height : 1;
+      if (flying[index].uniform) {
+        scaleX = scaleY = Math.min(scaleX, scaleY);
+      }
 
       if (
         Math.abs(deltaX) < 0.5 &&
@@ -375,11 +397,17 @@
     if (!heroPinned) {
       // Still unfolded, so the geometry is readable: the fold opens when the
       // wordmark reaches the height it will occupy in the bar.
-      const brandTop = brandBlockEl?.getBoundingClientRect().top ?? Number.POSITIVE_INFINITY;
+      const brandTop = brandEl?.getBoundingClientRect().top ?? Number.POSITIVE_INFINITY;
       if (brandTop > heroBarBrandTop) {
+        // How much of the run-up to the bar is behind us.
+        heroFadeProgress = Math.min(
+          1,
+          Math.max(0, (HERO_FADE_LEAD - (brandTop - heroBarBrandTop)) / HERO_FADE_LEAD),
+        );
         setHeroFoldProgress(0);
         return;
       }
+      heroFadeProgress = 1;
       void beginHeroFold();
       return;
     }
@@ -455,6 +483,7 @@
     }
     heroScrubbed = [];
     heroFoldProgress = 0;
+    heroFadeProgress = 0;
     heroSettleAt = performance.now() + HERO_FOLD_SETTLE_MS;
     heroSurfaceHeight = null;
     heroSnapped = true;
@@ -1672,9 +1701,9 @@
     class:hero--scrubbed={heroPinned && !searched}
     class:hero--fold-snap={heroSnapped}
     class="hero"
-    style={`--hero-fold: ${searched ? 1 : heroFoldProgress}${
-      heroSurfaceHeight === null ? "" : `; --hero-surface-height: ${heroSurfaceHeight}px`
-    }`}
+    style={`--hero-fold: ${searched ? 1 : heroFoldProgress}; --hero-fade: ${
+      searched ? 1 : heroFadeProgress
+    }${heroSurfaceHeight === null ? "" : `; --hero-surface-height: ${heroSurfaceHeight}px`}`}
   >
     <div class="hero__glow hero__glow--left"></div>
     <div class="hero__glow hero__glow--right"></div>
@@ -1690,7 +1719,7 @@
           <img src={vngLogo} alt="VNG Realisatie" width="96" height="50" />
         </a>
         <div bind:this={brandBlockEl} class="hero__brand-block">
-          <h1 class="brand">
+          <h1 bind:this={brandEl} class="brand">
             <a
               class="brand__link"
               href="/"

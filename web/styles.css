@@ -123,6 +123,25 @@ select {
   transition: none;
 }
 
+/* Same for the two things that fly. The flight already carries them, on the
+   reader's scroll; their own transitions would carry them again, on the clock,
+   and the wordmark would be scaled by one and re-sized by the other at once. */
+.hero--scrubbed .brand,
+.hero--scrubbed .brand__link,
+.hero--scrubbed .search-field--primary {
+  transition: none;
+}
+
+/* The parts with no place in the bar leave before the fold rather than with
+   it: by the time the layout swaps they are already gone, so nothing blinks
+   out from under the reader mid-movement. --hero-fade runs to 1 over the last
+   stretch of scrolling up to the fold. */
+.hero__vng,
+.brand__alias,
+.hero__meta {
+  opacity: calc(1 - var(--hero-fade, 0));
+}
+
 /* The scroll fold, unlike the one a query triggers, happens under a reader
    who is looking at the page below rather than at the hero. So the hero takes
    its collapsed shape at once and lets the surface fade and the flying brand
