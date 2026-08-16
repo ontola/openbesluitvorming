@@ -717,7 +717,9 @@ select {
 }
 
 .hero__meta-trigger:focus-visible {
-  box-shadow: 0 0 0 2px var(--bg-strong), 0 0 0 4px var(--accent);
+  box-shadow:
+    0 0 0 2px var(--bg-strong),
+    0 0 0 4px var(--accent);
 }
 
 .hero__meta-trigger[aria-expanded="true"] {
@@ -989,6 +991,27 @@ select {
   padding: 1rem 1.1rem;
 }
 
+/* The link on the title covers the whole card through ::after, so the card
+   stays clickable while its accessible name is just the title. */
+.result-card__link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.result-card__link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  /* Above the card's own decoration, below anything interactive inside it. */
+  z-index: 1;
+}
+
+.result-card__link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 0.3rem;
+}
+
 .result-card {
   display: block;
   width: 100%;
@@ -996,6 +1019,8 @@ select {
   color: inherit;
   cursor: pointer;
   text-align: left;
+  /* Anchor for the title link's ::after, which covers the card. */
+  position: relative;
   animation: rise 520ms ease-out both;
   transition:
     transform var(--motion-fast) ease,
@@ -1355,7 +1380,6 @@ select {
 .detail-sheet--reader {
   min-height: 0;
 }
-
 
 /* Drag gutters flanking the sheet: the overlay centers the trio, so a
    symmetric width change keeps the sheet centered. They live outside the
@@ -3245,7 +3269,6 @@ select {
   .search-panel__options {
     grid-template-columns: 1fr;
   }
-
 }
 
 @media (max-width: 640px) {

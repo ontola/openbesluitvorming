@@ -238,6 +238,29 @@
     return params;
   }
 
+  /** The address a result already has, made reachable.
+   *
+   * Every result was a <button>, so there was nothing to middle-click, nothing
+   * to copy, and nothing for a crawler to follow — 5,1 million public
+   * documents with no link pointing at any of them. The state was in the URL
+   * all along; only the anchor was missing (#212). */
+  function detailHref(item: SearchResult): string {
+    const params = routeStateToSearchParams({ ...currentRouteState(), view: item.entityId, page: "" });
+    return `/?${params.toString()}`;
+  }
+
+  /** Let the browser handle the clicks it has its own meaning for: a new tab,
+   * a new window, a download. Only a plain left click is ours to intercept. */
+  function shouldOpenInApp(event: MouseEvent): boolean {
+    return (
+      event.button === 0 &&
+      !event.metaKey &&
+      !event.ctrlKey &&
+      !event.shiftKey &&
+      !event.altKey
+    );
+  }
+
   function currentRouteState(): SearchRouteState {
     return {
       query: query.trim(),
@@ -1613,13 +1636,31 @@
   }
 
   $: initialResultsLoading = searched && loading && results.length === 0;
+  /** The corpus counter a few centimetres above this one is formatted, so an
+   * unseparated six-digit number beside it read as a slip rather than a
+   * choice. And `~` is jargon: a screen reader either says "tilde" or skips
+   * it, and skipping it turns an estimate into an exact number. */
+  const formatCount = (value: number): string => value.toLocaleString("nl-NL");
   $: resultsTitle = !searched
     ? "Zoek op organisatie of onderwerp"
     : loading
       ? "Zoeken..."
       : totalIsApproximate && totalCount !== null
-        ? `Resultaten (~${totalCount})`
-        : `Resultaten (${totalCount ?? results.length})`;
+        ? `Resultaten (ongeveer ${formatCount(totalCount)})`
+        : `Resultaten (${formatCount(totalCount ?? results.length)})`;
+  /** The title follows the state, because the URL already does.
+   *
+   * Researching this means putting several searches in tabs side by side, and
+   * every one of them read "OpenBesluitvorming" — a row of identical tabs with
+   * nothing to tell them apart, and a history and bookmark list that recorded
+   * the same name for every page. The document open in the reader wins over
+   * the query behind it, which is what the reader is actually looking at. */
+  $: pageTitle = detailItem?.title
+    ? `${detailItem.title} — OpenBesluitvorming`
+    : query.trim()
+      ? `${query.trim()} — zoeken — OpenBesluitvorming`
+      : "OpenBesluitvorming";
+
   $: selectedSource = sources.find((source) => source.key === organization) ?? null;
   $: detailIndex = detailItem ? results.findIndex((item) => item.entityId === detailItem.entityId) : -1;
   $: hasPreviousDetail = detailIndex > 0;
@@ -1691,6 +1732,10 @@
     void focusActiveDetailSurface();
   }
 </script>
+
+<svelte:head>
+  <title>{pageTitle}</title>
+</svelte:head>
 
 <svelte:window on:popstate={handlePopstate} on:scroll|passive={onWindowScroll} />
 
@@ -1798,6 +1843,11 @@
       >
         <div class="search-panel__query-row">
           <label bind:this={primarySearchFieldEl} class="search-field search-field--primary">
+            <!-- The one field every visitor uses was the one without a name:
+                 every other control here already carries an sr-only label, and
+                 a placeholder is not one — it disappears the moment you type,
+                 and voice control cannot address a field it cannot name. -->
+            <span class="sr-only">Zoeken in vergaderstukken</span>
             <input
               bind:this={queryInputEl}
               bind:value={query}
@@ -1907,18 +1957,10 @@
             <div class="result-state">Geen resultaten gevonden voor deze zoekopdracht.</div>
           {:else}
             {#each results as item, index (item.entityId)}
-              <button
-                type="button"
+              <article
                 class="surface-card surface-card--lift result-card"
                 class:result-card--with-preview={Boolean(item.previewImageUrl)}
                 data-result-id={item.entityId}
-                on:click={() => void openDetail(item)}
-                on:keydown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    void openDetail(item);
-                  }
-                }}
               >
                 <div class:result-card__layout--with-preview={Boolean(item.previewImageUrl)} class="result-card__layout">
                   <!-- The meta row is a sibling of the content column, not a child, so that on
@@ -1954,7 +1996,25 @@
                   {/if}
 
                   <div class="result-card__content">
-                    <h3>{item.title}</h3>
+                    <!-- The link is on the title alone, and covers the card
+                         through ::after. As a button the accessible name was
+                         the entire card — municipality, type, page count,
+                         date, title and snippet, some forty words announced
+                         per result, which made a list of 24 unusable to
+                         navigate by. -->
+                    <h3>
+                      <a
+                        class="result-card__link"
+                        href={detailHref(item)}
+                        on:click={(event) => {
+                          if (!shouldOpenInApp(event)) {
+                            return;
+                          }
+                          event.preventDefault();
+                          void openDetail(item);
+                        }}
+                      >{item.title}</a>
+                    </h3>
                     {#if item.summaryHtml}
                       <p>{@html item.summaryHtml}</p>
                     {:else}
@@ -1962,7 +2022,7 @@
                     {/if}
                   </div>
                 </div>
-              </button>
+              </article>
             {/each}
 
             {#if loadingMore}

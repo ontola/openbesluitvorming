@@ -5,6 +5,8 @@
 
   export let source: string;
   export let title: string;
+  /** The language the markdown itself is written in. */
+  export let lang = "nl";
 
   let html = "";
   let failed = false;
@@ -46,7 +48,7 @@
       <a href={source}>bronbestand</a> rechtstreeks openen.
     </p>
   {:else if html}
-    <article class="prose-detail">
+    <article class="prose-detail" {lang}>
       <!-- eslint-disable-next-line svelte/no-at-html-tags -->
       {@html html}
     </article>
