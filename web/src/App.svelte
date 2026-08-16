@@ -2026,14 +2026,11 @@
             vragen hiervoor geen toestemming, omdat er geen gegevens op je apparaat worden geplaatst of uitgelezen.
             Bezwaar maken kan wel, met de knop onderaan deze sectie.
           </p>
-          <!-- TODO: de twee «…»-plekken hieronder invullen vóór deployment: de formele
-               verwerkingsverantwoordelijke en de bewaartermijn zoals die in het Swetrix-project
-               is ingesteld. Beide zijn niet uit de code af te leiden. -->
           <p>
-            <strong>Verwerker en bewaartermijn.</strong> Verwerkingsverantwoordelijke is
-            «verwerkingsverantwoordelijke invullen». Swetrix Ltd verwerkt de gegevens als verwerker, in onze opdracht en
-            op servers in Duitsland, op basis van een verwerkersovereenkomst. De gegevens worden
-            «bewaartermijn invullen» bewaard.
+            <strong>Verwerker en bewaartermijn.</strong> Verwerkingsverantwoordelijke is Ontola. Swetrix Ltd verwerkt de
+            gegevens als verwerker, in onze opdracht en op servers in Duitsland, op basis van een
+            verwerkersovereenkomst. Swetrix kent voor bezoekstatistiek geen automatische verwijdertermijn: de gegevens
+            blijven staan tot wij ze verwijderen. We bewaren ze niet langer dan nodig is voor deze rapportages.
           </p>
           <p>
             <strong>Jouw rechten.</strong> Je hebt recht op inzage, correctie en verwijdering van je gegevens, en het

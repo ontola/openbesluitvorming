@@ -5,33 +5,33 @@
 // dus de cookiebepaling (art. 11.7a Telecommunicatiewet) is niet van toepassing.
 // Wat daar wel bij hoort is een echte bezwaarmogelijkheid (art. 21 AVG), en die
 // staat hier. Let op: het `swetrix_ignore`-mechanisme uit oudere versies van de
-// Swetrix-client bestaat niet meer in de huidige `swetrix.js` — de opt-out is
+// Swetrix-client bestaat niet meer in de huidige client — de opt-out is
 // daarom van ons, niet van hen.
 //
 // Wie bezwaar heeft gemaakt of Do Not Track / Global Privacy Control aan heeft
-// staan, laadt `swetrix.js` helemaal niet. Dat is strenger dan de `respectDNT`-
-// optie van Swetrix zelf, die het script wel laadt en pas daarna zwijgt: zo gaat
-// er voor deze bezoeker geen enkel verzoek naar een derde partij.
+// staan, laadt de client helemaal niet. Dat is strenger dan de `respectDNT`-
+// optie van Swetrix zelf, die wel laadt en pas daarna zwijgt: zo gaat er voor
+// deze bezoeker geen enkel verzoek naar een derde partij.
+//
+// De client komt uit de npm-dependency en niet van `swetrix.org` — die URL is
+// een 302 naar jsDelivr, dus dat waren twee derde partijen per bezoek. Hij zit
+// achter een dynamische import zodat hij pas over de lijn komt als er ook
+// werkelijk gemeten wordt. `@rrweb/record` (session replay) hangt er wel aan
+// maar wordt door de client zelf lui geladen, dus dat kost hier niets.
 
 const SWETRIX_PROJECT_ID = "n4xyH2Fb2m2z";
-const SWETRIX_SCRIPT_URL = "https://swetrix.org/swetrix.js";
 const OPT_OUT_STORAGE_KEY = "woozi.analyticsOptOut";
 
 type SwetrixTracker = { stop: () => void };
 
-type SwetrixGlobal = {
+type SwetrixClient = {
   init: (projectId: string, options?: Record<string, unknown>) => unknown;
   trackViews: () => Promise<SwetrixTracker>;
 };
 
 let tracker: SwetrixTracker | null = null;
-let scriptLoad: Promise<SwetrixGlobal | null> | null = null;
+let clientLoad: Promise<SwetrixClient | null> | null = null;
 let running = false;
-
-function swetrixGlobal(): SwetrixGlobal | null {
-  const candidate = (window as unknown as { swetrix?: SwetrixGlobal }).swetrix;
-  return candidate && typeof candidate.init === "function" ? candidate : null;
-}
 
 /** Do Not Track en zijn opvolger Global Privacy Control tellen als bezwaar. */
 export function browserSignalsNoTracking(): boolean {
@@ -59,18 +59,13 @@ export function analyticsOptedOut(): boolean {
   }
 }
 
-function loadSwetrix(): Promise<SwetrixGlobal | null> {
-  scriptLoad ??= new Promise<SwetrixGlobal | null>((resolve) => {
-    const script = document.createElement("script");
-    script.src = SWETRIX_SCRIPT_URL;
-    script.defer = true;
-    // Een blokker of een storing bij Swetrix mag de app niet raken: bij een
-    // mislukte load meten we gewoon niets.
-    script.addEventListener("load", () => resolve(swetrixGlobal()));
-    script.addEventListener("error", () => resolve(null));
-    document.head.appendChild(script);
-  });
-  return scriptLoad;
+function loadSwetrix(): Promise<SwetrixClient | null> {
+  // Een mislukte chunk mag de app niet raken: dan meten we gewoon niets.
+  clientLoad ??= import("swetrix").then(
+    (module) => module as SwetrixClient,
+    () => null,
+  );
+  return clientLoad;
 }
 
 export function startAnalytics(): void {
@@ -85,7 +80,7 @@ export function startAnalytics(): void {
     swetrix.init(SWETRIX_PROJECT_ID, { respectDNT: true });
     return swetrix.trackViews().then((handle) => {
       if (!running) {
-        // Er is bezwaar gemaakt terwijl het script nog laadde.
+        // Er is bezwaar gemaakt terwijl de client nog laadde.
         handle.stop();
         return;
       }
