@@ -789,6 +789,22 @@ select {
   border-radius: 0.4rem;
 }
 
+/* The opt-out sits inside the prose, so the button needs to shed the 1.82 prose
+   line-height that would otherwise stretch its pill, and the status text stays
+   on its own line on narrow screens rather than squeezing next to the button. */
+.analytics-optout {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  line-height: normal;
+}
+
+.analytics-optout__status {
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
 .content--search {
   max-width: 64rem;
   padding-top: 1.2rem;

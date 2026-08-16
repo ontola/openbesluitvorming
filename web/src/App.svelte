@@ -18,6 +18,7 @@
   import MotionCard from "./MotionCard.svelte";
   import ReaderLoading from "./ReaderLoading.svelte";
   import SourcePicker from "./SourcePicker.svelte";
+  import { analyticsOptedOut, browserSignalsNoTracking, setAnalyticsOptOut } from "./analytics.ts";
 
   type SearchRouteState = {
     query: string;
@@ -53,6 +54,8 @@
     ? null
     : routeStateFromUrl(new URL(window.location.href));
 
+  let analyticsOptOut = false;
+  let analyticsBlockedBySignal = false;
   let query = "";
   let organization = "";
   let entityType = "";
@@ -455,6 +458,11 @@
       (grouped[motion.agenda_item] ??= []).push(motion);
     }
     return grouped;
+  }
+
+  function toggleAnalyticsOptOut(): void {
+    analyticsOptOut = !analyticsOptOut;
+    setAnalyticsOptOut(analyticsOptOut);
   }
 
   function loadPreferredDetailMode(): "text" | "pdf" {
@@ -1391,6 +1399,8 @@
   }
 
   onMount(async () => {
+    analyticsOptOut = analyticsOptedOut();
+    analyticsBlockedBySignal = browserSignalsNoTracking();
     preferredDetailMode = loadPreferredDetailMode();
     detailSheetWidth = loadDetailSheetWidth();
     updateInitialLoadingCardCount();
@@ -2001,12 +2011,60 @@
             <a href="mailto:sander.bakker@vng.nl">Sander Bakker</a>.
           </p>
 
-          <h2>Analyse</h2>
+          <h2>Analyse en privacy</h2>
           <p>
-            We gebruiken Swetrix (een privacy-vriendelijk alternatief voor Google Analytics) om bezoekersstatistieken te
-            verzamelen. We gebruiken deze gegevens alleen om anonieme rapportages te maken van bezoekers, en verkopen
-            deze data aan niemand door. We slaan de laatste zes cijfers van IP-adressen niet op om jouw privacy te
-            beschermen.
+            We meten hoe vaak deze zoekmachine gebruikt wordt met Swetrix, een privacyvriendelijk alternatief voor
+            Google Analytics. Per paginabezoek gaat er één verzoek naar Swetrix met de opgevraagde pagina, de
+            verwijzende pagina, je browser- en apparaattype, je taalinstelling en het land waar je vandaan komt. Er
+            worden geen cookies geplaatst en er wordt niets in je browser opgeslagen. Van je IP-adres worden de laatste
+            zes cijfers niet opgeslagen, en we volgen je niet over andere websites. We gebruiken deze gegevens alleen
+            om geaggregeerde bezoekersrapportages te maken en verkopen ze aan niemand door.
+          </p>
+          <p>
+            <strong>Grondslag.</strong> Deze verwerking rust op ons gerechtvaardigd belang (artikel 6, lid 1, onder f
+            AVG): we willen weten of deze zoekmachine gevonden en gebruikt wordt, zodat we hem kunnen verbeteren. We
+            vragen hiervoor geen toestemming, omdat er geen gegevens op je apparaat worden geplaatst of uitgelezen.
+            Bezwaar maken kan wel, met de knop onderaan deze sectie.
+          </p>
+          <!-- TODO: de twee «…»-plekken hieronder invullen vóór deployment: de formele
+               verwerkingsverantwoordelijke en de bewaartermijn zoals die in het Swetrix-project
+               is ingesteld. Beide zijn niet uit de code af te leiden. -->
+          <p>
+            <strong>Verwerker en bewaartermijn.</strong> Verwerkingsverantwoordelijke is
+            «verwerkingsverantwoordelijke invullen». Swetrix Ltd verwerkt de gegevens als verwerker, in onze opdracht en
+            op servers in Duitsland, op basis van een verwerkersovereenkomst. De gegevens worden
+            «bewaartermijn invullen» bewaard.
+          </p>
+          <p>
+            <strong>Jouw rechten.</strong> Je hebt recht op inzage, correctie en verwijdering van je gegevens, en het
+            recht om bezwaar te maken tegen deze verwerking. Wil je daar gebruik van maken, mail dan
+            <a href="mailto:sander.bakker@vng.nl">Sander Bakker</a>. Je kunt ook een klacht indienen bij de
+            <a href="https://www.autoriteitpersoonsgegevens.nl/" rel="noopener noreferrer" target="_blank"
+              >Autoriteit Persoonsgegevens</a>.
+          </p>
+          <p>
+            <strong>Bezwaar maken.</strong> Met de knop hieronder zet je de meting uit. Er wordt dan niets meer geladen
+            van of verstuurd naar Swetrix. Je keuze wordt bewaard in deze browser, dus op een ander apparaat of na het
+            wissen van je browsergegevens moet je hem opnieuw maken. Heb je Do Not Track of Global Privacy Control
+            aanstaan, dan meten we sowieso niets.
+          </p>
+          <p class="analytics-optout">
+            {#if analyticsBlockedBySignal}
+              <!-- De knop zou hier niets toevoegen: het browsersignaal houdt de meting al tegen. -->
+              <span class="analytics-optout__status">
+                De meting staat uit: je browser stuurt een Do Not Track- of Global Privacy
+                Control-signaal.
+              </span>
+            {:else}
+              <button type="button" class="ghost-button ghost-button--subtle" on:click={toggleAnalyticsOptOut}>
+                {analyticsOptOut ? "Meting weer aanzetten" : "Meting uitzetten"}
+              </button>
+              <span class="analytics-optout__status">
+                {analyticsOptOut
+                  ? "De meting staat uit in deze browser."
+                  : "De meting staat aan in deze browser."}
+              </span>
+            {/if}
           </p>
 
           <h2>Disclaimer</h2>
