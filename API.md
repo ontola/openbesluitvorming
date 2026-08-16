@@ -271,6 +271,27 @@ No parameters. Cached for 10 minutes.
 Every organization in the catalog is listed, including the handful we no longer
 import from — their data is still searchable.
 
+Ten of them no longer exist: municipal reorganizations (*herindelingen*) merged
+them into a successor, so no further data is coming and none ever will. Those
+are `discontinued` rather than `stale` or `failing`, and they carry the date
+they ceased to exist and who took over:
+
+```json
+{
+  "sourceKey": "weesp",
+  "label": "Weesp",
+  "state": "discontinued",
+  "discontinuedAt": "2022-03-24",
+  "succeededBy": { "cbsId": "GM0363", "label": "Amsterdam", "sourceKey": "amsterdam" },
+  "latestContentDate": "2022-07-12T00:00:00.000Z"
+}
+```
+
+The list is verified against CBS *Gebieden in Nederland* — the year each CBS
+code last appears in. `succeededBy.sourceKey` is absent when we do not import
+the successor, which today is the case for the five organizations Land van
+Cuijk took over.
+
 **Source states:**
 
 | `state` | Meaning |
@@ -280,6 +301,7 @@ import from — their data is still searchable.
 | `failing` | The last run failed *and* nothing has succeeded within `windowHours` |
 | `never_imported` | In the catalog, but no import has ever run |
 | `not_implemented` | We no longer import from this organization; its existing data still answers searches |
+| `discontinued` | The organization was merged away by a herindeling. Nothing will ever be added; its existing data still answers searches |
 
 Only full imports count. Reindexes and other internal replays rebuild from data
 we already hold without contacting the source system, so a successful one says
@@ -312,6 +334,8 @@ at all — i.e. how long the outage has lasted.
 | `lastErrorMessage` | Why the last run failed. Present only when it did. Query strings are stripped |
 | `latestContentDate` | Newest meeting date held for this organization. Often in the future — an agenda is published before the meeting happens |
 | `lastIndexedAt` | When anything was last written to the search index for this organization |
+| `discontinuedAt` | The date the organization ceased to exist. Only on `discontinued` |
+| `succeededBy` | `{ cbsId, label, sourceKey }` of the organization that took over. `sourceKey` is absent when we do not import the successor. Only on `discontinued` |
 
 `latestContentDate` and `lastIndexedAt` come from the search index. If it cannot
 be reached, `indexActivityAvailable` is `false` and both are omitted everywhere;

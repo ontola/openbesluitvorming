@@ -53,14 +53,20 @@ function isFresh(timestamp: string | undefined, now: number, windowHours: number
 }
 
 /** See SourceStatusState: `failing` is reserved for the case that does not fix
- * itself, so a source with a recent success is `ok` even if last night failed. */
+ * itself, so a source with a recent success is `ok` even if last night failed.
+ *
+ * `discontinued` wins over everything, including `failing`. An organization
+ * merged away by a herindeling is not behind and cannot be caught up; putting
+ * it in the same bucket as a broken import sends someone looking for a problem
+ * that has no fix, and hides the ones that do. */
 function sourceState(
-  implemented: boolean,
+  source: { implemented: boolean; discontinuedAt?: string },
   run: SourceRunStatus | undefined,
   now: number,
   windowHours: number,
 ): SourceStatusState {
-  if (!implemented) return "not_implemented";
+  if (source.discontinuedAt) return "discontinued";
+  if (!source.implemented) return "not_implemented";
   if (!run?.lastRunAt) return "never_imported";
   if (isFresh(run.lastSuccessAt, now, windowHours)) return "ok";
   if (run.lastRunStatus === "failed") return "failing";
@@ -101,7 +107,7 @@ export function buildStatusResponse(options: {
     .map((source) => {
       const run = runBySource.get(source.key);
       const activity = indexActivity?.get(source.key);
-      const state = sourceState(source.implemented, run, now, windowHours);
+      const state = sourceState(source, run, now, windowHours);
       const lastErrorMessage =
         run?.lastRunStatus === "failed" && run.lastErrorMessage
           ? sanitizeErrorMessage(run.lastErrorMessage)
@@ -121,6 +127,17 @@ export function buildStatusResponse(options: {
         lastErrorMessage,
         latestContentDate: activity?.latestContentDate,
         lastIndexedAt: activity?.lastIndexedAt,
+        discontinuedAt: source.discontinuedAt,
+        succeededBy:
+          source.succeededByCbsId && source.succeededByLabel
+            ? {
+                cbsId: source.succeededByCbsId,
+                label: source.succeededByLabel,
+                // Absent when we do not import the successor at all, which is
+                // the case for the five sources Land van Cuijk took over.
+                sourceKey: source.succeededBySourceKey,
+              }
+            : undefined,
       } satisfies SourceStatus;
     })
     .sort((left, right) => left.label.localeCompare(right.label, "nl"));
@@ -129,7 +146,10 @@ export function buildStatusResponse(options: {
     .sort((left, right) => left.localeCompare(right, "nl"))
     .map((supplier) => {
       const own = sources.filter(
-        (source) => source.supplier === supplier && source.state !== "not_implemented",
+        (source) =>
+          source.supplier === supplier &&
+          source.state !== "not_implemented" &&
+          source.state !== "discontinued",
       );
       const window = windowBySupplier.get(supplier);
       const state = supplierState(window, own.length);

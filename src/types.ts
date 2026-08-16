@@ -473,6 +473,19 @@ export interface SourceCatalogEntry extends SourceDefinitionBase {
   legacyConfigFile: string;
   legacyConfigRoot: string;
   implemented: boolean;
+  /** The date this organization ceased to exist, for the ones merged away by a
+   * herindeling. Distinct from `implemented: false`, which says we stopped
+   * importing: this says there will never be anything left to import. Verified
+   * against CBS "Gebieden in Nederland" -- the year a code last appears in. */
+  discontinuedAt?: string;
+  /** CBS code and name of the organization that took over, and its catalog key
+   * when we import it. Not all of them: Land van Cuijk succeeds five sources
+   * here and is not itself in the catalog. The key is recorded rather than
+   * looked up by CBS code, because a code does not identify one entry --
+   * Amsterdam shares GM0363 with its seven stadsdelen. */
+  succeededByCbsId?: string;
+  succeededByLabel?: string;
+  succeededBySourceKey?: string;
   notubizOrganizationId?: number;
   ibabsSitename?: string;
   baseUrl?: string;
@@ -826,7 +839,16 @@ export interface ExportPage {
  * `failing` is the case that is not self-correcting and that #205 made
  * expensive: the last run failed *and* nothing has succeeded within the
  * window. */
-export type SourceStatusState = "ok" | "stale" | "failing" | "never_imported" | "not_implemented";
+export type SourceStatusState =
+  | "ok"
+  | "stale"
+  | "failing"
+  | "never_imported"
+  | "not_implemented"
+  /** Merged away by a herindeling. Nothing is coming, ever, and no amount of
+   * fixing on our side changes that -- so it must not sit in the same bucket
+   * as an organization that is merely behind. */
+  | "discontinued";
 
 export interface SourceStatus {
   sourceKey: string;
@@ -851,6 +873,11 @@ export interface SourceStatus {
   latestContentDate?: string;
   /** When anything was last written to the search index for this source. */
   lastIndexedAt?: string;
+  /** Set only when `state` is `discontinued`: when the organization ceased to
+   * exist, and who took over. `sourceKey` is present when we import the
+   * successor, so a caller can follow the trail. */
+  discontinuedAt?: string;
+  succeededBy?: { cbsId: string; label: string; sourceKey?: string };
 }
 
 /** `down` is the shape of #205: every run against a supplier failing, for as

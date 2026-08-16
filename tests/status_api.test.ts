@@ -278,3 +278,84 @@ Deno.test("sources are sorted by label, suppliers by key", () => {
     "one entry per supplier present in the catalog",
   );
 });
+
+Deno.test("an organization merged away by a herindeling reads as discontinued", () => {
+  const response = build({
+    sources: [
+      {
+        sourceKey: "weesp",
+        supplier: "notubiz",
+        lastRunAt: hoursAgo(12),
+        lastRunStatus: "failed",
+        lastErrorMessage: "no meetings found",
+        lastSuccessAt: hoursAgo(40_000),
+      },
+    ],
+  });
+
+  const weesp = source(response, "weesp");
+  // Weesp became part of Amsterdam on 24 March 2022. Nothing is coming, so
+  // this must not read as an import someone should go and fix.
+  assertEquals(weesp.state, "discontinued", "not 'failing'");
+  assertEquals(weesp.discontinuedAt, "2022-03-24", "with the date it ceased to exist");
+  assertEquals(
+    weesp.succeededBy,
+    { cbsId: "GM0363", label: "Amsterdam", sourceKey: "amsterdam" },
+    "and where its business went",
+  );
+});
+
+Deno.test("a successor we do not import is still named, without a source key", () => {
+  // Five sources are succeeded by Land van Cuijk, which is not in the catalog.
+  const boxmeer = source(build({}), "boxmeer");
+  assertEquals(boxmeer.state, "discontinued", "merged into Land van Cuijk in 2022");
+  assertEquals(
+    boxmeer.succeededBy,
+    { cbsId: "GM1982", label: "Land van Cuijk", sourceKey: undefined },
+    "naming who took over is useful even when we hold none of their data",
+  );
+});
+
+Deno.test("exactly the organizations CBS no longer lists are discontinued", () => {
+  const discontinued = build({})
+    .sources.filter((row) => row.state === "discontinued")
+    .map((row) => row.sourceKey)
+    .sort();
+
+  // Verified against CBS "Gebieden in Nederland": the year each code last
+  // appears in. Borger-Odoorn is deliberately absent -- it still exists, and
+  // only looked discontinued while its CBS code was stored lowercased.
+  assertEquals(
+    discontinued,
+    [
+      "beemster",
+      "binnenmaas",
+      "boxmeer",
+      "brielle",
+      "cuijk",
+      "grave",
+      "mill_en_st_hubert",
+      "sint_anthonis",
+      "weesp",
+      "westvoorne",
+    ],
+    "ten organizations, matching the count ORI ran into",
+  );
+});
+
+Deno.test("a discontinued organization is not counted against its source system", () => {
+  const response = build({
+    supplierWindows: [{ supplier: "notubiz", runCount: 200, succeededCount: 200, failedCount: 0 }],
+  });
+
+  const notubiz = supplier(response, "notubiz");
+  const notubizSources = response.sources.filter((row) => row.supplier === "notubiz");
+  const stillRunning = notubizSources.filter(
+    (row) => row.state !== "discontinued" && row.state !== "not_implemented",
+  ).length;
+  assertEquals(
+    notubiz.sourceCount,
+    stillRunning,
+    "a supplier is not marked short for organizations that no longer exist",
+  );
+});
