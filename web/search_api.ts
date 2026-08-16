@@ -18,7 +18,7 @@ import {
   projectionSupportsDateSort,
 } from "../src/pipeline/versioning.ts";
 import { QuickwitClient } from "../src/quickwit/client.ts";
-import { getSource, listSources } from "../src/sources/index.ts";
+import { getProjectableSource, getSource, listSources } from "../src/sources/index.ts";
 import { ObjectStorageClient } from "../src/storage/s3.ts";
 import { readTranscript } from "../src/recordings/storage.ts";
 import { pdfPageCacheKey } from "../src/documents/thumbnails.ts";
@@ -1171,24 +1171,43 @@ export async function getEntityContent(
 
   let agenda = hit.payload?.agenda;
   if (hit.entity_type === "Meeting" && !hasStructuredAgenda(agenda) && hit.source_key) {
-    const source = getSource(hit.source_key);
-    if (source.supplier === "notubiz") {
-      const meetingId = entityId.split(":").at(-1);
-      if (meetingId) {
-        const client = new NotubizClient();
-        const meetingResponse = await client.getMeeting(Number(meetingId));
-        const rawMeeting =
-          meetingResponse && typeof meetingResponse === "object"
-            ? (meetingResponse as { meeting?: unknown }).meeting
-            : undefined;
-        if (rawMeeting && typeof rawMeeting === "object") {
-          const record = rawMeeting as Record<string, unknown>;
-          agenda = normalizeNotubizAgendaItems(
-            source,
-            Array.isArray(record.agenda_items) ? record.agenda_items : [],
-          );
+    // Best effort, and isolated on purpose. Everything else in this response
+    // comes from our own storage; only the agenda is fetched from the supplier
+    // when the stored payload has none, so a supplier that is slow, down, or
+    // withdrawn must cost the agenda and not the page.
+    //
+    // It cost the page. Reading an entity we already hold is not importing it,
+    // but this resolved the source through the *import* gate, so Dongen --
+    // withdrawn from importing, 9,197 entities still in the export log and
+    // answering searches -- threw "Unknown or unsupported source" and returned
+    // 500 for every meeting. Findable in search, unreadable when opened. That
+    // is the same wrong assumption 7e4d51d fixed for the reindex and 4f16b57
+    // for search validation; this was the third call site.
+    try {
+      const source = getProjectableSource(hit.source_key);
+      if (source.supplier === "notubiz") {
+        const meetingId = entityId.split(":").at(-1);
+        if (meetingId) {
+          const client = new NotubizClient();
+          const meetingResponse = await client.getMeeting(Number(meetingId));
+          const rawMeeting =
+            meetingResponse && typeof meetingResponse === "object"
+              ? (meetingResponse as { meeting?: unknown }).meeting
+              : undefined;
+          if (rawMeeting && typeof rawMeeting === "object") {
+            const record = rawMeeting as Record<string, unknown>;
+            agenda = normalizeNotubizAgendaItems(
+              source,
+              Array.isArray(record.agenda_items) ? record.agenda_items : [],
+            );
+          }
         }
       }
+    } catch (error) {
+      console.warn(
+        `[detail] agenda enrichment failed for ${entityId}, serving the stored payload:`,
+        error instanceof Error ? error.message : error,
+      );
     }
   }
 

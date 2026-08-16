@@ -1082,3 +1082,59 @@ Deno.test("a total is not inflated by rows that arrive mid-scan", async () => {
     globalThis.fetch = originalFetch;
   }
 });
+
+/** A meeting from a withdrawn source must still open.
+ *
+ * Dongen is withdrawn from importing — Notubiz reports the organisation as
+ * non-active — while its 9,197 entities sit in the export log and answer
+ * searches. The detail view resolved the source through the *import* gate to
+ * decide whether to fetch a live agenda, so it threw "Unknown or unsupported
+ * source" and answered 500 for every one of those meetings: findable in
+ * search, unreadable when opened. Measured on production 2026-08-16.
+ *
+ * The agenda is the only part of this response that comes from the supplier
+ * rather than our own storage, so it is also the only part a supplier may
+ * cost. The stub answers the live agenda call with a failure to pin that.
+ */
+Deno.test("a meeting from a withdrawn source opens without its live agenda", async () => {
+  const originalFetch = globalThis.fetch;
+  const entityId = "meeting:notubiz:gemeente:dongen:1441836";
+
+  globalThis.fetch = async (input) => {
+    const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+
+    // The supplier is unreachable for this source; the page must survive it.
+    if (url.includes("notubiz")) {
+      throw new Error("Notubiz is not reachable for a withdrawn organisation");
+    }
+
+    return new Response(
+      JSON.stringify({
+        num_hits: 1,
+        hits: [
+          {
+            time: "2026-03-31T11:00:00Z",
+            entity_id: entityId,
+            entity_type: "Meeting",
+            name: "Raadsvergadering",
+            source_key: "dongen",
+            start_date: "2025-06-10T17:30:00Z",
+            payload: {},
+          },
+        ],
+      }),
+      { headers: { "content-type": "application/json" } },
+    );
+  };
+
+  try {
+    const content = await getEntityContent(entityId);
+    assert(content !== undefined, "a withdrawn source's meeting must still resolve");
+    assert(
+      content?.title === "Raadsvergadering",
+      `the stored payload should still be served, got ${content?.title}`,
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
