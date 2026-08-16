@@ -90,6 +90,9 @@ export interface DocumentDerivedContent {
   markdown_key?: string;
   page_chunks_key?: string;
   page_count?: number;
+  /** The document's own length, where it is known. `page_count` is how many
+   * pages were extracted and stops at MAX_PDF_PAGES; this does not. */
+  source_page_count?: number;
   extraction_quality_score?: number;
   extraction_quality_status?: "good" | "suspect";
 }
@@ -724,6 +727,9 @@ export interface SearchResult {
   downloadUrl?: string;
   matchedPage?: number;
   pageCount?: number;
+  /** The document's own length. Differs from `pageCount` exactly when the
+   * extraction cap bit, which is when the reader needs telling. */
+  sourcePageCount?: number;
   previewImageUrl?: string;
 }
 

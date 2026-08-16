@@ -396,6 +396,7 @@ async function rederiveFromStoredFile(
 
   let mdText = "";
   let pageChunks = document.page_chunks ?? [];
+  let sourcePageCount: number | undefined;
   const issues: ExtractionIssue[] = [];
 
   try {
@@ -405,6 +406,7 @@ async function rederiveFromStoredFile(
     });
     mdText = extraction.markdown;
     pageChunks = extraction.pageChunks ?? [];
+    sourcePageCount = extraction.sourcePageCount;
     issues.push(
       ...extraction.warnings.map((message) => ({
         severity: "warning" as const,
@@ -473,6 +475,10 @@ async function rederiveFromStoredFile(
         markdown_key: mdText ? extractedMarkdownKey(document) : undefined,
         page_chunks_key: pageChunks.length > 0 ? extractedPageChunksKey(document) : undefined,
         page_count: pageChunks.length > 0 ? pageChunks.length : undefined,
+        // What the document really is, next to what we read of it. Equal for
+        // anything under the page cap; different is exactly the case the
+        // reader was never told about (#221).
+        source_page_count: sourcePageCount,
         extraction_quality_score: quality?.score,
         extraction_quality_status: quality?.status,
       },
@@ -571,10 +577,10 @@ export async function materializeDocument(
   // When extraction service is configured and the document is a PDF,
   // delegate download + extraction + S3 upload to the extraction worker.
   // The ingest server never holds the PDF bytes in memory.
-  const serviceUrl = hasExtractionService() && isPdf(document) && document.original_url &&
-      options.storage
-    ? await nextExtractionServiceUrl()
-    : null;
+  const serviceUrl =
+    hasExtractionService() && isPdf(document) && document.original_url && options.storage
+      ? await nextExtractionServiceUrl()
+      : null;
   if (serviceUrl && isPdf(document) && document.original_url && options.storage) {
     const pdfKey = objectKey(document);
     const mdKey = extractedMarkdownKey(document);
@@ -594,7 +600,8 @@ export async function materializeDocument(
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       attemptsMade = attempt;
       // Pick a different worker on each retry so we don't hammer a slow/down node
-      const attemptUrl = attempt === 1 ? serviceUrl : ((await nextExtractionServiceUrl()) ?? serviceUrl);
+      const attemptUrl =
+        attempt === 1 ? serviceUrl : ((await nextExtractionServiceUrl()) ?? serviceUrl);
       try {
         const response = await fetch(`${attemptUrl}/extract`, {
           method: "POST",
@@ -617,8 +624,8 @@ export async function materializeDocument(
           // 422 is the service's wrapper around download/extraction exceptions
           // (disconnects, read timeouts) and 408/5xx are transient by nature;
           // any other 4xx means the source document itself is gone.
-          const retryable = response.status === 422 || response.status === 408 ||
-            response.status >= 500;
+          const retryable =
+            response.status === 422 || response.status === 408 || response.status >= 500;
           if (!retryable) {
             lastError = error;
             break;
@@ -679,6 +686,11 @@ export async function materializeDocument(
               markdown_key: mdKey,
               page_chunks_key: pageChunks.length > 0 ? extractedPageChunksKey(document) : undefined,
               page_count: payload.page_count > MAX_PDF_PAGES ? MAX_PDF_PAGES : payload.page_count,
+              // The service reports how long the document is; the line above
+              // clamps that to what we actually read, and the unclamped value
+              // used to be dropped here. It is the only place the reader could
+              // have learnt that a 908-page report was read to page 40 (#221).
+              source_page_count: payload.page_count > 0 ? payload.page_count : undefined,
               extraction_quality_score: quality?.score,
               extraction_quality_status: quality?.status,
             },
@@ -742,6 +754,7 @@ export async function materializeDocument(
   const dlMs = Math.round(performance.now() - tDl);
   let mdText = "";
   let pageChunks = document.page_chunks ?? [];
+  let sourcePageCount: number | undefined;
   const issues: ExtractionIssue[] = [];
 
   try {
@@ -751,6 +764,7 @@ export async function materializeDocument(
     });
     mdText = extraction.markdown;
     pageChunks = extraction.pageChunks ?? [];
+    sourcePageCount = extraction.sourcePageCount;
     issues.push(
       ...extraction.warnings.map((message) => ({
         severity: "warning" as const,
@@ -839,6 +853,7 @@ export async function materializeDocument(
               markdown_key: mdText ? extractedMarkdownKey(document) : undefined,
               page_chunks_key: pageChunks.length > 0 ? extractedPageChunksKey(document) : undefined,
               page_count: pageChunks.length > 0 ? pageChunks.length : undefined,
+              source_page_count: sourcePageCount,
               extraction_quality_score: quality?.score,
               extraction_quality_status: quality?.status,
             }

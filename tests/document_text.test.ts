@@ -1,4 +1,8 @@
-import { deriveMarkdownFromText, extractDocumentMarkdown } from "../src/documents/text.ts";
+import {
+  countPdfPages,
+  deriveMarkdownFromText,
+  extractDocumentMarkdown,
+} from "../src/documents/text.ts";
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) {
@@ -382,7 +386,10 @@ Deno.test("extractDocumentMarkdown prefers pymupdf4llm for PDFs when configured"
       fileName: "fallback.pdf",
     });
 
-    assert(result.markdown.includes("Fallback markdown"), "expected fallback markdown to be returned");
+    assert(
+      result.markdown.includes("Fallback markdown"),
+      "expected fallback markdown to be returned",
+    );
     assert(result.warnings.length === 0, "expected pymupdf4llm-first path to be clean");
   } finally {
     if (previousTransmutation === undefined) {
@@ -425,10 +432,7 @@ Deno.test("extractDocumentMarkdown falls back to transmutation when pymupdf4llm 
   await Deno.chmod(transmutationScript, 0o755);
 
   const fallbackScript = await Deno.makeTempFile({ suffix: ".sh" });
-  await Deno.writeTextFile(
-    fallbackScript,
-    "#!/bin/sh\nprintf 'pymupdf4llm failed' 1>&2\nexit 1\n",
-  );
+  await Deno.writeTextFile(fallbackScript, "#!/bin/sh\nprintf 'pymupdf4llm failed' 1>&2\nexit 1\n");
   await Deno.chmod(fallbackScript, 0o755);
 
   const previousTransmutation = Deno.env.get("WOOZI_TRANSMUTATION_BIN");
@@ -475,4 +479,38 @@ Deno.test("deriveMarkdownFromText preserves simple headings and list blocks", ()
     markdown.includes("## Besluitvorming"),
     "later heading-like blocks should also become markdown headings",
   );
+});
+
+/** #221: the extraction cap was presented as the document's length.
+ *
+ * A 908-page report appeared in search as "40 pagina's", and nothing said that
+ * only the first forty had been read — so a term on page 500 simply produced
+ * no hit. The length was already being computed here, to build the truncation
+ * warning, and then thrown away. Measured on production 2026-08-16: 334.129
+ * documents reach page 40, and exactly 4 reach page 41.
+ *
+ * The number itself comes from `mutool`, which lives in the production image
+ * and not on a development machine, so the count cannot be asserted here. What
+ * can, and what matters, is the invariant underneath: an unknown length stays
+ * unknown. A guess would put an invented page count on a search result, which
+ * is the failure this change is about.
+ */
+Deno.test("an unreadable page count stays null rather than becoming a wrong number", async () => {
+  assert(
+    (await countPdfPages(new TextEncoder().encode("dit is geen pdf"))) === null,
+    "a non-PDF has no page count",
+  );
+  assert((await countPdfPages(new Uint8Array())) === null, "empty input has no page count");
+});
+
+Deno.test("a document is never shorter than the part that was read from it", async () => {
+  const pdf = await Deno.readFile("tests/fixtures/documents/sample-good.pdf");
+  const pages = await countPdfPages(pdf);
+
+  // Null where mutool is absent; a real count where it is not. Either way the
+  // relation to the extracted chunks is the one the card now relies on.
+  if (pages === null) {
+    return;
+  }
+  assert(pages > 0, `a page count of ${pages} says nothing`);
 });

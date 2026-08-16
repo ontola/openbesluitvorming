@@ -3,6 +3,14 @@ export interface DocumentMarkdownExtractionResult {
   markdown: string;
   warnings: string[];
   pageChunks?: DocumentPageChunk[];
+  /** How long the document actually is, where that is knowable.
+   *
+   * Distinct from `pageChunks.length`, which stops at MAX_PDF_PAGES. The two
+   * were conflated downstream, so a 908-page document was presented as "40
+   * pagina's" and nothing said that search had only read the first forty of
+   * them (#221). This number was already being computed to build the
+   * truncation warning; it was simply thrown away afterwards. */
+  sourcePageCount?: number;
 }
 
 export const MAX_PDF_PAGES = 40;
@@ -27,7 +35,10 @@ function pymupdf4llmBinary(): string | null {
     return value;
   }
 
-  for (const candidate of ["/usr/local/bin/pymupdf4llm_extract", "/app/scripts/pymupdf4llm_extract.sh"]) {
+  for (const candidate of [
+    "/usr/local/bin/pymupdf4llm_extract",
+    "/app/scripts/pymupdf4llm_extract.sh",
+  ]) {
     try {
       Deno.statSync(candidate);
       return candidate;
@@ -92,7 +103,11 @@ export async function countPdfPages(bytes: Uint8Array): Promise<number | null> {
   await Deno.writeFile(inputPath, bytes);
 
   try {
-    const output = await readCommandOutput("mutool", ["show", inputPath, "trailer/Root/Pages/Count"]);
+    const output = await readCommandOutput("mutool", [
+      "show",
+      inputPath,
+      "trailer/Root/Pages/Count",
+    ]);
     const parsed = Number.parseInt(output.trim(), 10);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
   } catch {
@@ -166,10 +181,16 @@ async function extractPdf(bytes: Uint8Array): Promise<DocumentMarkdownExtraction
     result.warnings = [truncationWarning, ...result.warnings];
   }
 
+  if (pageCount !== null && pageCount > 0) {
+    result.sourcePageCount = pageCount;
+  }
+
   return result;
 }
 
-async function extractPdfWithTransmutation(bytes: Uint8Array): Promise<DocumentMarkdownExtractionResult> {
+async function extractPdfWithTransmutation(
+  bytes: Uint8Array,
+): Promise<DocumentMarkdownExtractionResult> {
   try {
     const pageChunks = await extractPdfMarkdownPagesWithCli(bytes);
     return {

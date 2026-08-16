@@ -49,6 +49,7 @@ type SearchHit = {
     derived_content?: {
       markdown_key?: string;
       page_count?: number;
+      source_page_count?: number;
       transcript_key?: string;
     };
     media_type?: "video" | "audio";
@@ -932,6 +933,7 @@ async function collectSearchWindow(
         downloadUrl: document.payload?.media_urls?.[0]?.url ?? document.payload?.original_url,
         matchedPage: document.entity_type === "DocumentPage" ? document.page_number : undefined,
         pageCount: document.payload?.derived_content?.page_count,
+        sourcePageCount: document.payload?.derived_content?.source_page_count,
       };
       if (canPreviewPdf) {
         previewKeys.set(resultEntityId, pdfPageCacheKey(resultEntityId, 1));

@@ -1971,7 +1971,19 @@
                       <span class="pill">{item.organization}</span>
                       <span class="pill pill--soft">{item.entityTypeLabel}</span>
                       {#if item.pageCount && item.entityType === "Document"}
-                        <span class="pill pill--soft">{item.pageCount} pagina's</span>
+                        <!-- The number here used to be how many pages were
+                             extracted, shown as if it were the document's
+                             length: a 908-page report read "40 pagina's", and
+                             nothing said that search had only seen the first
+                             forty (#221). Where the two differ, say both. -->
+                        {#if item.sourcePageCount && item.sourcePageCount > item.pageCount}
+                          <span
+                            class="pill pill--soft"
+                            title="Alleen de eerste {item.pageCount} pagina's zijn doorzocht"
+                          >{item.sourcePageCount} pagina's, {item.pageCount} doorzocht</span>
+                        {:else}
+                          <span class="pill pill--soft">{item.pageCount} pagina's</span>
+                        {/if}
                       {/if}
                     </div>
                     <span class="result-card__date">{item.date}</span>
