@@ -142,6 +142,19 @@ select {
   opacity: calc(1 - var(--hero-fade, 0));
 }
 
+/* --hero-fade is set per frame from the scroll offset, so these must not
+   transition it as well. .hero__meta declares a 500ms opacity transition of
+   its own further down, which left it trailing the scroll and stalling
+   half-faded — the counts and the organisation picker were the two that never
+   quite went. A query still transitions: there --hero-fade goes straight to 1,
+   and the transition is the thing that carries it. */
+.hero:not(.hero--search) .hero__vng,
+.hero:not(.hero--search) .brand__alias,
+.hero:not(.hero--search) .hero__meta,
+.hero--scrubbed .hero__meta {
+  transition: none;
+}
+
 /* The scroll fold, unlike the one a query triggers, happens under a reader
    who is looking at the page below rather than at the hero. So the hero takes
    its collapsed shape at once and lets the surface fade and the flying brand
@@ -355,37 +368,26 @@ select {
   transform: translateY(-8px);
 }
 
+/* Just the box that sizes and centres the field — no surface of its own.
+   It used to be a card: padding, a border, a blurred translucent background
+   and a shadow, all of which the fold threw away at once, so the field was
+   sitting on something that vanished the moment it started moving. The field
+   already has its own surface, which is the one that flies into the bar. */
 .search-panel {
   width: min(52rem, 100%);
   max-width: 52rem;
   margin: 0 auto;
-  padding: 1.1rem;
-  border: 1px solid rgba(41, 88, 153, 0.1);
-  border-radius: 1.75rem;
-  background: rgba(255, 255, 255, 0.68);
-  box-shadow: 0 14px 34px rgba(31, 62, 116, 0.08);
-  backdrop-filter: blur(14px);
   z-index: 3;
   transition:
     width var(--motion-slow) ease,
     max-width var(--motion-slow) ease,
-    margin var(--motion-slow) ease,
-    padding var(--motion-slow) ease,
-    border-radius var(--motion-slow) ease,
-    box-shadow var(--motion-slow) ease,
-    background var(--motion-slow) ease;
+    margin var(--motion-slow) ease;
 }
 
 .hero--search .search-panel {
   width: 100%;
   max-width: none;
   margin: 0 0 0 auto;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  box-shadow: none;
-  background: transparent;
-  backdrop-filter: none;
 }
 
 .search-panel__query-row {
@@ -2950,12 +2952,6 @@ select {
     color: var(--accent);
   }
 
-  .search-panel {
-    border-color: rgba(114, 163, 232, 0.18);
-    background: rgba(14, 16, 20, 0.82);
-    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
-  }
-
   .search-field,
   .select-field {
     border-color: rgba(114, 163, 232, 0.18);
@@ -3335,10 +3331,6 @@ select {
 
   .hero--search {
     padding: 0.75rem 1rem 0.9rem;
-  }
-
-  .search-panel {
-    padding: 0.9rem;
   }
 
   .search-panel__query-row {
