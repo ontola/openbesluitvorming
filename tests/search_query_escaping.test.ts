@@ -112,7 +112,7 @@ async function withProjection(version: string, fn: () => void | Promise<void>): 
   }
 }
 
-Deno.test("a quoted phrase is searched as a phrase", async () => {
+Deno.test("a quoted phrase is searched as a phrase, on the fields that can answer one", async () => {
   await withProjection("search-v3-meeting-date", () => {
     const query = build('"sociale huurwoningen"', "", "");
     assert(
@@ -122,6 +122,24 @@ Deno.test("a quoted phrase is searched as a phrase", async () => {
     assert(
       !query.includes("sociale AND huurwoningen"),
       `they should not be AND-ed back apart, got ${query}`,
+    );
+
+    // The defect this missed the first time: an unqualified phrase goes to
+    // every default search field, and `classification` records no positions,
+    // so Quickwit answered with a 500 instead of degrading. Shipped to
+    // production on 2026-08-16 with the assertions above passing, because
+    // "contains the phrase" says nothing about which field it lands on.
+    assert(
+      query.includes('name:"sociale huurwoningen"'),
+      `the phrase must name its fields, got ${query}`,
+    );
+    assert(
+      query.includes('content:"sociale huurwoningen"'),
+      `the phrase must name its fields, got ${query}`,
+    );
+    assert(
+      !query.includes('classification:"'),
+      `classification has no positions and cannot take a phrase, got ${query}`,
     );
   });
 });

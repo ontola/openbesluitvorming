@@ -212,6 +212,10 @@ const MATCHES_NOTHING = "entity_type:__geen_resultaat__";
  * becomes `kosten AND baten` and finds what the reader meant. Lowercasing
  * doubles as protection against the query keywords: `AND`, `OR`, `NOT` and `TO`
  * only bind in upper case, so a search for the word "not" stays a word. */
+/** The default search fields that record positions, and so can answer a
+ * phrase. `classification` is the third default field and has none. */
+const PHRASE_FIELDS = ["name", "content"] as const;
+
 function tokenizeQueryText(text: string): string[] {
   return (
     text
@@ -275,7 +279,12 @@ function buildSearchClause(text: string): string {
       clauses.push(...tokens);
       continue;
     }
-    clauses.push(escapeTerm(tokens.join(" ")));
+    // Named explicitly, because an unqualified phrase goes to every default
+    // search field and `classification` carries no positions -- which answered
+    // every quoted query with a 500 rather than degrading. The bare-term
+    // branch above still searches all three.
+    const quoted = escapeTerm(tokens.join(" "));
+    clauses.push(`(${PHRASE_FIELDS.map((field) => `${field}:${quoted}`).join(" OR ")})`);
   }
 
   clauses.push(...tokenizeQueryText(rest));
