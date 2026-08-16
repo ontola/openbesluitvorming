@@ -88,3 +88,77 @@ Deno.test("diacritics are letters, not punctuation", () => {
   assert(built.includes("coördinatie"), `expected the word intact: ${built}`);
   assert(built.includes("financiën"), `expected the word intact: ${built}`);
 });
+
+/** #198: quotes around a phrase were tokenised away.
+ *
+ * `"sociale huurwoningen"` matched every document holding both words anywhere,
+ * so most hits were irrelevant and nothing in the response said so. Positions
+ * are indexed on `name` and `content` from projection v3, so the phrase can
+ * now be asked for as a phrase — measured against the live index on
+ * 2026-08-16: 194.524 hits for the phrase, where the v2 index refuses it with
+ * "does not have positions indexed".
+ */
+async function withProjection(version: string, fn: () => void | Promise<void>): Promise<void> {
+  const original = Deno.env.get("WOOZI_PROJECTION_VERSION");
+  Deno.env.set("WOOZI_PROJECTION_VERSION", version);
+  try {
+    await fn();
+  } finally {
+    if (original === undefined) {
+      Deno.env.delete("WOOZI_PROJECTION_VERSION");
+    } else {
+      Deno.env.set("WOOZI_PROJECTION_VERSION", original);
+    }
+  }
+}
+
+Deno.test("a quoted phrase is searched as a phrase", async () => {
+  await withProjection("search-v3-meeting-date", () => {
+    const query = build('"sociale huurwoningen"', "", "");
+    assert(
+      query.includes('"sociale huurwoningen"'),
+      `the words should stay adjacent, got ${query}`,
+    );
+    assert(
+      !query.includes("sociale AND huurwoningen"),
+      `they should not be AND-ed back apart, got ${query}`,
+    );
+  });
+});
+
+Deno.test("a phrase combines with the loose words around it", async () => {
+  await withProjection("search-v3-meeting-date", () => {
+    const query = build('"sociale huurwoningen" begroting', "", "");
+    assert(query.includes('"sociale huurwoningen"'), `phrase kept, got ${query}`);
+    assert(query.includes("begroting"), `loose term kept, got ${query}`);
+  });
+});
+
+Deno.test("one quoted word is a term, not a phrase", async () => {
+  await withProjection("search-v3-meeting-date", () => {
+    // A single word needs no positions, so it must not be dressed up as one.
+    const query = build('"woningbouw"', "", "");
+    assert(!query.includes('"woningbouw"'), `should be a bare term, got ${query}`);
+    assert(query.includes("woningbouw"), `the word should survive, got ${query}`);
+  });
+});
+
+Deno.test("without positions in the index the quotes are dropped, not obeyed", async () => {
+  await withProjection("search-v2-pages", () => {
+    // v2 refuses a phrase outright rather than degrading it, so asking for one
+    // there would 500. The words are searched loose instead.
+    const query = build('"sociale huurwoningen"', "", "");
+    assert(
+      !query.includes('"sociale huurwoningen"'),
+      `a v2 index cannot answer a phrase, got ${query}`,
+    );
+    assert(query.includes("sociale") && query.includes("huurwoningen"), `got ${query}`);
+  });
+});
+
+Deno.test("an unbalanced quote still searches", async () => {
+  await withProjection("search-v3-meeting-date", () => {
+    const query = build('"sociale huurwoningen', "", "");
+    assert(query.includes("sociale") && query.includes("huurwoningen"), `got ${query}`);
+  });
+});

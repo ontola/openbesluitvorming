@@ -25,6 +25,19 @@ export function projectionSupportsDateSort(): boolean {
   return currentProjectionVersion() !== "search-v2-pages";
 }
 
+/** Whether the index this projection queries records term positions on `name`
+ * and `content`, and can therefore answer a phrase query.
+ *
+ * Same index generation as the date sort — v3 introduced both — but a
+ * different property of the mapping, so it is asked for by its own name. On a
+ * v2 index a phrase is not degraded, it is refused:
+ *   Schema error: 'Applied phrase query on field "content", which does not
+ *   have positions indexed'
+ * Verified against both live indexes on 2026-08-16. */
+export function projectionSupportsPhraseSearch(): boolean {
+  return currentProjectionVersion() !== "search-v2-pages";
+}
+
 export function currentDerivationVersion(): string {
   return Deno.env.get("WOOZI_DERIVATION_VERSION")?.trim() || "pymupdf-v1";
 }

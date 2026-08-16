@@ -1138,3 +1138,68 @@ Deno.test("a meeting from a withdrawn source opens without its live agenda", asy
     globalThis.fetch = originalFetch;
   }
 });
+
+/** #213: HTML entities arriving in the API as visible text.
+ *
+ * The extracted text already carries escaped markup — a source `<br>` reaches
+ * the index as the six literal characters `&lt;br&gt;` — and the response
+ * escaped that ampersand a second time, so `&amp;lt;br&amp;gt;` appeared on
+ * screen and in `summary`, which is documented as plain text. Measured on
+ * production 2026-08-16: five such places in one result page.
+ */
+Deno.test("a snippet carries the highlight and nothing else", async () => {
+  const originalFetch = globalThis.fetch;
+
+  globalThis.fetch = async () =>
+    new Response(
+      JSON.stringify({
+        num_hits: 1,
+        hits: [
+          {
+            time: "2026-03-31T10:00:00Z",
+            entity_id: "document:notubiz:gemeente:haarlem:42",
+            entity_type: "Document",
+            name: "Waddenbuurt",
+            source_key: "haarlem",
+            content: "x",
+          },
+        ],
+        snippets: [
+          {
+            content: [
+              "<b>Waddenbuurt</b> vast te stellen&lt;br&gt;2. Archeologie 2&#x27; dient de aanvrager",
+            ],
+          },
+        ],
+      }),
+      { headers: { "content-type": "application/json" } },
+    );
+
+  try {
+    const response = await searchMeetings({ query: "waddenbuurt" });
+    const [result] = response.results;
+
+    assert(
+      !result.summary.includes("&"),
+      `summary is documented as plain text, got ${JSON.stringify(result.summary)}`,
+    );
+    assert(
+      result.summary.includes("Archeologie 2' dient"),
+      `the apostrophe should be a character, got ${JSON.stringify(result.summary)}`,
+    );
+    assert(
+      !result.summary.includes("br"),
+      `source markup does not belong in a text preview, got ${JSON.stringify(result.summary)}`,
+    );
+    assert(
+      result.summaryHtml?.includes("<b>Waddenbuurt</b>"),
+      `the highlight must survive, got ${JSON.stringify(result.summaryHtml)}`,
+    );
+    assert(
+      !/&amp;(lt|gt);/.test(result.summaryHtml ?? ""),
+      `nothing should be escaped twice, got ${JSON.stringify(result.summaryHtml)}`,
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

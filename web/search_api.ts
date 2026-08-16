@@ -16,6 +16,7 @@ import { normalizeNotubizAgendaItems } from "../src/notubiz/normalize.ts";
 import {
   currentProjectionVersion,
   projectionSupportsDateSort,
+  projectionSupportsPhraseSearch,
 } from "../src/pipeline/versioning.ts";
 import { QuickwitClient } from "../src/quickwit/client.ts";
 import { getProjectableSource, getSource, listSources } from "../src/sources/index.ts";
@@ -210,19 +211,81 @@ const MATCHES_NOTHING = "entity_type:__geen_resultaat__";
  * becomes `kosten AND baten` and finds what the reader meant. Lowercasing
  * doubles as protection against the query keywords: `AND`, `OR`, `NOT` and `TO`
  * only bind in upper case, so a search for the word "not" stays a word. */
+function tokenizeQueryText(text: string): string[] {
+  return (
+    text
+      .toLowerCase()
+      // Unicode-aware: Dutch text is full of ë, ï and é, and those are letters.
+      .split(/[^\p{L}\p{N}]+/u)
+      .filter(Boolean)
+  );
+}
+
+/** Pull the double-quoted runs out of the input.
+ *
+ * An unbalanced trailing quote is left in `rest`, where it is stripped as
+ * punctuation like any other — a half-typed query should still search. */
+export function splitQuotedPhrases(text: string): { phrases: string[]; rest: string } {
+  const phrases: string[] = [];
+  const rest = text.replaceAll(/"([^"]*)"/g, (_match, inner: string) => {
+    const trimmed = inner.trim();
+    if (trimmed) {
+      phrases.push(trimmed);
+    }
+    return " ";
+  });
+  return { phrases, rest };
+}
+
+/** Whether the reader asked for a phrase, and we can answer one. */
+export function queryHasPhrase(text: string): boolean {
+  return splitQuotedPhrases(text).phrases.some((phrase) => tokenizeQueryText(phrase).length > 1);
+}
+
+/** Turn user input into a Quickwit clause.
+ *
+ * Words between double quotes become a phrase query; everything else becomes
+ * bare terms joined with AND. Quotes used to disappear into the tokenisation,
+ * so `"sociale huurwoningen"` matched every document containing both words
+ * anywhere — the majority of the hits irrelevant, with nothing in the response
+ * saying so (#198).
+ *
+ * Bare terms remain the treatment for unquoted input. Stripping everything
+ * that is not a letter or a digit matches how the default tokenizer splits
+ * text anyway, so `kosten/baten` becomes `kosten AND baten` and finds what the
+ * reader meant. Wrapping each of those in quotes, which looks like escaping
+ * but makes a phrase, is what produced a 500 on ordinary punctuation before
+ * positions existed (#197).
+ *
+ * Without positions in the index a phrase is refused outright rather than
+ * approximated, so on a v2 projection the quotes are dropped and the words are
+ * searched loose — the behaviour this replaces. */
 function buildSearchClause(text: string): string {
-  const tokens = text
-    .toLowerCase()
-    // Unicode-aware: Dutch text is full of ë, ï and é, and those are letters.
-    .split(/[^\p{L}\p{N}]+/u)
-    .filter(Boolean);
-  if (tokens.length === 0) {
+  const { phrases, rest } = splitQuotedPhrases(text);
+  const clauses: string[] = [];
+
+  for (const phrase of phrases) {
+    const tokens = tokenizeQueryText(phrase);
+    if (tokens.length === 0) {
+      continue;
+    }
+    if (tokens.length === 1 || !projectionSupportsPhraseSearch()) {
+      // One word is a term, not a phrase, and needs no positions.
+      clauses.push(...tokens);
+      continue;
+    }
+    clauses.push(escapeTerm(tokens.join(" ")));
+  }
+
+  clauses.push(...tokenizeQueryText(rest));
+
+  if (clauses.length === 0) {
     return text.trim() ? MATCHES_NOTHING : "";
   }
-  if (tokens.length === 1) {
-    return tokens[0];
+  if (clauses.length === 1) {
+    return clauses[0];
   }
-  return `(${tokens.join(" AND ")})`;
+  return `(${clauses.join(" AND ")})`;
 }
 
 function expandDutchGovernanceTerms(query: string): string[] {
@@ -294,7 +357,10 @@ function buildQuickwitQuery(
   }
 
   if (query) {
-    const expandedTerms = expandDutchGovernanceTerms(query);
+    // A quoted phrase is an exact request, so it is not widened with the
+    // governance synonyms -- that would OR the loose variants back in and undo
+    // exactly what the quotes asked for.
+    const expandedTerms = queryHasPhrase(query) ? [query] : expandDutchGovernanceTerms(query);
     if (expandedTerms.length === 1) {
       parts.push(buildSearchClause(expandedTerms[0]));
     } else {
@@ -485,14 +551,67 @@ function stripMarkdownPreviewSyntax(value: string): string {
     .trim();
 }
 
-function sanitizeSnippet(snippet?: string): string | undefined {
+const NAMED_ENTITIES: Record<string, string> = {
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+  nbsp: " ",
+};
+
+/** Undo one round of HTML escaping.
+ *
+ * The extracted text already carries escaped markup -- a source `<br>` reaches
+ * the index as the literal six characters `&lt;br&gt;` -- so escaping the
+ * snippet for output escaped that ampersand a second time and `&amp;lt;br&amp;gt;`
+ * arrived in the API as text. One round, not a loop: text that legitimately
+ * mentions `&lt;` should survive being read once (#213). */
+function decodeHtmlEntities(value: string): string {
+  return value.replaceAll(/&(#x?[0-9a-f]+|[a-z]+);/gi, (match, body: string) => {
+    if (body.startsWith("#")) {
+      const codePoint =
+        body[1] === "x" || body[1] === "X"
+          ? Number.parseInt(body.slice(2), 16)
+          : Number.parseInt(body.slice(1), 10);
+      return Number.isFinite(codePoint) && codePoint > 0 && codePoint <= 0x10ffff
+        ? String.fromCodePoint(codePoint)
+        : match;
+    }
+    return NAMED_ENTITIES[body.toLowerCase()] ?? match;
+  });
+}
+
+/** Quickwit marks the matched terms with `<b>`; everything around them is text
+ * that may itself contain markup from the source document. So the highlight is
+ * set aside, the rest is decoded and stripped back to prose, and only then is
+ * the whole thing escaped -- which leaves `summaryHtml` carrying nothing but
+ * the highlight, and `summary` nothing at all. */
+function sanitizeSnippet(snippet?: string): { text: string; html: string } | undefined {
   if (!snippet) {
     return undefined;
   }
 
-  return escapeHtml(stripMarkdownPreviewSyntax(snippet))
-    .replaceAll("&lt;b&gt;", "<b>")
-    .replaceAll("&lt;/b&gt;", "</b>");
+  const HIGHLIGHT_OPEN = "\u0000b\u0000";
+  const HIGHLIGHT_CLOSE = "\u0000/b\u0000";
+  const withPlaceholders = snippet
+    .replaceAll("<b>", HIGHLIGHT_OPEN)
+    .replaceAll("</b>", HIGHLIGHT_CLOSE);
+
+  const asProse = stripMarkdownPreviewSyntax(decodeHtmlEntities(withPlaceholders))
+    // Whatever markup the source carried is not part of a text preview. A
+    // `<br>` used to be shown to the reader as those four characters.
+    .replaceAll(/<[^>]*>/g, "")
+    .replaceAll(/\s+/g, " ")
+    .trim();
+
+  return {
+    // Plain text, as the field is documented: no markup and no entities. It
+    // used to be the escaped HTML with the <b> cut out, which is why the
+    // entities were in it.
+    text: asProse.replaceAll(HIGHLIGHT_OPEN, "").replaceAll(HIGHLIGHT_CLOSE, ""),
+    html: escapeHtml(asProse).replaceAll(HIGHLIGHT_OPEN, "<b>").replaceAll(HIGHLIGHT_CLOSE, "</b>"),
+  };
 }
 
 function formatDate(dateValue?: string): string {
@@ -786,7 +905,7 @@ async function collectSearchWindow(
     const dedupedHits = groupIndexedHits(dedupeLatestIndexedHits(indexedHits));
 
     for (const { hit: document, snippet: snippets } of dedupedHits) {
-      const snippetHtml = sanitizeSnippet(snippets?.content?.[0] ?? snippets?.name?.[0]);
+      const snippet = sanitizeSnippet(snippets?.content?.[0] ?? snippets?.name?.[0]);
       const normalizedEntityType = searchResultEntityType(document);
       const resultEntityId = searchResultEntityId(document);
       const canPreviewPdf =
@@ -808,10 +927,8 @@ async function collectSearchWindow(
           (normalizedEntityType === "Document"
             ? (document.file_name ?? "Ongetiteld document")
             : "Ongetitelde vergadering"),
-        summary: snippetHtml
-          ? snippetHtml.replaceAll(/<\/?b>/g, "")
-          : summarizeContent(document.content),
-        summaryHtml: snippetHtml,
+        summary: snippet ? snippet.text : summarizeContent(document.content),
+        summaryHtml: snippet?.html,
         downloadUrl: document.payload?.media_urls?.[0]?.url ?? document.payload?.original_url,
         matchedPage: document.entity_type === "DocumentPage" ? document.page_number : undefined,
         pageCount: document.payload?.derived_content?.page_count,
