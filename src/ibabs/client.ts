@@ -1,6 +1,6 @@
 import { XMLParser } from "npm:fast-xml-parser";
 import { setDefaultResultOrder } from "node:dns";
-import { ibabsRateLimiter } from "./rate_limit.ts";
+import { ibabsDownloadRateLimiter, ibabsRateLimiter } from "./rate_limit.ts";
 import type {
   DocumentEntity,
   IbabsDocument,
@@ -708,9 +708,11 @@ export class IbabsClient {
       throw new Error("Document has no download URL");
     }
 
-    const limiter = ibabsRateLimiter();
-    // Downloads go to api1.ibabs.eu rather than the SOAP host, but the block
-    // that hit us on 2026-08-05 covered both — it is one IP budget.
+    // Downloads go to api1.ibabs.eu rather than the SOAP host, and carry a
+    // budget six times smaller: 30/min against 180. The block that hit us on
+    // 2026-08-05 covered both hosts, so the breaker behind these two limiters
+    // is shared even though their pacing is not.
+    const limiter = ibabsDownloadRateLimiter();
     await limiter.acquire();
     const client = getProxyClient();
     // Same rationale as the SOAP fetch: an open but unresponsive connection

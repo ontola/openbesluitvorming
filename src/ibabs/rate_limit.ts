@@ -22,7 +22,21 @@
  * a missing volume degrades rather than breaks.
  */
 
-const DEFAULT_MAX_RPS = 2;
+/** What iBabs allows per minute, for the whole IP address.
+ *
+ * Their numbers, given on 2026-08-17 when they lifted the block: 180/min for
+ * the WCF endpoint and the public portal, 30/min for publicdownload and the
+ * document viewer. Downloads were lowered from what they used to be, because
+ * bots now spread requests over several addresses.
+ *
+ * These are per *IP*, and the fleet shares one, so the budget is divided by
+ * the number of workers rather than granted to each of them. Going over does
+ * not cost a 429 -- it cost twelve days of blacklisting on 2026-08-05 -- so
+ * the pacing keeps a fifth of the budget in hand. */
+const DEFAULT_SOAP_PER_MINUTE = 180;
+const DEFAULT_DOWNLOAD_PER_MINUTE = 30;
+const DEFAULT_WORKERS = 1;
+const BUDGET_HEADROOM = 0.8;
 const DEFAULT_COOLDOWN_MS = 30_000;
 /** Longest the breaker will hold every request in a process.
  *
@@ -37,6 +51,17 @@ export const DEFAULT_MAX_COOLDOWN_MS = 15 * 60_000;
 /** How long a read of the shared breaker file is trusted, so pacing does not
  * turn into a stat() per request. */
 const SHARED_READ_TTL_MS = 1_000;
+
+function envNumber(name: string, fallback: number): number {
+  const value = Number(Deno.env.get(name));
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+/** This process's share of a per-IP, per-minute budget, as requests/second. */
+function pacePerSecond(perMinute: number): number {
+  const workers = envNumber("WOOZI_IBABS_WORKERS", DEFAULT_WORKERS);
+  return (perMinute * BUDGET_HEADROOM) / workers / 60;
+}
 
 export interface RateLimiterOptions {
   maxRequestsPerSecond?: number;
@@ -72,9 +97,7 @@ export class IbabsRateLimiter {
   private tail: Promise<void> = Promise.resolve();
 
   constructor(options: RateLimiterOptions = {}) {
-    const rps =
-      options.maxRequestsPerSecond ??
-      Number(Deno.env.get("WOOZI_IBABS_MAX_RPS") ?? DEFAULT_MAX_RPS);
+    const rps = options.maxRequestsPerSecond ?? pacePerSecond(DEFAULT_SOAP_PER_MINUTE);
     this.minIntervalMs = rps > 0 ? 1000 / rps : 0;
     this.cooldownMs =
       options.cooldownMs ?? Number(Deno.env.get("WOOZI_IBABS_COOLDOWN_MS") ?? DEFAULT_COOLDOWN_MS);
@@ -153,13 +176,40 @@ export class IbabsRateLimiter {
   }
 }
 
-let sharedLimiter: IbabsRateLimiter | null = null;
+let soapLimiter: IbabsRateLimiter | null = null;
+let downloadLimiter: IbabsRateLimiter | null = null;
 
+/** Pacing for the SOAP endpoint and the WSDL: 180/min for the address.
+ *
+ * One limiter used to serve both this and the downloads, paced at whatever
+ * WOOZI_IBABS_MAX_RPS said. That was a single number for two budgets six times
+ * apart, so it was necessarily wrong for one of them: production ran it at 1/s
+ * per worker, which across four workers is 240/min -- inside the SOAP budget
+ * and eight times over the download one. */
 export function ibabsRateLimiter(): IbabsRateLimiter {
-  if (!sharedLimiter) {
-    sharedLimiter = new IbabsRateLimiter();
+  if (!soapLimiter) {
+    soapLimiter = new IbabsRateLimiter({
+      maxRequestsPerSecond: pacePerSecond(
+        envNumber("WOOZI_IBABS_SOAP_PER_MINUTE", DEFAULT_SOAP_PER_MINUTE),
+      ),
+    });
   }
-  return sharedLimiter;
+  return soapLimiter;
 }
 
-export const __test__ = { cooldownFor };
+/** Pacing for publicdownload and the document viewer: 30/min for the address.
+ *
+ * A separate limiter, but the breaker behind it is the same file, because a
+ * 403 on either host is the same address being told to stop. */
+export function ibabsDownloadRateLimiter(): IbabsRateLimiter {
+  if (!downloadLimiter) {
+    downloadLimiter = new IbabsRateLimiter({
+      maxRequestsPerSecond: pacePerSecond(
+        envNumber("WOOZI_IBABS_DOWNLOAD_PER_MINUTE", DEFAULT_DOWNLOAD_PER_MINUTE),
+      ),
+    });
+  }
+  return downloadLimiter;
+}
+
+export const __test__ = { cooldownFor, pacePerSecond };

@@ -1,10 +1,15 @@
 // Read at module load, so these have to be set before the client is imported.
 Deno.env.set("WOOZI_IBABS_THROTTLE_BASE_MS", "1");
-// The client shares one rate limiter, and stubbing a 403 opens its breaker for
-// real. Left at production values a single test would sleep 30s and the next
-// 60s, so pace and cooldown are collapsed here; IbabsRateLimiter's own
-// behaviour is covered in ibabs_rate_limit.test.ts.
-Deno.env.set("WOOZI_IBABS_MAX_RPS", "100000");
+// Stubbing a 403 opens the client's breaker for real. Left at production
+// values a single test would sleep 30s and the next 60s, so pace and cooldown
+// are collapsed here; IbabsRateLimiter's own behaviour is covered in
+// ibabs_rate_limit.test.ts.
+//
+// Pacing is now a share of a per-minute budget rather than a flat rate, so it
+// is widened through those budgets. A test that waits for the real 30/min
+// download pace would take two seconds per request.
+Deno.env.set("WOOZI_IBABS_SOAP_PER_MINUTE", "600000");
+Deno.env.set("WOOZI_IBABS_DOWNLOAD_PER_MINUTE", "600000");
 Deno.env.set("WOOZI_IBABS_COOLDOWN_MS", "1");
 Deno.env.set("WOOZI_IBABS_MAX_COOLDOWN_MS", "2");
 

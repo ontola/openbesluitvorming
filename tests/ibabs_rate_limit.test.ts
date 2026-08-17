@@ -167,3 +167,56 @@ Deno.test("a failing caller does not wedge the queue behind it", async () => {
   await recovered.acquire();
   assert(true, "a later limiter still works");
 });
+
+/** The budgets iBabs gave us on 2026-08-17, when they lifted the block.
+ *
+ * 180/min for WCF and the portal, 30/min for publicdownload and the document
+ * viewer — per IP address, which the whole fleet shares. One limiter used to
+ * serve both at a single rate, and production ran it at 1/s per worker: across
+ * four workers that is 240/min, inside the SOAP budget and eight times over
+ * the download one. Exceeding it does not cost a 429; it cost twelve days of
+ * blacklisting on 2026-08-05.
+ */
+Deno.test("each endpoint is paced to its own share of the per-IP budget", () => {
+  const previous = Deno.env.get("WOOZI_IBABS_WORKERS");
+  Deno.env.set("WOOZI_IBABS_WORKERS", "4");
+  try {
+    const perMinute = (perSecond: number) => perSecond * 60 * 4; // back to the fleet
+    const soap = __test__.pacePerSecond(180);
+    const download = __test__.pacePerSecond(30);
+
+    assertEquals(Math.round(perMinute(soap)), 144, "SOAP: 180/min with a fifth held back");
+    assertEquals(Math.round(perMinute(download)), 24, "downloads: 30/min with a fifth held back");
+    assert(
+      perMinute(download) <= 30,
+      `the fleet must stay inside 30/min, got ${perMinute(download)}`,
+    );
+    assert(perMinute(soap) <= 180, `the fleet must stay inside 180/min, got ${perMinute(soap)}`);
+    assert(download < soap, "downloads are the tighter budget of the two");
+  } finally {
+    if (previous === undefined) {
+      Deno.env.delete("WOOZI_IBABS_WORKERS");
+    } else {
+      Deno.env.set("WOOZI_IBABS_WORKERS", previous);
+    }
+  }
+});
+
+Deno.test("more workers means each one goes slower, not the fleet faster", () => {
+  const previous = Deno.env.get("WOOZI_IBABS_WORKERS");
+  try {
+    Deno.env.set("WOOZI_IBABS_WORKERS", "1");
+    const alone = __test__.pacePerSecond(30);
+    Deno.env.set("WOOZI_IBABS_WORKERS", "8");
+    const crowded = __test__.pacePerSecond(30);
+
+    assertEquals(alone / crowded, 8, "the budget is divided, not multiplied");
+    assert(crowded * 8 <= 30 / 60, "eight workers together still fit inside 30/min");
+  } finally {
+    if (previous === undefined) {
+      Deno.env.delete("WOOZI_IBABS_WORKERS");
+    } else {
+      Deno.env.set("WOOZI_IBABS_WORKERS", previous);
+    }
+  }
+});

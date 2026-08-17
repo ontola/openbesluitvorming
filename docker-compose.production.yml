@@ -151,6 +151,10 @@ services:
       QUICKWIT_INDEX_ID: ${WORKER_QUICKWIT_INDEX_ID:-${QUICKWIT_INDEX_ID:-woozi-events-prod}}
       WOOZI_PROJECTION_VERSION: ${WORKER_PROJECTION_VERSION:-${WOOZI_PROJECTION_VERSION:-}}
       QUICKWIT_BATCH_SIZE: ${QUICKWIT_BATCH_SIZE:-64}
+      # iBabs rate limits are per IP address and the whole fleet shares one, so
+      # each worker may only pace itself to its share of the budget. Without
+      # this the workers each assume they are alone.
+      WOOZI_IBABS_WORKERS: ${WOOZI_WORKER_REPLICAS:-1}
       WOOZI_KV_PATH: /data/woozi-ops.sqlite3
       WOOZI_EXPORT_LOG_PATH: /data/woozi-export-log.sqlite3
       AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY}
@@ -185,7 +189,11 @@ services:
       # backfill is not urgent and a second block is far more expensive than a
       # slow import. The breaker path lives on the shared volume so a 403 seen
       # by one worker pauses all of them.
-      WOOZI_IBABS_MAX_RPS: ${WOOZI_IBABS_MAX_RPS:-1}
+      # One rate for two budgets six times apart is necessarily wrong for one
+      # of them, so pacing is now per endpoint and expressed as iBabs states
+      # it: requests per minute for the whole address, divided across workers.
+      WOOZI_IBABS_SOAP_PER_MINUTE: ${WOOZI_IBABS_SOAP_PER_MINUTE:-180}
+      WOOZI_IBABS_DOWNLOAD_PER_MINUTE: ${WOOZI_IBABS_DOWNLOAD_PER_MINUTE:-30}
       WOOZI_IBABS_COOLDOWN_MS: ${WOOZI_IBABS_COOLDOWN_MS:-60000}
       WOOZI_IBABS_BREAKER_PATH: /data/ibabs-breaker.json
       OTEL_DENO: ${OTEL_DENO:-true}
