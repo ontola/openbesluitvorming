@@ -549,6 +549,61 @@ select {
   display: none;
 }
 
+/* The magnifier says what the box is for without spending a line of text on
+   it, and it survives the fold into the bar where the placeholder does not. */
+.search-field__icon {
+  flex: none;
+  width: 1.15rem;
+  height: 1.15rem;
+  margin-right: 0.6rem;
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 1.9;
+  stroke-linecap: round;
+}
+
+/* Only rendered while there is something to clear. */
+.search-field__clear {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  margin-left: 0.4rem;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  transition:
+    background var(--motion-fast) ease,
+    color var(--motion-fast) ease;
+}
+
+.search-field__clear svg {
+  width: 0.95rem;
+  height: 0.95rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.search-field__clear:hover,
+.search-field__clear:focus-visible {
+  background: color-mix(in srgb, var(--accent-deep) 12%, transparent);
+  color: var(--text);
+  outline: none;
+}
+
+/* WebKit puts its own clear control on type="search". Ours is the one that
+   matches the rest of the interface, so there should not be two. */
+.search-field input[type="search"]::-webkit-search-cancel-button,
+.search-field input[type="search"]::-webkit-search-decoration {
+  appearance: none;
+}
+
 .search-field input,
 .select-field select {
   width: 100%;

@@ -1390,6 +1390,19 @@
     scheduleSearch();
   }
 
+  /** Empty the field the way the native control would.
+   *
+   * `type="search"` gives WebKit its own clear button, which fires a `search`
+   * event; that is the path this mirrors, so clearing behaves the same however
+   * the reader does it. Focus goes back to the field, because the reason to
+   * clear a search is to type another one. */
+  async function clearQuery(): Promise<void> {
+    query = "";
+    queryInputEl?.focus();
+    onQueryInput();
+    await onQuerySearch();
+  }
+
   async function onQuerySearch(): Promise<void> {
     if (!searched && !hasActiveSearchFilters()) {
       return;
@@ -1848,6 +1861,10 @@
                  a placeholder is not one — it disappears the moment you type,
                  and voice control cannot address a field it cannot name. -->
             <span class="sr-only">Zoeken in vergaderstukken</span>
+            <svg class="search-field__icon" viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="11" cy="11" r="7" />
+              <path d="M16.5 16.5 21 21" />
+            </svg>
             <input
               bind:this={queryInputEl}
               bind:value={query}
@@ -1860,6 +1877,19 @@
                 void onQuerySearch();
               }}
             />
+            {#if query}
+              <button
+                type="button"
+                class="search-field__clear"
+                aria-label="Zoekopdracht wissen"
+                on:click={clearQuery}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M6 6l12 12" />
+                  <path d="M18 6 6 18" />
+                </svg>
+              </button>
+            {/if}
           </label>
         </div>
       </form>
