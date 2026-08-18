@@ -1056,8 +1056,26 @@ export async function getDocumentCoverage(monthCount = 12): Promise<AdminCoverag
   const months = coverageMonthLabels(Math.max(3, Math.min(monthCount, 60)));
   const coverageSources = listSources();
   const quickwit = new QuickwitClient();
+  // Restrict the documents considered to the months being shown.
+  //
+  // Without this the month sub-aggregation is a `terms` over the whole corpus,
+  // and a `terms` returns the *most frequent* buckets, not the ones asked for.
+  // A source with 195 months of history got its busiest 60 back, whichever
+  // years those fell in, and the view then looked up the recent months among
+  // them. So months with data read as empty -- Aalsmeer was missing 135 of its
+  // months -- and any source whose peak years are old read as nothing at all:
+  // Alkmaar showed 0 against 21.858 documents, because its busiest sixty
+  // months all end in 2018.
+  //
+  // Filtered to the window, at most `months.length` distinct values can occur,
+  // so the sub-aggregation can no longer drop any of them. Ranges are not an
+  // option here: document_month is a `str` field and Quickwit refuses a range
+  // query on one.
+  const monthClause = months.map((month) => `document_month:${escapeTerm(month)}`).join(" OR ");
   const response = await quickwit.searchRequest({
-    query: `projection_version:${escapeTerm(currentProjectionVersion())} AND entity_type:Document`,
+    query:
+      `projection_version:${escapeTerm(currentProjectionVersion())} AND entity_type:Document` +
+      ` AND (${monthClause})`,
     max_hits: 0,
     aggs: {
       by_source: {
