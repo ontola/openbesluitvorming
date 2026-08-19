@@ -2267,34 +2267,10 @@
             We meten hoe vaak deze zoekmachine gebruikt wordt met Swetrix, een privacyvriendelijk alternatief voor
             Google Analytics. Per paginabezoek gaat er één verzoek naar Swetrix met de opgevraagde pagina, de
             verwijzende pagina, je browser- en apparaattype, je taalinstelling en het land waar je vandaan komt. Er
-            worden geen cookies geplaatst en er wordt niets in je browser opgeslagen. Van je IP-adres worden de laatste
-            zes cijfers niet opgeslagen, en we volgen je niet over andere websites. We gebruiken deze gegevens alleen
-            om geaggregeerde bezoekersrapportages te maken en verkopen ze aan niemand door.
-          </p>
-          <p>
-            <strong>Grondslag.</strong> Deze verwerking rust op ons gerechtvaardigd belang (artikel 6, lid 1, onder f
-            AVG): we willen weten of deze zoekmachine gevonden en gebruikt wordt, zodat we hem kunnen verbeteren. We
-            vragen hiervoor geen toestemming, omdat er geen gegevens op je apparaat worden geplaatst of uitgelezen.
-            Bezwaar maken kan wel, met de knop onderaan deze sectie.
-          </p>
-          <p>
-            <strong>Verwerker en bewaartermijn.</strong> Verwerkingsverantwoordelijke is Ontola. Swetrix Ltd verwerkt de
-            gegevens als verwerker, in onze opdracht en op servers in Duitsland, op basis van een
-            verwerkersovereenkomst. Swetrix kent voor bezoekstatistiek geen automatische verwijdertermijn: de gegevens
-            blijven staan tot wij ze verwijderen. We bewaren ze niet langer dan nodig is voor deze rapportages.
-          </p>
-          <p>
-            <strong>Jouw rechten.</strong> Je hebt recht op inzage, correctie en verwijdering van je gegevens, en het
-            recht om bezwaar te maken tegen deze verwerking. Wil je daar gebruik van maken, mail dan
-            <a href="mailto:sander.bakker@vng.nl">Sander Bakker</a>. Je kunt ook een klacht indienen bij de
-            <a href="https://www.autoriteitpersoonsgegevens.nl/" rel="noopener noreferrer" target="_blank"
-              >Autoriteit Persoonsgegevens</a>.
-          </p>
-          <p>
-            <strong>Bezwaar maken.</strong> Met de knop hieronder zet je de meting uit. Er wordt dan niets meer geladen
-            van of verstuurd naar Swetrix. Je keuze wordt bewaard in deze browser, dus op een ander apparaat of na het
-            wissen van je browsergegevens moet je hem opnieuw maken. Heb je Do Not Track of Global Privacy Control
-            aanstaan, dan meten we sowieso niets.
+            worden geen cookies geplaatst en er wordt niets in je browser opgeslagen. Je IP-adres wordt niet bewaard —
+            het wordt bij binnenkomst omgerekend tot een code die na een dag niets meer zegt — en we volgen je niet
+            over andere websites. We gebruiken deze gegevens alleen om geaggregeerde bezoekersrapportages te maken en
+            verkopen ze aan niemand door. Wil je niet meegeteld worden, zet de meting dan hieronder uit.
           </p>
           <p class="analytics-optout">
             {#if analyticsBlockedBySignal}
