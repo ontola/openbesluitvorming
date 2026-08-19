@@ -59,6 +59,29 @@ processors:
       - key: host.name
         value: openbesluitvorming-server
         action: upsert
+  # A visitor's search term travels in the URL -- both /api/search?query=... and
+  # the page itself, /?query=... -- so the raw URL on an inbound span is a copy
+  # of what someone typed into the search box. On a government information site
+  # that is not neutral: people look up their own name, their address, their own
+  # case. web/server.ts already keeps the term out of our own logs (it records a
+  # hash and a length, never the text), but Deno's automatic HTTP
+  # instrumentation attaches url.full and url.query by itself, straight past
+  # that decision. Dropped here rather than per service: one place, every
+  # signal that leaves this host.
+  #
+  # Server spans only. Outbound calls to iBabs and Notubiz carry date windows in
+  # their query strings and no visitor data, and those are what you read when an
+  # import goes wrong.
+  transform/strip_visitor_queries:
+    error_mode: ignore
+    trace_statements:
+      - context: span
+        statements:
+          - delete_key(attributes, "url.query") where kind == 2
+          # "[?]" rather than an escaped "\?": OTTL string literals take no
+          # backslash escape for it, and a character class means the same to RE2.
+          - replace_pattern(attributes["url.full"], "[?].*", "") where kind == 2 and attributes["url.full"] != nil
+
   batch:
     send_batch_size: 8192
     timeout: 5s
@@ -80,7 +103,8 @@ service:
   pipelines:
     traces:
       receivers: [otlp]
-      processors: [memory_limiter, resourcedetection, resource, batch]
+      processors:
+        [memory_limiter, transform/strip_visitor_queries, resourcedetection, resource, batch]
       exporters: [otlp]
     metrics:
       receivers: [otlp, hostmetrics]

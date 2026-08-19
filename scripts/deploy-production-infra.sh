@@ -29,3 +29,19 @@ ssh "$DEPLOY_HOST" "
   docker compose -f \"$COMPOSE_FILE\" exec -T caddy caddy reload --config /etc/caddy/Caddyfile
 "
 echo "Reloaded Caddy on $DEPLOY_HOST"
+
+# The collector reads its config once, at startup, and the file is bind-mounted
+# read-only -- so syncing collector.yaml on its own changes nothing until the
+# container restarts. It was synced here for a while without that restart, which
+# is the quietest possible way for a config change to not happen.
+#
+# Validated first, in a throwaway container with the same mounts: the collector
+# exits on a config error, and `restart: unless-stopped` then turns that into a
+# crashloop with no telemetry at all.
+ssh "$DEPLOY_HOST" "
+  set -e
+  cd \"$DEPLOY_DIR\"
+  docker compose -f \"$COMPOSE_FILE\" run --rm --no-deps otel-collector validate --config=/etc/otelcol/config.yaml
+  docker compose -f \"$COMPOSE_FILE\" restart otel-collector
+"
+echo "Restarted the OTel collector on $DEPLOY_HOST"
