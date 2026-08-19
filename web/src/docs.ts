@@ -8,15 +8,10 @@ if (!target) {
   throw new Error("Docs root #docs-app niet gevonden.");
 }
 
-/** One page serving each of our markdown documents, chosen by path. `/docs/api`
- * is the API reference; `/docs/migration-guide` the guide for Open
- * Raadsinformatie reusers, which until now was only served as plain text;
- * `/privacy` the privacy statement, which lives at the address a privacy
- * statement is looked for rather than under the developer documentation. */
-const PAGES: Record<
-  string,
-  { source: string; title: string; lang: string; optOut?: boolean }
-> = {
+/** One page serving both markdown documents, chosen by path. `/docs/api` is
+ * the API reference; `/docs/migration-guide` the guide for Open
+ * Raadsinformatie reusers, which until now was only served as plain text. */
+const PAGES: Record<string, { source: string; title: string; lang: string }> = {
   // Both documents are written in English while the application declares
   // itself Dutch, so a Dutch speech synthesiser read English words with Dutch
   // phonetics -- correct and unintelligible at the same time (WCAG 3.1.2).
@@ -26,12 +21,6 @@ const PAGES: Record<
     source: "/docs/migration-guide.md",
     title: "Migreren van Open Raadsinformatie",
     lang: "en",
-  },
-  "/privacy": {
-    source: "/docs/privacy.md",
-    title: "Privacy",
-    lang: "nl",
-    optOut: true,
   },
 };
 
