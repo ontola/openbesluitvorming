@@ -298,6 +298,10 @@ async function handleRequest(request: Request): Promise<Response> {
     return await serveMarkdown("./docs/migration-guide.md");
   }
 
+  if (url.pathname === "/docs/privacy.md") {
+    return await serveMarkdown("./docs/privacy.md");
+  }
+
   const schemaMatch = url.pathname.match(/^\/schemas\/([\w.-]+\.schema\.json)$/);
   if (schemaMatch) {
     const file = await Deno.readFile(new URL(`./schemas/${schemaMatch[1]}`, projectRoot));
@@ -883,6 +887,7 @@ async function handleRequest(request: Request): Promise<Response> {
     "/admin": "/admin.html",
     "/docs/api": "/docs.html",
     "/docs/migration-guide": "/docs.html",
+    "/privacy": "/docs.html",
   };
 
   const pathname = PAGES[url.pathname] ?? url.pathname;
