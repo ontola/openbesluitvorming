@@ -35,10 +35,6 @@ export default defineConfig({
         target: apiTarget,
         changeOrigin: true,
       },
-      "/privacy": {
-        target: apiTarget,
-        changeOrigin: true,
-      },
       "/schemas": {
         target: apiTarget,
         changeOrigin: true,

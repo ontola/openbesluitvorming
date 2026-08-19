@@ -18,7 +18,7 @@
   import MotionCard from "./MotionCard.svelte";
   import ReaderLoading from "./ReaderLoading.svelte";
   import SourcePicker from "./SourcePicker.svelte";
-  import AnalyticsOptOut from "./AnalyticsOptOut.svelte";
+  import { analyticsOptedOut, browserSignalsNoTracking, setAnalyticsOptOut } from "./analytics.ts";
 
   type SearchRouteState = {
     query: string;
@@ -54,6 +54,8 @@
     ? null
     : routeStateFromUrl(new URL(window.location.href));
 
+  let analyticsOptOut = false;
+  let analyticsBlockedBySignal = false;
   let query = "";
   let organization = "";
   let entityType = "";
@@ -639,6 +641,11 @@
       (grouped[motion.agenda_item] ??= []).push(motion);
     }
     return grouped;
+  }
+
+  function toggleAnalyticsOptOut(): void {
+    analyticsOptOut = !analyticsOptOut;
+    setAnalyticsOptOut(analyticsOptOut);
   }
 
   function loadPreferredDetailMode(): "text" | "pdf" {
@@ -1588,6 +1595,8 @@
   }
 
   onMount(async () => {
+    analyticsOptOut = analyticsOptedOut();
+    analyticsBlockedBySignal = browserSignalsNoTracking();
     preferredDetailMode = loadPreferredDetailMode();
     detailSheetWidth = loadDetailSheetWidth();
     updateInitialLoadingCardCount();
@@ -2271,11 +2280,32 @@
 
           <h2>Analyse en privacy</h2>
           <p>
-            We tellen bezoeken met Swetrix, zonder cookies en zonder je te volgen over andere
-            websites. Wat we precies meten, wie daarvoor verantwoordelijk is en hoe je bezwaar
-            maakt, staat in de <a href="/privacy">privacyverklaring</a>.
+            We meten hoe vaak deze zoekmachine gebruikt wordt met Swetrix, een privacyvriendelijk alternatief voor
+            Google Analytics. Per paginabezoek gaat er één verzoek naar Swetrix met de opgevraagde pagina, de
+            verwijzende pagina, je browser- en apparaattype, je taalinstelling en het land waar je vandaan komt. Er
+            worden geen cookies geplaatst en er wordt niets in je browser opgeslagen. Je IP-adres wordt niet bewaard —
+            het wordt bij binnenkomst omgerekend tot een code die na een dag niets meer zegt — en we volgen je niet
+            over andere websites. We gebruiken deze gegevens alleen om geaggregeerde bezoekersrapportages te maken en
+            verkopen ze aan niemand door. Wil je niet meegeteld worden, zet de meting dan hieronder uit.
           </p>
-          <AnalyticsOptOut />
+          <p class="analytics-optout">
+            {#if analyticsBlockedBySignal}
+              <!-- De knop zou hier niets toevoegen: het browsersignaal houdt de meting al tegen. -->
+              <span class="analytics-optout__status">
+                De meting staat uit: je browser stuurt een Do Not Track- of Global Privacy
+                Control-signaal.
+              </span>
+            {:else}
+              <button type="button" class="ghost-button ghost-button--subtle" on:click={toggleAnalyticsOptOut}>
+                {analyticsOptOut ? "Meting weer aanzetten" : "Meting uitzetten"}
+              </button>
+              <span class="analytics-optout__status">
+                {analyticsOptOut
+                  ? "De meting staat uit in deze browser."
+                  : "De meting staat aan in deze browser."}
+              </span>
+            {/if}
+          </p>
 
           <h2>Disclaimer</h2>
           <p>
