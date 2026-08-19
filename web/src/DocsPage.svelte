@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import AnalyticsOptOut from "./AnalyticsOptOut.svelte";
   import { withHeadingAnchors } from "./doc_anchors.ts";
   import { renderOwnMarkdown } from "./markdown.ts";
 
@@ -7,6 +8,9 @@
   export let title: string;
   /** The language the markdown itself is written in. */
   export let lang = "nl";
+  /** The privacy statement ends on the objection it describes. Markdown cannot
+   * carry a button, so the page appends one when the document asks for it. */
+  export let optOut = false;
 
   let html = "";
   let failed = false;
@@ -51,6 +55,9 @@
     <article class="prose-detail" {lang}>
       <!-- eslint-disable-next-line svelte/no-at-html-tags -->
       {@html html}
+      {#if optOut}
+        <AnalyticsOptOut />
+      {/if}
     </article>
   {:else}
     <p>Laden…</p>
