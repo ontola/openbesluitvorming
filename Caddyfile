@@ -1,4 +1,30 @@
-openbesluitvorming.nl {
+# Two names, one site. Open Raadsinformatie is being folded into
+# OpenBesluitvorming, but its own audience is still arriving under its own name,
+# so zoek.openraadsinformatie.nl serves the same application rather than a
+# redirect -- a redirect would land them on the OpenBesluitvorming masthead,
+# which is the recognition the mirrored branding exists to avoid losing.
+#
+# All three Open Raadsinformatie names, because all three are the search engine:
+# the apex serves the very same bundle as zoek (index-BdhYVQ18.js), and www is a
+# 301 to zoek. Moving only zoek would leave the old interface running on
+# openraadsinformatie.nl, which is the thing being retired.
+#
+# api.openraadsinformatie.nl is NOT here. It lives on ori3 (5.9.117.28) and
+# stays there: the API keeps serving its reusers through the deprecation window
+# announced for 1 November, whatever happens to the search interface.
+#
+# Order of operations: deploy this first, then move the DNS. Caddy will fail the
+# ACME challenge for the new name until it resolves here -- noisy in the log,
+# harmless to openbesluitvorming.nl, and the certificate arrives by itself
+# within a minute of the record changing. Doing it the other way round leaves a
+# window where the name resolves here and Caddy refuses to answer for it.
+www.openraadsinformatie.nl {
+  # Netlify answered this with a 301 to zoek; keeping that rather than serving a
+  # third copy of the same page under a third name.
+  redir https://zoek.openraadsinformatie.nl{uri} permanent
+}
+
+openbesluitvorming.nl, zoek.openraadsinformatie.nl, openraadsinformatie.nl {
   @admin {
     path /admin /admin.html /api/admin/*
   }
