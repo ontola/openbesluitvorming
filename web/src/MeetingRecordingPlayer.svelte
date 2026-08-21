@@ -436,8 +436,8 @@
           class="recording__search"
           type="search"
           bind:value={query}
-          aria-label="Zoek in het gesproken woord"
-          placeholder="Zoek in het gesproken woord…"
+          aria-label="Zoek in de videotulen"
+          placeholder="Zoek in de videotulen…"
           autocomplete="off"
           on:keydown={(event) => {
             // The detail sheet binds Escape and the arrow keys on `document`
@@ -493,7 +493,7 @@
         <button
           type="button"
           class="recording__search-toggle"
-          aria-label="Zoek in het gesproken woord"
+          aria-label="Zoek in de videotulen"
           on:click={openSearch}
         >
           <svg class="recording__icon" viewBox="0 0 24 24" aria-hidden="true">

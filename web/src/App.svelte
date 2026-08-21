@@ -154,6 +154,20 @@
    * forwarded rather than quietly landing on the homepage. */
   const API_DOCS_PATH = "/docs/api";
 
+  /** zoek.openraadsinformatie.nl keeps its own name in front of the masthead
+   * for now. Open Raadsinformatie is being folded into this site, but the name
+   * is what its visitors know and what the subsidy paperwork still says, so
+   * telling them on arrival that they are somewhere else costs recognition we
+   * would rather keep for a few more months. Same application, same index --
+   * only the two lines of the masthead differ, mirrored: the name you came for
+   * on top, the name it is becoming underneath. */
+  const oriBranding = window.location.hostname.includes("openraadsinformatie");
+
+  /** The product name for this host. Every page title ends in it, and the tab
+   * is the first place an Open Raadsinformatie visitor would otherwise be told
+   * they are somewhere else. */
+  const siteName = oriBranding ? "OpenRaadsinformatie" : "OpenBesluitvorming";
+
   function redirectLegacyApiDocsHash(): boolean {
     const hash = window.location.hash;
     if (hash !== "#api" && !hash.startsWith("#api/")) {
@@ -1669,10 +1683,10 @@
    * the same name for every page. The document open in the reader wins over
    * the query behind it, which is what the reader is actually looking at. */
   $: pageTitle = detailItem?.title
-    ? `${detailItem.title} — OpenBesluitvorming`
+    ? `${detailItem.title} — ${siteName}`
     : query.trim()
-      ? `${query.trim()} — zoeken — OpenBesluitvorming`
-      : "OpenBesluitvorming";
+      ? `${query.trim()} — zoeken — ${siteName}`
+      : siteName;
 
   $: selectedSource = sources.find((source) => source.key === organization) ?? null;
   $: detailIndex = detailItem ? results.findIndex((item) => item.entityId === detailItem.entityId) : -1;
@@ -1785,11 +1799,21 @@
                 void clearToHome();
               }}
             >
-              <span class="brand__dark">Open</span><span class="brand__light">Besluitvorming</span>
+              {#if oriBranding}
+                <span class="brand__dark">Open</span><span class="brand__light">Raadsinformatie</span>
+              {:else}
+                <span class="brand__dark">Open</span><span class="brand__light">Besluitvorming</span>
+              {/if}
             </a>
           </h1>
 
-          <p class="brand__alias">voorheen <strong>OpenRaadsinformatie</strong></p>
+          <p class="brand__alias">
+            {#if oriBranding}
+              heet binnenkort <strong>OpenBesluitvorming</strong>
+            {:else}
+              voorheen <strong>OpenRaadsinformatie</strong>
+            {/if}
+          </p>
 
           <ul class="hero__meta">
             <li on:dblclick={() => { window.location.href = "/admin.html"; }}><strong>{(indexDocumentCount ?? fallbackDocumentCount).toLocaleString("nl-NL")}</strong> vergaderstukken</li>
@@ -1937,7 +1961,7 @@
                   <option value="Document">Documenten</option>
                   <option value="Meeting">Vergaderingen</option>
                   <option value="Motion">Moties</option>
-                  <option value="Recording">Gesproken woord</option>
+                  <option value="Recording">Videotulen</option>
                 </select>
               </label>
 
@@ -2141,14 +2165,6 @@
           </p>
 
           <h2>Door wie</h2>
-          <a
-            class="home-about__logo-link"
-            href="https://www.vngrealisatie.nl/"
-            rel="noopener noreferrer"
-            target="_blank"
-          >
-            <img class="home-about__logo" src={vngLogo} alt="VNG Realisatie" width="96" height="50" />
-          </a>
           <p>
             Vanuit het
             <a href="https://www.open-overheid.nl/over-open-overheid/actieplan-open-overheid" rel="noopener noreferrer"
