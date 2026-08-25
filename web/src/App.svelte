@@ -2153,7 +2153,7 @@
           <p>
             De zoek API is vernieuwd en per heden beschikbaar. Toevoegingen zijn onder andere bulkexport en
             incrementele synchronisatie. Bent u gebruiker van de oude API, houd er dan rekening mee dat deze per
-            1 oktober 2026 niet meer beschikbaar is.
+            1 november 2026 niet meer beschikbaar is.
           </p>
           <p>
             Om de overgang naar de nieuwe API te faciliteren is een
