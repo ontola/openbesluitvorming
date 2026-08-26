@@ -92,6 +92,7 @@ Current implemented slices:
 - A mapped `datetime` field that fails to parse makes Quickwit **discard the entire document**, with a successful-looking ingest response. Normalize dates through `toIndexDateTime` (`src/quickwit/project.ts`) and let bad values fall back to `undefined` — one unsorted row beats an entity that is missing from search.
 - Quickwit's `sort_by` direction is the opposite of the usual convention: bare field name = descending, `-` prefix = ascending. Missing values sort last either way.
 - `sort=relevance` is the absence of `sort_by`: Quickwit's own score order, and the one ordering that needs no mapped fast field. `sortResults` must leave that order alone — the rows arrive ranked and are collected into an insertion-ordered Map.
+- `/api/search` refuses what it cannot honour rather than answering a different question: unknown `entityType`, `organization` or `sort`, a `dateFrom`/`dateTo` that is not a bare `YYYY-MM-DD` calendar date, and the unsupported proximity notation `"a b"~10` all return 400 from `web/search_params.ts`. A silent substitution is harder for a consumer to notice than an error (#196, #199, #223, #224).
 
 ### Extraction and documents
 

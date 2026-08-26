@@ -107,8 +107,16 @@ on.
 
 `query` is free text, not a query language. Punctuation is stripped and the
 remaining words are combined with AND, so `kosten/baten` finds documents
-containing both words, and `14:30` finds both parts. There is no phrase search:
-quoting a phrase has no special meaning.
+containing both words, and `14:30` finds both parts.
+
+Double quotes are the one exception: `"sociale huurwoningen"` is searched as a
+phrase, the words adjacent and in that order. Everything outside the quotes is
+still combined with AND.
+
+The proximity form `"woord1 woord2"~10` is **not** supported and returns `400`.
+It used to be accepted, with the `~10` searched as the word `10` — which
+narrowed the result where a slop is supposed to widen it, and quietly answered a
+different question than the one asked.
 
 A query consisting only of punctuation returns zero results rather than
 everything.
@@ -128,9 +136,9 @@ The recommended search endpoint. Returns grouped, deduplicated results with docu
 | `query` | string | Search query. Required **unless** `organization` is given — a source key on its own browses that source without a search term. |
 | `organization` | string | Filter by source key (e.g. `soest`, `amsterdam`). Case-sensitive; an unknown key returns `400`. See [`/api/sources`](#sources). |
 | `entityType` | string | Filter by type: `Meeting`, `Document`, `Motion` or `Recording` (spoken word; matches resolve to their meeting). Case-sensitive; any other value returns `400`. |
-| `sort` | string | Sort order: `date_desc` (default), `date_asc`, or `relevance` |
-| `dateFrom` | string | Start date filter (ISO 8601, e.g. `2024-01-01`) |
-| `dateTo` | string | End date filter |
+| `sort` | string | Sort order: `date_desc` (default), `date_asc`, `title_asc` or `relevance`. Any other value returns `400`. `title_asc` orders the fetched window rather than the whole result set. |
+| `dateFrom` | string | Start date filter, `YYYY-MM-DD` only (e.g. `2024-01-01`). A value that is not a calendar date returns `400`; a time or time zone on the end is not accepted. |
+| `dateTo` | string | End date filter, same format. Inclusive of the whole day. |
 | `offset` | integer | Pagination offset (default: 0). Must be zero or greater. |
 | `limit` | integer | Results per page (default: 24, minimum 1, values above 100 are capped at 100). |
 

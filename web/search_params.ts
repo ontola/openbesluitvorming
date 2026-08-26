@@ -14,6 +14,40 @@ import { listAdminSourceOptions } from "../src/sources/index.ts";
 /** The entity types /api/search accepts, exactly as documented. */
 export const SEARCH_ENTITY_TYPES = ["Meeting", "Document", "Motion", "Recording"];
 
+/** The sort orders /api/search accepts, exactly as documented.
+ *
+ * `relevance` was documented long before it worked: every unrecognised value,
+ * that one included, fell through to the date ordering. It is implemented now
+ * (`quickwitSortBy`), so this list and the API reference finally agree with
+ * what the service does. */
+export const SEARCH_SORTS = ["date_desc", "date_asc", "title_asc", "relevance"];
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** `2026-02-31` parses as a shape and is still not a day. Round-tripping is the
+ * cheap way to tell the two apart without a calendar table. */
+function isCalendarDate(value: string): boolean {
+  if (!ISO_DATE.test(value)) {
+    return false;
+  }
+  const parsed = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+}
+
+/** `"woord1 woord2"~10` is the proximity notation that sits next to the phrase
+ * syntax in nearly every search engine. This one does not implement it, and the
+ * `~10` fell straight through the phrase splitter into the loose terms, where
+ * `10` was ANDed onto the query as an ordinary word.
+ *
+ * What makes it worth a 400 rather than a footnote is the direction of the
+ * error. A slop can only *widen* a phrase, so whoever writes one expects at
+ * least the bare phrase's hits. Measured on 2026-08-18: the bare phrase
+ * returned 79.791 and the slop 34.107, less than half -- and the same words
+ * with a loose `10` returned 35.118, which is what gave the cause away. A
+ * reader concluding from that number that little has been decided on a subject
+ * concludes the opposite of the truth (#224). */
+const PHRASE_SLOP = /"[^"]*"~\d/;
+
 function badRequest(error: string, hint?: string): Response {
   return Response.json(hint ? { error, hint } : { error }, { status: 400 });
 }
@@ -41,6 +75,41 @@ export function validateSearchParams(url: URL): Response | null {
       return badRequest(
         `Onbekende organization "${organization}".`,
         "Zie /api/sources voor geldige keys; deze zijn hoofdlettergevoelig.",
+      );
+    }
+  }
+
+  const query = url.searchParams.get("query") ?? "";
+  if (PHRASE_SLOP.test(query)) {
+    return badRequest(
+      'Nabijheidszoeken met een slop, zoals "woord1 woord2"~10, wordt niet ondersteund.',
+      'Laat de `~10` weg voor een exacte frase ("woord1 woord2"), of zoek de woorden los zonder aanhalingstekens.',
+    );
+  }
+
+  const sort = url.searchParams.get("sort")?.trim() ?? "";
+  if (sort && !SEARCH_SORTS.includes(sort)) {
+    // An unknown sort used to fall through to `date_desc`, so a caller who
+    // asked for one order was answered in another with nothing saying so.
+    return badRequest(
+      `Onbekende sort "${sort}".`,
+      `Geldige waarden zijn ${SEARCH_SORTS.join(", ")}.`,
+    );
+  }
+
+  for (const name of ["dateFrom", "dateTo"]) {
+    const raw = url.searchParams.get(name)?.trim() ?? "";
+    if (!raw) {
+      continue;
+    }
+    // The dangerous one of the three. An unreadable date was compared against
+    // dates that are readable, which filtered every result away: a typo, or an
+    // ISO value with a time on the end, answered HTTP 200 with zero results --
+    // indistinguishable from a period in which nothing was decided.
+    if (!isCalendarDate(raw)) {
+      return badRequest(
+        `Parameter ${name} moet een datum in de vorm JJJJ-MM-DD zijn, kreeg "${raw}".`,
+        "Alleen de kale datum wordt geaccepteerd; een tijd of tijdzone erachter niet.",
       );
     }
   }
