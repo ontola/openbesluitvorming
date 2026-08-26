@@ -91,6 +91,7 @@ Current implemented slices:
 - **Ordering and date filtering must be pushed down to Quickwit, never applied only app-side.** The scan window is capped (`max_hits`), so sorting the fetched rows can at best reorder the wrong ones: the index's `timestamp_field` is `time` (the ingest time), so an unsorted scan returns whatever was imported last. That was issue #184 — results ordered by import date. Sorting and range filtering need a mapped **fast field**; a dynamic field silently ignores both.
 - A mapped `datetime` field that fails to parse makes Quickwit **discard the entire document**, with a successful-looking ingest response. Normalize dates through `toIndexDateTime` (`src/quickwit/project.ts`) and let bad values fall back to `undefined` — one unsorted row beats an entity that is missing from search.
 - Quickwit's `sort_by` direction is the opposite of the usual convention: bare field name = descending, `-` prefix = ascending. Missing values sort last either way.
+- `sort=relevance` is the absence of `sort_by`: Quickwit's own score order, and the one ordering that needs no mapped fast field. `sortResults` must leave that order alone — the rows arrive ranked and are collected into an insertion-ordered Map.
 
 ### Extraction and documents
 

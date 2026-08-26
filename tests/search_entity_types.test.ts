@@ -183,6 +183,11 @@ Deno.test("date sorting is only pushed down when the index maps the field", () =
     Deno.env.set("WOOZI_PROJECTION_VERSION", "search-v3-meeting-date");
     assertEquals(__test__.quickwitSortBy("date_desc"), "start_date", "v3 sorts descending");
     assertEquals(__test__.quickwitSortBy("date_asc"), "-start_date", "v3 sorts ascending");
+    assertEquals(
+      __test__.quickwitSortBy("relevance"),
+      undefined,
+      "relevance is Quickwit's own score order, which is what no sort_by means",
+    );
     assert(
       __test__.startDateRangeClause("2026-01-01", "2026-06-30")?.startsWith("start_date:["),
       "and pushes the range down",
@@ -194,4 +199,38 @@ Deno.test("date sorting is only pushed down when the index maps the field", () =
       Deno.env.set("WOOZI_PROJECTION_VERSION", original);
     }
   }
+});
+
+/** `relevance` was in the API reference from the start and implemented by
+ * nothing: it fell through to the date ordering, so a caller who asked for the
+ * best match was answered with the newest and nothing said so (#223). */
+Deno.test("relevance keeps the order the index scored, on either projection", () => {
+  const original = Deno.env.get("WOOZI_PROJECTION_VERSION");
+  try {
+    // Score needs no fast field, so it is the one sort that survives a v2 index.
+    Deno.env.delete("WOOZI_PROJECTION_VERSION");
+    assertEquals(__test__.quickwitSortBy("relevance"), undefined, "no sort_by on v2 either");
+  } finally {
+    if (original === undefined) {
+      Deno.env.delete("WOOZI_PROJECTION_VERSION");
+    } else {
+      Deno.env.set("WOOZI_PROJECTION_VERSION", original);
+    }
+  }
+
+  const scored = [
+    { entityId: "best", title: "b", sortDate: "2020-01-01" },
+    { entityId: "next", title: "a", sortDate: "2026-01-01" },
+  ] as Parameters<typeof __test__.sortResults>[0];
+
+  assertEquals(
+    __test__.sortResults(scored, "relevance").map((result) => result.entityId),
+    ["best", "next"],
+    "the ranking Quickwit returned is not re-sorted by date or title",
+  );
+  assertEquals(
+    __test__.sortResults(scored, "date_desc").map((result) => result.entityId),
+    ["next", "best"],
+    "the other orders are unaffected",
+  );
 });

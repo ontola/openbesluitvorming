@@ -437,6 +437,14 @@ export function startDateRangeClause(dateFrom: string, dateTo: string): string |
  * Title sorting has no fast field to sort on and stays app-side, so it still
  * only orders the fetched window rather than the whole result set. */
 export function quickwitSortBy(sort: string): string | undefined {
+  // Omitting sort_by is Quickwit's own BM25 ordering, and that *is* the
+  // pushdown for relevance: the scan window then holds the best-scoring rows
+  // instead of the newest. It sits above the mapping check because a score
+  // needs no fast field. Until now `relevance` was documented but unhandled,
+  // so it fell through to the date ordering below (#223).
+  if (sort === "relevance") {
+    return undefined;
+  }
   // Only an index that maps start_date can sort on it. Against the v2 mapping
   // the field is a dynamic string and Quickwit fails the whole query rather
   // than ignoring the clause — see projectionSupportsDateSort.
@@ -484,6 +492,13 @@ function compareSortDate(left: SearchResult, right: SearchResult, ascending: boo
 
 function sortResults(results: SearchResult[], sort: string): SearchResult[] {
   const items = [...results];
+
+  if (sort === "relevance") {
+    // The rows arrived in score order and were collected into a Map, which
+    // keeps insertion order, so the ranking is already here. Any comparator
+    // would discard it.
+    return items;
+  }
 
   if (sort === "date_asc") {
     items.sort((a, b) => compareSortDate(a, b, true));
@@ -1772,6 +1787,7 @@ async function computeIndexStats(): Promise<IndexStats> {
 
 export const __test__ = {
   quickwitSortBy,
+  sortResults,
   startDateRangeClause,
   buildQuickwitQuery,
   entityTypeLabel,
