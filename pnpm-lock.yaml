@@ -25,8 +25,8 @@ importers:
         specifier: ^20.8.9
         version: 20.8.9
       marked:
-        specifier: ^16.4.1
-        version: 16.4.2
+        specifier: ^18.0.10
+        version: 18.0.10
       oxfmt:
         specifier: ^0.43.0
         version: 0.43.0
@@ -728,8 +728,8 @@ packages:
   magic-string@0.30.21:
     resolution: {integrity: sha512-vd2F4YUyEXKGcLHoq+TEyCjxueSeHnFxyyjNp80yg0XV4vUhnDer/lvvlqM/arB5bXQN5K2/3oinyCRyx8T2CQ==}
 
-  marked@16.4.2:
-    resolution: {integrity: sha512-TI3V8YYWvkVf3KJe1dRkpnjs68JUPyEa5vjKrp1XEEJUAOaQc+Qj+L1qWbPd0SJuAdQkFU0h73sXXqwDYxsiDA==}
+  marked@18.0.10:
+    resolution: {integrity: sha512-FJeH4bRpYoXiggcgriCGItKCSv3xkngJc4QCZ/rkQCogU3VYaLxYJoZl8Nw/b4+x7iij/pd+09mZ6A1dXzpL0A==}
     engines: {node: '>= 20'}
     hasBin: true
 
@@ -1312,7 +1312,7 @@ snapshots:
     dependencies:
       '@jridgewell/sourcemap-codec': 1.5.5
 
-  marked@16.4.2: {}
+  marked@18.0.10: {}
 
   mitt@3.0.1: {}
 
