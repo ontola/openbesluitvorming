@@ -12,7 +12,7 @@
     "npm:fast-xml-parser@^5.11.0": "5.11.0",
     "npm:happy-dom@^20.11.6": "20.11.6",
     "npm:hls.js@^1.7.1": "1.7.1",
-    "npm:marked@^16.4.2": "16.4.2",
+    "npm:marked@^18.0.11": "18.0.11",
     "npm:oxfmt@0.43": "0.43.0",
     "npm:oxlint@^1.80.0": "1.80.0",
     "npm:svelte@^5.56.10": "5.56.10",
@@ -1614,8 +1614,8 @@
         "@jridgewell/sourcemap-codec"
       ]
     },
-    "marked@16.4.2": {
-      "integrity": "sha512-TI3V8YYWvkVf3KJe1dRkpnjs68JUPyEa5vjKrp1XEEJUAOaQc+Qj+L1qWbPd0SJuAdQkFU0h73sXXqwDYxsiDA==",
+    "marked@18.0.11": {
+      "integrity": "sha512-HnslJfsZkRPBDJRHvVtAaWlZHEpSu7u8LgQuJCELjRKuWR+hpq4A7sLq3p8HaI9ypVoXDXxV34CsQJEe1+J5Aw==",
       "bin": true
     },
     "mimic-response@3.1.0": {
@@ -1976,7 +1976,7 @@
         "npm:fast-xml-parser@^5.11.0",
         "npm:happy-dom@^20.11.6",
         "npm:hls.js@^1.7.1",
-        "npm:marked@^16.4.2",
+        "npm:marked@^18.0.11",
         "npm:oxfmt@0.43",
         "npm:oxlint@^1.80.0",
         "npm:svelte@^5.56.10",
