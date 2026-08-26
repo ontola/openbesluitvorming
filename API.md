@@ -40,12 +40,17 @@ Most requests cost **1 unit**. Two exceptions:
 | Request | Cost |
 |---------|------|
 | `/api/search` with `limit=24` or lower (the default) | 1 unit |
-| `/api/search` with a higher `limit` | 1 unit per 24 results, rounded up — so `limit=100` costs 5 |
+| `/api/search` with a higher `limit` | 1 unit, plus 1 further unit per 250 results above the first 24 — so `limit=100` costs 1.3 |
 | `/api/entities/{id}/pdf/page/{n}` | 1/8 unit — a long agenda's thumbnails should not drain your budget |
 
-The charge is per *requested* page, so asking for the server-side maximum drains
-the budget five times faster than paging through the same results at the default
-size. Both are allowed; pick whichever suits you.
+Nearly all of a search's cost is the query itself, evaluated over the index, and
+that is charged once whatever the page size; the rows it returns add about 1/250
+of it each. So **asking for fewer, larger pages is the cheap way to read in
+bulk**: 1000 results at `limit=100` costs 13 units, where paging the same 1000
+at the default size costs 42.
+
+Harvesting the whole corpus is better served by the [bulk export API](#bulk-export) than
+by paging through search.
 
 Every response carries the current state, so you can pace yourself without
 guessing:

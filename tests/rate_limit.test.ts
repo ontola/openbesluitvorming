@@ -16,10 +16,35 @@ function fakeClock(start = 1_000_000) {
   };
 }
 
-Deno.test("a search costs one unit per page, so ordinary paging is cheap", () => {
+Deno.test("a search costs one unit, plus what its extra rows measure", () => {
   assertEquals(requestCost(searchUrl("q=fietspad")), 1, "default page size costs one unit");
   assertEquals(requestCost(searchUrl(`q=x&limit=${RATE_LIMIT_PAGE_UNIT}`)), 1, "UI page size");
-  assertEquals(requestCost(searchUrl("q=x&limit=100")), 5, "the 100-result cap costs 5 units");
+  assertEquals(requestCost(searchUrl("q=x&limit=1")), 1, "a smaller page is not cheaper than one");
+  // 76 rows above the free page, at 250 rows to the unit: the query itself is
+  // the bulk of the work and is charged once, whatever the page size (#225).
+  assertEquals(requestCost(searchUrl("q=x&limit=100")), 1 + 76 / 250, "the cap costs 1.3 units");
+});
+
+Deno.test("a limit past the server-side cap is not charged for rows it cannot get", () => {
+  const capped = requestCost(searchUrl("q=x&limit=100"));
+  assertEquals(requestCost(searchUrl("q=x&limit=1000")), capped, "the API clamps to 100");
+  assertEquals(requestCost(searchUrl("q=x&limit=100000")), capped, "so does the charge");
+});
+
+/** The cheapest way for us to serve 1000 results used to be the dearest way to
+ * ask for it. Ten requests of 100 rows cost 50 units where 42 requests of 24
+ * rows cost 42, while the ten took roughly a quarter of the server time. */
+Deno.test("reading in large pages is now cheaper than paging in small ones", () => {
+  const inLargePages = 10 * requestCost(searchUrl("q=x&limit=100"));
+  const inDefaultPages =
+    Math.ceil(1000 / RATE_LIMIT_PAGE_UNIT) * requestCost(searchUrl("q=x&limit=24"));
+
+  assertEquals(
+    inLargePages < inDefaultPages,
+    true,
+    `${inLargePages} should undercut ${inDefaultPages}`,
+  );
+  assertEquals(Math.round(inLargePages), 13, "1000 results cost 13 units, where they cost 42");
 });
 
 Deno.test("non-search endpoints and unusable limits cost a single unit", () => {
@@ -50,7 +75,7 @@ Deno.test("clients are budgeted independently", () => {
   assertEquals(limiter.consume("quiet", 1).allowed, true, "a different IP is unaffected");
 });
 
-Deno.test("heavy scraping drains the budget faster than UI paging", () => {
+Deno.test("a larger page still drains the budget faster than the default one", () => {
   const clock = fakeClock();
   const heavy = new RateLimiter(60, clock.now);
   let heavyAllowed = 0;
@@ -64,8 +89,10 @@ Deno.test("heavy scraping drains the budget faster than UI paging", () => {
     lightAllowed += 1;
   }
 
-  assertEquals(heavyAllowed, 12, "limit=100 gets 12 requests per minute");
+  assertEquals(heavyAllowed, 46, "limit=100 gets 46 requests per minute");
   assertEquals(lightAllowed, 60, "limit=24 keeps the full 60 per minute");
+  // 4600 rows a minute against 1440: the point of the repricing.
+  assertEquals(heavyAllowed * 100 > lightAllowed * RATE_LIMIT_PAGE_UNIT, true);
 });
 
 Deno.test("budget refills over time and reports a usable Retry-After", () => {

@@ -952,7 +952,7 @@ function rateLimitedResponse(verdict: RateVerdict): Response {
       error: `Te veel verzoeken. Probeer het over ${verdict.retryAfterSeconds} seconde(n) opnieuw.`,
       limit_per_minute: verdict.limit,
       retry_after_seconds: verdict.retryAfterSeconds,
-      hint: `Zware verzoeken tellen zwaarder: een zoekopdracht kost 1 eenheid per ${RATE_LIMIT_PAGE_UNIT} resultaten, dus limit=100 kost 5. Verlaag 'limit' of spreid je verzoeken. Elke API-response bevat RateLimit-Limit, RateLimit-Remaining en RateLimit-Reset.`,
+      hint: `Een zoekopdracht kost 1 eenheid, plus 1 eenheid per 250 resultaten boven de eerste ${RATE_LIMIT_PAGE_UNIT}: limit=100 kost 1,3. Grotere pagina's zijn dus goedkoper dan meer verzoeken. Spreid je verzoeken, of gebruik /api/export voor bulk. Elke API-response bevat RateLimit-Limit, RateLimit-Remaining en RateLimit-Reset.`,
       documentation: "https://openbesluitvorming.nl/docs/api",
     },
     { status: 429 },

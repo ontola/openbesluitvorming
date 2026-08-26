@@ -15,6 +15,27 @@
  * so ordinary browsing and paging cost exactly one unit. */
 export const RATE_LIMIT_PAGE_UNIT = 24;
 
+/** The largest page /api/search will return -- `search_api.ts` clamps to it.
+ * Charging past it would bill for rows the API was never going to send. */
+const MAX_SEARCH_LIMIT = 100;
+
+/** Rows above the free page that together add one unit to a search.
+ *
+ * The first model charged a unit per 24 rows, on the assumption that a search
+ * costs what it hands back. Measured against production on 2026-08-26, warm,
+ * five repetitions per size: `limit=1` took 1.15s, `limit=24` 1.44s and
+ * `limit=100` 1.61s. A search is a query evaluated over the splits -- that is
+ * the 1.15s, and it is charged whatever the page size -- plus some 4.6ms per
+ * row returned. One base search therefore buys about 250 further rows, not 24.
+ *
+ * Being ten times too steep is the smaller half of it. The old price was
+ * highest for the *cheapest* way to read the corpus: 1000 results at `limit=24`
+ * is 42 requests and about 60s of server time, charged 42 units, while the same
+ * 1000 at `limit=100` is 10 requests and 16s, charged 50. Pricing the marginal
+ * row at what it measures makes the fewer, larger requests the cheap option for
+ * the consumer too, which is also the traffic we would rather have (#225). */
+const ROWS_PER_EXTRA_UNIT = 250;
+
 export interface RateVerdict {
   allowed: boolean;
   limit: number;
@@ -43,9 +64,12 @@ const PDF_PAGE_COST = 1 / 8;
 
 const PDF_PAGE_PATH = /\/pdf\/page\/\d+$/;
 
-/** A heavy request is charged proportionally: `limit=100` costs 5 units, so
- * bulk scraping at the server-side cap drains the budget 5x faster than the
- * UI's default page while remaining possible. */
+/** A larger page is charged for the rows it adds, not for the query it repeats:
+ * `limit=100` costs 1.3 units. What actually protects the host from the fan-out
+ * of 2026-07-26 is the per-minute budget itself -- at 1.44s against 1.61s a
+ * server, sixty `limit=24` searches were always about as heavy as sixty
+ * `limit=100` ones, so the old multiplier bought almost no protection and
+ * charged honest bulk readers five times over for it. */
 export function requestCost(url: URL): number {
   if (PDF_PAGE_PATH.test(url.pathname)) {
     return PDF_PAGE_COST;
@@ -57,7 +81,8 @@ export function requestCost(url: URL): number {
   if (!Number.isFinite(limit) || limit <= 0) {
     return 1;
   }
-  return Math.max(1, Math.ceil(limit / RATE_LIMIT_PAGE_UNIT));
+  const billable = Math.min(limit, MAX_SEARCH_LIMIT);
+  return 1 + Math.max(0, billable - RATE_LIMIT_PAGE_UNIT) / ROWS_PER_EXTRA_UNIT;
 }
 
 export class RateLimiter {
@@ -83,8 +108,7 @@ export class RateLimiter {
     const now = this.now();
     this.sweep(now);
 
-    const bucket = this.buckets.get(key) ??
-      { tokens: this.capacity, updatedAt: now, loggedAt: 0 };
+    const bucket = this.buckets.get(key) ?? { tokens: this.capacity, updatedAt: now, loggedAt: 0 };
     bucket.tokens = Math.min(
       this.capacity,
       bucket.tokens + (now - bucket.updatedAt) * this.tokensPerMs,
