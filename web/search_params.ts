@@ -9,6 +9,7 @@
  * (#196, #199), which is harder to notice than an error and, for a consumer
  * building a report, worse than one.
  */
+import { type ApiErrorCode, apiError } from "./api_errors.ts";
 import { listAdminSourceOptions } from "../src/sources/index.ts";
 
 /** The entity types /api/search accepts, exactly as documented. */
@@ -48,8 +49,11 @@ function isCalendarDate(value: string): boolean {
  * concludes the opposite of the truth (#224). */
 const PHRASE_SLOP = /"[^"]*"~\d/;
 
-function badRequest(error: string, hint?: string): Response {
-  return Response.json(hint ? { error, hint } : { error }, { status: 400 });
+/** Every refusal carries a code as well as a sentence. The sentence is what a
+ * person reads and is free to change; the code is what a program matches on
+ * and is not (#224). */
+function badRequest(code: ApiErrorCode, error: string, hint?: string): Response {
+  return apiError(code, 400, error, hint ? { hint } : undefined);
 }
 
 export function validateSearchParams(url: URL): Response | null {
@@ -59,6 +63,7 @@ export function validateSearchParams(url: URL): Response | null {
     // caller asking for meetings received documents -- the opposite of the
     // request -- and could only find out by inspecting every result.
     return badRequest(
+      "unknown_entity_type",
       `Onbekend entityType "${entityType}".`,
       `Geldige waarden zijn ${SEARCH_ENTITY_TYPES.join(", ")}; let op hoofdletters.`,
     );
@@ -73,6 +78,7 @@ export function validateSearchParams(url: URL): Response | null {
     const known = listAdminSourceOptions().some((source) => source.key === organization);
     if (!known) {
       return badRequest(
+        "unknown_organization",
         `Onbekende organization "${organization}".`,
         "Zie /api/sources voor geldige keys; deze zijn hoofdlettergevoelig.",
       );
@@ -82,6 +88,7 @@ export function validateSearchParams(url: URL): Response | null {
   const query = url.searchParams.get("query") ?? "";
   if (PHRASE_SLOP.test(query)) {
     return badRequest(
+      "unsupported_phrase_slop",
       'Nabijheidszoeken met een slop, zoals "woord1 woord2"~10, wordt niet ondersteund.',
       'Laat de `~10` weg voor een exacte frase ("woord1 woord2"), of zoek de woorden los zonder aanhalingstekens.',
     );
@@ -92,6 +99,7 @@ export function validateSearchParams(url: URL): Response | null {
     // An unknown sort used to fall through to `date_desc`, so a caller who
     // asked for one order was answered in another with nothing saying so.
     return badRequest(
+      "unknown_sort",
       `Onbekende sort "${sort}".`,
       `Geldige waarden zijn ${SEARCH_SORTS.join(", ")}.`,
     );
@@ -108,6 +116,7 @@ export function validateSearchParams(url: URL): Response | null {
     // indistinguishable from a period in which nothing was decided.
     if (!isCalendarDate(raw)) {
       return badRequest(
+        "invalid_date",
         `Parameter ${name} moet een datum in de vorm JJJJ-MM-DD zijn, kreeg "${raw}".`,
         "Alleen de kale datum wordt geaccepteerd; een tijd of tijdzone erachter niet.",
       );
@@ -121,16 +130,22 @@ export function validateSearchParams(url: URL): Response | null {
     }
     const value = Number(raw);
     if (!Number.isInteger(value)) {
-      return badRequest(`Parameter ${name} moet een geheel getal zijn, kreeg "${raw}".`);
+      return badRequest(
+        name === "limit" ? "invalid_limit" : "invalid_offset",
+        `Parameter ${name} moet een geheel getal zijn, kreeg "${raw}".`,
+      );
     }
     // limit=0 and limit=-5 were clamped up to 1 and answered with a single
     // result, so a caller whose variable was accidentally zero got data back
     // instead of a signal.
     if (name === "limit" && value < 1) {
-      return badRequest(`Parameter limit moet minstens 1 zijn, kreeg ${value}.`);
+      return badRequest("invalid_limit", `Parameter limit moet minstens 1 zijn, kreeg ${value}.`);
     }
     if (name === "offset" && value < 0) {
-      return badRequest(`Parameter offset kan niet negatief zijn, kreeg ${value}.`);
+      return badRequest(
+        "invalid_offset",
+        `Parameter offset kan niet negatief zijn, kreeg ${value}.`,
+      );
     }
   }
 

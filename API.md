@@ -87,11 +87,52 @@ cost one unit per call.
 
 ## Errors
 
-Errors are JSON. A failing search returns `500` with a generic message and a
-`request_id`:
+Errors are JSON, and every one carries a machine-readable `code` beside the
+human-readable `error`:
 
 ```json
 {
+  "code": "invalid_date",
+  "error": "Parameter dateFrom moet een datum in de vorm JJJJ-MM-DD zijn, kreeg \"bogus\".",
+  "hint": "Alleen de kale datum wordt geaccepteerd; een tijd of tijdzone erachter niet."
+}
+```
+
+**Branch on `code`, never on `error`.** The message is Dutch prose: it may be
+reworded, given a clearer hint, or one day offered in another language, and a
+consumer matching on the text breaks silently when that happens. Codes are
+added as needed; an existing one is not renamed or removed without a note here.
+
+| Code | Status | Meaning |
+|------|--------|---------|
+| `unknown_entity_type` | 400 | `entityType` is not one of the four documented values |
+| `unknown_organization` | 400 | `organization` is not a key from `/api/sources` |
+| `unknown_sort` | 400 | `sort` is not one of the four documented orders |
+| `invalid_date` | 400 | `dateFrom` or `dateTo` is not a bare `YYYY-MM-DD` calendar date |
+| `invalid_limit` | 400 | `limit` is not an integer, or is below 1 |
+| `invalid_offset` | 400 | `offset` is not an integer, or is negative |
+| `unsupported_phrase_slop` | 400 | `query` uses the proximity notation `"a b"~10` |
+| `invalid_page_number` | 400 | the page number in a PDF page URL is not a positive integer |
+| `missing_export_source` | 400 | an export call omitted `source` |
+| `unknown_export_source` | 400 | an export call named a source that does not exist |
+| `invalid_export_cursor` | 400 | `cursor` was not produced by an earlier export response |
+| `entity_not_found` | 404 | no entity with that id |
+| `pdf_not_found` | 404 | the entity exists but carries no PDF |
+| `pdf_page_not_found` | 404 | the PDF exists but has no such page |
+| `rate_limited` | 429 | budget spent; see [Rate limits](#rate-limits) |
+| `search_failed` | 500 | the search could not be completed |
+| `stats_failed` | 500 | `/api/stats` could not be assembled |
+| `status_failed` | 500 | `/api/status` could not be assembled |
+| `export_failed` | 500 | an export page could not be read |
+| `pdf_fetch_failed` | 500, 502 | the source PDF could not be retrieved |
+| `pdf_render_failed` | 500 | the page could not be rendered to an image |
+| `entity_content_failed` | 500 | the entity's content could not be assembled |
+
+A failing search adds a `request_id`:
+
+```json
+{
+  "code": "search_failed",
   "error": "Zoeken mislukt. Probeer het opnieuw of meld deze fout met het request ID.",
   "request_id": "3f9c1a2b"
 }

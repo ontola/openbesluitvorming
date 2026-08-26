@@ -33,6 +33,7 @@ import { ObjectStorageClient } from "../src/storage/s3.ts";
 import { pdfPageCacheKey, pdfPageMetaKey, renderPdfPageJpeg } from "../src/documents/thumbnails.ts";
 import { getStatus } from "./status_api.ts";
 import { RATE_LIMIT_PAGE_UNIT, RateLimiter, type RateVerdict, requestCost } from "./rate_limit.ts";
+import { apiError } from "./api_errors.ts";
 import { validateSearchParams } from "./search_params.ts";
 
 const root = new URL("./", import.meta.url);
@@ -98,18 +99,20 @@ function parseServerTiming(value: string | null): ParsedServerTiming {
 
 function validateExportSource(sourceKey: string): Response | null {
   if (!sourceKey) {
-    return Response.json(
-      { error: "Parameter source is verplicht; zie /api/sources voor geldige keys." },
-      { status: 400 },
+    return apiError(
+      "missing_export_source",
+      400,
+      "Parameter source is verplicht; zie /api/sources voor geldige keys.",
     );
   }
   try {
     getSource(sourceKey);
     return null;
   } catch {
-    return Response.json(
-      { error: `Onbekende source "${sourceKey}"; zie /api/sources voor geldige keys.` },
-      { status: 400 },
+    return apiError(
+      "unknown_export_source",
+      400,
+      `Onbekende source "${sourceKey}"; zie /api/sources voor geldige keys.`,
     );
   }
 }
@@ -331,9 +334,10 @@ async function handleRequest(request: Request): Promise<Response> {
         headers: { "cache-control": "public, max-age=600" },
       });
     } catch (error) {
-      return Response.json(
-        { error: error instanceof Error ? error.message : "Status ophalen mislukt" },
-        { status: 500 },
+      return apiError(
+        "status_failed",
+        500,
+        error instanceof Error ? error.message : "Status ophalen mislukt",
       );
     }
   }
@@ -349,9 +353,10 @@ async function handleRequest(request: Request): Promise<Response> {
       cursor = url.searchParams.get("cursor");
       parseChangesCursor(cursor);
     } catch {
-      return Response.json(
-        { error: "Ongeldige cursor; gebruik de nextCursor uit een eerdere response." },
-        { status: 400 },
+      return apiError(
+        "invalid_export_cursor",
+        400,
+        "Ongeldige cursor; gebruik de nextCursor uit een eerdere response.",
       );
     }
     try {
@@ -365,9 +370,10 @@ async function handleRequest(request: Request): Promise<Response> {
         "x-has-more": String(page.hasMore),
       });
     } catch (error) {
-      return Response.json(
-        { error: error instanceof Error ? error.message : "Export changes ophalen mislukt" },
-        { status: 500 },
+      return apiError(
+        "export_failed",
+        500,
+        error instanceof Error ? error.message : "Export changes ophalen mislukt",
       );
     }
   }
@@ -390,9 +396,10 @@ async function handleRequest(request: Request): Promise<Response> {
         "x-changes-cursor": page.changesCursor,
       });
     } catch (error) {
-      return Response.json(
-        { error: error instanceof Error ? error.message : "Export snapshot ophalen mislukt" },
-        { status: 500 },
+      return apiError(
+        "export_failed",
+        500,
+        error instanceof Error ? error.message : "Export snapshot ophalen mislukt",
       );
     }
   }
@@ -590,7 +597,7 @@ async function handleRequest(request: Request): Promise<Response> {
         );
       }
       return withServerTiming(
-        Response.json({ error: message || "Statistieken ophalen mislukt" }, { status: 500 }),
+        apiError("stats_failed", 500, message || "Statistieken ophalen mislukt"),
         requestStart,
         metrics,
       );
@@ -640,12 +647,11 @@ async function handleRequest(request: Request): Promise<Response> {
         }),
       );
       return withServerTiming(
-        Response.json(
-          {
-            error: "Zoeken mislukt. Probeer het opnieuw of meld deze fout met het request ID.",
-            request_id: requestId,
-          },
-          { status: 500 },
+        apiError(
+          "search_failed",
+          500,
+          "Zoeken mislukt. Probeer het opnieuw of meld deze fout met het request ID.",
+          { request_id: requestId },
         ),
         requestStart,
         metrics,
@@ -661,7 +667,7 @@ async function handleRequest(request: Request): Promise<Response> {
 
     if (isNaN(pageNumber) || pageNumber < 1) {
       return withServerTiming(
-        Response.json({ error: "Ongeldig paginanummer" }, { status: 400 }),
+        apiError("invalid_page_number", 400, "Ongeldig paginanummer"),
         requestStart,
         metrics,
       );
@@ -700,7 +706,7 @@ async function handleRequest(request: Request): Promise<Response> {
       const pdfInfo = await measureTiming(metrics, "pdf_lookup", () => getEntityPdfInfo(entityId));
       if (!pdfInfo?.pdfUrl) {
         return withServerTiming(
-          Response.json({ error: "PDF niet gevonden" }, { status: 404 }),
+          apiError("pdf_not_found", 404, "PDF niet gevonden"),
           requestStart,
           metrics,
         );
@@ -717,9 +723,10 @@ async function handleRequest(request: Request): Promise<Response> {
         );
       } catch (error) {
         const notFound = error instanceof Error && error.message === "PDF page not found";
-        const status = notFound ? 404 : 500;
-        const msg = notFound ? "Pagina niet gevonden" : "PDF-pagina kon niet worden weergegeven";
-        return withServerTiming(Response.json({ error: msg }, { status }), requestStart, metrics);
+        const response = notFound
+          ? apiError("pdf_page_not_found", 404, "Pagina niet gevonden")
+          : apiError("pdf_render_failed", 500, "PDF-pagina kon niet worden weergegeven");
+        return withServerTiming(response, requestStart, metrics);
       }
 
       const pageCount = renderedPage.pageCount;
@@ -752,12 +759,10 @@ async function handleRequest(request: Request): Promise<Response> {
       );
     } catch (error) {
       return withServerTiming(
-        Response.json(
-          {
-            error:
-              error instanceof Error ? error.message : "PDF-pagina kon niet worden weergegeven",
-          },
-          { status: 500 },
+        apiError(
+          "pdf_render_failed",
+          500,
+          error instanceof Error ? error.message : "PDF-pagina kon niet worden weergegeven",
         ),
         requestStart,
         metrics,
@@ -779,7 +784,7 @@ async function handleRequest(request: Request): Promise<Response> {
       const content = await measureTiming(metrics, "content", () => getEntityContent(entityId));
       if (!content?.pdfUrl) {
         return withServerTiming(
-          Response.json({ error: "PDF niet gevonden" }, { status: 404 }),
+          apiError("pdf_not_found", 404, "PDF niet gevonden"),
           requestStart,
           metrics,
         );
@@ -800,7 +805,7 @@ async function handleRequest(request: Request): Promise<Response> {
 
       if (!upstream.ok && upstream.status !== 206) {
         return withServerTiming(
-          Response.json({ error: `PDF ophalen mislukt (${upstream.status})` }, { status: 502 }),
+          apiError("pdf_fetch_failed", 502, `PDF ophalen mislukt (${upstream.status})`),
           requestStart,
           metrics,
         );
@@ -834,11 +839,10 @@ async function handleRequest(request: Request): Promise<Response> {
       );
     } catch (error) {
       return withServerTiming(
-        Response.json(
-          {
-            error: error instanceof Error ? error.message : "PDF ophalen mislukt",
-          },
-          { status: 500 },
+        apiError(
+          "pdf_fetch_failed",
+          500,
+          error instanceof Error ? error.message : "PDF ophalen mislukt",
         ),
         requestStart,
         metrics,
@@ -854,7 +858,7 @@ async function handleRequest(request: Request): Promise<Response> {
       const content = await measureTiming(metrics, "content", () => getEntityContent(entityId));
       if (!content) {
         return withServerTiming(
-          Response.json({ error: "Resultaat niet gevonden" }, { status: 404 }),
+          apiError("entity_not_found", 404, "Resultaat niet gevonden"),
           requestStart,
           metrics,
         );
@@ -862,11 +866,10 @@ async function handleRequest(request: Request): Promise<Response> {
       return withServerTiming(Response.json(content), requestStart, metrics);
     } catch (error) {
       return withServerTiming(
-        Response.json(
-          {
-            error: error instanceof Error ? error.message : "Documentinhoud ophalen mislukt",
-          },
-          { status: 500 },
+        apiError(
+          "entity_content_failed",
+          500,
+          error instanceof Error ? error.message : "Documentinhoud ophalen mislukt",
         ),
         requestStart,
         metrics,
@@ -947,15 +950,16 @@ function applyRateLimitHeaders(response: Response, verdict: RateVerdict): void {
 }
 
 function rateLimitedResponse(verdict: RateVerdict): Response {
-  const response = Response.json(
+  const response = apiError(
+    "rate_limited",
+    429,
+    `Te veel verzoeken. Probeer het over ${verdict.retryAfterSeconds} seconde(n) opnieuw.`,
     {
-      error: `Te veel verzoeken. Probeer het over ${verdict.retryAfterSeconds} seconde(n) opnieuw.`,
       limit_per_minute: verdict.limit,
       retry_after_seconds: verdict.retryAfterSeconds,
       hint: `Een zoekopdracht kost 1 eenheid, plus 1 eenheid per 250 resultaten boven de eerste ${RATE_LIMIT_PAGE_UNIT}: limit=100 kost 1,3. Grotere pagina's zijn dus goedkoper dan meer verzoeken. Spreid je verzoeken, of gebruik /api/export voor bulk. Elke API-response bevat RateLimit-Limit, RateLimit-Remaining en RateLimit-Reset.`,
       documentation: "https://openbesluitvorming.nl/docs/api",
     },
-    { status: 429 },
   );
   applyRateLimitHeaders(response, verdict);
   response.headers.set("Retry-After", String(verdict.retryAfterSeconds));
