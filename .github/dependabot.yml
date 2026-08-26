@@ -1,0 +1,19 @@
+version: 2
+updates:
+  # The web build installs with `pnpm install --frozen-lockfile`
+  # (Dockerfile.web, .github/workflows/test.yml), so pnpm-lock.yaml is the
+  # only npm lockfile that describes what actually ships.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      # One PR per week for routine bumps; majors still get their own.
+      minor-and-patch:
+        update-types:
+          - minor
+          - patch
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
