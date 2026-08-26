@@ -1295,6 +1295,15 @@ select {
   text-align: center;
 }
 
+/* A refused search is a statement, not an absence, so it gets the full text
+   colour and a solid edge instead of the dashed one the empty state wears. */
+.result-state--error {
+  border-style: solid;
+  border-color: var(--accent);
+  color: var(--text);
+  text-align: left;
+}
+
 .content[hidden] {
   display: none;
 }

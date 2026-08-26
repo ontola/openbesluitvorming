@@ -82,6 +82,13 @@
   let indexProvinceCount = 7;
   let totalCount: number | null = null;
   let totalIsApproximate = false;
+  /** What the API said when it refused, so the reason reaches the reader.
+   *
+   * A failed search emptied the list and left the ordinary "geen resultaten"
+   * behind it, which is the one thing a rejected search does not mean. The API
+   * refuses a query it cannot honour rather than answering a different one
+   * (#223, #224); swallowing that message here put the silence straight back. */
+  let searchError: string | null = null;
   let hasMore = false;
   let loading = false;
   let loadingMore = false;
@@ -1277,6 +1284,7 @@
 
     loading = true;
     loadingMore = false;
+    searchError = null;
     if (mode) writeRouteState(mode);
     const requestId = ++searchRequestId;
     const signature = currentSearchSignature();
@@ -1318,6 +1326,9 @@
         totalIsApproximate = false;
         hasMore = false;
         nextSearchOffset = PAGE_SIZE;
+        searchError = error instanceof Error && error.message
+          ? error.message
+          : "Zoeken mislukt. Probeer het opnieuw.";
       }
     } finally {
       if (requestId === searchRequestId) {
@@ -1672,9 +1683,11 @@
     ? "Zoek op organisatie of onderwerp"
     : loading
       ? "Zoeken..."
-      : totalIsApproximate && totalCount !== null
-        ? `Resultaten (ongeveer ${formatCount(totalCount)})`
-        : `Resultaten (${formatCount(totalCount ?? results.length)})`;
+      : searchError
+        ? "Zoekopdracht geweigerd"
+        : totalIsApproximate && totalCount !== null
+          ? `Resultaten (ongeveer ${formatCount(totalCount)})`
+          : `Resultaten (${formatCount(totalCount ?? results.length)})`;
   /** The title follows the state, because the URL already does.
    *
    * Researching this means putting several searches in tabs side by side, and
@@ -2007,6 +2020,8 @@
                 <span class="skeleton result-card__line result-card__line--body result-card__line--short"></span>
               </article>
             {/each}
+          {:else if searchError && !loading}
+            <div class="result-state result-state--error" role="alert">{searchError}</div>
           {:else if results.length === 0 && !loading}
             <div class="result-state">Geen resultaten gevonden voor deze zoekopdracht.</div>
           {:else}
