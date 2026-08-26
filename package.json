@@ -30,17 +30,17 @@
     "test:live": "WOOZI_RUN_LIVE_INTEGRATION=1 deno test -A tests/notubiz.test.ts tests/quickwit.test.ts tests/gui_e2e.test.ts"
   },
   "dependencies": {
-    "hls.js": "^1.6.17",
+    "hls.js": "^1.7.1",
     "swetrix": "^4.5.0"
   },
   "devDependencies": {
-    "@sveltejs/vite-plugin-svelte": "^7.0.0",
-    "fast-xml-parser": "^5.7.0",
-    "happy-dom": "^20.8.9",
+    "@sveltejs/vite-plugin-svelte": "^7.3.0",
+    "fast-xml-parser": "^5.11.0",
+    "happy-dom": "^20.11.6",
     "marked": "^16.4.1",
-    "oxfmt": "^0.43.0",
-    "oxlint": "^1.58.0",
-    "svelte": "^5.55.1",
+    "oxfmt": "^0.64.0",
+    "oxlint": "^1.79.0",
+    "svelte": "^5.56.10",
     "typescript": "^5.9.3",
     "vite": "^7.1.10"
   }
