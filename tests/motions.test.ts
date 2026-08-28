@@ -1,8 +1,5 @@
 import { __test__ as ibabsClientTest } from "../src/ibabs/client.ts";
-import {
-  IbabsMeetingExtractor,
-  __test__ as ibabsExtractorTest,
-} from "../src/ibabs/extractor.ts";
+import { IbabsMeetingExtractor, __test__ as ibabsExtractorTest } from "../src/ibabs/extractor.ts";
 import { normalizeIbabsMotion, normalizeIbabsMotionDocuments } from "../src/ibabs/normalize.ts";
 import {
   MeetingIndex,
@@ -30,12 +27,13 @@ function assert(condition: unknown, message: string): asserts condition {
 
 function assertEquals<T>(actual: T, expected: T, message: string): void {
   if (JSON.stringify(actual) !== JSON.stringify(expected)) {
-    throw new Error(`${message}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
+    throw new Error(
+      `${message}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`,
+    );
   }
 }
 
-const fixture = (name: string) =>
-  Deno.readTextFile(new URL(`./fixtures/${name}`, import.meta.url));
+const fixture = (name: string) => Deno.readTextFile(new URL(`./fixtures/${name}`, import.meta.url));
 
 Deno.test("iBabs list parsers read registries, entries, values and votes", async () => {
   const lists = ibabsClientTest.parseListsXml(await fixture("ibabs_lists_response.xml"));
@@ -152,7 +150,9 @@ Deno.test("an iBabs motion normalizes with votes, tally and a meeting link", asy
   );
 
   const meetings = new MeetingIndex();
-  meetings.add(meetingFixture("meeting:ibabs:gemeente:utrecht:m1", "Gemeenteraad", "2026-01-29T00:00:00Z"));
+  meetings.add(
+    meetingFixture("meeting:ibabs:gemeente:utrecht:m1", "Gemeenteraad", "2026-01-29T00:00:00Z"),
+  );
 
   const motion = normalizeIbabsMotion(source, list, entries[0], detail, votes, meetings);
 
@@ -178,7 +178,11 @@ Deno.test("an iBabs motion normalizes with votes, tally and a meeting link", asy
   assert(firstVote.group?.startsWith("party:ibabs:"), "group resolves to a canonical party id");
 
   assertEquals(motion.meeting, "meeting:ibabs:gemeente:utrecht:m1", "linked meeting");
-  assertEquals(motion.agenda_item, "meeting:ibabs:gemeente:utrecht:m1:item-23", "linked agenda item");
+  assertEquals(
+    motion.agenda_item,
+    "meeting:ibabs:gemeente:utrecht:m1:item-23",
+    "linked agenda item",
+  );
   assertEquals(motion.agenda_item_hint, undefined, "hint dropped once fully resolved");
 
   const documents = normalizeIbabsMotionDocuments(source, motion, detail);
@@ -243,7 +247,9 @@ Deno.test("a Notubiz motion normalizes with an exact agenda-item link", async ()
     name: "Gemeenteraad",
     classification: ["Agenda"],
     start_date: "2026-02-19T19:30:00Z",
-    agenda: [{ id: canonicalAgendaItemId(source, 9977098), title: "Geotechnisch onderzoek", order: 15 }],
+    agenda: [
+      { id: canonicalAgendaItemId(source, 9977098), title: "Geotechnisch onderzoek", order: 15 },
+    ],
     source_info: { supplier: "notubiz", source: "alkmaar" },
     raw: {},
   });
@@ -253,8 +259,16 @@ Deno.test("a Notubiz motion normalizes with an exact agenda-item link", async ()
   assert(motion.name.includes("Amendement"), "title from field 1");
   assertEquals(motion.status, "verworpen", "outcome from field 62");
   assertEquals(motion.result, "verworpen", "normalized result");
-  assertEquals(motion.agenda_item, canonicalAgendaItemId(source, 9977098), "exact agenda item link");
-  assertEquals(motion.meeting, "meeting:notubiz:gemeente:alkmaar:m1", "meeting resolved via agenda item");
+  assertEquals(
+    motion.agenda_item,
+    canonicalAgendaItemId(source, 9977098),
+    "exact agenda item link",
+  );
+  assertEquals(
+    motion.meeting,
+    "meeting:notubiz:gemeente:alkmaar:m1",
+    "meeting resolved via agenda item",
+  );
   assertEquals(motion.last_discussed_at, "2026-02-19T19:30:00Z", "dated by its meeting");
   assert((motion.parties?.length ?? 0) > 0, "submitting parties from field 37");
 
@@ -290,7 +304,12 @@ Deno.test("the outcome field wins over prose in the same field", () => {
   assertEquals(pick(attrs([[62, "aangenomen"]])), "aangenomen", "field 62 is preferred");
   // Some municipalities park prose in 62 and the real outcome in 71.
   assertEquals(
-    pick(attrs([[62, "gelijke stemming - wordt opnieuw in stemming gebracht"], [71, "verworpen"]])),
+    pick(
+      attrs([
+        [62, "gelijke stemming - wordt opnieuw in stemming gebracht"],
+        [71, "verworpen"],
+      ]),
+    ),
     "verworpen",
     "a decisive field wins over prose",
   );
@@ -307,7 +326,10 @@ class FakeIbabsClient {
   readonly meetingRangeCalls: Array<[string, string]> = [];
 
   constructor(
-    private readonly meetingsByDate: Record<string, Array<{ Id: string; MeetingDate: string; Title: string }>>,
+    private readonly meetingsByDate: Record<
+      string,
+      Array<{ Id: string; MeetingDate: string; Title: string }>
+    >,
     private readonly entries: Array<{ EntryId: string; MutationDate: string; agendapunt: string }>,
   ) {}
 
@@ -320,13 +342,15 @@ class FakeIbabsClient {
     const collected = [];
     for (const [date, meetings] of Object.entries(this.meetingsByDate)) {
       if (date >= from && date <= to) {
-        collected.push(...meetings.map((meeting) => ({
-          Id: meeting.Id,
-          MeetingtypeId: "t1",
-          MeetingDate: meeting.MeetingDate,
-          MeetingItems: [{ Id: `${meeting.Id}-item5`, Title: meeting.Title, Documents: [] }],
-          Documents: [],
-        })));
+        collected.push(
+          ...meetings.map((meeting) => ({
+            Id: meeting.Id,
+            MeetingtypeId: "t1",
+            MeetingDate: meeting.MeetingDate,
+            MeetingItems: [{ Id: `${meeting.Id}-item5`, Title: meeting.Title, Documents: [] }],
+            Documents: [],
+          })),
+        );
       }
     }
     return Promise.resolve(collected);
@@ -373,13 +397,29 @@ Deno.test("motions link to meetings outside the run window, fetching each date o
   // decided inside it. The first two share a meeting date.
   const client = new FakeIbabsClient(
     {
-      "2024-11-07": [{ Id: "old-meeting", MeetingDate: "2024-11-07T19:30:00", Title: "Programmabegroting" }],
-      "2026-07-16": [{ Id: "new-meeting", MeetingDate: "2026-07-16T19:30:00", Title: "Voorjaarsnota" }],
+      "2024-11-07": [
+        { Id: "old-meeting", MeetingDate: "2024-11-07T19:30:00", Title: "Programmabegroting" },
+      ],
+      "2026-07-16": [
+        { Id: "new-meeting", MeetingDate: "2026-07-16T19:30:00", Title: "Voorjaarsnota" },
+      ],
     },
     [
-      { EntryId: "e1", MutationDate: "2026-07-15T10:00:00", agendapunt: "Gemeenteraad 7-11-2024\\n5 Programmabegroting" },
-      { EntryId: "e2", MutationDate: "2026-07-15T11:00:00", agendapunt: "Gemeenteraad 7-11-2024\\n5 Programmabegroting" },
-      { EntryId: "e3", MutationDate: "2026-07-16T12:00:00", agendapunt: "Gemeenteraad 16-7-2026\\n5 Voorjaarsnota" },
+      {
+        EntryId: "e1",
+        MutationDate: "2026-07-15T10:00:00",
+        agendapunt: "Gemeenteraad 7-11-2024\\n5 Programmabegroting",
+      },
+      {
+        EntryId: "e2",
+        MutationDate: "2026-07-15T11:00:00",
+        agendapunt: "Gemeenteraad 7-11-2024\\n5 Programmabegroting",
+      },
+      {
+        EntryId: "e3",
+        MutationDate: "2026-07-16T12:00:00",
+        agendapunt: "Gemeenteraad 16-7-2026\\n5 Voorjaarsnota",
+      },
     ],
   );
 
@@ -419,10 +459,16 @@ Deno.test("motions_only skips the meeting pass but still links motions", async (
   const source = getIbabsSource("utrecht");
   const client = new FakeIbabsClient(
     {
-      "2024-11-07": [{ Id: "old-meeting", MeetingDate: "2024-11-07T19:30:00", Title: "Programmabegroting" }],
+      "2024-11-07": [
+        { Id: "old-meeting", MeetingDate: "2024-11-07T19:30:00", Title: "Programmabegroting" },
+      ],
     },
     [
-      { EntryId: "e1", MutationDate: "2026-07-15T10:00:00", agendapunt: "Gemeenteraad 7-11-2024\\n5 Programmabegroting" },
+      {
+        EntryId: "e1",
+        MutationDate: "2026-07-15T10:00:00",
+        agendapunt: "Gemeenteraad 7-11-2024\\n5 Programmabegroting",
+      },
     ],
   );
 
@@ -464,7 +510,9 @@ Deno.test("a motion projects into a searchable Quickwit document", async () => {
     await fixture("ibabs_list_entry_votes_response.xml"),
   );
   const meetings = new MeetingIndex();
-  meetings.add(meetingFixture("meeting:ibabs:gemeente:utrecht:m1", "Gemeenteraad", "2026-01-29T00:00:00Z"));
+  meetings.add(
+    meetingFixture("meeting:ibabs:gemeente:utrecht:m1", "Gemeenteraad", "2026-01-29T00:00:00Z"),
+  );
 
   const motion = normalizeIbabsMotion(source, list, entries[0], detail, votes, meetings);
   const event = await buildEntityCommitEvent(motion);
@@ -503,6 +551,56 @@ Deno.test("an unparseable date is dropped rather than passed to the index", asyn
   }
 });
 
+/** #203, and the reason it outlived its own fix.
+ *
+ * The suppliers' normalisers already convert a bare reading, but they only run
+ * at import time. The export log kept what they produced *before* that fix —
+ * readings like `2023-11-28 19:30:00` — and projection handed those straight
+ * to `new Date()`, which in a UTC container reads 19:30 as 19:30 UTC. Every
+ * meeting imported before the fix therefore claimed to start an hour or two
+ * later than it did, and one near midnight landed on the wrong day entirely.
+ *
+ * Converting here is what makes the backlog repairable without asking a
+ * supplier anything: the raw wall clock is still in the export log, so a
+ * reindex_only re-projects it correctly. */
+Deno.test("a zoneless start_date is projected as a Dutch wall clock, not as UTC", async () => {
+  const cases: Array<[string, string, string]> = [
+    ["2023-11-28 19:30:00", "2023-11-28T18:30:00Z", "winter is CET, so 19:30 is 18:30Z"],
+    ["2026-08-19T19:30:00", "2026-08-19T17:30:00Z", "summer is CEST, so 19:30 is 17:30Z"],
+    ["2026-08-19 19:30", "2026-08-19T17:30:00Z", "seconds are optional"],
+    // A reading that already carries a zone is trusted, not shifted again.
+    ["2026-08-19T17:30:00Z", "2026-08-19T17:30:00Z", "an explicit Z is left alone"],
+    ["2026-01-29T10:15:30+01:00", "2026-01-29T09:15:30Z", "an explicit offset is honoured"],
+    // Midnight is a date, not a moment: shifting it back would move a meeting
+    // to the previous day for every consumer that reads only the date part.
+    ["2026-08-19 00:00:00", "2026-08-19T00:00:00Z", "midnight stays put"],
+    ["2026-08-19", "2026-08-19T00:00:00Z", "a bare day stays put"],
+  ];
+
+  for (const [raw, expected, why] of cases) {
+    const meeting = meetingFixture("meeting:ibabs:gemeente:utrecht:m10", "Gemeenteraad", raw);
+    const event = await buildEntityCommitEvent(meeting);
+    const [projected] = projectEntityCommitToQuickwitDocuments(event);
+    assertEquals(projected.start_date, expected, `${why} (input ${JSON.stringify(raw)})`);
+  }
+});
+
+/** The bug's most damaging shape: an evening meeting stamped as UTC is read
+ * back an hour or two later, and one late enough tips over midnight into the
+ * next day — where a date filter for its actual day no longer finds it. */
+Deno.test("a late-evening meeting keeps its own day", async () => {
+  const meeting = meetingFixture(
+    "meeting:ibabs:gemeente:utrecht:m11",
+    "Gemeenteraad",
+    "2024-03-01 23:58:00",
+  );
+  const event = await buildEntityCommitEvent(meeting);
+  const [projected] = projectEntityCommitToQuickwitDocuments(event);
+
+  assertEquals(projected.start_date, "2024-03-01T22:58:00Z", "23:58 CET is 22:58Z");
+  assertEquals(projected.start_date?.slice(0, 10), "2024-03-01", "and stays on 1 March");
+});
+
 Deno.test("the backfill planner splits only where the cap demands it", async () => {
   const { __test__: planner } = await import("../scripts/plan_motion_backfill.ts");
 
@@ -525,12 +623,18 @@ Deno.test("a throttled meeting-type call fails a full run but not a motions_only
 
   class ThrottlingTypes extends FakeIbabsClient {
     override getMeetingTypes(): Promise<never> {
-      return Promise.reject(new Error("Request failed 403 for https://wcf.ibabs.eu/api/Public.svc"));
+      return Promise.reject(
+        new Error("Request failed 403 for https://wcf.ibabs.eu/api/Public.svc"),
+      );
     }
   }
 
   const entries = [
-    { EntryId: "e1", MutationDate: "2026-07-15T10:00:00", agendapunt: "Gemeenteraad 7-11-2024\\n5 Programmabegroting" },
+    {
+      EntryId: "e1",
+      MutationDate: "2026-07-15T10:00:00",
+      agendapunt: "Gemeenteraad 7-11-2024\\n5 Programmabegroting",
+    },
   ];
   const meetings = {
     "2024-11-07": [{ Id: "m", MeetingDate: "2024-11-07T19:30:00", Title: "Programmabegroting" }],
@@ -540,14 +644,15 @@ Deno.test("a throttled meeting-type call fails a full run but not a motions_only
   const lenient = new ThrottlingTypes(meetings, entries);
   const motions: MotionEntity[] = [];
   // deno-lint-ignore no-explicit-any
-  const bundle = await new IbabsMeetingExtractor(lenient as any, () => Promise.resolve(undefined))
-    .extractForDateRange(source, "2026-07-14", "2026-07-18", {
-      executionMode: "motions_only",
-      retainEntities: false,
-      onEntity: (entity) => {
-        if (entity.type === "Motion") motions.push(entity);
-      },
-    });
+  const bundle = await new IbabsMeetingExtractor(lenient as any, () =>
+    Promise.resolve(undefined),
+  ).extractForDateRange(source, "2026-07-14", "2026-07-18", {
+    executionMode: "motions_only",
+    retainEntities: false,
+    onEntity: (entity) => {
+      if (entity.type === "Motion") motions.push(entity);
+    },
+  });
   assertEquals(motions.length, 1, "the motion is still imported");
   assert(bundle.stats.issue_count >= 1, "and the failure is reported, not swallowed");
 
@@ -557,8 +662,9 @@ Deno.test("a throttled meeting-type call fails a full run but not a motions_only
   let thrown: unknown;
   try {
     // deno-lint-ignore no-explicit-any
-    await new IbabsMeetingExtractor(strict as any, () => Promise.resolve(undefined))
-      .extractForDateRange(source, "2026-07-14", "2026-07-18", { retainEntities: false });
+    await new IbabsMeetingExtractor(strict as any, () =>
+      Promise.resolve(undefined),
+    ).extractForDateRange(source, "2026-07-14", "2026-07-18", { retainEntities: false });
   } catch (error) {
     thrown = error;
   }
