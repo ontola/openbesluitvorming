@@ -10,6 +10,7 @@ import type {
   WooziEntity,
 } from "../types.ts";
 import { currentProjectionVersion } from "../pipeline/versioning.ts";
+import { supplierDateTimeToUtc } from "../util/local_time.ts";
 
 export interface QuickwitSearchDocument {
   time: string;
@@ -64,6 +65,31 @@ function toIndexDateTime(value?: string): string | undefined {
     return undefined;
   }
 
+  // A reading without a zone is a Dutch wall clock, not UTC.
+  //
+  // This is where #203 actually lived. The suppliers' own normalisers already
+  // convert (`supplierDateTimeToUtc`), but they only run at import time, and
+  // the export log faithfully kept what they produced *before* that fix: bare
+  // readings like `2023-11-28 19:30:00`. Projection then handed those to
+  // `new Date()`, which in a UTC container reads them as 19:30 UTC and stamps
+  // `2023-11-28T19:30:00Z` — a council meeting claimed an hour or two late,
+  // and near midnight a whole day off, which moves it into the wrong
+  // `dateFrom`/`dateTo` window.
+  //
+  // Doing it here rather than only at import is what makes the backlog
+  // repairable: the raw wall clock survives in the export log, so a
+  // reindex_only re-projects it correctly without asking a supplier anything.
+  const normalized = supplierDateTimeToUtc(trimmed);
+  if (normalized) {
+    return normalized;
+  }
+
+  // Fallback for shapes supplierDateTimeToUtc does not recognise but Date
+  // does, e.g. sub-second precision. Kept because the cost of the two
+  // outcomes is not symmetric: an unparseable value makes Quickwit drop the
+  // whole entity, while a slightly wrong one costs a badly sorted row. A
+  // zoneless reading that lands here is still stamped as UTC, but every shape
+  // the suppliers are known to emit is handled above.
   const parsed = new Date(trimmed);
   if (Number.isNaN(parsed.getTime())) {
     return undefined;
