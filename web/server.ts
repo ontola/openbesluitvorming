@@ -251,6 +251,10 @@ function contentType(pathname: string): string {
   if (pathname.endsWith(".png")) return "image/png";
   if (pathname.endsWith(".ico")) return "image/x-icon";
   if (pathname.endsWith(".woff2")) return "font/woff2";
+  // robots.txt and llms.txt are read by machines that check the type. The
+  // fallthrough below is text/html, which makes a crawler treat a directive
+  // file as a document and ignore it.
+  if (pathname.endsWith(".txt")) return "text/plain; charset=utf-8";
   if (pathname.endsWith(".svg")) return "image/svg+xml";
   return "text/html; charset=utf-8";
 }
