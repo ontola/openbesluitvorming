@@ -1,0 +1,49 @@
+# OpenBesluitvorming
+
+> Doorzoek de openbare besluitvorming van Nederlandse gemeenten, provincies en
+> waterschappen: vergaderstukken, agenda's, besluiten, moties en verslagen uit
+> ruim 300 bestuursorganen, dagelijks bijgewerkt bij de bron.
+
+De collectie bestaat uit stukken die de bestuursorganen zelf publiceren in hun
+raadsinformatiesystemen (Notubiz, iBabs, GemeenteOplossingen, Parlaeus). Deze
+dienst haalt ze op, maakt de tekst doorzoekbaar en houdt de herkomst intact:
+elk resultaat verwijst naar het originele document bij de bron.
+
+Dit is de opvolger van Open Raadsinformatie. Zie de migratiegids hieronder.
+
+## Zoeken
+
+- [Zoekpagina](https://openbesluitvorming.nl/): zoeken op onderwerp, met filters op
+  bestuursorgaan, type, datum en sortering. Een zoekopdracht staat volledig in de
+  URL, dus een link naar een zoekresultaat blijft werken.
+- Een frase zoek je tussen dubbele aanhalingstekens: `"sociale huurwoningen"`.
+  Nabijheidszoeken (`"a b"~10`) wordt niet ondersteund en levert een foutmelding
+  in plaats van een ander antwoord.
+
+## API
+
+- [API-documentatie](https://openbesluitvorming.nl/docs/api) (Engelstalig): endpoints,
+  parameters, foutcodes en tariefgrenzen.
+- `GET /api/search` — zoeken, met `query`, `organization`, `entityType`, `sort`,
+  `dateFrom`, `dateTo`, `offset` en `limit`.
+- `GET /api/entities/{id}` — één vergadering, document, motie of opname, inclusief
+  de volledige geëxtraheerde tekst.
+- `GET /api/sources` — de bestuursorganen die worden geïndexeerd.
+- `GET /api/status` — actualiteit per bron: wanneer er voor het laatst met succes is
+  bijgewerkt.
+- `GET /api/export/snapshot` en `/api/export/changes` — bulk ophalen en synchroniseren.
+  Dit is de bedoelde route voor wie de collectie in zijn geheel wil, niet de zoek-API.
+
+Elke foutmelding draagt een stabiele `code` naast de Nederlandse tekst; zie de
+foutcodetabel in de API-documentatie. Match op `code`, niet op de tekst.
+
+## Voor hergebruikers van Open Raadsinformatie
+
+- [Migratiegids](https://openbesluitvorming.nl/docs/migration-guide) (Engelstalig):
+  hoe de oude ORI-API zich verhoudt tot deze.
+
+## Wat deze dienst niet is
+
+Geen officiële bekendmaking en geen archief met rechtskracht. De bron blijft het
+bestuursorgaan zelf; een document dat daar wordt ingetrokken of vervangen, kan
+hier nog even zichtbaar zijn. Voor de geldende versie: volg de link naar de bron.

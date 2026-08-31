@@ -1,0 +1,24 @@
+# openbesluitvorming.nl — doorzoek de openbare besluitvorming van Nederlandse
+# gemeenten, provincies en waterschappen.
+#
+# Crawlen is welkom. Deze stukken zijn openbaar en juist bedoeld om gevonden
+# te worden; tot voor kort was er geen enkele link naar een document om te
+# volgen, wat de hele collectie buiten het bereik van zoekmachines hield.
+# Wat hieronder dicht staat, staat dicht omdat crawlen er niets oplevert.
+
+User-agent: *
+Allow: /
+
+# De beheeromgeving zit achter authenticatie en heeft geen publieke inhoud.
+Disallow: /admin
+
+# Bulk-export levert NDJSON van megabytes per pagina: nuttig voor een
+# hergebruiker, zinloos voor een index, en duur om te serveren. Wie de
+# volledige collectie wil, leest /docs/api en gebruikt deze endpoints
+# rechtstreeks in plaats van ze te crawlen.
+Disallow: /api/export/
+
+# De overige /api/-adressen blijven bewust open. De site rendert een document
+# in de browser via die endpoints, dus een crawler die ze niet mag ophalen
+# ziet een lege pagina — precies het tegenovergestelde van wat dit bestand
+# moet bereiken.
