@@ -58,7 +58,27 @@ QUICKWIT_SPLIT_CACHE_POLLUTION_RATIO="${WOOZI_MONITOR_QUICKWIT_SPLIT_CACHE_POLLU
 # cached files (below this floor, so the janitor never ran) of which 40 were
 # orphans, occupying 44G of the 55G budget and evicting live splits.
 QUICKWIT_SPLIT_CACHE_POLLUTION_MIN_FILES="${WOOZI_MONITOR_QUICKWIT_SPLIT_CACHE_POLLUTION_MIN_FILES:-150}"
-QUICKWIT_INDEX_ID="${WOOZI_MONITOR_QUICKWIT_INDEX_ID:-woozi-events-prod}"
+# The index to watch. Follows the one the application and workers actually
+# serve -- QUICKWIT_INDEX_ID from /opt/woozi/.env, which systemd hands us via
+# EnvironmentFile -- because here the two drifting apart is not cosmetic: this
+# name selects the metastore that decides which cached splits are orphans.
+#
+# It used to be a bare default, and nothing ever set
+# WOOZI_MONITOR_QUICKWIT_INDEX_ID, so the monitor watched woozi-events-prod
+# while the app moved to woozi-events-v3b on 2026-08-12. The janitor below
+# then protected 92 splits of a frozen index nobody queries, and treated every
+# split of the *served* index as an orphan -- deleting each one within two
+# minutes of the searcher fetching it. Measured 2026-08-30 in a quiet period:
+# 50 of 50 cached splits belonged to prod and 0 to v3b, 53G of cache spent on
+# splits no query touches, while the cache could never retain a live one.
+#
+# That is the standing cause behind the chronic "Search is slow" alerts (115
+# in the preceding week). It only looked like an incident when a reindex made
+# the searcher fetch live splits faster than the janitor deleted them.
+#
+# The same name feeds the cold-cache threshold below, so its "what there is to
+# cache" denominator was measured against the wrong index too.
+QUICKWIT_INDEX_ID="${WOOZI_MONITOR_QUICKWIT_INDEX_ID:-${QUICKWIT_INDEX_ID:-woozi-events-prod}}"
 QUICKWIT_INDEX_ROOT_PREFIX="${WOOZI_MONITOR_QUICKWIT_INDEX_ROOT_PREFIX:-indexes-prod}"
 # Floor between two cache purges regardless of how often the ratio trips —
 # the purge itself resets the ratio to ~1x, so this only guards against a

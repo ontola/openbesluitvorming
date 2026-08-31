@@ -131,6 +131,7 @@ Current implemented slices:
   variant — the .ts variant is a local tool) checks search latency, disk,
   containers, import health (stalled pipeline, stuck queue, extraction failure
   surges), and backup freshness. Runs every 2 min via `woozi-monitor.timer`.
+- The monitor must watch the index the app actually serves. Its split-cache janitor deletes every cached split absent from `QUICKWIT_INDEX_ID`'s metastore, so pointing it at the wrong index does not degrade a check — it deletes the live cache. That is what happened between 2026-08-12 and 2026-08-30: the monitor's own default still said `woozi-events-prod` after the projection moved to `woozi-events-v3b`, so 53G of cache sat on a frozen index nobody queries while every live split was removed within two minutes of being fetched. It now follows `QUICKWIT_INDEX_ID` from the same `.env` the app reads. Bump the projection index and the monitor follows; override only via `WOOZI_MONITOR_QUICKWIT_INDEX_ID`.
 - The SQLite state (ops + export log) is backed up daily to S3 via
   `woozi-backup.timer` running `scripts/backup_state.ts` inside the web
   container (14-day retention, `backups/sqlite/` prefix). Install with
