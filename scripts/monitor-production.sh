@@ -84,6 +84,11 @@ QUICKWIT_INDEX_ROOT_PREFIX="${WOOZI_MONITOR_QUICKWIT_INDEX_ROOT_PREFIX:-indexes-
 # the purge itself resets the ratio to ~1x, so this only guards against a
 # flapping/misreading metastore causing a restart loop.
 QUICKWIT_SPLIT_CACHE_HEAL_COOLDOWN_SECONDS="${WOOZI_MONITOR_QUICKWIT_SPLIT_CACHE_HEAL_COOLDOWN_SECONDS:-1800}"
+# Gap between Quickwit's own split-cache tally and the bytes actually on disk,
+# in GB, above which we say so. They drift apart only when something removes
+# files from the cache directory while Quickwit runs, and the drift is what
+# stops the cache from refilling. 0 disables.
+QUICKWIT_SPLIT_CACHE_PHANTOM_GB="${WOOZI_MONITOR_QUICKWIT_SPLIT_CACHE_PHANTOM_GB:-20}"
 # Disk on the extraction fleet, read from each host's /stats. Those hosts
 # write downloaded PDFs into the extraction container's writable layer, and
 # a worker killed mid-request (routine: 4 uvicorn workers on 3.8GB RAM)
@@ -659,28 +664,68 @@ PY
   published_splits="$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(sum(1 for s in d.get('splits',[]) if s.get('split_state')=='Published'))" "$tmp_meta" 2>/dev/null || echo 0)"
   orphan_count="$(wc -l < "$tmp_orphans" | xargs)"
 
+  # The sweep counts orphans; it no longer deletes them.
+  #
+  # It used to unlink them here, on the reasoning quoted above: Linux lets you
+  # unlink a file a process still has open, so the removal looked free. That is
+  # true of the file handle and false of everything else. The split cache is
+  # Quickwit's own directory and it keeps its own tally of what it holds;
+  # unlinking a file underneath it never corrects that tally. Every sweep
+  # therefore inflated the tally permanently, until the process restarted.
+  #
+  # Measured 2026-09-01, after six weeks of sweeping and two weeks of uptime:
+  # Quickwit reported 1196 splits and 119.5G against its 120G budget while 7
+  # splits were on disk. Believing itself full of splits that no longer
+  # existed, it had stopped downloading altogether -- so the cache the sweep
+  # was meant to protect could not hold a single live split.
+  #
+  # There is no safe non-disruptive version of this. Clearing the cache means
+  # stopping Quickwit first, which the escalation below already does, and
+  # Quickwit evicts superseded splits itself once its tally is honest.
   if [ "$orphan_count" -gt 0 ] && [ -s "$tmp_meta" ]; then
-    docker exec -i woozi-quickwit-1 sh -c "cd '${cache_dir}' && xargs -r rm -f" < "$tmp_orphans" >/dev/null 2>&1 || true
-    printf '{"event":"quickwit_split_cache_janitor","cache_files":%s,"published_splits":%s,"orphans_removed":%s}\n' \
+    printf '{"event":"quickwit_split_cache_orphans","cache_files":%s,"published_splits":%s,"orphans":%s}\n' \
       "$cache_files" "${published_splits:-0}" "$orphan_count"
   fi
   rm -f "$tmp_meta" "$tmp_cache" "$tmp_orphans"
 
-  # Fallback: metastore unreadable, or the janitor genuinely can't keep pace
-  # with the churn rate. Re-measure the cache *after* cleanup -- the deletion
-  # above already brings the count down in the common case, and comparing
-  # against the pre-cleanup count would trigger a needless restart on every
-  # single successful janitor run.
+  # What Quickwit thinks it holds, against what is actually there.
   #
-  # Everything below stops Quickwit, so it keeps the MIN_FILES floor that the
-  # (harmless, non-disruptive) orphan sweep above deliberately no longer has.
+  # This is the signal that was missing. The script only ever measured the
+  # directory, so a tally drifting away from it was invisible -- and the tally
+  # is what decides whether Quickwit downloads anything. It stops at its byte
+  # budget whether or not the bytes exist.
+  local accounted_bytes disk_kb accounted_gb disk_gb phantom_gb
+  accounted_bytes="$(docker exec woozi-quickwit-1 sh -c \
+    "curl -s http://127.0.0.1:7280/metrics | grep '^quickwit_cache_searcher_split_in_cache_num_bytes ' | cut -d' ' -f2" \
+    2>/dev/null | xargs || true)"
+  disk_kb="$(docker exec woozi-quickwit-1 sh -c "du -sk '${cache_dir}' 2>/dev/null | cut -f1" 2>/dev/null | xargs || true)"
+  if [ -n "$accounted_bytes" ] && [ -n "$disk_kb" ] && [ "${QUICKWIT_SPLIT_CACHE_PHANTOM_GB:-0}" -gt 0 ]; then
+    accounted_gb="$((accounted_bytes / 1000000000))"
+    disk_gb="$((disk_kb / 1000000))"
+    phantom_gb="$((accounted_gb - disk_gb))"
+    if [ "$phantom_gb" -ge "$QUICKWIT_SPLIT_CACHE_PHANTOM_GB" ]; then
+      alert warning quickwit_split_cache_phantom \
+        "Quickwit's split cache tally no longer matches the disk" \
+        "accounted_gb=${accounted_gb} disk_gb=${disk_gb} phantom_gb=${phantom_gb}; Quickwit stops downloading at its byte budget whether or not those bytes exist, so the cache cannot refill. Only restarting Quickwit rebuilds the tally. If this returns, something is removing files from ${cache_dir} while Quickwit runs."
+    fi
+  fi
+
+  # Escalation: the metastore is unreadable, or orphans have genuinely piled
+  # up. This is now the *only* thing that clears the cache, and it does so the
+  # one way that is safe -- stop Quickwit, wipe, start -- so that the tally it
+  # rebuilds on startup matches what is on disk.
+  #
+  # Everything below stops Quickwit, so it keeps the MIN_FILES floor. That
+  # floor used to be described as something the sweep above did not need;
+  # since the sweep no longer deletes, the floor is what stops a small cache
+  # from provoking a restart.
   [ "$cache_files" -ge "$QUICKWIT_SPLIT_CACHE_POLLUTION_MIN_FILES" ] || return 0
   if [ -z "$published_splits" ] || [ "$published_splits" -le 0 ]; then
     quickwit_split_cache_full_restart "$cache_files" "${published_splits:-0}" "n/a"
     return 0
   fi
-  cache_files="$(docker exec woozi-quickwit-1 sh -c \
-    "find '${cache_dir}' -maxdepth 1 -type f 2>/dev/null | wc -l" 2>/dev/null | xargs || echo "$cache_files")"
+  # No re-measure: nothing was deleted, so the count taken at the top still
+  # describes the cache.
   ratio="$((cache_files / published_splits))"
   [ "$ratio" -ge "$QUICKWIT_SPLIT_CACHE_POLLUTION_RATIO" ] || return 0
   quickwit_split_cache_full_restart "$cache_files" "$published_splits" "$ratio"
