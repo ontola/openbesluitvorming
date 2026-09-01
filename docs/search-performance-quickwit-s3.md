@@ -459,3 +459,94 @@ Three layers, from root cause to safety net:
    existing index, then create the new local-storage index on the new
    version, keeping the old S3 index as fallback until the new one is
    verified.
+
+---
+
+## Update 2026-09-01: layer 1 was never done, and layer 2 grew a hand
+
+Two months on, the prevention plan above stands, but only one of its three
+layers was built — and that one was built doing something the plan never asked
+for.
+
+### The root cause was reproduced, not removed
+
+Layer 1 said: create the next projection index on local storage with a sane
+`commit_timeout_secs`, and the split cache becomes irrelevant. The next
+projection index was created on 2026-08-12 — the v2 to v3 bump that gave
+`start_date` a mapped fast field — and it was created like this:
+
+```
+index_uri            s3://woozi-dev/indexes-prod/woozi-events-v3b
+commit_timeout_secs  1
+```
+
+Both conditions the July analysis named as the cause. The migration that was
+the natural moment to apply layer 1 instead reproduced it. `commit_timeout_secs`
+is settable only at creation on Quickwit 0.8, so that choice is now fixed until
+the next new index.
+
+### Layer 2 was built with an extra verb
+
+Layer 2 asked for detection: compare cache files against published splits, alert
+above 3x. What was deployed also *deleted* the excess, live, from Quickwit's own
+directory, described in the script as non-disruptive because Linux permits
+unlinking an open file.
+
+It permits it. Quickwit does not survive it. The split cache is Quickwit's
+directory and it keeps its own tally; an external unlink never corrects that
+tally. Measured on 2026-09-01, after six weeks of sweeping and two weeks of
+process uptime, three independent views of the same damage:
+
+| what | Quickwit believes | actually |
+|---|---|---|
+| split cache bytes | 119.5 GB (budget 120 GB) | 56 MB on disk |
+| split cache entries | 1196 splits | 7 splits |
+| file descriptors | 100 of 100 held | 93 of them point at deleted files |
+| cache volume | — | `df` 42 GB used, `du` 56 MB |
+
+The 42 GB gap is the same fault seen from the filesystem: unlinked files stay
+allocated while a process holds them open. Believing itself full of splits that
+no longer existed, Quickwit had stopped downloading, and search ran entirely off
+S3 for weeks. All three clear only on restart.
+
+The sweep no longer deletes (see the commit that removed it); a
+`quickwit_split_cache_phantom` check now compares Quickwit's tally against the
+disk, which is the view that was missing the whole time.
+
+### The next index is one operation, not three
+
+Three things now separately want a fresh index. They are the same operation:
+
+1. **The #203 backlog.** Supplier timestamps before 2026-08-28 were stamped `Z`
+   on a Dutch wall clock. The projection reads them correctly now, but
+   re-projecting into the *live* index appends a second row per entity carrying
+   the same `time`, and the dedupe keeps whichever Quickwit returns first — so
+   reindexing in place doubles the index and settles each date by chance. Only a
+   fresh index actually replaces anything.
+2. **Layer 1 of this document.** Local `index_uri`, `commit_timeout_secs` of
+   60-120.
+3. **The projection compaction** already described under Option C, which the
+   July estimate put at a ~3.5x shrink once query-time dedup is baked in.
+
+Doing them together also clears the duplicate rows left in `dongen` by the
+2026-08-28 trial reindex.
+
+### It fits
+
+The host has a dedicated 147 GB volume currently used for nothing but the split
+cache (`/dev/sdb`, 98 GB free), and 104 GB free on root. The published index is
+62.4 GB across 22 splits for 5.21M documents. It fits locally today, before any
+compaction; with the estimated shrink it is not close.
+
+### What this deletes
+
+Once the index is local, the split cache is irrelevant and the machinery built
+around it goes: the janitor, the ratio-based purge, the cold-cache threshold,
+the phantom check, and their `QUICKWIT_SPLIT_CACHE_*` settings. That is the
+largest and most incident-prone section of `monitor-production.sh`, and every
+one of its thresholds has needed correcting at least once for measuring
+something that did not track what it claimed to.
+
+Sequence, unchanged from layer 3 above: upgrade Quickwit first, verify against
+the existing index, then create the new local index on the new version, keep the
+S3 index as fallback until the new one is verified.
