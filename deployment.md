@@ -430,10 +430,13 @@ matching where the live index already is. Two things to know:
   startup; 0.8.1 refuses to start on them afterwards. Copy the whole
   `indexes-prod` directory out of the volume before changing the tag, and
   restore it to roll back.
-- **The deploy does not restart Quickwit.** `deploy-production.sh` brings up
-  `openbesluitvorming worker caddy otel-collector` only, so a synced
-  `quickwit.yaml` sits unread until Quickwit is restarted by hand. Restarting it
-  makes search unavailable for a few seconds.
+- **The deploy restarts Quickwit only when its container definition changed.**
+  `deploy-production.sh` brings up `openbesluitvorming worker caddy
+  otel-collector`, but the web container `depends_on` Quickwit, so a changed
+  image tag or environment recreates it as part of that deploy (seen
+  2026-09-02 with the 0.9.0 tag). A synced `quickwit.yaml` is a mounted file
+  and does not count: it sits unread until Quickwit is restarted by hand.
+  Either way search is unavailable for a few seconds.
 - **Existing indexes keep the URI they were created with.** This changes nothing
   for `woozi-events-prod`; it only decides where the next index goes. Verify with
   `GET /api/v1/indexes/<id>` and look at `index_uri` before trusting a rebuild.

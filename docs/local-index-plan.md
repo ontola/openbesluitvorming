@@ -121,11 +121,31 @@ does not). Search is unavailable for seconds. Check: `/api/v1/version` says
 returned before, the workers' next import succeeds. Rollback: the 0.8.1 tag
 plus the metastore copy from step 0.
 
+Done 2026-09-02 11:40 UTC. What it taught:
+
+- the deploy recreated Quickwit itself: the web container `depends_on` it,
+  and `docker compose up -d openbesluitvorming …` recreates a dependency
+  whose image changed. "The deploy does not restart Quickwit" holds for a
+  changed `quickwit.yaml` (a mounted file), not for a changed tag. Take the
+  metastore copy *before* merging the tag change, not after;
+- the 0.9 image has no `curl`, so every `docker exec … curl` in the monitor
+  became a silent no-op. It now reaches Quickwit from the host by container
+  IP;
+- 0.9 renamed the cache metrics: one family per measure with a
+  `component_name` label (`searcher_split`, `fd`, `fastfields`, …) instead
+  of a family per cache. The monitor and the collector filter follow;
+- `/api/search` takes `query`, not `q`, and an empty query without an
+  organization answers an empty list by design. A baseline taken with the
+  wrong parameter name looks exactly like an outage after the upgrade.
+
 **2. Stop the churn on v3b.** `PUT /api/v1/indexes/woozi-events-v3b` with
 `commit_timeout_secs: 60`. Check: the index config reports 60; over the next
 hour the number of published splits stops climbing between merges. This alone
 removes most of what the split cache machinery exists for, and it holds even
 if the reindex is postponed.
+
+Done 2026-09-02 11:57 UTC, after a one-week import of `maassluis` on 0.9
+succeeded end to end (run `5e885f68`, 3 meetings, row visible in v3b).
 
 **3. Make room on the volume.** Lower
 `QUICKWIT_SPLIT_CACHE_MAX_NUM_BYTES` to 40G for the duration and restart
