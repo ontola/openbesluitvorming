@@ -32,7 +32,8 @@ services:
 
   # Does the search, needs an S3 bucket and a volume
   quickwit:
-    image: quickwit/quickwit:0.8.1
+    # Override to try a newer Quickwit locally, e.g. QUICKWIT_IMAGE=quickwit/quickwit:0.9.0.
+    image: ${QUICKWIT_IMAGE:-quickwit/quickwit:0.8.1}
     command:
       - run
       - --config
