@@ -73,8 +73,14 @@ our `quickwit.yaml` and `index-config.json`:
 - `PUT /api/v1/indexes/<id>` updates `commit_timeout_secs` on an existing
   index. Verified: 60 to 90 on a live index. **This means the churn on v3b can
   be stopped the day of the upgrade, before any reindex.**
-- the file metastore is rewritten to format `0.9` on first write; back it up
-  first, there is no downgrade;
+- the file metastore is rewritten to format `0.9` **at startup**, not at
+  first write: rehearsed on a copy of the production `indexes-prod`
+  directory, the manifest and every metastore said `0.9` before any request
+  was made, with all 26 published splits and 44.6M documents intact. 0.8.1
+  then refuses to start on it (`unknown variant 0.9, expected 0.8`), so the
+  rollback is the copy of the whole `indexes-prod` directory, not one file;
+- 0.9 creates `otel-logs-v0_9` and `otel-traces-v0_9` for its own OTLP
+  endpoint on first start, next to the existing `v0_7` pair. Expected, harmless;
 - ingest V2 serves `/api/v1/<id>/ingest`. With `commit=wait_for` every batch
   waits the full `commit_timeout_secs`: measured 62s for one batch and 60s for
   four parallel batches at a timeout of 60. `commit=auto` returns in 20 ms.
@@ -101,9 +107,12 @@ worker through `WORKER_QUICKWIT_INDEX_URI`,
 Each step has a check that decides whether the next one happens.
 
 **0. Before touching anything.** `df` on both disks, the phantom check
-(tally against disk) at zero, and a copy of
-`/quickwit/qwdata/indexes-prod/woozi-events-v3b/metastore.json` outside the
-container. Note the current `/api/search` latency for comparison.
+(tally against disk) at zero, and a copy of the whole
+`/var/lib/docker/volumes/woozi_quickwit-data/_data/indexes-prod` directory
+(manifest plus every metastore, under 100 KB) outside the volume. Note the
+current `/api/search` latency for comparison. Done 2026-09-02 11:21 UTC:
+101 GB free on root, 79 GB on the volume, tally 65.2 GB against 65.2 GB on
+disk, 26 published splits, cold searches 5-10s and warm 45-80 ms.
 
 **1. Upgrade Quickwit to 0.9.0.** Change the image tag in
 `docker-compose.production.yml`, deploy, restart Quickwit by hand (the deploy
