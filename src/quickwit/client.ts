@@ -115,6 +115,78 @@ function getIndexId(): string {
   return Deno.env.get("QUICKWIT_INDEX_ID") ?? DEFAULT_INDEX_ID;
 }
 
+function envOrUndefined(name: string): string | undefined {
+  const value = Deno.env.get(name)?.trim();
+  return value ? value : undefined;
+}
+
+export type IndexConfigOverrides = {
+  indexId: string;
+  /** Where the splits go. Unset leaves it to the node's
+   * `default_index_root_uri`, which on production is S3. */
+  indexUri?: string;
+  /** Seconds between commits. The checked-in config says 1, which is what
+   * produced the split churn described in docs/search-performance-quickwit-s3.md;
+   * the next index wants 60-120. */
+  commitTimeoutSecs?: number;
+};
+
+/** The checked-in index config is shared by dev, tests and production, so the
+ * per-deployment choices -- id, storage location, commit cadence -- are made
+ * here, at creation time, from the environment. Nothing here changes an index
+ * that already exists; see `ensureIndex`. */
+export function applyIndexConfigOverrides(
+  config: Record<string, unknown>,
+  overrides: IndexConfigOverrides,
+): Record<string, unknown> {
+  const result: Record<string, unknown> = { ...config, index_id: overrides.indexId };
+  if (overrides.indexUri) {
+    result.index_uri = overrides.indexUri;
+  }
+  if (overrides.commitTimeoutSecs !== undefined) {
+    const settings = (config.indexing_settings ?? {}) as Record<string, unknown>;
+    result.indexing_settings = { ...settings, commit_timeout_secs: overrides.commitTimeoutSecs };
+  }
+  return result;
+}
+
+function getIndexConfigOverridesFromEnv(indexId: string): IndexConfigOverrides {
+  const raw = envOrUndefined("QUICKWIT_COMMIT_TIMEOUT_SECS");
+  const commitTimeoutSecs = raw === undefined ? undefined : Number(raw);
+  if (
+    commitTimeoutSecs !== undefined &&
+    !(Number.isInteger(commitTimeoutSecs) && commitTimeoutSecs > 0)
+  ) {
+    throw new Error(
+      `QUICKWIT_COMMIT_TIMEOUT_SECS must be a positive integer, got ${JSON.stringify(raw)}`,
+    );
+  }
+  return {
+    indexId,
+    indexUri: envOrUndefined("QUICKWIT_INDEX_URI"),
+    commitTimeoutSecs,
+  };
+}
+
+const INGEST_COMMIT_MODES = ["auto", "wait_for", "force"] as const;
+type IngestCommitMode = (typeof INGEST_COMMIT_MODES)[number];
+
+/** `wait_for` holds the response until the batch is committed, which with a
+ * sane `commit_timeout_secs` means every batch takes the full timeout
+ * (measured on 0.9.0: 60s per batch at 60, four parallel batches all 60s).
+ * That is fine for the steady trickle of daily imports and hopeless for a
+ * corpus-wide reindex, which wants `auto`: the request returns once the rows
+ * are in Quickwit's durable queue, and the indexer commits on its own clock. */
+export function getIngestCommitMode(): IngestCommitMode {
+  const value = envOrUndefined("QUICKWIT_INGEST_COMMIT") ?? "wait_for";
+  if (!(INGEST_COMMIT_MODES as readonly string[]).includes(value)) {
+    throw new Error(
+      `QUICKWIT_INGEST_COMMIT must be one of ${INGEST_COMMIT_MODES.join(", ")}, got ${JSON.stringify(value)}`,
+    );
+  }
+  return value as IngestCommitMode;
+}
+
 function getSearchTimeoutMs(): number {
   const value = Number(Deno.env.get("QUICKWIT_SEARCH_TIMEOUT_MS") ?? DEFAULT_SEARCH_TIMEOUT_MS);
   return Number.isFinite(value) && value > 0 ? value : DEFAULT_SEARCH_TIMEOUT_MS;
@@ -172,8 +244,10 @@ export class QuickwitClient {
   }
 
   async ensureIndex(configPath: string): Promise<void> {
-    const config = JSON.parse(await Deno.readTextFile(configPath)) as Record<string, unknown>;
-    config.index_id = this.indexId;
+    const config = applyIndexConfigOverrides(
+      JSON.parse(await Deno.readTextFile(configPath)) as Record<string, unknown>,
+      getIndexConfigOverridesFromEnv(this.indexId),
+    );
     const configText = JSON.stringify(config);
     const list = await fetchJson<
       Array<{ index_id?: string; index_config?: { index_id?: string } }>
@@ -249,7 +323,7 @@ export class QuickwitClient {
     for (let attempt = 1; attempt <= INGEST_ATTEMPTS; attempt += 1) {
       try {
         const response = await fetch(
-          `${this.baseUrl}/api/v1/${this.indexId}/ingest?commit=wait_for`,
+          `${this.baseUrl}/api/v1/${this.indexId}/ingest?commit=${getIngestCommitMode()}`,
           {
             method: "POST",
             headers: {

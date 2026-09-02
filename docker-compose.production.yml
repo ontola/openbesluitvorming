@@ -150,6 +150,15 @@ services:
       # to the served values, so unset changes nothing.
       QUICKWIT_INDEX_ID: ${WORKER_QUICKWIT_INDEX_ID:-${QUICKWIT_INDEX_ID:-woozi-events-prod}}
       WOOZI_PROJECTION_VERSION: ${WORKER_PROJECTION_VERSION:-${WOOZI_PROJECTION_VERSION:-}}
+      # Only consulted when the worker *creates* an index (a new id above).
+      # Unset, the node's default_index_root_uri (S3) and the checked-in
+      # commit_timeout_secs (1) apply -- both of which the next index must not
+      # inherit. See docs/local-index-plan.md.
+      QUICKWIT_INDEX_URI: ${WORKER_QUICKWIT_INDEX_URI:-}
+      QUICKWIT_COMMIT_TIMEOUT_SECS: ${WORKER_QUICKWIT_COMMIT_TIMEOUT_SECS:-}
+      # auto | wait_for | force. wait_for blocks each batch for a full
+      # commit_timeout_secs; set auto for a corpus-wide reindex.
+      QUICKWIT_INGEST_COMMIT: ${QUICKWIT_INGEST_COMMIT:-wait_for}
       QUICKWIT_BATCH_SIZE: ${QUICKWIT_BATCH_SIZE:-64}
       # iBabs rate limits are per IP address and the whole fleet shares one, so
       # each worker may only pace itself to its share of the budget. Without

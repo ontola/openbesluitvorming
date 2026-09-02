@@ -433,6 +433,29 @@ matching where the live index already is. Two things to know:
   for `woozi-events-prod`; it only decides where the next index goes. Verify with
   `GET /api/v1/indexes/<id>` and look at `index_uri` before trusting a rebuild.
 
+### Creating an index somewhere else than the node default
+
+`ensureIndex` posts `quickwit/index-config.json` verbatim, so on its own every
+new index inherits the node's `default_index_root_uri` (S3 on production) and
+the file's `commit_timeout_secs: 1`. Three environment variables, read by the
+container that creates the index, override that at creation time and are
+ignored for an index that already exists:
+
+| variable | effect |
+|---|---|
+| `QUICKWIT_INDEX_URI` | sets `index_uri`, e.g. `file:///quickwit/qwdata/indexes-prod/woozi-events-v4` |
+| `QUICKWIT_COMMIT_TIMEOUT_SECS` | sets `indexing_settings.commit_timeout_secs` |
+| `QUICKWIT_INGEST_COMMIT` | `auto`, `wait_for` (default) or `force` on every ingest request |
+
+On production the worker takes them from `WORKER_QUICKWIT_INDEX_URI`,
+`WORKER_QUICKWIT_COMMIT_TIMEOUT_SECS` and `QUICKWIT_INGEST_COMMIT` in
+`/opt/woozi/.env`. Verify with `GET /api/v1/indexes/<id>` after the first
+worker run: `index_uri` and `commit_timeout_secs` are what the index will keep.
+
+`wait_for` and a sane commit timeout do not mix for bulk work: every batch then
+waits the full timeout (measured 60s per batch at 60, on 0.9.0, regardless of
+how many batches are in flight). Reindex campaigns want `auto`.
+
 ### Cutting over without emptying search
 
 Switching both containers at once empties search for as long as the reindex
