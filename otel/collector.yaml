@@ -16,6 +16,29 @@ receivers:
         endpoint: 0.0.0.0:4317
       http:
         endpoint: 0.0.0.0:4318
+  # Quickwit's own accounting of its split cache.
+  #
+  # It decides whether to download a split from a tally it keeps in memory,
+  # not from the directory, and those two can part company: in August 2026 it
+  # reported 119.5G against a 120G budget while 7 splits were on disk, so it
+  # had quietly stopped filling the cache. Nothing here could see that,
+  # because nothing scraped Quickwit itself.
+  #
+  # Deliberately not all 468 series it exposes -- the process scraper below
+  # already carries a comment about cardinality and SigNoz billing per sample.
+  # This keeps the split-cache gauges and its two ceilings, which is what the
+  # incident needed and no more.
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: quickwit
+          scrape_interval: 60s
+          static_configs:
+            - targets: ["quickwit:7280"]
+          metric_relabel_configs:
+            - source_labels: [__name__]
+              regex: "quickwit_cache_(searcher_split_.*|fd_in_cache_count)"
+              action: keep
   hostmetrics:
     collection_interval: 60s
     root_path: /hostfs
@@ -28,7 +51,11 @@ receivers:
       filesystem:
         include_mount_points:
           match_type: strict
-          mount_points: ["/"]
+          # The split cache has its own 147G disk (/dev/sdb). Watching only "/"
+          # meant its usage was in no graph at all -- which is how 42G of
+          # unlinked-but-still-open split files sat there unnoticed for weeks
+          # in August 2026 while `du` on the same directory reported 56M.
+          mount_points: ["/", "/mnt/quickwit-cache"]
       process:
         # Only the processes we run; scraping every host process explodes
         # metric cardinality (and SigNoz Cloud bills per sample).
@@ -107,7 +134,7 @@ service:
         [memory_limiter, transform/strip_visitor_queries, resourcedetection, resource, batch]
       exporters: [otlp]
     metrics:
-      receivers: [otlp, hostmetrics]
+      receivers: [otlp, hostmetrics, prometheus]
       processors: [memory_limiter, resourcedetection, resource, batch]
       exporters: [otlp]
     logs:
