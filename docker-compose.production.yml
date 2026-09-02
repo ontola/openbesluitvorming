@@ -20,7 +20,11 @@ services:
       - caddy-config:/config
 
   quickwit:
-    image: quickwit/quickwit:0.8.1
+    # 0.9.0 rewrites the file metastore to its own format at startup and 0.8.1
+    # will not read that back. Rolling back means restoring the indexes-prod
+    # directory from the copy taken before the upgrade, not just the tag.
+    # See docs/local-index-plan.md, step 1.
+    image: quickwit/quickwit:0.9.0
     restart: unless-stopped
     command:
       - run

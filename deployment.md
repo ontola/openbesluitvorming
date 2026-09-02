@@ -425,6 +425,11 @@ reindex could never have finished at any speed or concurrency.
 It now points at `s3://${S3_STORAGE_BUCKET_NAME}/${QUICKWIT_INDEX_ROOT_PREFIX}`,
 matching where the live index already is. Two things to know:
 
+- **A Quickwit upgrade is one-way for the metastore.** 0.9.0 rewrites
+  `indexes-prod/manifest.json` and every `metastore.json` to format `0.9` at
+  startup; 0.8.1 refuses to start on them afterwards. Copy the whole
+  `indexes-prod` directory out of the volume before changing the tag, and
+  restore it to roll back.
 - **The deploy does not restart Quickwit.** `deploy-production.sh` brings up
   `openbesluitvorming worker caddy otel-collector` only, so a synced
   `quickwit.yaml` sits unread until Quickwit is restarted by hand. Restarting it
