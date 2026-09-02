@@ -566,6 +566,17 @@ check_worker_fds() {
   alert warning worker_fd_leak "Worker fd leak: restarted the import workers" "max_fds=${max_fds} threshold=${WORKER_FD_MAX}; interrupted runs are requeued by reconcile"
 }
 
+# Quickwit publishes no host port by design (compose network only), and the
+# 0.9 image ships without curl, so `docker exec woozi-quickwit-1 curl` -- which
+# is how this script reached it under 0.8 -- fails silently there. The host
+# can reach the container on the compose bridge, so ask Docker for its address
+# and talk to it directly. Empty when the container is not running.
+quickwit_base_url() {
+  local ip
+  ip="$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' woozi-quickwit-1 2>/dev/null || true)"
+  [ -n "$ip" ] && printf 'http://%s:7280' "$ip"
+}
+
 quickwit_split_cache_heal_on_cooldown() {
   local state_file="$STATE_DIR/quickwit_split_cache_heal_last" now previous
   now="$(date +%s)"
@@ -608,9 +619,7 @@ quickwit_split_cache_full_restart() {
   find "$cache_src" -mindepth 1 -delete 2>/dev/null || true
   (cd /opt/woozi && docker compose -f docker-compose.production.yml up -d quickwit) >/dev/null 2>&1 || true
   for _ in $(seq 1 30); do
-    # Quickwit has no host-published port by design (compose network only),
-    # so the readiness probe has to run inside the container.
-    [ "$(docker exec woozi-quickwit-1 curl -s -o /dev/null -w '%{http_code}' -m 3 http://localhost:7280/health/readyz 2>/dev/null || true)" = "200" ] && break
+    [ "$(curl -s -o /dev/null -w '%{http_code}' -m 3 "$(quickwit_base_url)/health/readyz" 2>/dev/null || true)" = "200" ] && break
     sleep 2
   done
   # shellcheck disable=SC2086
@@ -647,9 +656,10 @@ check_quickwit_split_cache_pollution() {
 
   # What Quickwit thinks it holds, against what is actually there.
   local accounted_bytes disk_kb accounted_gb disk_gb phantom_gb
-  accounted_bytes="$(docker exec woozi-quickwit-1 sh -c \
-    "curl -s http://127.0.0.1:7280/metrics | grep '^quickwit_cache_searcher_split_in_cache_num_bytes ' | cut -d' ' -f2" \
-    2>/dev/null | xargs || true)"
+  # Quickwit 0.9 metric name; 0.8 called this
+  # quickwit_cache_searcher_split_in_cache_num_bytes without the label.
+  accounted_bytes="$(curl -s -m 5 "$(quickwit_base_url)/metrics" 2>/dev/null |
+    grep '^quickwit_cache_in_cache_num_bytes{component_name="searcher_split"} ' | cut -d' ' -f2 | xargs || true)"
   disk_kb="$(docker exec woozi-quickwit-1 sh -c "du -sk '${cache_dir}' 2>/dev/null | cut -f1" 2>/dev/null | xargs || true)"
   if [[ "${accounted_bytes:-}" =~ ^[0-9]+$ ]] && [[ "${disk_kb:-}" =~ ^[0-9]+$ ]]; then
     accounted_gb="$((accounted_bytes / 1000000000))"
