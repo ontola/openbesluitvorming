@@ -91,6 +91,14 @@ services:
       # Worth revisiting if splits ever get smaller, or if the machine gets a
       # bigger root disk.
       - /mnt/quickwit-cache:/quickwit/qwdata/searcher-split-cache
+      # The next projection index lives on the same volume, as a local
+      # file:// index instead of an S3 index with a cache in front of it. The
+      # worker creates it there through WORKER_QUICKWIT_INDEX_URI; this mount
+      # is what makes that path land on /dev/sdb instead of the root disk
+      # (which cannot hold a 60 GB index plus merge headroom -- see
+      # docs/local-index-plan.md). Its metastore.json lands here too, because
+      # metastore_uri and the index root share the indexes-prod prefix.
+      - /mnt/quickwit-cache/indexes/woozi-events-v4:/quickwit/qwdata/indexes-prod/woozi-events-v4
       - ./quickwit/quickwit.yaml:/quickwit/config/quickwit.yaml:ro
 
   openbesluitvorming:
