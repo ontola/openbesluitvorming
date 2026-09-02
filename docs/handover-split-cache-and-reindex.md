@@ -72,12 +72,41 @@ All three clear only on restart. Fixed in `89235d5` (PR #243): the sweep counts
 and reports, and a `quickwit_split_cache_phantom` check compares the tally
 against the disk.
 
-**3. The escalation fires constantly and does not purge.** This is live and
-unfixed. See below.
+**3. The escalation fired constantly and did not purge.** Fixed in the
+commit that follows this document (see "What was broken" below, and the
+deploy note at the end of it).
 
-## What is still broken
+## What was broken, and the fix
 
-### The purge wipes the wrong directory
+Both faults below were fixed in one change, because fixing either alone
+would have been worse than the pair: a working purge under the ratio trigger
+would have wiped a warm 61 GB cache every cooldown.
+
+The fix makes the phantom gap — Quickwit's tally minus the bytes on disk —
+the *only* trigger for the stop/wipe/start path, and makes that path wipe
+the directory Docker reports as the mount source of the cache path instead of
+a hard-coded volume. The ratio is still computed and logged as
+`quickwit_split_cache_orphans`, but nothing acts on it.
+
+Why the phantom gap and not a byte-pressure condition: a full cache is the
+healthy state, so "bytes against budget" cannot distinguish healthy from
+broken. What the restart actually repairs is a tally Quickwit cannot correct
+itself, and that is exactly the phantom gap. Once the tally is honest,
+Quickwit's own LRU evicts superseded splits before live ones — every query
+touches every live split, superseded splits are never touched again — so
+orphans piling up is what this cache looks like at rest. Dry run against
+production on 2026-09-02 with the real values (tally 65.2 GB, disk 65.2 GB,
+475 files, 449 orphans): no purge at the 20 GB threshold; the escalation
+branch fires with the threshold forced to 1 GB and resolves the mount to
+`/mnt/quickwit-cache`.
+
+**Deploy note.** `/opt/woozi/.env` on the host still carries
+`WOOZI_MONITOR_QUICKWIT_SPLIT_CACHE_HEAL_COOLDOWN_SECONDS=86400` from the
+holding measure. Remove that line once this change is deployed; the default
+of 1800 is correct again because a purge empties the gap that triggered it.
+The backup of the previous `.env` is at `/opt/woozi/.env.bak-2026-09-02`.
+
+### The purge wiped the wrong directory
 
 `quickwit_split_cache_full_restart()` does:
 
@@ -95,7 +124,11 @@ to its own disk.
 The giveaway is in the alerts: `cache_files=475` is byte-identical in every one
 of them. A working purge would have moved that number.
 
-### The ratio trigger no longer measures pollution
+Fixed: the purge now asks `docker inspect` for the mount source of that path
+and empties *that*, refusing (with a `quickwit_split_cache_purge_skipped`
+alert) rather than guessing when no mount is found.
+
+### The ratio trigger did not measure pollution
 
 The escalation fires on `cache_files / published_splits >= 3`. With the sweep no
 longer deleting, orphans accumulate normally: 475 files against 26 published is
@@ -107,17 +140,11 @@ not track what it claims to measure; the first two are described in its own
 comments (the `MIN_FILES` floor, and the cold-cache percentage). Worth treating
 as a pattern rather than three coincidences.
 
-**Damped, not fixed.** `/opt/woozi/.env` now carries
-`WOOZI_MONITOR_QUICKWIT_SPLIT_CACHE_HEAL_COOLDOWN_SECONDS=86400`, so at most one
-restart a day instead of sixteen. Backup of the previous file is at
-`/opt/woozi/.env.bak-2026-09-02`. This is a holding measure with no expiry —
-remove it when the two faults below are fixed in code.
-
-**These two must be fixed together.** Correcting the purge path while the ratio
-trigger still fires would wipe a warm 61 GB cache every cooldown, which is worse
-than the present state. A byte-pressure condition (cache bytes against the
-configured budget) is the obvious replacement for the ratio, but it has not been
-designed or tested.
+**Damped first, then fixed.** `/opt/woozi/.env` was given
+`WOOZI_MONITOR_QUICKWIT_SPLIT_CACHE_HEAL_COOLDOWN_SECONDS=86400` on 2026-09-02
+as a holding measure (one restart a day instead of sixteen). The code fix
+removed the ratio trigger and the `MIN_FILES` floor altogether; see the deploy
+note above for removing the holding measure.
 
 ## The next index is one operation, not three
 
@@ -172,8 +199,9 @@ In this order, because each answers whether the next one is still true:
    means something is unlinking files under Quickwit again.
 2. The `quickwit_cache_searcher_split_in_cache_num_bytes` metric against that
    disk figure. Divergence is the phantom-tally fault returning.
-3. `journalctl -u woozi-monitor | grep "purged and restarted"` — frequency tells
-   you whether the cooldown damping is still holding.
+3. `journalctl -u woozi-monitor | grep "purged and restarted"` — after the
+   fix this should be rare and each one should coincide with a phantom gap;
+   a restart with `phantom_gb` near zero means the trigger is misreading.
 4. Whether PR #245 landed. It adds `/mnt/quickwit-cache` to the collector's
    filesystem scraper and scrapes six Quickwit split-cache metrics into SigNoz.
    Both blind spots above were invisible for six weeks because neither was
