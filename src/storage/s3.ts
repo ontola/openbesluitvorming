@@ -9,6 +9,15 @@
 // server-side closes correctly.
 
 import { AwsClient } from "npm:aws4fetch";
+
+/** Per-attempt ceiling on an object read; see getObjectBytes. */
+const READ_TIMEOUT_MS = Number(Deno.env.get("WOOZI_S3_READ_TIMEOUT_MS") ?? "15000");
+const READ_ATTEMPTS = 3;
+const READ_RETRY_BASE_MS = 500;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 import { getConfigValue } from "../config.ts";
 
 const DEFAULT_BUCKET = "woozi";
@@ -208,11 +217,11 @@ export class ObjectStorageClient {
         file.close();
       }
 
-      const completeXml = `<CompleteMultipartUpload>${
-        etags
-          .map((etag, index) => `<Part><PartNumber>${index + 1}</PartNumber><ETag>${etag}</ETag></Part>`)
-          .join("")
-      }</CompleteMultipartUpload>`;
+      const completeXml = `<CompleteMultipartUpload>${etags
+        .map(
+          (etag, index) => `<Part><PartNumber>${index + 1}</PartNumber><ETag>${etag}</ETag></Part>`,
+        )
+        .join("")}</CompleteMultipartUpload>`;
       const completeResponse = await this.client.fetch(
         `${url}?uploadId=${encodeURIComponent(uploadId)}`,
         { method: "POST", headers: { "content-type": "application/xml" }, body: completeXml },
@@ -220,7 +229,9 @@ export class ObjectStorageClient {
       const completeBody = await completeResponse.text();
       // S3 can return 200 with an <Error> body for a failed complete.
       if (!completeResponse.ok || completeBody.includes("<Error>")) {
-        throw new Error(`multipart complete failed: HTTP ${completeResponse.status} ${completeBody.slice(0, 200)}`);
+        throw new Error(
+          `multipart complete failed: HTTP ${completeResponse.status} ${completeBody.slice(0, 200)}`,
+        );
       }
     } catch (error) {
       if (uploadId) {
@@ -292,10 +303,9 @@ export class ObjectStorageClient {
 
     let body: string;
     try {
-      const response = await this.client.fetch(
-        `${this.endpoint}/${this.bucket}?${params}`,
-        { method: "GET" },
-      );
+      const response = await this.client.fetch(`${this.endpoint}/${this.bucket}?${params}`, {
+        method: "GET",
+      });
       if (!response.ok) {
         throw new Error(await errorSummary(response));
       }
@@ -305,7 +315,7 @@ export class ObjectStorageClient {
     }
 
     const keys = [...body.matchAll(/<Key>([^<]*)<\/Key>/g)].map((match) =>
-      decodeXmlEntities(match[1])
+      decodeXmlEntities(match[1]),
     );
     return {
       keys,
@@ -352,22 +362,61 @@ export class ObjectStorageClient {
     return deleted;
   }
 
+  /** Read one object, with a ceiling on how long a single attempt may take.
+   *
+   * Object storage answers most reads in tens of milliseconds and a few in
+   * tens of seconds: measured 2026-09-03 on Hetzner, 2-4% of GETs took 6-60s
+   * regardless of size, and some came back 504 after exactly 60s -- three
+   * times in a row through aws4fetch's own retry loop, which has no timeout.
+   * One such object then held a reindex slice for three minutes. So the
+   * attempts are made here, each under an abort signal, and aws4fetch is only
+   * asked to sign. Retried: a timeout, a network error, 429, and 5xx. Not
+   * retried: 404 (absent is an answer) and other 4xx. */
   async getObjectBytes(key: string): Promise<Uint8Array | null> {
-    let response: Response;
-    try {
-      response = await this.client.fetch(this.objectUrl(key), { method: "GET" });
-    } catch (error) {
-      throw describeStorageError("read", key, error);
-    }
+    const url = this.objectUrl(key);
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= READ_ATTEMPTS; attempt += 1) {
+      let response: Response;
+      try {
+        const signed = await this.client.sign(url, { method: "GET" });
+        response = await fetch(signed, { signal: AbortSignal.timeout(READ_TIMEOUT_MS) });
+      } catch (error) {
+        lastError = error;
+        if (attempt < READ_ATTEMPTS) {
+          await sleep(READ_RETRY_BASE_MS * attempt);
+          continue;
+        }
+        throw describeStorageError("read", key, error);
+      }
 
-    if (response.status === 404) {
-      await response.body?.cancel();
-      return null;
-    }
-    if (!response.ok) {
-      throw describeStorageError("read", key, new Error(await errorSummary(response)));
-    }
+      if (response.status === 404) {
+        await response.body?.cancel();
+        return null;
+      }
+      if (response.status === 429 || response.status >= 500) {
+        lastError = new Error(await errorSummary(response));
+        if (attempt < READ_ATTEMPTS) {
+          await sleep(READ_RETRY_BASE_MS * attempt);
+          continue;
+        }
+        throw describeStorageError("read", key, lastError);
+      }
+      if (!response.ok) {
+        throw describeStorageError("read", key, new Error(await errorSummary(response)));
+      }
 
-    return new Uint8Array(await response.arrayBuffer());
+      try {
+        return new Uint8Array(await response.arrayBuffer());
+      } catch (error) {
+        // The body can stall after the headers arrived; the signal covers it.
+        lastError = error;
+        if (attempt < READ_ATTEMPTS) {
+          await sleep(READ_RETRY_BASE_MS * attempt);
+          continue;
+        }
+        throw describeStorageError("read", key, error);
+      }
+    }
+    throw describeStorageError("read", key, lastError);
   }
 }
