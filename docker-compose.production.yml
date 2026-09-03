@@ -39,31 +39,6 @@ services:
       QUICKWIT_CLUSTER_ID: ${QUICKWIT_CLUSTER_ID:-woozi-prod}
       QUICKWIT_NODE_ID: ${QUICKWIT_NODE_ID:-quickwit-prod}
       QUICKWIT_INDEX_ROOT_PREFIX: ${QUICKWIT_INDEX_ROOT_PREFIX:-indexes-prod}
-      # 40G -> 55G (2026-07-23) -> 120G (2026-07-31), briefly 70G on 2026-08-14
-      # while the cache was moved to the root disk and back.
-      #
-      # The budget has to be generous relative to the largest single split,
-      # not merely larger than the index. A split is cached whole, and the
-      # served index is 60.8GB across 9 published splits with four of them
-      # 12-18GB. Tried at 70G on the root disk (2026-08-14): the cache settled
-      # at 9.6GB, taking the 14 small splits and refusing all four large ones
-      # while 60GB of budget sat unused. At 120G the old cache had held a
-      # 24.9GB split without trouble -- the same ratio of split to budget that
-      # 70G denies.
-      #
-      # So this number is about the ratio, and the volume is what makes the
-      # ratio affordable. This is the first thing to check when cold search
-      # gets slow, along with the split sizes it has to accommodate: if merges
-      # keep growing splits, the budget has to grow with them or the biggest
-      # ones silently stop being cached. Smaller splits would remove the
-      # problem rather than fund it.
-      #
-      # Rescaling the server was the obvious alternative but is not possible
-      # here: fsn1-dc14 lists no affordable larger type in
-      # available_for_migration, so the cheap big machines can only be had by
-      # rebuilding onto a new server.
-      QUICKWIT_SPLIT_CACHE_MAX_NUM_BYTES: ${QUICKWIT_SPLIT_CACHE_MAX_NUM_BYTES:-120G}
-      QUICKWIT_SPLIT_CACHE_NUM_CONCURRENT_DOWNLOADS: ${QUICKWIT_SPLIT_CACHE_NUM_CONCURRENT_DOWNLOADS:-1}
     # Quickwit logs every search at INFO, including the full split list, and
     # Docker's json-file driver does not rotate unless told to. The log had
     # reached 1.2 GB on the root disk by the time anyone looked (2026-08-12),
@@ -76,28 +51,18 @@ services:
         max-file: "3"
     volumes:
       - quickwit-data:/quickwit/qwdata
-      # Dedicated 150GB volume for the searcher split cache only. It holds no
-      # durable state -- everything here is a local copy of splits that live in
-      # S3 -- so it can be wiped or lost without data loss.
-      #
-      # This disk is slow: measured 2026-08-14, 4K random reads take 2.01ms
-      # here against 0.22ms on the root disk's NVMe, which is 9x on exactly the
-      # access pattern a term lookup performs. Moving the cache to root was
-      # tried that day for precisely that reason and moved back, because the
-      # root disk cannot spare enough space to hold the largest splits and an
-      # uncached 18GB split is fetched from S3 -- far worse than a slow local
-      # read. Capacity wins here as long as splits are this large.
-      #
-      # Worth revisiting if splits ever get smaller, or if the machine gets a
-      # bigger root disk.
-      - /mnt/quickwit-cache:/quickwit/qwdata/searcher-split-cache
-      # The next projection index lives on the same volume, as a local
-      # file:// index instead of an S3 index with a cache in front of it. The
-      # worker creates it there through WORKER_QUICKWIT_INDEX_URI; this mount
-      # is what makes that path land on /dev/sdb instead of the root disk
-      # (which cannot hold a 60 GB index plus merge headroom -- see
-      # docs/local-index-plan.md). Its metastore.json lands here too, because
+      # The served index is a local file:// index on the dedicated 147 GB
+      # volume (/dev/sdb). The worker created it there through
+      # WORKER_QUICKWIT_INDEX_URI; this mount is what makes that path land on
+      # the volume instead of the root disk, which cannot hold a 60 GB index
+      # plus merge headroom. Its metastore.json lives here too, because
       # metastore_uri and the index root share the indexes-prod prefix.
+      #
+      # This volume is slow for 4K random reads (2.01ms against 0.22ms on the
+      # root NVMe, measured 2026-08-14), but it is where warm searches read
+      # from since the split cache moved here in August; nothing got slower
+      # by putting the index itself here, and nothing is fetched from S3
+      # any more. See docs/local-index-plan.md.
       - /mnt/quickwit-cache/indexes/woozi-events-v4:/quickwit/qwdata/indexes-prod/woozi-events-v4
       - ./quickwit/quickwit.yaml:/quickwit/config/quickwit.yaml:ro
 

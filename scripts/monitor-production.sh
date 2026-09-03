@@ -8,15 +8,6 @@ SEARCH_CRITICAL_MS="${WOOZI_MONITOR_SEARCH_CRITICAL_MS:-8000}"
 QUICKWIT_WARN_MS="${WOOZI_MONITOR_QUICKWIT_WARN_MS:-1500}"
 DISK_WARN_PERCENT="${WOOZI_MONITOR_DISK_WARN_PERCENT:-80}"
 DISK_CRITICAL_PERCENT="${WOOZI_MONITOR_DISK_CRITICAL_PERCENT:-90}"
-# Percentage of the *cacheable* bytes -- min(budget, published index size) --
-# below which the cache counts as cold (see check_containers). Measured
-# against the index rather than the budget, because once the budget exceeds
-# the index a full cache can never reach a budget-relative threshold. 0
-# disables.
-QUICKWIT_CACHE_COLD_PERCENT="${WOOZI_MONITOR_QUICKWIT_CACHE_COLD_PERCENT:-40}"
-# Must match docker-compose.production.yml; used to turn the cache size into
-# a percentage of budget. Accepts the same G/M/K suffixes Quickwit does.
-QUICKWIT_SPLIT_CACHE_MAX_NUM_BYTES="${QUICKWIT_SPLIT_CACHE_MAX_NUM_BYTES:-120G}"
 CONTAINER_RESTART_WARN="${WOOZI_MONITOR_CONTAINER_RESTART_WARN:-0}"
 STATE_DIR="${WOOZI_MONITOR_STATE_DIR:-/tmp/woozi-monitor-alerts}"
 ALERT_COOLDOWN_SECONDS="${WOOZI_MONITOR_ALERT_COOLDOWN_SECONDS:-900}"
@@ -41,22 +32,11 @@ WORKER_FD_MAX="${WOOZI_MONITOR_WORKER_FD_MAX:-10000}"
 # queue has drained and more hosts than the steady-state baseline are
 # configured. See infra/terraform.tfvars for the scale-down procedure.
 SCALE_DOWN_BASELINE_HOSTS="${WOOZI_MONITOR_SCALE_DOWN_BASELINE_HOSTS:-2}"
-# There is no longer a ratio-based purge here. Between July and September
-# 2026 this script wiped and restarted Quickwit whenever the cache held more
-# than 3x as many files as the metastore published, on the theory that dead
-# splits were crowding out live ones. Two things were wrong with that. The
-# purge never touched the cache: it wiped a stub inside the docker volume
-# while the real cache is a bind mount over the same path, so every "purged
-# and restarted" only restarted (the alerts said cache_files=475 before and
-# after, sixteen times in twelve hours on 2026-09-02). And the ratio does not
-# measure crowding: Quickwit's own eviction is LRU by bytes, every query
-# touches every live split, and superseded splits are never touched again, so
-# with an honest tally the orphans are exactly what gets evicted first. A
-# ratio of 18x is the normal resting state of this cache, not a fault.
-#
-# What the stop/wipe/start path *does* fix, and nothing else does, is a tally
-# that no longer matches the disk (see QUICKWIT_SPLIT_CACHE_PHANTOM_GB). That
-# is now its only trigger.
+# There used to be ~200 lines here about the searcher split cache: a janitor,
+# a ratio-based purge, a cold-cache threshold, a phantom-tally check and their
+# settings. The index lives on local disk since search-v4-local, so there is
+# no split cache and nothing to guard. The history is in
+# docs/search-performance-quickwit-s3.md and docs/handover-split-cache-and-reindex.md.
 # The index to watch. Follows the one the application and workers actually
 # serve -- QUICKWIT_INDEX_ID from /opt/woozi/.env, which systemd hands us via
 # EnvironmentFile -- because here the two drifting apart is not cosmetic: this
@@ -79,18 +59,6 @@ SCALE_DOWN_BASELINE_HOSTS="${WOOZI_MONITOR_SCALE_DOWN_BASELINE_HOSTS:-2}"
 # cache" denominator was measured against the wrong index too.
 QUICKWIT_INDEX_ID="${WOOZI_MONITOR_QUICKWIT_INDEX_ID:-${QUICKWIT_INDEX_ID:-woozi-events-prod}}"
 QUICKWIT_INDEX_ROOT_PREFIX="${WOOZI_MONITOR_QUICKWIT_INDEX_ROOT_PREFIX:-indexes-prod}"
-# Floor between two cache purges. A purge rebuilds the tally from an empty
-# directory, so the trigger below cannot be true again immediately afterwards;
-# this only guards against a misread metric provoking a restart loop.
-QUICKWIT_SPLIT_CACHE_HEAL_COOLDOWN_SECONDS="${WOOZI_MONITOR_QUICKWIT_SPLIT_CACHE_HEAL_COOLDOWN_SECONDS:-1800}"
-# Gap between Quickwit's own split-cache tally and the bytes actually on disk,
-# in GB, above which the cache is purged and Quickwit restarted. They drift
-# apart only when something removes files from the cache directory while
-# Quickwit runs, and the drift is what stops the cache from refilling:
-# Quickwit stops downloading at its byte budget whether or not those bytes
-# exist. Restarting is the only thing that rebuilds the tally. 0 disables
-# both the check and the purge.
-QUICKWIT_SPLIT_CACHE_PHANTOM_GB="${WOOZI_MONITOR_QUICKWIT_SPLIT_CACHE_PHANTOM_GB:-20}"
 # Disk on the extraction fleet, read from each host's /stats. Those hosts
 # write downloaded PDFs into the extraction container's writable layer, and
 # a worker killed mid-request (routine: 4 uvicorn workers on 3.8GB RAM)
@@ -264,7 +232,7 @@ check_disk() {
 }
 
 check_containers() {
-  local line name restarts status worker cache_output cache_kb split_count cache_gb
+  local line name restarts status worker
   local restart_state_file previous_restarts
   while read -r name restarts status; do
     [ -n "${name:-}" ] || continue
@@ -295,67 +263,7 @@ check_containers() {
     alert critical worker_not_running "Import worker is not running" "expected>=1 replica; scale with: docker compose up -d --scale worker=1 worker (set WOOZI_MONITOR_EXPECT_WORKER=0 to silence during intentional scale-down)"
   fi
 
-  cache_output="$(docker exec woozi-quickwit-1 sh -lc 'du -sk /quickwit/qwdata/searcher-split-cache 2>/dev/null; find /quickwit/qwdata/searcher-split-cache -maxdepth 1 -type f 2>/dev/null | wc -l')"
-  cache_kb="$(sed -n '1s/[[:space:]].*$//p' <<< "$cache_output")"
-  split_count="$(sed -n '2p' <<< "$cache_output" | xargs)"
-  # "Cold" has to be measured in bytes, not split count. Split sizes are wildly
-  # uneven -- measured 2026-07-31: one 24.9GB split is 38% of a 65.6GB index
-  # whose median split is 774MB -- so only ~35 of 81 splits physically fit in
-  # the 55G budget. A count-based rule ("cache should hold >=70% of published
-  # splits") is then arithmetically unsatisfiable and fires forever, the same
-  # way the janitor's MIN_FILES gate silently broke once splits got large.
-  #
-  # What indicates a cold cache is a cache far below *what there is to cache*,
-  # i.e. the published index -- not below its configured budget. Measuring
-  # against the budget breaks as soon as the budget exceeds the index: after
-  # the cache moved to a 150GB volume and the budget went to 120G, a
-  # completely full cache could only ever reach 55% of budget (index 66.4GB),
-  # so a 40% threshold fired on every janitor sweep while the cache held 93%
-  # of the index. That is the same unsatisfiable-threshold trap as the
-  # split-count rule this replaced -- twice now, from tying the check to a
-  # number that does not track what it claims to measure.
-  #
-  # So compare against min(budget, index): whichever actually limits how much
-  # can be resident. Genuine slowness from an index larger than the budget is
-  # already caught directly by the search probes above.
-  if [ -n "$cache_kb" ] && [ "${QUICKWIT_CACHE_COLD_PERCENT:-0}" -gt 0 ] &&
-    command -v python3 >/dev/null 2>&1; then
-    local budget_kb cache_pct index_kb target_kb
-    budget_kb="$(awk -v spec="${QUICKWIT_SPLIT_CACHE_MAX_NUM_BYTES:-120G}" 'BEGIN {
-      n = spec + 0
-      if (spec ~ /[Gg]/) n *= 1024 * 1024
-      else if (spec ~ /[Mm]/) n *= 1024
-      else if (spec ~ /[Kk]/) n *= 1
-      else n /= 1024
-      printf "%d", n
-    }')"
-    index_kb="$(docker exec woozi-quickwit-1 cat \
-      "/quickwit/qwdata/${QUICKWIT_INDEX_ROOT_PREFIX}/${QUICKWIT_INDEX_ID}/metastore.json" 2>/dev/null |
-      python3 -c "
-import json,sys
-try:
-    d = json.load(sys.stdin)
-except Exception:
-    print(0); raise SystemExit
-pub = [s for s in d.get('splits', []) if s.get('split_state') == 'Published']
-total = sum((s.get('split_metadata', s).get('footer_offsets', {}) or {}).get('end') or 0 for s in pub)
-print(total // 1024)
-" 2>/dev/null || echo 0)"
-    [ -n "$index_kb" ] || index_kb=0
-    if [ "$index_kb" -gt 0 ] && [ "$index_kb" -lt "$budget_kb" ]; then
-      target_kb="$index_kb"
-    else
-      target_kb="$budget_kb"
-    fi
-    cache_pct=$((target_kb > 0 ? cache_kb * 100 / target_kb : 100))
-    if [ "$cache_pct" -lt "$QUICKWIT_CACHE_COLD_PERCENT" ]; then
-      cache_gb="$(awk -v kb="${cache_kb:-0}" 'BEGIN { print int((kb / 1024 / 1024) + 0.5) }')"
-      alert warning quickwit_cache_cold "Quickwit split cache is far below what it should hold" "cache_gb=${cache_gb} percent_of_cacheable=${cache_pct} threshold=${QUICKWIT_CACHE_COLD_PERCENT} cacheable_gb=$(awk -v kb="$target_kb" 'BEGIN { print int((kb / 1024 / 1024) + 0.5) }') splits=${split_count}"
-    fi
-  fi
-}
 
-ops_query() {
   sqlite3 -readonly "$OPS_DB" "$1" 2>/dev/null
 }
 
@@ -566,151 +474,6 @@ check_worker_fds() {
   alert warning worker_fd_leak "Worker fd leak: restarted the import workers" "max_fds=${max_fds} threshold=${WORKER_FD_MAX}; interrupted runs are requeued by reconcile"
 }
 
-# Quickwit publishes no host port by design (compose network only), and the
-# 0.9 image ships without curl, so `docker exec woozi-quickwit-1 curl` -- which
-# is how this script reached it under 0.8 -- fails silently there. The host
-# can reach the container on the compose bridge, so ask Docker for its address
-# and talk to it directly. Empty when the container is not running.
-quickwit_base_url() {
-  local ip
-  ip="$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' woozi-quickwit-1 2>/dev/null || true)"
-  [ -n "$ip" ] && printf 'http://%s:7280' "$ip"
-}
-
-quickwit_split_cache_heal_on_cooldown() {
-  local state_file="$STATE_DIR/quickwit_split_cache_heal_last" now previous
-  now="$(date +%s)"
-  previous="$(cat "$state_file" 2>/dev/null || echo 0)"
-  [ $((now - previous)) -lt "$QUICKWIT_SPLIT_CACHE_HEAL_COOLDOWN_SECONDS" ]
-}
-
-mark_quickwit_split_cache_healed() {
-  mkdir -p "$STATE_DIR"
-  date +%s > "$STATE_DIR/quickwit_split_cache_heal_last"
-}
-
-quickwit_split_cache_full_restart() {
-  # Stops the workers and Quickwit, empties the split cache, starts Quickwit,
-  # waits for readiness, starts the workers. The one safe way to clear this
-  # cache: Quickwit rebuilds its tally from the directory on startup, so an
-  # empty directory and an empty tally agree.
-  local accounted_gb="$1" disk_gb="$2" phantom_gb="$3" workers cache_src
-  quickwit_split_cache_heal_on_cooldown && return 0
-
-  # Ask Docker where the cache directory actually lives instead of assuming.
-  # The cache is a bind mount (/mnt/quickwit-cache on its own disk) over the
-  # same path inside the container that the docker volume also carries as an
-  # empty stub. This function used to wipe the stub -- `-v woozi_quickwit-data`
-  # -- and reported the cache purged while 61 GB sat untouched on the mount.
-  # Reading the mount source from the container is the one answer that cannot
-  # drift from the compose file. Refuse rather than guess when it is missing.
-  cache_src="$(docker inspect -f \
-    '{{range .Mounts}}{{if eq .Destination "/quickwit/qwdata/searcher-split-cache"}}{{.Source}}{{end}}{{end}}' \
-    woozi-quickwit-1 2>/dev/null || true)"
-  if [ -z "$cache_src" ] || [ ! -d "$cache_src" ]; then
-    alert warning quickwit_split_cache_purge_skipped "Could not locate the split cache on the host; not purging" "mount_source='${cache_src}'; expected a mount at /quickwit/qwdata/searcher-split-cache in woozi-quickwit-1"
-    return 0
-  fi
-
-  workers="$(docker ps --format '{{.Names}}' --filter 'name=woozi-worker' | tr '\n' ' ')"
-  # shellcheck disable=SC2086
-  [ -z "$workers" ] || docker stop $workers >/dev/null 2>&1 || true
-  docker stop woozi-quickwit-1 >/dev/null 2>&1 || true
-  find "$cache_src" -mindepth 1 -delete 2>/dev/null || true
-  (cd /opt/woozi && docker compose -f docker-compose.production.yml up -d quickwit) >/dev/null 2>&1 || true
-  for _ in $(seq 1 30); do
-    [ "$(curl -s -o /dev/null -w '%{http_code}' -m 3 "$(quickwit_base_url)/health/readyz" 2>/dev/null || true)" = "200" ] && break
-    sleep 2
-  done
-  # shellcheck disable=SC2086
-  [ -z "$workers" ] || docker start $workers >/dev/null 2>&1 || true
-
-  mark_quickwit_split_cache_healed
-  alert warning quickwit_split_cache_phantom "Quickwit's split cache tally no longer matched the disk: purged and restarted" "accounted_gb=${accounted_gb} disk_gb=${disk_gb} phantom_gb=${phantom_gb} purged=${cache_src}; the cache refills from S3 now; interrupted runs are requeued by reconcile. If this returns, something is removing files from the cache while Quickwit runs. Structural fix is the planned reindex onto local storage (docs/search-performance-quickwit-s3.md)"
-}
-
-check_quickwit_split_cache_pollution() {
-  # Two views of the searcher split cache, one action.
-  #
-  # The view that matters is Quickwit's own tally against the bytes on disk.
-  # The tally decides whether Quickwit downloads anything: it stops at its byte
-  # budget whether or not those bytes exist. Anything that unlinks files under
-  # a running Quickwit (this script did, from 2026-07-18 to 2026-09-01)
-  # inflates the tally permanently -- measured 2026-09-01 at 1196 splits and
-  # 119.5G believed against 7 splits and 56M present, and no downloads for
-  # weeks. The only correction is a restart from an empty directory, which is
-  # what the escalation below does when the gap exceeds the threshold.
-  #
-  # The other view -- cached files against the metastore's Published splits --
-  # is reported, not acted on. Superseded splits linger in the cache until
-  # Quickwit's LRU evicts them, and since every query touches every live split
-  # they are the first to go once the budget is reached. A high ratio here is
-  # what this cache looks like at rest.
-  local cache_dir="/quickwit/qwdata/searcher-split-cache"
-  local metastore_path="/quickwit/qwdata/${QUICKWIT_INDEX_ROOT_PREFIX}/${QUICKWIT_INDEX_ID}/metastore.json"
-  local tmp_meta tmp_cache tmp_orphans cache_files published_splits orphan_count
-
-  [ "${QUICKWIT_SPLIT_CACHE_PHANTOM_GB:-0}" -gt 0 ] || return 0
-  command -v docker >/dev/null 2>&1 || return 0
-  docker ps --format '{{.Names}}' | grep -qx woozi-quickwit-1 || return 0
-
-  # What Quickwit thinks it holds, against what is actually there.
-  local accounted_bytes disk_kb accounted_gb disk_gb phantom_gb
-  # Quickwit 0.9 metric name; 0.8 called this
-  # quickwit_cache_searcher_split_in_cache_num_bytes without the label.
-  accounted_bytes="$(curl -s -m 5 "$(quickwit_base_url)/metrics" 2>/dev/null |
-    grep '^quickwit_cache_in_cache_num_bytes{component_name="searcher_split"} ' | cut -d' ' -f2 | xargs || true)"
-  disk_kb="$(docker exec woozi-quickwit-1 sh -c "du -sk '${cache_dir}' 2>/dev/null | cut -f1" 2>/dev/null | xargs || true)"
-  if [[ "${accounted_bytes:-}" =~ ^[0-9]+$ ]] && [[ "${disk_kb:-}" =~ ^[0-9]+$ ]]; then
-    accounted_gb="$((accounted_bytes / 1000000000))"
-    disk_gb="$((disk_kb * 1024 / 1000000000))"
-    phantom_gb="$((accounted_gb - disk_gb))"
-    if [ "$phantom_gb" -ge "$QUICKWIT_SPLIT_CACHE_PHANTOM_GB" ]; then
-      if quickwit_split_cache_heal_on_cooldown; then
-        alert warning quickwit_split_cache_phantom \
-          "Quickwit's split cache tally no longer matches the disk (purge on cooldown)" \
-          "accounted_gb=${accounted_gb} disk_gb=${disk_gb} phantom_gb=${phantom_gb}; Quickwit stops downloading at its byte budget whether or not those bytes exist, so the cache cannot refill until the next purge window. Something is removing files from ${cache_dir} while Quickwit runs."
-      else
-        quickwit_split_cache_full_restart "$accounted_gb" "$disk_gb" "$phantom_gb"
-      fi
-      return 0
-    fi
-  fi
-
-  # Orphan report. Needs python3 to read the metastore; without it there is
-  # nothing to report and nothing to do.
-  command -v python3 >/dev/null 2>&1 || return 0
-  cache_files="$(docker exec woozi-quickwit-1 sh -c \
-    "find '${cache_dir}' -maxdepth 1 -type f 2>/dev/null | wc -l" 2>/dev/null | xargs || true)"
-  [ -n "$cache_files" ] && [ "$cache_files" -gt 0 ] || return 0
-
-  tmp_meta="$(mktemp)"; tmp_cache="$(mktemp)"; tmp_orphans="$(mktemp)"
-  docker exec woozi-quickwit-1 cat "$metastore_path" > "$tmp_meta" 2>/dev/null || true
-  docker exec woozi-quickwit-1 sh -c "ls '${cache_dir}'" > "$tmp_cache" 2>/dev/null || true
-
-  python3 - "$tmp_meta" "$tmp_cache" > "$tmp_orphans" 2>/dev/null << 'PY' || true
-import json, sys
-try:
-    data = json.load(open(sys.argv[1]))
-except Exception:
-    sys.exit(0)
-published = {s.get("split_id") for s in data.get("splits", []) if s.get("split_state") == "Published"}
-for line in open(sys.argv[2]):
-    name = line.strip()
-    if name.endswith(".split") and name[: -len(".split")] not in published:
-        print(name)
-PY
-
-  published_splits="$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(sum(1 for s in d.get('splits',[]) if s.get('split_state')=='Published'))" "$tmp_meta" 2>/dev/null || echo 0)"
-  orphan_count="$(wc -l < "$tmp_orphans" | xargs)"
-
-  if [ "$orphan_count" -gt 0 ] && [ -s "$tmp_meta" ]; then
-    printf '{"event":"quickwit_split_cache_orphans","cache_files":%s,"published_splits":%s,"orphans":%s}\n' \
-      "$cache_files" "${published_splits:-0}" "$orphan_count"
-  fi
-  rm -f "$tmp_meta" "$tmp_cache" "$tmp_orphans"
-}
-
 alert_is_unsuppressed() {
   local key="$1"
   local state_file="$STATE_DIR/$key"
@@ -790,7 +553,6 @@ main() {
   check_extraction_disk
   check_scale_down
   check_worker_fds
-  check_quickwit_split_cache_pollution
 
   if [ "${#ALERTS[@]}" -eq 0 ]; then
     printf '{"event":"monitor_run","ok":true,"alert_count":0}\n'

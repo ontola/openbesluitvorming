@@ -192,6 +192,34 @@ each with the corrected date; a phrase query, a date range, a date sort.
 That is the only moment users notice anything. Check: `/api/search` latency
 at or below step 0, the monitor's index follows automatically.
 
+Done 2026-09-03 19:54 UTC after the campaign and two repairs: `amsterdam`
+re-run (its run had been killed by a resume), and 29,650 documents skipped
+under Hetzner's `503 SlowDown` re-projected with the back-off client (0
+issues). Verified: meetings per source exact on 12 sources, documents per
+source exact on 7, the #203 meeting one row at 18:00Z, phrase/range/sort/
+relevance working, the web code against v4 in 15-180 ms. Public search went
+from 5-14 s (cold v3b cache) to 0.06-0.6 s.
+
+What the campaign taught, beyond the plan:
+
+- **Merge overhead needs room.** A merge keeps its inputs ~30 minutes after
+  publishing and writes its output beside them; with default merge
+  concurrency the volume dropped under 10 GB three times. A pause/resume
+  regulator on the host kept it alive; `indexer.merge_concurrency: 2` is
+  the durable answer, in this change.
+- **Object storage throttles.** Hetzner answered 24,800 reads with `503
+  SlowDown` and 4,800 with timeouts at 64-wide rehydration across 16-24 jobs.
+  #254 and #257 made reads bounded and patient; the next campaign should run
+  at 8-wide with two or three workers.
+- **Ingest V2 shard rotation hung the workers** once, for 15 minutes each
+  time, until restarted. A stall detector on ingest rate is cheap insurance.
+- **A deploy mid-campaign restarts the workers** and marks their runs failed;
+  reconcile requeues them, but a source restarts from zero and the index
+  collects duplicate rows. Do not deploy while a reindex runs.
+- **Runs restart from zero.** v4 carries ~2x rows for Amsterdam and for
+  Committee/Party; query-time dedupe hides it, merges compact it. A clean
+  reprojection can come later, against a storage that is not being hammered.
+
 **8. Delete what the local index makes irrelevant.** One pull request:
 
 - `searcher.split_cache` section out of `quickwit.yaml`; the split-cache
@@ -208,6 +236,13 @@ at or below step 0, the monitor's index follows automatically.
 
 Restart Quickwit once more with the cache section gone. Check: the cache
 directory stays empty across a day of searches.
+
+Host side, same day: restore v4's merge policy (`PUT` the config saved in
+`/root/v4-index-config-before-nomerge.json`), remove the old cache files under
+`/mnt/quickwit-cache/*.split`, drop `QUICKWIT_SPLIT_CACHE_MAX_NUM_BYTES` and
+`WOOZI_MONITOR_QUICKWIT_CACHE_COLD_PERCENT` from `/opt/woozi/.env`, remove
+`/opt/woozi/docker-compose.campaign.yml`, and stop the `v4-campaign-watchdog`
+unit once the merges have settled.
 
 **9. Retire v3b.** Keep it a week. Then `DELETE /api/v1/indexes/woozi-events-v3b`
 and remove its S3 prefix. The v3b metastore copy from step 0 stays on the host

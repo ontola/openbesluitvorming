@@ -28,26 +28,6 @@ receivers:
   # already carries a comment about cardinality and SigNoz billing per sample.
   # This keeps the split-cache gauges and its two ceilings, which is what the
   # incident needed and no more.
-  prometheus:
-    config:
-      scrape_configs:
-        - job_name: quickwit
-          scrape_interval: 60s
-          static_configs:
-            - targets: ["quickwit:7280"]
-          # Quickwit 0.9 folded every cache into one metric family with a
-          # component_name label (0.8 had quickwit_cache_searcher_split_* and
-          # quickwit_cache_fd_*). Keep the two components that matter: the
-          # searcher split cache, whose in_cache_num_bytes is the tally the
-          # monitor compares against the disk, and the fd cache, whose count
-          # pinned at 100 was the descriptor leak of 2026-09-01.
-          metric_relabel_configs:
-            - source_labels: [__name__]
-              regex: "quickwit_cache_(in_cache_count|in_cache_num_bytes|cache_hits_bytes|cache_hits_total|cache_misses_total)"
-              action: keep
-            - source_labels: [component_name]
-              regex: "searcher_split|fd"
-              action: keep
   hostmetrics:
     collection_interval: 60s
     root_path: /hostfs
@@ -143,7 +123,7 @@ service:
         [memory_limiter, transform/strip_visitor_queries, resourcedetection, resource, batch]
       exporters: [otlp]
     metrics:
-      receivers: [otlp, hostmetrics, prometheus]
+      receivers: [otlp, hostmetrics]
       processors: [memory_limiter, resourcedetection, resource, batch]
       exporters: [otlp]
     logs:

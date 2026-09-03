@@ -21,11 +21,20 @@ storage:
     endpoint: ${S3_STORAGE_ENDPOINT}
     region: ${S3_STORAGE_REGION}
     force_path_style_access: true
+indexer:
+  # Two merges at a time, not twelve. The index shares a 147 GB volume with
+  # nothing else, but a merge holds its inputs for ~30 minutes after it
+  # publishes (the janitor's grace period) and writes its output next to them.
+  # With the default concurrency the v4 reindex of 2026-09-02/03 filled the
+  # volume to under 10 GB three times. Two concurrent merges bound that
+  # overhead to a few tens of GB.
+  merge_concurrency: 2
 searcher:
   fast_field_cache_capacity: ${QUICKWIT_FAST_FIELD_CACHE_CAPACITY:-1G}
   split_footer_cache_capacity: ${QUICKWIT_SPLIT_FOOTER_CACHE_CAPACITY:-512M}
   partial_request_cache_capacity: ${QUICKWIT_PARTIAL_REQUEST_CACHE_CAPACITY:-128M}
-  split_cache:
-    max_num_bytes: ${QUICKWIT_SPLIT_CACHE_MAX_NUM_BYTES:-10G}
-    max_num_splits: ${QUICKWIT_SPLIT_CACHE_MAX_NUM_SPLITS:-10000}
-    num_concurrent_downloads: ${QUICKWIT_SPLIT_CACHE_NUM_CONCURRENT_DOWNLOADS:-2}
+  # No split_cache section, on purpose. The searcher split cache wraps every
+  # storage, file:// included (checked in quickwit-search/src/leaf.rs and
+  # measured on 0.9.0), so with a local index it would copy each split from
+  # the index directory into a cache directory on the same disk. Setting
+  # max_num_bytes to 0 does not disable it; leaving the section out does.
