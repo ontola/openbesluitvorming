@@ -248,7 +248,7 @@ Deno.test("a recording without a stored transcript reindexes without failing", a
   assert(ingested[0].content?.includes("Opening"), "the chapters still make it searchable");
 });
 
-Deno.test("rehydration reads run in parallel, and the order still holds", async () => {
+Deno.test("rehydration reads run in parallel, and every record lands once", async () => {
   // The reindex is bounded by object-storage latency: one read per document,
   // 57% of live entities carrying stored text. Doing them one at a time held a
   // source to ~4 entities/second, which made Amsterdam alone a ~14 hour floor
@@ -290,10 +290,73 @@ Deno.test("rehydration reads run in parallel, and the order still holds", async 
     `and must respect the limit, peak was ${storage.peakConcurrency}`,
   );
 
-  // Parallel reads must not reshuffle what gets indexed.
-  const ids = ingested.map((doc) => doc.entity_id);
-  assertEquals([...ids].sort(), ids, `projection order must follow the export log: ${ids}`);
-  assert(ingested[0].content?.includes("inhoud van document 0"), "text arrives with its entity");
+  // Reads complete in whatever order storage answers; what matters is that
+  // every entity lands exactly once, with its own text.
+  const ids = ingested.map((doc) => doc.entity_id).sort();
+  assertEquals(
+    ids,
+    records.map((record) => record.entity_id).sort(),
+    `every record is projected once: ${ids}`,
+  );
+  const doc0 = ingested.find((doc) => doc.entity_id.endsWith(":d00"));
+  assert(doc0?.content?.includes("inhoud van document 0"), "text arrives with its entity");
+});
+
+Deno.test("one slow read delays only its own document", async () => {
+  // Measured 2026-09-03: object storage answered a few reads per hundred in
+  // 6-60s. The slice-at-a-time loop this replaces made every slice wait for
+  // its slowest read, so one such object held ~100 documents for minutes.
+  const records: ExportChangeRecord[] = [];
+  const objects: Record<string, string> = {};
+  for (let i = 0; i < 8; i += 1) {
+    const key = `text/doc-${i}/md.md`;
+    objects[key] = `tekst ${i}`;
+    records.push(documentRecord(`document:ibabs:gemeente:utrecht:d${i}`, { markdown: key }));
+  }
+  const storage = new FakeStorage(objects, 1);
+  const slowKey = "text/doc-3/md.md";
+  let releaseSlow: () => void = () => {};
+  const slowGate = new Promise<void>((resolve) => {
+    releaseSlow = resolve;
+  });
+  const originalGet = storage.getObjectText.bind(storage);
+  storage.getObjectText = async (key: string) => {
+    if (key === slowKey) {
+      await slowGate;
+    }
+    return originalGet(key);
+  };
+
+  const batches: string[][] = [];
+  const run = reindexSource("utrecht", {
+    // deno-lint-ignore no-explicit-any
+    exportLog: new FakeExportLog(records) as any,
+    // deno-lint-ignore no-explicit-any
+    storage: storage as any,
+    batchSize: 2,
+    rehydrateConcurrency: 4,
+    ingest: (documents) => {
+      batches.push(documents.map((doc) => doc.entity_id));
+      return Promise.resolve();
+    },
+  });
+
+  // Give the fast reads time to finish while doc-3 is still held.
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  const landedBeforeRelease = batches.flat().length;
+  assert(
+    landedBeforeRelease >= 6,
+    `documents behind the slow one must not wait for it, got ${landedBeforeRelease}`,
+  );
+  assert(
+    !batches.flat().includes("document:ibabs:gemeente:utrecht:d3"),
+    "the slow one is not in yet",
+  );
+
+  releaseSlow();
+  const stats = await run;
+  assertEquals(stats.entity_count, 8, "and everything lands in the end");
+  assert(batches.flat().includes("document:ibabs:gemeente:utrecht:d3"), "including the slow one");
 });
 
 Deno.test("a failing rehydration is reported per record, not per slice", async () => {

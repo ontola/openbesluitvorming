@@ -203,14 +203,21 @@ export async function reindexSource(
 
   let cursor: string | null = null;
   let pending: QuickwitSearchDocument[] = [];
+  // Flushes are serialised: rehydration finishes in whatever order object
+  // storage answers, and each completion may want to flush, but Quickwit is
+  // handed one batch at a time so the ingest side keeps its old shape.
+  let flushing: Promise<void> = Promise.resolve();
 
-  const flush = async (): Promise<void> => {
-    if (pending.length === 0) {
-      return;
-    }
-    const batch = pending;
-    pending = [];
-    await context.ingest(batch);
+  const flush = (): Promise<void> => {
+    flushing = flushing.then(async () => {
+      if (pending.length === 0) {
+        return;
+      }
+      const batch = pending;
+      pending = [];
+      await context.ingest(batch);
+    });
+    return flushing;
   };
 
   while (true) {
@@ -228,63 +235,59 @@ export async function reindexSource(
     // afterwards, so the batching and its memory behaviour are unchanged. The
     // slice is what bounds memory: a rehydrated document carries its page
     // chunks, so only `concurrency` of them are ever held beyond `pending`.
-    for (let offset = 0; offset < page.records.length; offset += concurrency) {
-      const slice = page.records.slice(offset, offset + concurrency);
-      const prepared = await mapLimit(slice, concurrency, async (record) => {
-        try {
-          const event = toCommitEvent(record);
-          const payload = event.data.payload;
-          let rehydrated = false;
+    // This used to walk the page in slices of `concurrency` records and wait
+    // for the whole slice before projecting any of it, which made every slice
+    // as slow as its slowest read. Measured 2026-09-03 against Hetzner: with a
+    // few reads per hundred taking 6-60s, 96 documents took 152s that way.
+    // Now every record of the page is in flight under the same limit and each
+    // one is projected the moment its own read completes; a slow object delays
+    // only itself. Memory is bounded the same way as before: at most
+    // `concurrency` rehydrated documents exist beyond `pending`, because a
+    // record is projected (and its text handed to `pending`) before the slot
+    // is reused.
+    await mapLimit(page.records, concurrency, async (record) => {
+      let event: EntityCommitEvent<WooziEntity>;
+      let isDocument = false;
+      let rehydrated = false;
+      try {
+        event = toCommitEvent(record);
+        const payload = event.data.payload;
+        isDocument = payload?.type === "Document";
 
-          if (payload?.type === "Document") {
-            rehydrated = await rehydrateDocumentText(payload, context.storage);
-          } else if (payload?.type === "Recording") {
-            rehydrated = await rehydrateTranscript(payload, context.storage);
-          }
-
-          return { record, event, isDocument: payload?.type === "Document", rehydrated };
-        } catch (error) {
-          return { record, error };
+        if (payload?.type === "Document") {
+          rehydrated = await rehydrateDocumentText(payload, context.storage);
+        } else if (payload?.type === "Recording") {
+          rehydrated = await rehydrateTranscript(payload, context.storage);
         }
-      });
-
-      for (const item of prepared) {
-        if ("error" in item && item.error) {
-          stats.issue_count += 1;
-          await context.onIssue?.({
-            severity: "warning",
-            step: "ingest_quickwit",
-            entity_id: item.record.entity_id,
-            message: `Reindex skipped ${item.record.entity_id}: ${
-              item.error instanceof Error ? item.error.message : String(item.error)
-            }`,
-          });
-          continue;
-        }
-
-        const { event, isDocument, rehydrated } = item as {
-          event: EntityCommitEvent<WooziEntity>;
-          isDocument: boolean;
-          rehydrated: boolean;
-        };
-
-        if (isDocument) {
-          stats.document_count += 1;
-        }
-        if (rehydrated) {
-          stats.rehydrated_count += 1;
-        }
-
-        pending.push(...projectEntityCommitToQuickwitDocuments(event));
-        stats.entity_count += 1;
-
-        // Documents carry their page chunks until the batch is flushed, so
-        // flush on the projected-document count rather than the entity count.
-        if (pending.length >= context.batchSize) {
-          await flush();
-        }
+      } catch (error) {
+        stats.issue_count += 1;
+        await context.onIssue?.({
+          severity: "warning",
+          step: "ingest_quickwit",
+          entity_id: record.entity_id,
+          message: `Reindex skipped ${record.entity_id}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        });
+        return;
       }
-    }
+
+      if (isDocument) {
+        stats.document_count += 1;
+      }
+      if (rehydrated) {
+        stats.rehydrated_count += 1;
+      }
+
+      pending.push(...projectEntityCommitToQuickwitDocuments(event));
+      stats.entity_count += 1;
+
+      // Documents carry their page chunks until the batch is flushed, so
+      // flush on the projected-document count rather than the entity count.
+      if (pending.length >= context.batchSize) {
+        await flush();
+      }
+    });
 
     await context.onProgress?.(stats);
 
