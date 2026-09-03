@@ -12,8 +12,25 @@ import { AwsClient } from "npm:aws4fetch";
 
 /** Per-attempt ceiling on an object read; see getObjectBytes. */
 const READ_TIMEOUT_MS = Number(Deno.env.get("WOOZI_S3_READ_TIMEOUT_MS") ?? "15000");
-const READ_ATTEMPTS = 3;
-const READ_RETRY_BASE_MS = 500;
+/** Attempts per read, with exponential back-off between them: 1s, 2s, 4s,
+ * 8s, 16s -- about half a minute in total before a read is given up. Object
+ * storage answers a burst it dislikes with `503 SlowDown: Please reduce your
+ * request rate`; measured 2026-09-03 during the v4 reindex, 24,800 reads in a
+ * few hours were refused that way and skipped, because three attempts half a
+ * second apart are three chances to hit the same throttle. A throttle wants
+ * patience, not persistence. `Retry-After`, when the server sends one, wins. */
+const READ_ATTEMPTS = 6;
+const READ_RETRY_BASE_MS = 1_000;
+const READ_RETRY_MAX_MS = 16_000;
+
+function readRetryDelayMs(attempt: number, retryAfter: string | null): number {
+  const advised = retryAfter ? Number(retryAfter) : NaN;
+  if (Number.isFinite(advised) && advised > 0) {
+    return Math.min(advised * 1000, 60_000);
+  }
+  const exponential = Math.min(READ_RETRY_MAX_MS, READ_RETRY_BASE_MS * 2 ** (attempt - 1));
+  return exponential + Math.floor(Math.random() * 250);
+}
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -383,7 +400,7 @@ export class ObjectStorageClient {
       } catch (error) {
         lastError = error;
         if (attempt < READ_ATTEMPTS) {
-          await sleep(READ_RETRY_BASE_MS * attempt);
+          await sleep(readRetryDelayMs(attempt, null));
           continue;
         }
         throw describeStorageError("read", key, error);
@@ -394,9 +411,10 @@ export class ObjectStorageClient {
         return null;
       }
       if (response.status === 429 || response.status >= 500) {
+        const retryAfter = response.headers.get("retry-after");
         lastError = new Error(await errorSummary(response));
         if (attempt < READ_ATTEMPTS) {
-          await sleep(READ_RETRY_BASE_MS * attempt);
+          await sleep(readRetryDelayMs(attempt, retryAfter));
           continue;
         }
         throw describeStorageError("read", key, lastError);
@@ -411,7 +429,7 @@ export class ObjectStorageClient {
         // The body can stall after the headers arrived; the signal covers it.
         lastError = error;
         if (attempt < READ_ATTEMPTS) {
-          await sleep(READ_RETRY_BASE_MS * attempt);
+          await sleep(readRetryDelayMs(attempt, null));
           continue;
         }
         throw describeStorageError("read", key, error);
