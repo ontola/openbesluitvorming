@@ -432,14 +432,30 @@ export interface NotubizModuleItemAttribute {
   values?: NotubizModuleItemValue[];
 }
 
+/** A document as Notubiz lists it under a module item's `attachments`.
+ * Richer than the field-2 reference: it carries the file name, size, version
+ * and modification time the cache key and the download need. */
+export interface NotubizAttachmentDocument {
+  id: number;
+  /** `https://api.notubiz.nl/document/{id}/{version}` */
+  url?: string;
+  title?: string;
+  publication_date?: string;
+  last_modified?: string;
+  version?: number;
+  confidential?: number;
+  versions?: Array<{ id?: number; mime_type?: string; file_name?: string; file_size?: number }>;
+}
+
 export interface NotubizModuleItem {
   id: number;
   module_id?: number;
   organisation_id?: number;
   last_modified?: string;
+  permission_group?: string;
   attributes?: NotubizModuleItemAttribute[];
   attachments?: {
-    document?: unknown[];
+    document?: NotubizAttachmentDocument[];
   };
 }
 

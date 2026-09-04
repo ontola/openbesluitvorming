@@ -4,14 +4,12 @@ import {
   canonicalMotionId,
   canonicalOrganizationId,
 } from "../ids.ts";
-import {
-  type MeetingIndex,
-  normalizeMotionResult,
-  parseMotionDate,
-} from "../motions/normalize.ts";
+import { type MeetingIndex, normalizeMotionResult, parseMotionDate } from "../motions/normalize.ts";
+import { normalizeDateTime } from "./normalize.ts";
 import type {
   DocumentEntity,
   MotionEntity,
+  NotubizAttachmentDocument,
   NotubizModule,
   NotubizModuleItem,
   NotubizModuleItemAttribute,
@@ -49,6 +47,20 @@ export function isMotionModule(module: NotubizModule): boolean {
   return MOTION_MODULE_PATTERN.test(module.name?.trim() ?? "");
 }
 
+/** Every other module is a register: Ingekomen stukken, Raadsvoorstellen,
+ * Schriftelijke vragen, Toezeggingen, Bestuursdocumenten, and whatever an
+ * organisation adds. Their items are not projected as entities of their own;
+ * their attachments are, as Documents classified by the module's name.
+ *
+ * Measured 2026-09-04 (#258): of 40 Ermelo documents from 2025 that the old
+ * ORI held and we did not, 24 sat in "Ingekomen stukken", 11 in
+ * "Raadsvoorstellen" and 1 in "Moties" -- none under an agenda item any more.
+ * Notubiz organisations moved their publishing into these registers during
+ * 2025, so a meeting-only harvest keeps the history and misses the present. */
+export function isRegisterModule(module: NotubizModule): boolean {
+  return !isMotionModule(module) && (module.name?.trim().length ?? 0) > 0;
+}
+
 function attributesById(item: NotubizModuleItem): Map<number, NotubizModuleItemAttribute> {
   const map = new Map<number, NotubizModuleItemAttribute>();
   for (const attribute of item.attributes ?? []) {
@@ -80,9 +92,9 @@ function referenceIds(
 ): string[] {
   return (attribute?.values ?? [])
     .filter((value) => value.meta_data?.reference_model === referenceModel)
-    .map((value) => (value.content === null || value.content === undefined
-      ? undefined
-      : String(value.content)))
+    .map((value) =>
+      value.content === null || value.content === undefined ? undefined : String(value.content),
+    )
     .filter((id): id is string => Boolean(id));
 }
 
@@ -117,8 +129,10 @@ export function htmlToText(value: string): string {
  * stemming gebracht"). Prefer whichever candidate maps onto a real outcome,
  * and fall back to field 62 verbatim so nothing is silently dropped. */
 function pickStatus(attributes: Map<number, NotubizModuleItemAttribute>): string | undefined {
-  const candidates = [textOf(attributes.get(FIELD.outcome)), textOf(attributes.get(FIELD.status))]
-    .filter((value): value is string => Boolean(value));
+  const candidates = [
+    textOf(attributes.get(FIELD.outcome)),
+    textOf(attributes.get(FIELD.status)),
+  ].filter((value): value is string => Boolean(value));
 
   const decisive = candidates.find((value) => normalizeMotionResult(value) !== "overig");
   return decisive ?? candidates[0];
@@ -185,8 +199,9 @@ export function normalizeNotubizMotion(
   const coProposers = labelsOf(attributes.get(FIELD.coSigners));
   const date = parseMotionDate(textOf(attributes.get(FIELD.date)));
 
-  const documentIds = referenceIds(attributes.get(FIELD.mainDocument), "document")
-    .map((id) => canonicalDocumentId(source, id));
+  const documentIds = referenceIds(attributes.get(FIELD.mainDocument), "document").map((id) =>
+    canonicalDocumentId(source, id),
+  );
 
   return {
     id: canonicalMotionId(source, item.id),
@@ -208,8 +223,8 @@ export function normalizeNotubizMotion(
     agenda_item: agendaItem,
     agenda_item_hint: meeting
       ? undefined
-      : labelsOf(attributes.get(FIELD.agendaItem))[0] ??
-        labelsOf(attributes.get(FIELD.linkedEvent))[0],
+      : (labelsOf(attributes.get(FIELD.agendaItem))[0] ??
+        labelsOf(attributes.get(FIELD.linkedEvent))[0]),
     attachment: documentIds.length > 0 ? documentIds : undefined,
     organization: canonicalOrganizationId(source),
     last_discussed_at: meetingStart ?? date,
@@ -224,43 +239,149 @@ export function normalizeNotubizMotion(
   };
 }
 
-/** Documents attached to a Notubiz motion.
+/** The documents a module item carries, from `attachments.document`.
  *
- * Only the main document (field 2) is materialized. `attachments.document`
- * also carries bijlagen, but those are already reachable through the agenda
- * item and would double the download load for little gain. */
+ * This used to read only the main document (field 2) and match it on
+ * `meta_data.reference_model === "document"`. Real items put the document
+ * under `value.document` with `meta_data: null`, so that filter matched
+ * nothing and Notubiz motions shipped without a single attachment (both
+ * fixtures reproduce it). `attachments.document` is the list Notubiz itself
+ * maintains and it carries what the cache key and the download need: file
+ * name, size, mime type, version and modification time. Confidential
+ * attachments are skipped; the item itself is already public. */
+function attachmentDocuments(item: NotubizModuleItem): NotubizAttachmentDocument[] {
+  const list = item.attachments?.document;
+  if (!Array.isArray(list)) {
+    return [];
+  }
+  return list.filter(
+    (document): document is NotubizAttachmentDocument =>
+      Boolean(document && typeof document === "object" && typeof document.id === "number") &&
+      !(document as NotubizAttachmentDocument).confidential,
+  );
+}
+
+function normalizeAttachmentDocument(
+  source: NotubizSourceDefinition,
+  document: NotubizAttachmentDocument,
+  context: {
+    name: string;
+    classification: string[];
+    referencedBy: string;
+    lastDiscussedAt?: string;
+    sourceIri?: string;
+  },
+  item: NotubizModuleItem,
+): DocumentEntity {
+  const documentId = String(document.id);
+  const version = document.version ?? 1;
+  const file =
+    document.versions?.find((candidate) => candidate.id === version) ?? document.versions?.[0];
+  const dateModified = normalizeDateTime(document.last_modified);
+  return {
+    id: canonicalDocumentId(source, documentId),
+    type: "Document",
+    name: document.title?.trim() || file?.file_name || context.name,
+    classification: context.classification,
+    original_url: document.url ?? `https://api.notubiz.nl/document/${documentId}/${version}`,
+    identifier_url: `https://api.notubiz.nl/document/${documentId}`,
+    file_name: file?.file_name,
+    content_type: file?.mime_type,
+    size_in_bytes: file?.file_size,
+    date_modified: dateModified,
+    last_discussed_at: context.lastDiscussedAt,
+    is_referenced_by: context.referencedBy,
+    organization: canonicalOrganizationId(source),
+    source_info: {
+      supplier: source.supplier,
+      source: source.key,
+      organization_type: source.organizationType,
+      canonical_id: documentId,
+      canonical_iri: `https://api.notubiz.nl/document/${documentId}`,
+      source_iri: context.sourceIri,
+    },
+    // `version` and `last_modified` feed the cache key (see cacheVersionToken
+    // in src/documents/process.ts), so a re-published document is fetched
+    // again instead of served from the copy of its first version.
+    raw: {
+      id: documentId,
+      version,
+      last_modified: document.last_modified,
+      module_item: item.id,
+    },
+  };
+}
+
+/** Documents attached to a Notubiz motion. */
 export function normalizeNotubizMotionDocuments(
   source: NotubizSourceDefinition,
   motion: MotionEntity,
   item: NotubizModuleItem,
 ): DocumentEntity[] {
-  const attributes = attributesById(item);
-  const main = attributes.get(FIELD.mainDocument);
-
-  return (main?.values ?? [])
-    .filter((value) => value.meta_data?.reference_model === "document")
-    .map((value) => String(value.content))
-    .filter((id) => id && id !== "null" && id !== "undefined")
-    .map((documentId) => ({
-      id: canonicalDocumentId(source, documentId),
-      type: "Document" as const,
-      name: motion.name,
-      classification: [motion.motion_type ?? "Motie"],
-      original_url: `https://api.notubiz.nl/document/${documentId}/1`,
-      identifier_url: `https://api.notubiz.nl/document/${documentId}`,
-      last_discussed_at: motion.last_discussed_at,
-      is_referenced_by: motion.id,
-      organization: motion.organization,
-      source_info: {
-        supplier: source.supplier,
-        source: source.key,
-        organization_type: source.organizationType,
-        canonical_id: documentId,
-        canonical_iri: `https://api.notubiz.nl/document/${documentId}`,
-        source_iri: motion.source_info.canonical_iri,
+  return attachmentDocuments(item).map((document) =>
+    normalizeAttachmentDocument(
+      source,
+      document,
+      {
+        name: motion.name,
+        classification: [motion.motion_type ?? "Motie"],
+        referencedBy: motion.id,
+        lastDiscussedAt: motion.last_discussed_at,
+        sourceIri: motion.source_info.canonical_iri,
       },
-      raw: { id: documentId, motion: motion.id },
-    }));
+      item,
+    ),
+  );
+}
+
+/** Documents of a register item (any non-motion module).
+ *
+ * The item is dated by its own date field, or by the meeting its agenda
+ * reference resolves to; it is referenced by that meeting when there is one
+ * and by the organisation otherwise, so a reader can still see which council
+ * published it. The item's title is the name of a document that has none. */
+export function normalizeNotubizRegisterDocuments(
+  source: NotubizSourceDefinition,
+  module: NotubizModule,
+  item: NotubizModuleItem,
+  meetings?: MeetingIndex,
+): DocumentEntity[] {
+  const attributes = attributesById(item);
+  const title = textOf(attributes.get(FIELD.title)) ?? `${module.name} ${item.id}`;
+  const date = parseMotionDate(textOf(attributes.get(FIELD.date)));
+
+  const agendaItemIds = [
+    ...referenceIds(attributes.get(FIELD.agendaItem), "agenda_item"),
+    ...referenceIds(attributes.get(FIELD.linkedEvent), "agenda_item"),
+  ].map((id) => canonicalAgendaItemId(source, id));
+  let referencedBy = canonicalOrganizationId(source);
+  let meetingStart: string | undefined;
+  for (const candidate of agendaItemIds) {
+    const owner = meetings?.findByAgendaItem(candidate);
+    if (owner) {
+      referencedBy = owner.id;
+      meetingStart = owner.start_date;
+      break;
+    }
+  }
+
+  return attachmentDocuments(item).map((document) =>
+    normalizeAttachmentDocument(
+      source,
+      document,
+      {
+        name: title,
+        classification: [module.name],
+        referencedBy,
+        lastDiscussedAt:
+          meetingStart ??
+          date ??
+          (document.publication_date ? parseMotionDate(document.publication_date) : undefined),
+        sourceIri: `https://api.notubiz.nl/modules/${module.id}/items/${item.id}`,
+      },
+      item,
+    ),
+  );
 }
 
 export const __test__ = { FIELD, pickStatus, pickVoteSummary, attributesById };
