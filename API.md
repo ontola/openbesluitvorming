@@ -388,6 +388,7 @@ at all — i.e. how long the outage has lasted.
 | `lastErrorMessage` | Why the last run failed. Present only when it did. Query strings are stripped |
 | `latestContentDate` | Newest meeting date held for this organization. Often in the future — an agenda is published before the meeting happens |
 | `lastIndexedAt` | When anything was last written to the search index for this organization |
+| `coverage` | Present once the weekly coverage check has covered this organization. What the source system's own API listed for a date window, against what the index holds: `supplierDocuments`, `heldDocuments`, `missingDocuments` (the first two partition the third), `ratio` (held over supplier; 1 means complete), `windowFrom`/`windowTo`, `checkedAt`, `missingSample` (a few missing document ids), `lowerBound` (true when some supplier requests failed, so the gap may be larger), and `error` when the check itself failed. `state: "ok"` says the last import ran; `coverage` says whether it asked for everything |
 | `discontinuedAt` | The date the organization ceased to exist. Only on `discontinued` |
 | `succeededBy` | `{ cbsId, label, sourceKey }` of the organization that took over. `sourceKey` is absent when we do not import the successor. Only on `discontinued` |
 

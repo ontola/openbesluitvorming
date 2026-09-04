@@ -92,7 +92,22 @@ async function getDatabase(): Promise<DatabaseSync> {
           streak INTEGER NOT NULL DEFAULT 0,
           last_checked_at TEXT NOT NULL
         );
-        CREATE TABLE IF NOT EXISTS revalidation_cursor (
+        CREATE TABLE IF NOT EXISTS coverage_check (
+        source_key TEXT NOT NULL,
+        checked_at TEXT NOT NULL,
+        window_from TEXT NOT NULL,
+        window_to TEXT NOT NULL,
+        supplier_documents INTEGER NOT NULL,
+        held_documents INTEGER NOT NULL,
+        missing_documents INTEGER NOT NULL,
+        missing_sample TEXT NOT NULL,
+        supplier_meetings INTEGER NOT NULL,
+        register_entries INTEGER NOT NULL,
+        warnings INTEGER NOT NULL,
+        error TEXT,
+        PRIMARY KEY (source_key, checked_at)
+      );
+      CREATE TABLE IF NOT EXISTS revalidation_cursor (
           supplier TEXT PRIMARY KEY,
           start_offset INTEGER NOT NULL DEFAULT 0
         );
@@ -214,8 +229,11 @@ export async function getRunIssueCount(runId: string): Promise<number> {
 
 function normalizeTrigger(trigger: string): IngestRunTrigger {
   if (
-    trigger === "scheduled" || trigger === "user" || trigger === "manual" ||
-    trigger === "api" || trigger === "backfill"
+    trigger === "scheduled" ||
+    trigger === "user" ||
+    trigger === "manual" ||
+    trigger === "api" ||
+    trigger === "backfill"
   ) {
     return trigger;
   }
@@ -1149,4 +1167,84 @@ export async function listConfirmedGoneDocuments(
        ORDER BY streak DESC`,
     )
     .all({ supplier, threshold }) as unknown as RevalidationEntry[];
+}
+
+/** One coverage check of one source: what the supplier listed for the window
+ * against what the export log held. See src/coverage/check.ts. */
+export interface CoverageCheckRecord {
+  source_key: string;
+  checked_at: string;
+  window_from: string;
+  window_to: string;
+  supplier_documents: number;
+  held_documents: number;
+  missing_documents: number;
+  missing_sample: string[];
+  supplier_meetings: number;
+  register_entries: number;
+  /** Supplier requests that failed during the listing; the supplier count is
+   * then a lower bound. */
+  warnings: number;
+  /** Set when the listing itself failed and the counts are meaningless. */
+  error?: string;
+}
+
+export async function recordCoverageCheck(record: CoverageCheckRecord): Promise<void> {
+  const db = await getDatabase();
+  db.prepare(
+    `INSERT INTO coverage_check (
+       source_key, checked_at, window_from, window_to, supplier_documents, held_documents,
+       missing_documents, missing_sample, supplier_meetings, register_entries, warnings, error
+     ) VALUES (
+       @source_key, @checked_at, @window_from, @window_to, @supplier_documents, @held_documents,
+       @missing_documents, @missing_sample, @supplier_meetings, @register_entries, @warnings, @error
+     )
+     ON CONFLICT(source_key, checked_at) DO UPDATE SET
+       supplier_documents = excluded.supplier_documents,
+       held_documents = excluded.held_documents,
+       missing_documents = excluded.missing_documents,
+       missing_sample = excluded.missing_sample,
+       supplier_meetings = excluded.supplier_meetings,
+       register_entries = excluded.register_entries,
+       warnings = excluded.warnings,
+       error = excluded.error`,
+  ).run({
+    source_key: record.source_key,
+    checked_at: record.checked_at,
+    window_from: record.window_from,
+    window_to: record.window_to,
+    supplier_documents: record.supplier_documents,
+    held_documents: record.held_documents,
+    missing_documents: record.missing_documents,
+    missing_sample: JSON.stringify(record.missing_sample),
+    supplier_meetings: record.supplier_meetings,
+    register_entries: record.register_entries,
+    warnings: record.warnings,
+    error: record.error ?? null,
+  });
+}
+
+/** The latest check per source. */
+export async function latestCoverageChecks(): Promise<CoverageCheckRecord[]> {
+  const db = await getDatabase();
+  const rows = db
+    .prepare(
+      `SELECT source_key, checked_at, window_from, window_to, supplier_documents, held_documents,
+              missing_documents, missing_sample, supplier_meetings, register_entries, warnings, error
+       FROM (
+         SELECT *, ROW_NUMBER() OVER (PARTITION BY source_key ORDER BY checked_at DESC) AS rn
+         FROM coverage_check
+       ) WHERE rn = 1`,
+    )
+    .all() as unknown as Array<
+    Omit<CoverageCheckRecord, "missing_sample" | "error"> & {
+      missing_sample: string;
+      error: string | null;
+    }
+  >;
+  return rows.map((row) => ({
+    ...row,
+    missing_sample: JSON.parse(row.missing_sample) as string[],
+    error: row.error ?? undefined,
+  }));
 }

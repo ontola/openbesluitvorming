@@ -835,6 +835,18 @@ Three systemd timers run on the production host:
   [docs_internal/bsn-takedown.md](docs_internal/bsn-takedown.md) for the
   calibration details and the ori3 equivalent. Install with
   [scripts/install-production-revalidate.sh](scripts/install-production-revalidate.sh).
+- **Coverage check** (`woozi-coverage.timer`, weekly, Sunday 05:00): for every
+  runnable source, `scripts/coverage_check.ts` lists the document ids the
+  supplier's own API exposes for the last 12 months -- meeting documents and
+  register/motion attachments -- and compares them with the export log. The
+  result goes to `coverage_check` in the ops SQLite and appears in
+  `/api/status` as `coverage` per source (supplier count, held, missing, a
+  sample of missing ids). Nothing is downloaded. It shares the suppliers'
+  request budgets with the nightly import, so it runs one source at a time on
+  a quiet morning; a full pass takes a few hours. Run one source by hand with
+  `docker exec woozi-openbesluitvorming-1 deno run -A scripts/coverage_check.ts
+  --source ermelo --dry-run`. Install with
+  [scripts/install-production-coverage.sh](scripts/install-production-coverage.sh).
 
 To restore: download the newest `backups/sqlite/...` object, gunzip, stop the
 `openbesluitvorming` and `worker` containers, replace the file on the

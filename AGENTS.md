@@ -158,6 +158,12 @@ Current implemented slices:
   `docs_internal/bsn-takedown.md` ("Stap 6") for the per-supplier
   "genuinely gone" calibration and the org-wide-outage-vs-real-deletion
   distinction.
+- A weekly coverage check (`scripts/coverage_check.ts`, `woozi-coverage.timer`)
+  compares the document ids each supplier's API lists for the last 12 months
+  with the export log and stores the result in `coverage_check`; `/api/status`
+  exposes it as `coverage` per source. "Last import succeeded" only says the
+  run finished; `coverage` says whether it asked for everything (#258 found
+  a Notubiz source at 11% for 2025 while its status was green).
 - The admin dashboard polls every 5s. Any per-run work it does (e.g. fetching run detail) multiplies by the number of visible runs — keep the dashboard cheap so it doesn't starve the single-threaded `openbesluitvorming` process and slow down user searches.
 
 ### iBabs specifics

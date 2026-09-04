@@ -900,6 +900,30 @@ export interface SourceStatus {
    * successor, so a caller can follow the trail. */
   discontinuedAt?: string;
   succeededBy?: { cbsId: string; label: string; sourceKey?: string };
+  /** The most recent coverage check for this source, when one has run: what
+   * the supplier's own API listed for a date window against what we hold.
+   * Absent until the weekly check has covered the source. */
+  coverage?: SourceCoverage;
+}
+
+/** Result of one coverage check (src/coverage/check.ts). `heldDocuments` and
+ * `missingDocuments` partition `supplierDocuments`; `ratio` is held over
+ * supplier, 1 meaning every document the supplier lists is in the index.
+ * `lowerBound` is true when some supplier requests failed, so the supplier
+ * count (and the gap) may be larger than reported. */
+export interface SourceCoverage {
+  checkedAt: string;
+  windowFrom: string;
+  windowTo: string;
+  supplierDocuments: number;
+  heldDocuments: number;
+  missingDocuments: number;
+  ratio: number;
+  lowerBound: boolean;
+  /** A few of the missing document ids, for a human to verify. */
+  missingSample: string[];
+  /** Set when the check itself failed for this source. */
+  error?: string;
 }
 
 /** `down` is the shape of #205: every run against a supplier failing, for as
