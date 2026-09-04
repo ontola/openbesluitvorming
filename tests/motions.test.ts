@@ -216,8 +216,8 @@ Deno.test("motion list selection and the run window bound what gets fetched", ()
   assert(pattern.test("Moties"), "Moties matches");
   assert(pattern.test("1.2 Amendementen"), "numbered Amendementen matches");
   assert(pattern.test("Stemming"), "Stemming matches");
-  assert(!pattern.test("Toezeggingen"), "Toezeggingen is out of scope");
-  assert(!pattern.test("Ingekomen stukken"), "Ingekomen stukken is out of scope");
+  assert(!pattern.test("Toezeggingen"), "Toezeggingen is a register, not a motion list");
+  assert(!pattern.test("Ingekomen stukken"), "Ingekomen stukken is a register, not a motion list");
 
   const inWindow = ibabsExtractorTest.isEntryInWindow;
   assert(inWindow("2026-01-29T19:45:18.133", "2026-01-01", "2026-06-30"), "inside window");

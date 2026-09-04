@@ -57,6 +57,13 @@ Current implemented slices:
 
 - Notubiz, iBabs (165 sources, date-range chunked), GemeenteOplossingen, and
   Parlaeus meetings and documents (production)
+- registers: every Notubiz module and every iBabs list that is not a motion
+  list (ingekomen stukken, raadsvoorstellen, schriftelijke vragen,
+  toezeggingen, ...). Their attachments are Documents classified by the
+  register's name; the entry itself is not an entity. Since 2025 Notubiz
+  organisations publish most new material this way (#258); the Notubiz
+  window is the module item's date, the iBabs window its MutationDate, and
+  `WOOZI_IBABS_REGISTER_LIMIT` (default 2000) caps entries per run.
 - document download and caching
 - markdown extraction with `transmutation` + remote extraction workers
 - PDF page-chunk derivation

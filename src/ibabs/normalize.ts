@@ -85,7 +85,10 @@ function toAgendaDocumentLinks(
   return documents.length > 0 ? documents : undefined;
 }
 
-function collectAgendaItems(source: IbabsSourceDefinition, meeting: IbabsMeeting): MeetingAgendaItem[] {
+function collectAgendaItems(
+  source: IbabsSourceDefinition,
+  meeting: IbabsMeeting,
+): MeetingAgendaItem[] {
   return (meeting.MeetingItems ?? []).map((item: IbabsMeetingItem, index) => ({
     id: canonicalAgendaItemId(source, item.Id),
     title: item.Title,
@@ -195,15 +198,14 @@ export function normalizeIbabsMotion(
   meetings?: MeetingIndex,
 ): MotionEntity {
   const values = detail.Values;
-  const name = pickValue(values, ["Onderwerp", "Titel", "Toezegging"]) ??
+  const name =
+    pickValue(values, ["Onderwerp", "Titel", "Toezegging"]) ??
     entry.EntryTitle ??
     `${list.ListName} ${entry.EntryId}`;
   const status = pickValue(values, ["Status"]);
   const date = parseMotionDate(pickValue(values, ["Datum", "Datum motie", "Datum indiening"]));
 
-  const proposers = splitProposers(
-    pickValue(values, ["Indiener(s)", "Indieners", "Indiener"]),
-  );
+  const proposers = splitProposers(pickValue(values, ["Indiener(s)", "Indieners", "Indiener"]));
   const coProposers = splitProposers(
     pickValue(values, ["Mede-indieners", "Mede-indiener(s)", "Medeondertekenaars"]),
   );
@@ -282,6 +284,60 @@ export function normalizeIbabsMotionDocuments(
       canonical_id: document.Id,
       canonical_iri: `ibabs://${source.ibabsSitename}/document/${document.Id}`,
       source_iri: motion.source_info.canonical_iri,
+    },
+    raw: document,
+  }));
+}
+
+/** Documents of a register entry: ingekomen stukken, raadsvragen,
+ * toezeggingen, brieven aan de raad, and whatever other list an organisation
+ * keeps besides its meetings.
+ *
+ * ORI harvested these as `Report` entities with their attachments; 117,746 of
+ * them across all iBabs sources (#226), most of them dated 2025 and 2026. The
+ * entry itself is not projected here -- its attachments are, as Documents
+ * classified by the list's name, referenced by the meeting the entry's
+ * "Agendapunt" resolves to and by the organisation otherwise. A file that
+ * also hangs off an agenda item keeps its id and stays one entity. */
+export function normalizeIbabsRegisterDocuments(
+  source: IbabsSourceDefinition,
+  list: IbabsList,
+  entry: IbabsListEntryBase,
+  detail: IbabsListEntryDetail,
+  meetings?: MeetingIndex,
+): DocumentEntity[] {
+  const values = detail.Values;
+  const title =
+    pickValue(values, ["Onderwerp", "Titel", "Toezegging", "Vraag"]) ??
+    entry.EntryTitle ??
+    `${list.ListName} ${entry.EntryId}`;
+  const date =
+    parseMotionDate(
+      pickValue(values, ["Datum", "Datum ontvangst", "Datum indiening", "Datum toezegging"]),
+    ) ?? parseMotionDate(entry.MutationDate);
+  const reference = parseAgendaPointReference(pickValue(values, ["Agendapunt"]));
+  const meeting = reference && meetings ? meetings.find(reference) : undefined;
+  const sourceIri = `ibabs://${source.ibabsSitename}/listentry/${entry.EntryId}`;
+
+  return detail.Documents.map((document) => ({
+    id: canonicalDocumentId(source, document.Id),
+    type: "Document",
+    name: document.DisplayName?.trim() || document.FileName?.trim() || title,
+    classification: [list.ListName],
+    original_url: document.PublicDownloadURL,
+    identifier_url: `ibabs://${source.ibabsSitename}/document/${document.Id}`,
+    file_name: document.FileName,
+    size_in_bytes: document.FileSize,
+    last_discussed_at: meeting?.start_date ?? date,
+    is_referenced_by: meeting?.id ?? canonicalOrganizationId(source),
+    organization: canonicalOrganizationId(source),
+    source_info: {
+      supplier: source.supplier,
+      source: source.key,
+      organization_type: source.organizationType,
+      canonical_id: document.Id,
+      canonical_iri: `ibabs://${source.ibabsSitename}/document/${document.Id}`,
+      source_iri: sourceIri,
     },
     raw: document,
   }));

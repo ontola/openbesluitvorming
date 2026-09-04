@@ -9,6 +9,10 @@ import {
 } from "../src/notubiz/motions.ts";
 import { getNotubizSource } from "../src/sources/index.ts";
 import type { NotubizModule, NotubizModuleItem } from "../src/types.ts";
+import { IbabsMeetingExtractor } from "../src/ibabs/extractor.ts";
+import { normalizeIbabsRegisterDocuments } from "../src/ibabs/normalize.ts";
+import { getIbabsSource } from "../src/sources/index.ts";
+import type { ExtractionIssue, IbabsList, IbabsListEntryBase } from "../src/types.ts";
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) {
@@ -78,7 +82,11 @@ Deno.test("a register item's attachments become documents classified by the regi
   assertEquals(first.file_name, "Wegenbeheerplan 2026-2030 e250064948.pdf", "file name");
   assertEquals(first.size_in_bytes, 1630609, "size");
   assertEquals(first.content_type, "application/pdf", "mime type");
-  assertEquals(first.date_modified, "2026-02-05T10:51:47Z", "modification time, Dutch wall clock read as UTC");
+  assertEquals(
+    first.date_modified,
+    "2026-02-05T10:51:47Z",
+    "modification time, Dutch wall clock read as UTC",
+  );
   assertEquals(
     first.last_discussed_at,
     "2025-12-17T00:00:00Z",
@@ -179,4 +187,134 @@ Deno.test("motion attachments come from the attachment list, not from field 2", 
   assertEquals(documents.length, 1, "the attachment is materialised");
   assertEquals(documents[0].is_referenced_by, motion.id, "referenced by the motion");
   assertEquals(documents[0].classification, ["Moties"], "classified as the motion type");
+});
+
+// ---------------------------------------------------------------------------
+// iBabs registers
+// ---------------------------------------------------------------------------
+
+const INGEKOMEN: IbabsList = { ListId: "list-9", ListName: "Ingekomen stukken" };
+
+Deno.test("an iBabs register entry's documents are classified by the list", () => {
+  const source = getIbabsSource("utrecht");
+  const entry: IbabsListEntryBase = {
+    EntryId: "e-1",
+    EntryTitle: "Brief provincie over N201",
+    MutationDate: "2026-02-03T10:00:00",
+    ListId: INGEKOMEN.ListId,
+    ListName: INGEKOMEN.ListName,
+    ListCanVote: false,
+  };
+  const documents = normalizeIbabsRegisterDocuments(source, INGEKOMEN, entry, {
+    EntryId: "e-1",
+    Values: { Onderwerp: "Brief provincie over N201", "Datum ontvangst": "2026-02-01" },
+    Documents: [
+      {
+        Id: "d-1",
+        DisplayName: "Brief provincie",
+        FileName: "brief.pdf",
+        PublicDownloadURL: "https://api1.ibabs.eu/publicdownload.aspx?d=1",
+        FileSize: 1234,
+      },
+      { Id: "d-2", FileName: "bijlage.pdf", PublicDownloadURL: "https://api1.ibabs.eu/x?d=2" },
+    ],
+  });
+  assertEquals(documents.length, 2, "one document per attachment");
+  assertEquals(
+    documents[0].id,
+    "document:ibabs:gemeente:utrecht:d-1",
+    "same id scheme as meeting documents",
+  );
+  assertEquals(documents[0].classification, ["Ingekomen stukken"], "classified by the list");
+  assertEquals(documents[0].name, "Brief provincie", "display name");
+  assertEquals(documents[1].name, "bijlage.pdf", "file name when there is no display name");
+  assertEquals(documents[0].last_discussed_at, "2026-02-01T00:00:00Z", "dated by the entry's date");
+  assertEquals(
+    documents[0].is_referenced_by,
+    "organization:nl:gemeente:utrecht",
+    "the council, absent a meeting",
+  );
+  assertEquals(
+    documents[0].source_info.source_iri,
+    "ibabs://utrecht/listentry/e-1",
+    "the entry it came from",
+  );
+});
+
+class FakeIbabsRegisterClient {
+  votesCalls = 0;
+  downloads: string[] = [];
+
+  getMeetingTypes() {
+    return Promise.resolve([{ Id: "t1", Description: "Gemeenteraad" }]);
+  }
+  listMeetingsByDateRange() {
+    return Promise.resolve([]);
+  }
+  getLists() {
+    return Promise.resolve([
+      { ListId: "list-1", ListName: "Moties" },
+      { ListId: "list-9", ListName: "Ingekomen stukken" },
+    ]);
+  }
+  listListEntries(_source: unknown, listId: string) {
+    if (listId === "list-9") {
+      return Promise.resolve([
+        {
+          EntryId: "r-1",
+          EntryTitle: "Brief",
+          MutationDate: "2026-02-03T10:00:00",
+          ListId: "list-9",
+          ListName: "Ingekomen stukken",
+          ListCanVote: false,
+        },
+      ]);
+    }
+    return Promise.resolve([]);
+  }
+  getListEntry(_source: unknown, _listId: string, entryId: string) {
+    return Promise.resolve({
+      EntryId: entryId,
+      Values: { Onderwerp: "Brief provincie" },
+      Documents: [
+        { Id: "rd-1", FileName: "brief.pdf", PublicDownloadURL: "https://api1.ibabs.eu/x?d=rd-1" },
+      ],
+    });
+  }
+  getListEntryVotes() {
+    this.votesCalls += 1;
+    return Promise.resolve([]);
+  }
+  downloadDocument(document: { id: string }) {
+    this.downloads.push(document.id);
+    return Promise.reject(new Error("no network in tests"));
+  }
+}
+
+Deno.test("iBabs register entries reach the document path without a vote lookup", async () => {
+  const source = getIbabsSource("utrecht");
+  const client = new FakeIbabsRegisterClient();
+  const extractor = new IbabsMeetingExtractor(
+    // deno-lint-ignore no-explicit-any
+    client as any,
+    () => Promise.resolve(undefined),
+  );
+  const issues: ExtractionIssue[] = [];
+  const bundle = await extractor.extractForDateRange(source, "2026-02-01", "2026-02-28", {
+    onIssue: (issue) => {
+      issues.push(issue);
+    },
+  });
+
+  assertEquals(
+    client.downloads,
+    ["document:ibabs:gemeente:utrecht:rd-1"],
+    "the register document is fetched",
+  );
+  assertEquals(client.votesCalls, 0, "registers carry no votes, so none are asked for");
+  assertEquals(bundle.stats.motion_count ?? 0, 0, "a register entry is not a motion");
+  assert(
+    issues.some((issue) => issue.entity_id === "document:ibabs:gemeente:utrecht:rd-1"),
+    "the failed download is reported against the document",
+  );
 });
