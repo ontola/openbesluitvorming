@@ -771,25 +771,61 @@ async function estimateTotal(
     // The scan's own num_hits stays as the fallback; it is at least a number.
   }
 
+  // The scan's own sample is only usable when it is both relevance-ordered
+  // and large enough. A first page stops after a few dozen rows, and 32 rows
+  // are not a ratio: measured on production, 447,000 from the scan against
+  // 195,000 from a proper sample for the same query.
   let ratio = scan.scannedResults > 0 ? scan.scannedRows / scan.scannedResults : 1;
-  if (sortBy) {
-    try {
-      const sample = await quickwit.searchRequest({
-        query: queryString,
-        max_hits: RATIO_SAMPLE_ROWS,
-        count_all: false,
-      });
-      const hits = sample.hits as SearchHit[];
-      const distinct = new Set(hits.map((hit) => searchResultEntityId(hit)));
-      if (distinct.size > 0) {
-        ratio = hits.length / distinct.size;
-      }
-    } catch {
-      // Keep the scan's own ratio; a sort-dependent estimate beats none.
+  if (sortBy || scan.scannedRows < RATIO_SAMPLE_ROWS) {
+    const sampled = await sampledRowsPerResult(quickwit, queryString);
+    if (sampled !== undefined) {
+      ratio = sampled;
     }
   }
 
   return roundEstimate(rows / Math.max(ratio, 1));
+}
+
+/** Rows per result, measured once per query and remembered for a while: the
+ * same query is asked again for every page and every sort, and a 2,000-row
+ * sample is not free. */
+const ratioCache = new Map<string, { ratio: number; expiresAt: number }>();
+const RATIO_CACHE_TTL_MS = 10 * 60 * 1000;
+const RATIO_CACHE_MAX = 500;
+
+async function sampledRowsPerResult(
+  quickwit: QuickwitClient,
+  queryString: string,
+): Promise<number | undefined> {
+  const now = Date.now();
+  const cached = ratioCache.get(queryString);
+  if (cached && cached.expiresAt > now) {
+    return cached.ratio;
+  }
+  try {
+    const sample = await quickwit.searchRequest({
+      query: queryString,
+      max_hits: RATIO_SAMPLE_ROWS,
+      count_all: false,
+    });
+    const hits = sample.hits as SearchHit[];
+    const distinct = new Set(hits.map((hit) => searchResultEntityId(hit)));
+    if (distinct.size === 0) {
+      return undefined;
+    }
+    const ratio = hits.length / distinct.size;
+    if (ratioCache.size >= RATIO_CACHE_MAX) {
+      const oldest = ratioCache.keys().next().value;
+      if (oldest !== undefined) {
+        ratioCache.delete(oldest);
+      }
+    }
+    ratioCache.set(queryString, { ratio, expiresAt: now + RATIO_CACHE_TTL_MS });
+    return ratio;
+  } catch {
+    // Keep the scan's own ratio; a rough estimate beats none.
+    return undefined;
+  }
 }
 
 /** Three significant figures above a thousand: 190,285 reads as exact and is
