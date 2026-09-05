@@ -730,6 +730,78 @@ function dedupeLatestIndexedHits(items: IndexedHit[]): IndexedHit[] {
   return [...byEntityId.values()].filter((item) => item.hit.op !== "delete");
 }
 
+/** Rows to sample when the ratio of rows to results has to be measured in an
+ * order the user did not choose. */
+const RATIO_SAMPLE_ROWS = 2000;
+
+/** Estimate how many results a capped scan would have produced.
+ *
+ * Two things made this number move (#265): the same query showed 146,881,
+ * 189,609 and 339,160 depending on the sort order.
+ *
+ * The numerator was Quickwit's `num_hits` from a scan page asked with
+ * `count_all: false`, which stops counting early: measured on the v4 index,
+ * 4,190 for an unsorted scan against 570,855 with a sort. So the numerator is
+ * now one dedicated count request, exact and cheap (0.2s on 570k rows).
+ *
+ * The denominator is how many index rows collapse into one result, and that
+ * depends on which rows a sort puts first: the newest documents carry more
+ * page rows than the oldest (measured 2.27 against 3.22 rows per result for
+ * the same query, newest-first against oldest-first). So the ratio is always
+ * taken from the relevance-ordered sample -- the scan itself when that is
+ * the order asked for, a separate sample otherwise -- and the same query gets
+ * the same estimate whatever the sort. It is still an estimate, rounded to
+ * three significant figures so it reads as one; the exact answer needs a
+ * distinct count over a fast field the index does not carry yet. */
+async function estimateTotal(
+  quickwit: QuickwitClient,
+  queryString: string,
+  sortBy: string | undefined,
+  scan: { scannedRows: number; scannedResults: number; fallbackRows: number },
+): Promise<number> {
+  let rows = scan.fallbackRows;
+  try {
+    const counted = await quickwit.searchRequest({
+      query: queryString,
+      max_hits: 0,
+      count_all: true,
+    });
+    rows = counted.num_hits;
+  } catch {
+    // The scan's own num_hits stays as the fallback; it is at least a number.
+  }
+
+  let ratio = scan.scannedResults > 0 ? scan.scannedRows / scan.scannedResults : 1;
+  if (sortBy) {
+    try {
+      const sample = await quickwit.searchRequest({
+        query: queryString,
+        max_hits: RATIO_SAMPLE_ROWS,
+        count_all: false,
+      });
+      const hits = sample.hits as SearchHit[];
+      const distinct = new Set(hits.map((hit) => searchResultEntityId(hit)));
+      if (distinct.size > 0) {
+        ratio = hits.length / distinct.size;
+      }
+    } catch {
+      // Keep the scan's own ratio; a sort-dependent estimate beats none.
+    }
+  }
+
+  return roundEstimate(rows / Math.max(ratio, 1));
+}
+
+/** Three significant figures above a thousand: 190,285 reads as exact and is
+ * not; 190,000 reads as what it is. */
+export function roundEstimate(value: number): number {
+  if (value < 1000) {
+    return Math.round(value);
+  }
+  const magnitude = 10 ** (Math.floor(Math.log10(value)) - 2);
+  return Math.round(value / magnitude) * magnitude;
+}
+
 /** A hit is presented as the thing a reader wants to open, which is not always
  * the thing that matched: a page belongs to its document, and a transcript
  * belongs to its meeting — that is where the player and the spoken text are. */
@@ -1031,9 +1103,17 @@ async function collectSearchWindow(
   // same switch #184, #192 and #194 are waiting on.
   const groupedCount = sortedResults.length;
   const scannedEverything = exhausted && !scanLimitReached;
-  const totalCount = scannedEverything
-    ? groupedCount
-    : Math.max(groupedCount, Math.round((rawNumHits ?? 0) / Math.max(rowsPerResult, 1)));
+  let totalCount = groupedCount;
+  if (!scannedEverything) {
+    totalCount = Math.max(
+      groupedCount,
+      await estimateTotal(quickwit, queryString, sortBy, {
+        scannedRows: rawSeen,
+        scannedResults: collected.size,
+        fallbackRows: rawNumHits ?? 0,
+      }),
+    );
+  }
 
   return {
     results: pageWindowResults,
