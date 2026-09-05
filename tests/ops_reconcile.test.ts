@@ -28,6 +28,21 @@ function assertEquals(actual: unknown, expected: unknown, message: string): void
 function backdateRunStart(runId: string, minutes = 10): void {
   const db = new DatabaseSync(Deno.env.get("WOOZI_KV_PATH")!);
   try {
+    db.prepare(`UPDATE ingest_run SET started_at = ?, claimed_at = ? WHERE id = ?`).run(
+      new Date(Date.now() - minutes * 60_000).toISOString(),
+      new Date(Date.now() - minutes * 60_000).toISOString(),
+      runId,
+    );
+  } finally {
+    db.close();
+  }
+}
+
+/** A run that sat in the queue for a while: enqueued long ago, claimed now
+ * (or not yet). */
+function backdateEnqueue(runId: string, minutes = 300): void {
+  const db = new DatabaseSync(Deno.env.get("WOOZI_KV_PATH")!);
+  try {
     db.prepare(`UPDATE ingest_run SET started_at = ? WHERE id = ?`).run(
       new Date(Date.now() - minutes * 60_000).toISOString(),
       runId,
@@ -67,7 +82,10 @@ Deno.test("interrupted runs are requeued instead of failed, up to the cap", asyn
 
   // Restarts two through five: requeued again.
   for (let interruption = 2; interruption <= 5; interruption += 1) {
-    assert(await claimQueuedRun(runId), `requeued run can be claimed (interruption ${interruption})`);
+    assert(
+      await claimQueuedRun(runId),
+      `requeued run can be claimed (interruption ${interruption})`,
+    );
     backdateRunStart(runId);
     reconciled = await reconcileInterruptedRuns();
     target = reconciled.find((run) => run.id === runId);
@@ -140,5 +158,67 @@ Deno.test("reconcile leaves freshly claimed runs to their owning worker", async 
   assert(
     !reconciled.some((item) => item.id === run.id),
     "a fresh claim must not be requeued by a booting sibling",
+  );
+});
+
+Deno.test("a run that queued for hours and was just claimed is not requeued", async () => {
+  // 2026-09-05: a backfill of 1,172 chunks was enqueued at 07:18 and the
+  // workers restarted at 12:22. Judged by started_at every fresh claim was
+  // five hours old, so each booting worker requeued its siblings' claims and
+  // took them itself; eight runs ran in triplicate.
+  const run = await createRun({
+    source_key: "almelo",
+    supplier: "ibabs",
+    date_from: "2025-09-05",
+    date_to: "2026-03-05",
+    trigger: "scheduled",
+    execution_mode: "full",
+    parent_run_id: undefined,
+    projection_version: "test",
+    derivation_version: "test",
+    status: "queued",
+  });
+  backdateEnqueue(run.id);
+  assert(await claimQueuedRun(run.id), "run can be claimed");
+
+  const reconciled = await reconcileInterruptedRuns();
+  assert(
+    !reconciled.some((item) => item.id === run.id),
+    "a claim made seconds ago belongs to a live worker, however old the row",
+  );
+  const details = await getRunDetails(run.id);
+  assertEquals(details?.run.status, "running", "the owning worker keeps its run");
+});
+
+Deno.test("a run claimed before claimed_at existed is judged by started_at", async () => {
+  const run = await createRun({
+    source_key: "soest",
+    supplier: "notubiz",
+    date_from: "2024-01-01",
+    date_to: "2024-12-31",
+    trigger: "scheduled",
+    execution_mode: "full",
+    parent_run_id: undefined,
+    projection_version: "test",
+    derivation_version: "test",
+    status: "queued",
+  });
+  assert(await claimQueuedRun(run.id), "run can be claimed");
+  // As left by a worker running the previous schema: an old row, no stamp.
+  const db = new DatabaseSync(Deno.env.get("WOOZI_KV_PATH")!);
+  try {
+    db.prepare(`UPDATE ingest_run SET started_at = ?, claimed_at = NULL WHERE id = ?`).run(
+      new Date(Date.now() - 10 * 60_000).toISOString(),
+      run.id,
+    );
+  } finally {
+    db.close();
+  }
+
+  const reconciled = await reconcileInterruptedRuns();
+  assertEquals(
+    reconciled.find((item) => item.id === run.id)?.status,
+    "queued",
+    "an unstamped old running row is still treated as interrupted",
   );
 });
