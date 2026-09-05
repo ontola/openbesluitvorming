@@ -1035,7 +1035,9 @@ Deno.test("a total is not inflated by rows that arrive mid-scan", async () => {
       const startOffset = Number(body.start_offset ?? 0);
       const maxHits = Number(body.max_hits);
       const count = Math.max(0, Math.min(maxHits, TOTAL_ROWS - startOffset));
-      const numHits = TOTAL_ROWS + round * growPerRound;
+      // The dedicated count request (max_hits 0, count_all) sees the index as
+      // it is; the growth simulates rows arriving between scan pages.
+      const numHits = body.count_all ? TOTAL_ROWS : TOTAL_ROWS + round * growPerRound;
       round += 1;
 
       const hits = Array.from({ length: count }, (_, index) => {
@@ -1202,4 +1204,74 @@ Deno.test("a snippet carries the highlight and nothing else", async () => {
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+Deno.test("the total does not move with the sort order", async () => {
+  // #265: the same query showed 146,881, 189,609 and 339,160 results under
+  // three sort orders. The numerator was a partial count and the denominator
+  // a collapse ratio sampled in whatever order the sort put first.
+  const originalFetch = globalThis.fetch;
+  const TOTAL_ROWS = 570_855;
+  const serve = async (_input: unknown, init?: unknown) => {
+    const body = JSON.parse(String((init as { body?: string } | undefined)?.body ?? "{}"));
+    if (body.count_all) {
+      return new Response(JSON.stringify({ num_hits: TOTAL_ROWS, hits: [] }), {
+        headers: { "content-type": "application/json" },
+      });
+    }
+    // A sorted scan sees documents with many pages first (5 rows per result);
+    // relevance order collapses 2 to 1. Same index, different sample.
+    const perResult = body.sort_by ? 5 : 2;
+    const maxHits = Number(body.max_hits);
+    const startOffset = Number(body.start_offset ?? 0);
+    const hits = Array.from({ length: maxHits }, (_, index) => {
+      const row = startOffset + index;
+      const documentIndex = Math.floor(row / perResult);
+      return {
+        time: "2026-03-31T11:00:00Z",
+        entity_id: `document:notubiz:gemeente:ermelo:${documentIndex}#page=${(row % perResult) + 1}`,
+        parent_entity_id: `document:notubiz:gemeente:ermelo:${documentIndex}`,
+        page_number: (row % perResult) + 1,
+        entity_type: "DocumentPage",
+        name: `Schriftelijke vragen ${documentIndex}`,
+        start_date: "2025-01-14T17:00:00Z",
+        source_key: "ermelo",
+        content: "schriftelijke vragen over van alles",
+      };
+    });
+    // num_hits from a scan page is deliberately partial, as Quickwit's is
+    // without count_all.
+    return new Response(JSON.stringify({ num_hits: 4190, hits }), {
+      headers: { "content-type": "application/json" },
+    });
+  };
+
+  try {
+    globalThis.fetch = serve as typeof globalThis.fetch;
+    await withV3Projection(async () => {
+      const totals: Record<string, number> = {};
+      for (const sort of ["relevance", "date_desc", "date_asc", "title_asc"]) {
+        const response = await searchMeetings({ query: "schriftelijke vragen", sort, limit: 24 });
+        assert(response.totalIsApproximate, `${sort}: a capped scan is an estimate`);
+        totals[sort] = response.totalCount ?? 0;
+      }
+      const distinct = new Set(Object.values(totals));
+      assert(distinct.size === 1, `one estimate for every sort, got ${JSON.stringify(totals)}`);
+      // 570,855 rows at 2 rows per result, rounded to three figures.
+      assert(
+        totals.relevance === 285_000,
+        `estimate from the exact count, got ${totals.relevance}`,
+      );
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+Deno.test("an estimate is rounded to three significant figures", async () => {
+  const { roundEstimate } = await import("../web/search_api.ts");
+  assert(roundEstimate(190_285) === 190_000, "190,285 -> 190,000");
+  assert(roundEstimate(146_881) === 147_000, "146,881 -> 147,000");
+  assert(roundEstimate(1_234) === 1_230, "1,234 -> 1,230");
+  assert(roundEstimate(999) === 999, "under a thousand stays exact");
 });
