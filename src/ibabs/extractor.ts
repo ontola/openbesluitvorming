@@ -21,6 +21,7 @@ import {
   normalizeIbabsMeeting,
   normalizeIbabsMotion,
   normalizeIbabsMotionDocuments,
+  normalizeIbabsRegisterDocuments,
 } from "./normalize.ts";
 import { MeetingIndex, parseAgendaPointReference } from "../motions/normalize.ts";
 import { IbabsClient } from "./client.ts";
@@ -36,6 +37,10 @@ const MOTION_LIST_PATTERN = /moties?|amendement|stemming/i;
  * an unexpectedly wide window shouldn't be able to run for hours. Overruns are
  * reported as an issue rather than silently dropped. */
 const DEFAULT_MOTION_LIMIT = 750;
+/** Register entries per run. Registers are larger than motion lists -- an
+ * organisation's "Ingekomen stukken" easily runs to hundreds a year -- and
+ * cost one SOAP call each (no votes), so the cap is higher and separate. */
+const DEFAULT_REGISTER_LIMIT = 2000;
 /** Concurrency for the motion pass, deliberately below the document one.
  *
  * Motions are pure SOAP traffic against a single throttled endpoint, where
@@ -299,11 +304,53 @@ export class IbabsMeetingExtractor {
     // Motions run after every chunk so the meeting index covers the whole
     // window — a motion's agenda reference may point at a meeting from an
     // earlier chunk than the one it was mutated in.
+    // Motion and register attachments take the same path as meeting
+    // documents. A file seen twice in one run (agenda item and register, or
+    // two registers) is fetched once.
+    const listDocumentsSeen = new Set<string>();
+    const materializeListDocuments = async (listDocuments: DocumentEntity[]) => {
+      for (const document of listDocuments) {
+        if (listDocumentsSeen.has(document.id)) {
+          continue;
+        }
+        listDocumentsSeen.add(document.id);
+        try {
+          const materialized = await materializeDocument(document, {
+            download: (documentEntity) => this.client.downloadDocument(documentEntity),
+            storage,
+            executionMode: options.executionMode,
+          });
+          for (const issue of materialized.issues) {
+            await registerIssue(issue);
+          }
+          documentCount += 1;
+          if (retainEntities) {
+            documents.push(materialized.document);
+          }
+          if (materialized.cacheHit) {
+            cacheHits += 1;
+          } else {
+            downloadedCount += 1;
+          }
+          await options.onProgress?.(currentStats());
+          await options.onEntity?.(materialized.document);
+        } catch (error) {
+          await registerIssue({
+            severity: "error",
+            step: issueStepForDocumentError(error),
+            entity_id: document.id,
+            message: error instanceof Error ? error.message : "Document processing failed",
+          });
+        }
+      }
+    };
+
     await this.extractMotions(source, dateFrom, dateTo, {
       meetingIndex,
       meetingTypes: meetingTypeMap,
       concurrency: motionConcurrency,
       registerIssue,
+      onRegisterDocuments: materializeListDocuments,
       onMotion: async (motion, motionDocuments) => {
         motionCount += 1;
         if (retainEntities) {
@@ -311,37 +358,7 @@ export class IbabsMeetingExtractor {
         }
         await options.onProgress?.(currentStats());
         await options.onEntity?.(motion);
-
-        for (const document of motionDocuments) {
-          try {
-            const materialized = await materializeDocument(document, {
-              download: (documentEntity) => this.client.downloadDocument(documentEntity),
-              storage,
-              executionMode: options.executionMode,
-            });
-            for (const issue of materialized.issues) {
-              await registerIssue(issue);
-            }
-            documentCount += 1;
-            if (retainEntities) {
-              documents.push(materialized.document);
-            }
-            if (materialized.cacheHit) {
-              cacheHits += 1;
-            } else {
-              downloadedCount += 1;
-            }
-            await options.onProgress?.(currentStats());
-            await options.onEntity?.(materialized.document);
-          } catch (error) {
-            await registerIssue({
-              severity: "error",
-              step: issueStepForDocumentError(error),
-              entity_id: document.id,
-              message: error instanceof Error ? error.message : "Document processing failed",
-            });
-          }
-        }
+        await materializeListDocuments(motionDocuments);
       },
     });
 
@@ -369,10 +386,14 @@ export class IbabsMeetingExtractor {
       concurrency: number;
       registerIssue: (issue: ExtractionIssue) => Promise<void>;
       onMotion: (motion: MotionEntity, documents: DocumentEntity[]) => Promise<void>;
+      onRegisterDocuments: (documents: DocumentEntity[]) => Promise<void>;
     },
   ): Promise<void> {
     const limit = Number(Deno.env.get("WOOZI_IBABS_MOTION_LIMIT") ?? `${DEFAULT_MOTION_LIMIT}`);
-    if (limit <= 0) {
+    const registerLimit = Number(
+      Deno.env.get("WOOZI_IBABS_REGISTER_LIMIT") ?? `${DEFAULT_REGISTER_LIMIT}`,
+    );
+    if (limit <= 0 && registerLimit <= 0) {
       return;
     }
 
@@ -391,15 +412,29 @@ export class IbabsMeetingExtractor {
       return;
     }
 
-    const targets = lists.filter((list) => MOTION_LIST_PATTERN.test(list.ListName));
+    // Every list is either a motion list or a register. Motion lists keep
+    // their vote lookup and become Motion entities; every other list is a
+    // register whose attachments become Documents (see
+    // normalizeIbabsRegisterDocuments). Measured 2026-09-04 (#258): for
+    // Notubiz the same split explained 90% of the recent documents ORI held
+    // and we did not, and #226 measured 117,746 register entries ORI held
+    // across iBabs sources.
+    const isMotionList = (list: IbabsList) => MOTION_LIST_PATTERN.test(list.ListName);
+    const targets = lists.filter((list) =>
+      isMotionList(list) ? limit > 0 : registerLimit > 0 && list.ListName.trim().length > 0,
+    );
     if (targets.length === 0) {
       return;
     }
 
-    const pending: Array<{ list: IbabsList; entry: IbabsListEntryBase }> = [];
+    const pending: Array<{ list: IbabsList; entry: IbabsListEntryBase; motion: boolean }> = [];
     let skippedForLimit = 0;
+    let skippedForRegisterLimit = 0;
+    let pendingMotions = 0;
+    let pendingRegisters = 0;
 
     for (const list of targets) {
+      const motion = isMotionList(list);
       let entries: IbabsListEntryBase[];
       try {
         entries = await this.client.listListEntries(source, list.ListId, dateFrom);
@@ -419,12 +454,32 @@ export class IbabsMeetingExtractor {
         if (!isEntryInWindow(entry.MutationDate, dateFrom, dateTo)) {
           continue;
         }
-        if (pending.length >= limit) {
-          skippedForLimit += 1;
-          continue;
+        if (motion) {
+          if (pendingMotions >= limit) {
+            skippedForLimit += 1;
+            continue;
+          }
+          pendingMotions += 1;
+        } else {
+          if (pendingRegisters >= registerLimit) {
+            skippedForRegisterLimit += 1;
+            continue;
+          }
+          pendingRegisters += 1;
         }
-        pending.push({ list, entry });
+        pending.push({ list, entry, motion });
       }
+    }
+
+    if (skippedForRegisterLimit > 0) {
+      await context.registerIssue({
+        severity: "warning",
+        step: "list_motions",
+        entity_id: source.key,
+        message:
+          `iBabs ${source.ibabsSitename}: ${skippedForRegisterLimit} register entries skipped, over the ` +
+          `${registerLimit}-entry per-run cap (WOOZI_IBABS_REGISTER_LIMIT). Narrow the date range to import them.`,
+      });
     }
 
     if (skippedForLimit > 0) {
@@ -481,17 +536,31 @@ export class IbabsMeetingExtractor {
       return load;
     };
 
-    await mapLimit(pending, context.concurrency, async ({ list, entry }) => {
+    await mapLimit(pending, context.concurrency, async ({ list, entry, motion: isMotion }) => {
       try {
         const detail = await this.client.getListEntry(source, list.ListId, entry.EntryId);
-        // Empty for the ~half of sources without the digital voting module.
-        const votes = await this.client.getListEntryVotes(source, entry.EntryId);
 
         const reference = parseAgendaPointReference(detail.Values["Agendapunt"]);
         if (reference) {
           await ensureMeetingsForDate(reference.meetingDate);
         }
 
+        if (!isMotion) {
+          const documents = normalizeIbabsRegisterDocuments(
+            source,
+            list,
+            entry,
+            detail,
+            context.meetingIndex,
+          );
+          if (documents.length > 0) {
+            await context.onRegisterDocuments(documents);
+          }
+          return;
+        }
+
+        // Empty for the ~half of sources without the digital voting module.
+        const votes = await this.client.getListEntryVotes(source, entry.EntryId);
         const motion = normalizeIbabsMotion(
           source,
           list,

@@ -117,8 +117,7 @@ export class ExportChangesLog {
     // but a range scan is guaranteed to use idx_export_entity_state_entity_id_op
     // regardless of SQLite version/collation quirks in the LIKE optimizer.
     const upperBound =
-      idPrefix.slice(0, -1) +
-      String.fromCharCode(idPrefix.charCodeAt(idPrefix.length - 1) + 1);
+      idPrefix.slice(0, -1) + String.fromCharCode(idPrefix.charCodeAt(idPrefix.length - 1) + 1);
     const row = this.db
       .prepare(
         `SELECT COUNT(*) AS count FROM export_entity_state
@@ -357,6 +356,21 @@ export class ExportChangesLog {
       nextCursor: String(nextCursor),
       hasMore: nextCursor < this.headNextSeq(sourceKey),
     };
+  }
+
+  /** Every live entity id of a source under an id prefix, without parsing a
+   * single record. Ids are `<type>:<supplier>:<orgType>:<key>:<native>`, so
+   * `document:` selects a source's documents as one primary-key range. The
+   * coverage check compares this against what the supplier lists. */
+  listEntityIds(sourceKey: string, prefix: string): string[] {
+    const rows = this.db
+      .prepare(
+        `SELECT entity_id FROM export_entity_state
+         WHERE source_key = ? AND op = 'upsert' AND entity_id >= ? AND entity_id < ?
+         ORDER BY entity_id`,
+      )
+      .all(sourceKey, prefix, `${prefix}\uffff`) as Array<{ entity_id: string }>;
+    return rows.map((row) => row.entity_id);
   }
 
   /** Read the current state per entity (latest upsert record, tombstones

@@ -432,14 +432,30 @@ export interface NotubizModuleItemAttribute {
   values?: NotubizModuleItemValue[];
 }
 
+/** A document as Notubiz lists it under a module item's `attachments`.
+ * Richer than the field-2 reference: it carries the file name, size, version
+ * and modification time the cache key and the download need. */
+export interface NotubizAttachmentDocument {
+  id: number;
+  /** `https://api.notubiz.nl/document/{id}/{version}` */
+  url?: string;
+  title?: string;
+  publication_date?: string;
+  last_modified?: string;
+  version?: number;
+  confidential?: number;
+  versions?: Array<{ id?: number; mime_type?: string; file_name?: string; file_size?: number }>;
+}
+
 export interface NotubizModuleItem {
   id: number;
   module_id?: number;
   organisation_id?: number;
   last_modified?: string;
+  permission_group?: string;
   attributes?: NotubizModuleItemAttribute[];
   attachments?: {
-    document?: unknown[];
+    document?: NotubizAttachmentDocument[];
   };
 }
 
@@ -884,6 +900,30 @@ export interface SourceStatus {
    * successor, so a caller can follow the trail. */
   discontinuedAt?: string;
   succeededBy?: { cbsId: string; label: string; sourceKey?: string };
+  /** The most recent coverage check for this source, when one has run: what
+   * the supplier's own API listed for a date window against what we hold.
+   * Absent until the weekly check has covered the source. */
+  coverage?: SourceCoverage;
+}
+
+/** Result of one coverage check (src/coverage/check.ts). `heldDocuments` and
+ * `missingDocuments` partition `supplierDocuments`; `ratio` is held over
+ * supplier, 1 meaning every document the supplier lists is in the index.
+ * `lowerBound` is true when some supplier requests failed, so the supplier
+ * count (and the gap) may be larger than reported. */
+export interface SourceCoverage {
+  checkedAt: string;
+  windowFrom: string;
+  windowTo: string;
+  supplierDocuments: number;
+  heldDocuments: number;
+  missingDocuments: number;
+  ratio: number;
+  lowerBound: boolean;
+  /** A few of the missing document ids, for a human to verify. */
+  missingSample: string[];
+  /** Set when the check itself failed for this source. */
+  error?: string;
 }
 
 /** `down` is the shape of #205: every run against a supplier failing, for as

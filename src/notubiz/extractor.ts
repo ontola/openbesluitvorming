@@ -5,8 +5,10 @@ import { canonicalMeetingId } from "../ids.ts";
 import { normalizeNotubizDocuments, normalizeNotubizMeeting } from "./normalize.ts";
 import {
   isMotionModule,
+  isRegisterModule,
   normalizeNotubizMotion,
   normalizeNotubizMotionDocuments,
+  normalizeNotubizRegisterDocuments,
 } from "./motions.ts";
 import { normalizeNotubizRecording } from "./recordings.ts";
 import { storeTranscript } from "../recordings/storage.ts";
@@ -353,6 +355,47 @@ export class NotubizMeetingExtractor {
     // recordings, and the registries were already imported by the run that
     // brought in these meetings.
     if (!mediaOnly) {
+      // Register and motion attachments take the same path as meeting
+      // documents: cache check, download, extraction, BSN scan. A document
+      // already seen under an agenda item in this run is not fetched twice.
+      const moduleDocumentsSeen = new Set<string>();
+      const materializeModuleDocuments = async (moduleDocuments: DocumentEntity[]) => {
+        await mapLimit(moduleDocuments, documentConcurrency, async (document) => {
+          if (moduleDocumentsSeen.has(document.id)) {
+            return;
+          }
+          moduleDocumentsSeen.add(document.id);
+          try {
+            const materialized = await materializeDocument(document, {
+              download: (documentEntity) => this.client.downloadDocument(documentEntity),
+              storage,
+              executionMode: options.executionMode,
+            });
+            for (const issue of materialized.issues) {
+              await registerIssue(issue);
+            }
+            documentCount += 1;
+            if (retainEntities) {
+              documents.push(materialized.document);
+            }
+            if (materialized.cacheHit) {
+              cacheHits += 1;
+            } else {
+              downloadedCount += 1;
+            }
+            await options.onProgress?.(currentStats());
+            await options.onEntity?.(materialized.document);
+          } catch (error) {
+            await registerIssue({
+              severity: "error",
+              step: issueStepForDocumentError(error),
+              entity_id: document.id,
+              message: error instanceof Error ? error.message : "Document processing failed",
+            });
+          }
+        });
+      };
+
       await this.extractMotions(source, dateFrom, dateTo, {
         meetingIndex,
         registerIssue,
@@ -363,38 +406,9 @@ export class NotubizMeetingExtractor {
           }
           await options.onProgress?.(currentStats());
           await options.onEntity?.(motion);
-
-          await mapLimit(motionDocuments, documentConcurrency, async (document) => {
-            try {
-              const materialized = await materializeDocument(document, {
-                download: (documentEntity) => this.client.downloadDocument(documentEntity),
-                storage,
-                executionMode: options.executionMode,
-              });
-              for (const issue of materialized.issues) {
-                await registerIssue(issue);
-              }
-              documentCount += 1;
-              if (retainEntities) {
-                documents.push(materialized.document);
-              }
-              if (materialized.cacheHit) {
-                cacheHits += 1;
-              } else {
-                downloadedCount += 1;
-              }
-              await options.onProgress?.(currentStats());
-              await options.onEntity?.(materialized.document);
-            } catch (error) {
-              await registerIssue({
-                severity: "error",
-                step: issueStepForDocumentError(error),
-                entity_id: document.id,
-                message: error instanceof Error ? error.message : "Document processing failed",
-              });
-            }
-          });
+          await materializeModuleDocuments(motionDocuments);
         },
+        onRegisterDocuments: materializeModuleDocuments,
       });
     }
 
@@ -501,6 +515,7 @@ export class NotubizMeetingExtractor {
       meetingIndex: MeetingIndex;
       registerIssue: (issue: ExtractionIssue) => Promise<void>;
       onMotion: (motion: MotionEntity, documents: DocumentEntity[]) => Promise<void>;
+      onRegisterDocuments: (documents: DocumentEntity[]) => Promise<void>;
     },
   ): Promise<void> {
     let modules: NotubizModule[];
@@ -518,7 +533,7 @@ export class NotubizMeetingExtractor {
       return;
     }
 
-    for (const module of modules.filter(isMotionModule)) {
+    for (const module of modules.filter((m) => isMotionModule(m) || isRegisterModule(m))) {
       let items: NotubizModuleItem[];
       try {
         items = await this.client.listModuleItems(
@@ -540,8 +555,23 @@ export class NotubizMeetingExtractor {
       }
 
       for (const item of items) {
-        const motion = normalizeNotubizMotion(source, module, item, context.meetingIndex);
-        await context.onMotion(motion, normalizeNotubizMotionDocuments(source, motion, item));
+        if (item.permission_group && item.permission_group !== "public") {
+          continue;
+        }
+        if (isMotionModule(module)) {
+          const motion = normalizeNotubizMotion(source, module, item, context.meetingIndex);
+          await context.onMotion(motion, normalizeNotubizMotionDocuments(source, motion, item));
+        } else {
+          const documents = normalizeNotubizRegisterDocuments(
+            source,
+            module,
+            item,
+            context.meetingIndex,
+          );
+          if (documents.length > 0) {
+            await context.onRegisterDocuments(documents);
+          }
+        }
       }
     }
   }

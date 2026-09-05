@@ -1,4 +1,5 @@
 import type {
+  SourceCoverage,
   SourceStatus,
   SourceStatusState,
   StatusResponse,
@@ -7,7 +8,9 @@ import type {
   SupplierStatusState,
 } from "../src/types.ts";
 import {
+  type CoverageCheckRecord,
   getIngestStatus,
+  latestCoverageChecks,
   type SourceRunStatus,
   type SupplierRunWindow,
 } from "../src/ops/store.ts";
@@ -96,13 +99,17 @@ function latestTimestamp(values: Array<string | undefined>): string | undefined 
 export function buildStatusResponse(options: {
   runStatus: { sources: SourceRunStatus[]; supplierWindows: SupplierRunWindow[] };
   indexActivity: Map<string, SourceIndexActivity> | null;
+  coverageChecks?: CoverageCheckRecord[];
   now: number;
   windowHours: number;
 }): StatusResponse {
-  const { runStatus, indexActivity, now, windowHours } = options;
+  const { runStatus, indexActivity, coverageChecks, now, windowHours } = options;
   const runBySource = new Map(runStatus.sources.map((row) => [row.sourceKey, row]));
   const windowBySupplier = new Map(runStatus.supplierWindows.map((row) => [row.supplier, row]));
 
+  const coverageBySource = new Map(
+    (coverageChecks ?? []).map((check) => [check.source_key, toSourceCoverage(check)]),
+  );
   const sources: SourceStatus[] = listCatalogSources()
     .map((source) => {
       const run = runBySource.get(source.key);
@@ -138,6 +145,7 @@ export function buildStatusResponse(options: {
                 sourceKey: source.succeededBySourceKey,
               }
             : undefined,
+        coverage: coverageBySource.get(source.key),
       } satisfies SourceStatus;
     })
     .sort((left, right) => left.label.localeCompare(right.label, "nl"));
@@ -186,6 +194,24 @@ export function buildStatusResponse(options: {
 let cached: { value: StatusResponse; expiresAt: number } | null = null;
 let inFlight: Promise<StatusResponse> | null = null;
 
+function toSourceCoverage(check: CoverageCheckRecord): SourceCoverage {
+  return {
+    checkedAt: check.checked_at,
+    windowFrom: check.window_from,
+    windowTo: check.window_to,
+    supplierDocuments: check.supplier_documents,
+    heldDocuments: check.held_documents,
+    missingDocuments: check.missing_documents,
+    ratio:
+      check.supplier_documents > 0
+        ? Math.round((check.held_documents / check.supplier_documents) * 1000) / 1000
+        : 1,
+    lowerBound: check.warnings > 0,
+    missingSample: check.missing_sample,
+    error: check.error,
+  };
+}
+
 async function computeStatus(windowHours: number): Promise<StatusResponse> {
   const runStatus = await getIngestStatus(windowHours);
 
@@ -200,9 +226,20 @@ async function computeStatus(windowHours: number): Promise<StatusResponse> {
     console.warn(`[status] index activity unavailable, reporting imports only: ${message}`);
   }
 
+  // The coverage check is optional in the same way: absent until the weekly
+  // job has run, and never a reason for the endpoint to fail.
+  let coverageChecks: CoverageCheckRecord[] | undefined;
+  try {
+    coverageChecks = await latestCoverageChecks();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[status] coverage checks unavailable: ${message}`);
+  }
+
   return buildStatusResponse({
     runStatus,
     indexActivity,
+    coverageChecks,
     now: Date.now(),
     windowHours,
   });

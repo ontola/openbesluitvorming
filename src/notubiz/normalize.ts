@@ -52,7 +52,10 @@ function canonicalDocumentDownloadUrl(documentId: string): string {
   return `https://api.notubiz.nl/document/${documentId}/1`;
 }
 
-function agendaAttributeValue(typeData: Record<string, unknown> | undefined, id: number): string | undefined {
+function agendaAttributeValue(
+  typeData: Record<string, unknown> | undefined,
+  id: number,
+): string | undefined {
   const attributes = Array.isArray(typeData?.attributes) ? typeData.attributes : [];
   for (const attribute of attributes) {
     if (!attribute || typeof attribute !== "object") {
@@ -107,7 +110,9 @@ export function normalizeNotubizAgendaItems(
           : undefined;
       const agendaId = canonicalAgendaItemId(source, id);
       const documents = (Array.isArray(record.documents) ? record.documents : [])
-        .filter((document): document is Record<string, unknown> => Boolean(document && typeof document === "object"))
+        .filter((document): document is Record<string, unknown> =>
+          Boolean(document && typeof document === "object"),
+        )
         .map((document) => normalizeAgendaDocumentLink(source, document))
         .filter((document): document is MeetingAgendaDocumentLink => Boolean(document));
       const children = normalizeNotubizAgendaItems(
@@ -116,20 +121,22 @@ export function normalizeNotubizAgendaItems(
         agendaId,
       );
 
-      return [{
-        id: agendaId,
-        parent: parentId,
-        title: agendaAttributeValue(typeData, 1),
-        description: agendaAttributeValue(typeData, 3),
-        number: typeof typeData?.title_prefix === "string" ? typeData.title_prefix : undefined,
-        order: typeof record.order === "number" ? record.order : undefined,
-        classification: typeof record.type === "string" ? record.type : undefined,
-        is_heading: typeData?.heading === true,
-        start_date: normalizeDateTime(record.start_date),
-        end_date: normalizeDateTime(record.end_date),
-        documents: documents.length > 0 ? documents : undefined,
-        agenda_items: children.length > 0 ? children : undefined,
-      }];
+      return [
+        {
+          id: agendaId,
+          parent: parentId,
+          title: agendaAttributeValue(typeData, 1),
+          description: agendaAttributeValue(typeData, 3),
+          number: typeof typeData?.title_prefix === "string" ? typeData.title_prefix : undefined,
+          order: typeof record.order === "number" ? record.order : undefined,
+          classification: typeof record.type === "string" ? record.type : undefined,
+          is_heading: typeData?.heading === true,
+          start_date: normalizeDateTime(record.start_date),
+          end_date: normalizeDateTime(record.end_date),
+          documents: documents.length > 0 ? documents : undefined,
+          agenda_items: children.length > 0 ? children : undefined,
+        },
+      ];
     });
 }
 
@@ -197,7 +204,7 @@ function documentClassification(document: Record<string, unknown>): string[] | u
   return values.length > 0 ? values : undefined;
 }
 
-function normalizeDateTime(value: unknown): string | undefined {
+export function normalizeDateTime(value: unknown): string | undefined {
   if (typeof value !== "string" || value.length === 0) {
     return undefined;
   }
@@ -281,7 +288,10 @@ export function normalizeNotubizMeeting(
       typeof gremiumId === "number" || typeof gremiumId === "string"
         ? canonicalCommitteeId(source, gremiumId)
         : undefined,
-    agenda: normalizeNotubizAgendaItems(source, Array.isArray(record.agenda_items) ? record.agenda_items : []),
+    agenda: normalizeNotubizAgendaItems(
+      source,
+      Array.isArray(record.agenda_items) ? record.agenda_items : [],
+    ),
     attachment: collectAttachmentIds(source, record),
     source_info: {
       supplier: "notubiz",

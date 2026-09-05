@@ -1,0 +1,387 @@
+{
+  "items": [
+    {
+      "attachments": {
+        "document": [
+          {
+            "self": "api.notubiz.nl/document/16387622",
+            "url": "https://api.notubiz.nl/document/16387622/1",
+            "title": "Wegenbeheerplan 2026-2030 e250064948",
+            "description": "",
+            "date": "",
+            "case_code": "",
+            "policy_field": "",
+            "category": "",
+            "id": 16387622,
+            "confidential": 0,
+            "publication_date": "2026-09-04",
+            "last_modified": "2026-02-05 11:51:47",
+            "version": 1,
+            "types": [
+              {
+                "id": 64,
+                "value": "Pdf"
+              }
+            ],
+            "versions": [
+              {
+                "type": "file",
+                "mime_type": "application/pdf",
+                "file_name": "Wegenbeheerplan 2026-2030 e250064948.pdf",
+                "file_size": 1630609,
+                "id": 1
+              }
+            ]
+          },
+          {
+            "self": "api.notubiz.nl/document/16504312",
+            "url": "https://api.notubiz.nl/document/16504312/2",
+            "title": "Vraag één-Ermelo informatiememo Wegenbeheerplan",
+            "description": "",
+            "date": "",
+            "case_code": "",
+            "policy_field": "",
+            "category": "",
+            "id": 16504312,
+            "confidential": 0,
+            "publication_date": "2026-09-04",
+            "last_modified": "2026-02-05 11:51:47",
+            "version": 2,
+            "types": [
+              {
+                "id": 64,
+                "value": "Pdf"
+              }
+            ],
+            "versions": [
+              {
+                "type": "file",
+                "mime_type": "application/pdf",
+                "file_name": "Vraag één-Ermelo.pdf",
+                "file_size": 218094,
+                "id": 2
+              },
+              {
+                "type": "file",
+                "mime_type": "application/pdf",
+                "file_name": "Vraag één-Ermelo.pdf",
+                "file_size": 218094,
+                "id": 1
+              }
+            ]
+          },
+          {
+            "self": "api.notubiz.nl/document/16507416",
+            "url": "https://api.notubiz.nl/document/16507416/1",
+            "title": "Vragen Progressief Ermelo informatiememo Wegenbeheerplan",
+            "description": "",
+            "date": "",
+            "case_code": "",
+            "policy_field": "",
+            "category": "",
+            "id": 16507416,
+            "confidential": 0,
+            "publication_date": "2026-09-04",
+            "last_modified": "2026-02-05 11:51:47",
+            "version": 1,
+            "types": [
+              {
+                "id": 64,
+                "value": "Pdf"
+              }
+            ],
+            "versions": [
+              {
+                "type": "file",
+                "mime_type": "application/pdf",
+                "file_name": "Vragen Progressief Ermelo informatiememo Wegenbeheerplan.pdf",
+                "file_size": 352388,
+                "id": 1
+              }
+            ]
+          },
+          {
+            "self": "api.notubiz.nl/document/16508676",
+            "url": "https://api.notubiz.nl/document/16508676/1",
+            "title": "Vragen CDA Informatiememo Wegenbeheerplan",
+            "description": "",
+            "date": "",
+            "case_code": "",
+            "policy_field": "",
+            "category": "",
+            "id": 16508676,
+            "confidential": 0,
+            "publication_date": "2026-09-04",
+            "last_modified": "2026-02-05 11:51:47",
+            "version": 1,
+            "types": [
+              {
+                "id": 64,
+                "value": "Pdf"
+              }
+            ],
+            "versions": [
+              {
+                "type": "file",
+                "mime_type": "application/pdf",
+                "file_name": "Vragen CDA Informatiememo Wegenbeheerplan.pdf",
+                "file_size": 350224,
+                "id": 1
+              }
+            ]
+          },
+          {
+            "self": "api.notubiz.nl/document/16510048",
+            "url": "https://api.notubiz.nl/document/16510048/1",
+            "title": "Beantwoording vragen één-Ermelo, PE, CDA en Fietsersbond",
+            "description": "",
+            "date": "",
+            "case_code": "",
+            "policy_field": "",
+            "category": "",
+            "id": 16510048,
+            "confidential": 0,
+            "publication_date": "2026-09-04",
+            "last_modified": "2026-02-05 11:51:47",
+            "version": 1,
+            "types": [
+              {
+                "id": 64,
+                "value": "Pdf"
+              }
+            ],
+            "versions": [
+              {
+                "type": "file",
+                "mime_type": "application/pdf",
+                "file_name": "Beantwoording vragen één-Ermelo, PE, CDA en Fietsersbond.pdf",
+                "file_size": 142954,
+                "id": 1
+              }
+            ]
+          },
+          {
+            "self": "api.notubiz.nl/document/16510229",
+            "url": "https://api.notubiz.nl/document/16510229/1",
+            "title": "Fietsersbond Inspraak wegenbeheerplan 21 januari 2026",
+            "description": "",
+            "date": "",
+            "case_code": "",
+            "policy_field": "",
+            "category": "",
+            "id": 16510229,
+            "confidential": 0,
+            "publication_date": "2026-09-04",
+            "last_modified": "2026-02-05 11:51:47",
+            "version": 1,
+            "types": [
+              {
+                "id": 64,
+                "value": "Pdf"
+              }
+            ],
+            "versions": [
+              {
+                "type": "file",
+                "mime_type": "application/pdf",
+                "file_name": "Fietsersbond Inspraak wegenbeheerplan 21 januari 2026.pdf",
+                "file_size": 22136,
+                "id": 1
+              }
+            ]
+          },
+          {
+            "self": "api.notubiz.nl/document/16557209",
+            "url": "https://api.notubiz.nl/document/16557209/1",
+            "title": "Antwoord raadsvragen wegenbeheerplan nav beeldvormende avond 21 jan 2026 (1) (2) (1)",
+            "description": "",
+            "date": "",
+            "case_code": "",
+            "policy_field": "",
+            "category": "",
+            "id": 16557209,
+            "confidential": 0,
+            "publication_date": "2026-09-04",
+            "last_modified": "2026-02-05 11:51:47",
+            "version": 1,
+            "types": [
+              {
+                "id": 64,
+                "value": "Pdf"
+              }
+            ],
+            "versions": [
+              {
+                "type": "file",
+                "mime_type": "application/pdf",
+                "file_name": "Antwoord raadsvragen wegenbeheerplan nav beeldvormende avond 21 jan 2026 (1) (2) (1).pdf",
+                "file_size": 75468,
+                "id": 1
+              }
+            ]
+          }
+        ]
+      },
+      "id": 1114629,
+      "creation_date": null,
+      "last_modified": "2026-02-05 11:51:47",
+      "confidential": 0,
+      "body": null,
+      "permission_group": "public",
+      "organisation_id": 1550,
+      "module_id": 1,
+      "attributes": [
+        {
+          "label": "Onderwerp",
+          "id": 1,
+          "datatype": "varchar",
+          "order": 4,
+          "multiple": 0,
+          "visible": "both",
+          "values": [
+            {
+              "meta_data": null,
+              "content": "372-25 Informatiememo Wegenbeheerplan 2026-2030 "
+            }
+          ]
+        },
+        {
+          "label": "Datum vergadering",
+          "id": 15,
+          "datatype": "datetime",
+          "order": 8,
+          "multiple": 0,
+          "visible": "both",
+          "values": [
+            {
+              "meta_data": null,
+              "content": "2025-12-17 00:00:00"
+            }
+          ]
+        },
+        {
+          "label": "Gekoppeld evenement",
+          "id": 54,
+          "datatype": "integer",
+          "order": 11,
+          "multiple": 1,
+          "visible": "detail",
+          "values": [
+            {
+              "meta_data": {
+                "reference_model": "agenda_item",
+                "label": "Lijst ingekomen stukken raad 17 december 2025 (Raadsvergadering  17-12-2025 19:30)"
+              },
+              "content": 9893143
+            },
+            {
+              "meta_data": {
+                "reference_model": "agenda_item",
+                "label": "Informatiememo Wegenbeheerplan 2026-2030 (Raadzaal 07-01-2026 19:00)"
+              },
+              "content": 9895779
+            },
+            {
+              "meta_data": {
+                "reference_model": "agenda_item",
+                "label": "Informatiememo Wegenbeheerplan 2026-2030 (Raadzaal 21-01-2026 19:00)"
+              },
+              "content": 9945254
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "attachments": {
+        "document": [
+          {
+            "self": "api.notubiz.nl/document/16387544",
+            "url": "https://api.notubiz.nl/document/16387544/1",
+            "title": "SOK OMVV 2025 e250048157 (geanonimiseerd)",
+            "description": "",
+            "date": "",
+            "case_code": "",
+            "policy_field": "",
+            "category": "",
+            "id": 16387544,
+            "confidential": 0,
+            "publication_date": "2026-09-04",
+            "last_modified": "2025-12-16 08:30:48",
+            "version": 1,
+            "types": [
+              {
+                "id": 64,
+                "value": "Pdf"
+              }
+            ],
+            "versions": [
+              {
+                "type": "file",
+                "mime_type": "application/pdf",
+                "file_name": "SOK OMVV 2025 e250048157 (geanonimiseerd).pdf",
+                "file_size": 28980424,
+                "id": 1
+              }
+            ]
+          }
+        ]
+      },
+      "id": 1114625,
+      "creation_date": null,
+      "last_modified": "2025-12-16 08:30:48",
+      "confidential": 0,
+      "body": null,
+      "permission_group": "public",
+      "organisation_id": 1550,
+      "module_id": 1,
+      "attributes": [
+        {
+          "label": "Onderwerp",
+          "id": 1,
+          "datatype": "varchar",
+          "order": 4,
+          "multiple": 0,
+          "visible": "both",
+          "values": [
+            {
+              "meta_data": null,
+              "content": "371-25 Informatiememo SOK OMVV "
+            }
+          ]
+        },
+        {
+          "label": "Datum vergadering",
+          "id": 15,
+          "datatype": "datetime",
+          "order": 8,
+          "multiple": 0,
+          "visible": "both",
+          "values": [
+            {
+              "meta_data": null,
+              "content": "2025-12-17 00:00:00"
+            }
+          ]
+        },
+        {
+          "label": "Gekoppeld evenement",
+          "id": 54,
+          "datatype": "integer",
+          "order": 11,
+          "multiple": 1,
+          "visible": "detail",
+          "values": [
+            {
+              "meta_data": {
+                "reference_model": "agenda_item",
+                "label": "Lijst ingekomen stukken raad 17 december 2025 (Raadsvergadering  17-12-2025 19:30)"
+              },
+              "content": 9893143
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
