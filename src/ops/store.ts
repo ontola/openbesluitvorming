@@ -160,6 +160,14 @@ async function getDatabase(): Promise<DatabaseSync> {
         `CREATE INDEX IF NOT EXISTS ingest_run_mode_source_started
          ON ingest_run(execution_mode, source_key, started_at DESC)`,
       );
+      // ingest_run_issue is counted per run on every progress update
+      // (`issue_count = (SELECT COUNT(*) ... WHERE run_id = @id)`). Without an
+      // index that is a scan of the whole table, and the table is large: 2.1M
+      // rows, 774 MB, on 2026-09-05. Measured that day, every worker sat at 100%
+      // CPU reading 500 MB of this table per meeting it imported, and the
+      // register backfill crawled at a few documents a minute. The index took 6
+      // seconds to build on production and the CPU fell to nothing.
+      db.exec(`CREATE INDEX IF NOT EXISTS ingest_run_issue_run ON ingest_run_issue (run_id)`);
       return db;
     })();
   }
