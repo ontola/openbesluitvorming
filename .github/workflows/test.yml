@@ -55,13 +55,21 @@ jobs:
       - name: Check out
         uses: actions/checkout@v5
 
+      # pnpm comes from its own action, not from corepack: corepack downloads
+      # pnpm on every run and that download tripped an undici assertion in
+      # Node 24 ("assert(!this.paused)"), failing the job before a single
+      # test ran. The version is pinned by package.json's packageManager.
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
           node-version: 24
+          cache: pnpm
 
       - name: Install
-        run: corepack enable && pnpm install --frozen-lockfile --config.strict-dep-builds=false
+        run: pnpm install --frozen-lockfile --config.strict-dep-builds=false
 
       - name: Build the front end
         run: pnpm run build:web
