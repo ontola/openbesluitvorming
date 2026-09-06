@@ -28,6 +28,7 @@ import {
   normalizeIbabsRegisterDocuments,
 } from "../ibabs/normalize.ts";
 import { NotubizClient } from "../notubiz/client.ts";
+import { expandPublicMeetingIds } from "../notubiz/assemblies.ts";
 import {
   isMotionModule,
   isRegisterModule,
@@ -123,12 +124,11 @@ async function listNotubiz(
     if (events.length === 0) {
       break;
     }
-    for (const event of events) {
-      const record = event as { id?: unknown; permission_group?: unknown };
-      if (record.permission_group === "public" && typeof record.id === "number") {
-        meetingIds.push(record.id);
-      }
-    }
+    meetingIds.push(
+      ...(await expandPublicMeetingIds(events, client, (assemblyId, error) => {
+        listing.warnings.push(`assembly ${assemblyId}: ${errorText(error)}`);
+      })),
+    );
     if (!response.pagination?.has_more_pages) {
       break;
     }

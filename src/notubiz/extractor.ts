@@ -1,5 +1,6 @@
 import { materializeDocument } from "../documents/process.ts";
 import { NotubizClient } from "./client.ts";
+import { expandPublicMeetingIds } from "./assemblies.ts";
 import { buildEntityCommitEvent } from "../events/entity_commit.ts";
 import { canonicalMeetingId } from "../ids.ts";
 import { normalizeNotubizDocuments, normalizeNotubizMeeting } from "./normalize.ts";
@@ -214,13 +215,22 @@ export class NotubizMeetingExtractor {
           break;
         }
 
-        const publicMeetingIds = events
-          .filter((item): item is Record<string, unknown> =>
-            Boolean(item && typeof item === "object"),
-          )
-          .filter((eventRecord) => eventRecord.permission_group === "public")
-          .map((eventRecord) => eventRecord.id)
-          .filter((meetingId): meetingId is number => typeof meetingId === "number");
+        // Assemblies (raadsplein evenings) list their child meetings only
+        // through their own endpoint; see assemblies.ts for what was lost
+        // while this took the events list at face value.
+        const publicMeetingIds = await expandPublicMeetingIds(
+          events,
+          this.client,
+          async (assemblyId, error) => {
+            const message = error instanceof Error ? error.message : String(error);
+            await registerIssue({
+              severity: "warning",
+              step: "get_meeting",
+              entity_id: canonicalMeetingId(source, assemblyId),
+              message: `Assembly detail failed; its child meetings are skipped: ${message}`,
+            });
+          },
+        );
 
         const pageMeetings = (
           await mapLimit(publicMeetingIds, meetingConcurrency, async (meetingId) => {
