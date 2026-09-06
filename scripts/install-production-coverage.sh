@@ -3,13 +3,19 @@
 # that runs scripts/coverage_check.ts inside the web container and stores the
 # result in the ops database, where /api/status reads it.
 #
-# Usage: DEPLOY_HOST=root@host WOOZI_COVERAGE_DAY=Sun WOOZI_COVERAGE_TIME=05:00 \
+# Usage: DEPLOY_HOST=root@host WOOZI_COVERAGE_DAY=Sun WOOZI_COVERAGE_TIME=08:00 \
 #        bash scripts/install-production-coverage.sh
+#
+# The check shares the iBabs per-address budget with the workers, paced at
+# one worker's share, so it takes hours and must not overlap the nightly
+# imports (00:00 until about 08:00): the first run, at 05:00, pushed the
+# address over budget within minutes and iBabs blocked imports and check
+# alike. Re-run this script after changing the time; a deploy does not.
 set -euo pipefail
 
 DEPLOY_HOST="${DEPLOY_HOST:-root@91.98.32.151}"
 COVERAGE_DAY="${WOOZI_COVERAGE_DAY:-Sun}"
-COVERAGE_TIME="${WOOZI_COVERAGE_TIME:-05:00}"
+COVERAGE_TIME="${WOOZI_COVERAGE_TIME:-08:00}"
 COVERAGE_MONTHS="${WOOZI_COVERAGE_MONTHS:-12}"
 
 ssh "$DEPLOY_HOST" "COVERAGE_DAY='$COVERAGE_DAY' COVERAGE_TIME='$COVERAGE_TIME' COVERAGE_MONTHS='$COVERAGE_MONTHS' bash -s" <<'REMOTE'
