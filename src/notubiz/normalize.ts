@@ -48,8 +48,38 @@ function collectAttachmentIds(
   return [...new Set(result)];
 }
 
-function canonicalDocumentDownloadUrl(documentId: string): string {
-  return `https://api.notubiz.nl/document/${documentId}/1`;
+/** The download URL of the document's current version.
+ *
+ * Notubiz keeps every uploaded version under `document/{id}/{n}`. When a
+ * municipality uploads a new one -- typically an anonymised copy -- the
+ * earlier versions go behind a token and answer 400 "U moet een token
+ * doorgeven", while the new one is public. This always pointed at `/1`, so
+ * for every document revised after publication we handed re-users a dead
+ * link and kept the pre-anonymisation text (#269: 75 of 156 sampled recent
+ * documents). The payload names the current version twice: `url` carries
+ * the full download URL and `version` the number; the first is used when it
+ * is an API download URL, the second otherwise, `/1` only when the payload
+ * says nothing. The version is part of the cache key, so a revised document
+ * is downloaded and extracted again. */
+function canonicalDocumentDownloadUrl(
+  documentId: string,
+  document: Record<string, unknown> = {},
+): string {
+  if (
+    typeof document.url === "string" &&
+    /^https?:\/\/api\.notubiz\.nl\/document\/\d+\/\d+$/.test(document.url.trim())
+  ) {
+    return document.url.trim().replace(/^http:/, "https:");
+  }
+  const version =
+    typeof document.version === "number" &&
+    Number.isInteger(document.version) &&
+    document.version > 0
+      ? document.version
+      : typeof document.version === "string" && /^\d+$/.test(document.version)
+        ? Number(document.version)
+        : 1;
+  return `https://api.notubiz.nl/document/${documentId}/${version}`;
 }
 
 function agendaAttributeValue(
@@ -87,7 +117,7 @@ function normalizeAgendaDocumentLink(
         : (normalizeFileName(document) ?? `Document ${documentId}`),
     file_name: normalizeFileName(document),
     content_type: normalizeContentType(document),
-    original_url: canonicalDocumentDownloadUrl(documentId),
+    original_url: canonicalDocumentDownloadUrl(documentId, document),
   };
 }
 
@@ -341,7 +371,7 @@ export function normalizeNotubizDocuments(
     // The supplier payload sometimes includes municipality-hosted document URLs that return 4xx
     // even though the document metadata itself is valid. Use the stable API download endpoint
     // for retrieval and keep the original source URL only as metadata.
-    original_url: canonicalDocumentDownloadUrl(documentId),
+    original_url: canonicalDocumentDownloadUrl(documentId, document),
     identifier_url:
       typeof document.self === "string"
         ? `https://${document.self.replace(/^https?:\/\//, "")}`

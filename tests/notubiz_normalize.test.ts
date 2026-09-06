@@ -95,3 +95,63 @@ Deno.test("meeting responses without a meeting are described, not swallowed", as
   const empty = describeMeetingResponseError({});
   assert(empty === "no error detail in response", `got ${empty}`);
 });
+
+Deno.test("a revised document downloads as its current version, not as /1", async () => {
+  // #269: Notubiz keeps every version under document/{id}/{n}. Once a
+  // municipality uploads an anonymised copy, /1 goes behind a token and
+  // answers 400; the new version is the public one. The payload says which
+  // version is current, twice.
+  const source = getNotubizSource("haarlem");
+  const attributes = JSON.parse(
+    await Deno.readTextFile(new URL("./fixtures/notubiz_haarlem_attributes.json", import.meta.url)),
+  ) as NotubizOrganizationAttributes;
+  const rawMeeting = JSON.parse(
+    await Deno.readTextFile(new URL("./fixtures/notubiz_haarlem_meeting.json", import.meta.url)),
+  );
+
+  const revised: Record<string, unknown>[] = [];
+  const walk = (node: unknown) => {
+    if (Array.isArray(node)) {
+      node.forEach(walk);
+    } else if (node && typeof node === "object") {
+      const record = node as Record<string, unknown>;
+      if (Array.isArray(record.versions) && typeof record.id === "number") {
+        revised.push(record);
+      }
+      Object.values(record).forEach(walk);
+    }
+  };
+  walk(rawMeeting);
+  assert(revised.length === 2, "the fixture carries two documents");
+
+  // Document 42, as the live API shapes a thrice-uploaded document: url and
+  // version both name /3, versions listed newest first.
+  revised[0].version = 3;
+  revised[0].url = "https://api.notubiz.nl/document/42/3";
+  revised[0].versions = [{ id: 3 }, { id: 2 }, { id: 1 }].map((item) => ({
+    ...item,
+    mime_type: "application/pdf",
+    file_name: "memo-participatie-geanonimiseerd.pdf",
+  }));
+  // Document 43: only the version number, no url.
+  revised[1].version = 2;
+  delete revised[1].url;
+
+  const meeting = normalizeNotubizMeeting(source, attributes, rawMeeting);
+  const documents = normalizeNotubizDocuments(source, meeting);
+  const byId = new Map(documents.map((document) => [document.id, document]));
+  assert(
+    byId.get("document:notubiz:gemeente:haarlem:42")?.original_url ===
+      "https://api.notubiz.nl/document/42/3",
+    "the payload's url names the current version",
+  );
+  assert(
+    byId.get("document:notubiz:gemeente:haarlem:43")?.original_url ===
+      "https://api.notubiz.nl/document/43/2",
+    "without a url the version number does",
+  );
+  assert(
+    meeting.agenda?.[0]?.documents?.every((link) => !link.original_url?.endsWith("/1")) ?? true,
+    "agenda document links follow the same rule",
+  );
+});
