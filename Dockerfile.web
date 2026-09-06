@@ -5,7 +5,8 @@ WORKDIR /app
 ENV PNPM_CONFIG_STRICT_DEP_BUILDS=false
 
 COPY package.json pnpm-lock.yaml* ./
-RUN corepack enable && pnpm install --frozen-lockfile --config.strict-dep-builds=false
+# Pinned pnpm from npm rather than corepack: see .github/workflows/test.yml.
+RUN npm install -g pnpm@11.7.0 && pnpm install --frozen-lockfile --config.strict-dep-builds=false
 
 COPY tsconfig.json vite.config.ts ./
 COPY web ./web

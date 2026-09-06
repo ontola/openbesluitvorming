@@ -2,6 +2,7 @@
   "name": "woozi",
   "private": true,
   "type": "module",
+  "packageManager": "pnpm@11.7.0",
   "scripts": {
     "web": "pnpm run build:web && deno run -A web/server.ts",
     "serve:web": "deno run -A web/server.ts",
