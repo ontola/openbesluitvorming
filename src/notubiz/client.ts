@@ -292,6 +292,13 @@ export class NotubizClient {
     return await fetchJson(buildUrl(`events/meetings/${meetingId}`));
   }
 
+  /** An assembly is an evening with several meetings under it (Castricum's
+   * raadsplein: carrousels, commissies, raad). The events list carries the
+   * assembly, not its meetings; only this endpoint names them. */
+  async getAssembly(assemblyId: number): Promise<unknown> {
+    return await fetchJson(buildUrl(`events/assemblies/${assemblyId}`));
+  }
+
   /** Registries configured for an organisation (Moties, Toezeggingen, …). */
   async listModules(organizationId: number): Promise<NotubizModule[]> {
     const data = await fetchJson<{ modules?: NotubizModule[] }>(
