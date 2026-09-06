@@ -143,6 +143,11 @@ async function getDatabase(): Promise<DatabaseSync> {
         // Column already exists on initialized databases.
       }
       try {
+        db.exec("ALTER TABLE ingest_run ADD COLUMN claimed_at TEXT");
+      } catch {
+        // Column already exists on initialized databases.
+      }
+      try {
         db.exec("ALTER TABLE ingest_run ADD COLUMN motion_count INTEGER NOT NULL DEFAULT 0");
       } catch {
         // Column already exists on initialized databases.
@@ -490,8 +495,15 @@ const MAX_INTERRUPTED_REQUEUES = 5;
  * two worker replicas restarting seconds apart (a deploy), the second one to
  * boot would otherwise requeue rows its sibling just claimed, and the same
  * run ends up executing twice concurrently (seen July 2026: duplicate
- * failures and phantom stalls for the same run id). Genuinely interrupted
- * rows carry a started_at from before the restart, well past this margin. */
+ * failures and phantom stalls for the same run id).
+ *
+ * The age is that of the claim, `claimed_at`, not of the row. `started_at` is
+ * set when the run is enqueued, and a backfill chunk can sit in the queue for
+ * hours before a worker takes it; judged by `started_at` such a claim looked
+ * ancient the moment it was made. Seen 2026-09-05: after a restart three of
+ * four workers each requeued and re-claimed the same eight runs within one
+ * second, and executed them in triplicate for an hour. Rows claimed before
+ * this column existed carry no `claimed_at` and fall back to `started_at`. */
 const RECONCILE_MIN_CLAIM_AGE_MS = 120_000;
 
 export async function reconcileInterruptedRuns(): Promise<IngestRunRecord[]> {
@@ -505,7 +517,7 @@ export async function reconcileInterruptedRuns(): Promise<IngestRunRecord[]> {
         started_at, finished_at, meeting_count, document_count, cache_hits, downloaded_count, motion_count, recording_count,
         issue_count, quickwit_index_id, error_message, interrupted_count
        FROM ingest_run
-       WHERE status = 'running' AND started_at < ?
+       WHERE status = 'running' AND COALESCE(claimed_at, started_at) < ?
        ORDER BY started_at ASC`,
     )
     .all(claimedBefore) as unknown as (RunRow & { interrupted_count: number | null })[];
@@ -613,19 +625,23 @@ export async function reconcileInterruptedRuns(): Promise<IngestRunRecord[]> {
 // Atomically move a queued run to "running". Multiple workers can race on
 // the same queued id; only one succeeds. The loser gets null and must try
 // another run. Requires SQLite >= 3.35 for UPDATE ... RETURNING.
+/** Take a queued run for this process. Atomic: the status guard in the
+ * UPDATE means at most one caller gets the row back. The claim is stamped so
+ * a sibling's startup reconcile can tell a run that is being worked on from
+ * one whose worker died (see RECONCILE_MIN_CLAIM_AGE_MS). */
 export async function claimQueuedRun(runId: string): Promise<IngestRunRecord | null> {
   const db = await getDatabase();
   const row = db
     .prepare(
       `UPDATE ingest_run
-       SET status = 'running', error_message = NULL
+       SET status = 'running', error_message = NULL, claimed_at = @claimed_at
        WHERE id = @id AND status = 'queued'
        RETURNING id, source_key, supplier, date_from, date_to, trigger_mode as trigger,
          execution_mode, parent_run_id, projection_version, derivation_version, status,
          started_at, finished_at, meeting_count, document_count, cache_hits, motion_count,
          recording_count, downloaded_count, issue_count, quickwit_index_id, error_message`,
     )
-    .get({ id: runId }) as IngestRunRecord | undefined;
+    .get({ id: runId, claimed_at: new Date().toISOString() }) as IngestRunRecord | undefined;
   return row ? normalizeRunRecord(row) : null;
 }
 
