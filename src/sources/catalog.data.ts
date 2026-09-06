@@ -4167,6 +4167,22 @@ export const sourceCatalog = [
     implemented: true,
   },
   {
+    sourceRef: "notubiz:gemeente:uitgeest",
+    key: "uitgeest",
+    label: "Uitgeest",
+    sourceName: "Uitgeest",
+    supplier: "notubiz",
+    organizationType: "gemeente",
+    allmanakId: 26536,
+    cbsId: "GM0450",
+    notubizOrganizationId: 2127,
+    // Not in the ORI inventory: added 2026-09-06 on request (#256), the
+    // fourth BUCH municipality next to Bergen, Castricum and Heiloo.
+    legacyConfigFile: "ori.notubiz.yaml",
+    legacyConfigRoot: "ori.notubiz",
+    implemented: true,
+  },
+  {
     sourceRef: "notubiz:gemeente:veendam",
     key: "veendam",
     label: "Veendam",
