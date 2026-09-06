@@ -31,7 +31,7 @@
 // transfer as-is):
 //   - iBabs (PublicDownloadURL, same publicdownload.aspx endpoint as ori3):
 //     HTTP 403 or 404 = gone. HTTP 200 = live. Anything else = unknown.
-//   - Notubiz (canonicalDocumentDownloadUrl, api.notubiz.nl/document/{id}/1):
+//   - Notubiz (canonicalDocumentDownloadUrl, api.notubiz.nl/document/{id}/{version}):
 //     HTTP 400 with an XML body containing "<error_code>" = gone (observed
 //     message: "Document kan niet gedownload worden"). HTTP 200 = live.
 //     Anything else (including a bare 404, which this endpoint does not use)
@@ -185,7 +185,12 @@ async function runSweep(supplier: string, limit: number): Promise<void> {
   const batch: DocumentHit[] = [];
   let offset = startOffset;
   while (batch.length < limit) {
-    const page = await fetchBatch(quickwit, supplier, offset, Math.min(QUICKWIT_PAGE_SIZE, limit - batch.length));
+    const page = await fetchBatch(
+      quickwit,
+      supplier,
+      offset,
+      Math.min(QUICKWIT_PAGE_SIZE, limit - batch.length),
+    );
     if (page.length === 0) {
       break;
     }
@@ -197,7 +202,9 @@ async function runSweep(supplier: string, limit: number): Promise<void> {
   }
 
   if (batch.length === 0) {
-    console.log(`no more ${supplier} documents after offset ${startOffset} -- wrapping cursor to 0`);
+    console.log(
+      `no more ${supplier} documents after offset ${startOffset} -- wrapping cursor to 0`,
+    );
     await setRevalidationCursor(supplier, 0);
     return;
   }
@@ -248,13 +255,7 @@ async function runSweep(supplier: string, limit: number): Promise<void> {
   }
 
   for (const { hit, status } of toRecord) {
-    await recordRevalidationResult(
-      hit.entityId,
-      supplier,
-      hit.sourceKey,
-      status,
-      hit.url ?? null,
-    );
+    await recordRevalidationResult(hit.entityId, supplier, hit.sourceKey, status, hit.url ?? null);
   }
 
   await setRevalidationCursor(supplier, offset);
