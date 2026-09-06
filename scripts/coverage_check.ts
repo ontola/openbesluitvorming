@@ -16,12 +16,21 @@
  *
  * Runs weekly on production from a systemd timer
  * (scripts/install-production-coverage.sh). It shares the suppliers' request
- * budgets with the nightly import -- iBabs is paced by the same fleet-wide
- * limiter -- which is why it runs on a quiet morning and one source at a
- * time.
+ * budgets with the import workers: iBabs is paced by the same per-address
+ * limiter, and this process takes one worker's share of it (the compose
+ * file gives the web container the same WOOZI_IBABS_* settings as the
+ * workers), which is why it runs one source at a time, after the nightly
+ * imports are done, and takes hours.
+ *
+ * When iBabs' edge nonetheless answers 403 "The request is blocked", the
+ * check waits and tries the source once more before recording it as
+ * failed. The first run (2026-09-06, unpaced) saw that block lift within
+ * minutes of the burst stopping; a block that outlasts the wait is the
+ * address-level kind and a person has to deal with it.
  */
 import { parseArgs } from "node:util";
 import { compareCoverage, listSupplierDocuments } from "../src/coverage/check.ts";
+import { IbabsBlockedError } from "../src/ibabs/client.ts";
 import { getExportLog } from "../src/exports/log.ts";
 import { recordCoverageCheck } from "../src/ops/store.ts";
 import { listRunnableCatalogSources, listSources } from "../src/sources/index.ts";
@@ -71,13 +80,38 @@ console.log(
   }`,
 );
 
+/** How long to stay off iBabs after its edge blocks a request, before the
+ * source is listed once more. */
+const BLOCKED_RETRY_DELAY_MS = Number(
+  Deno.env.get("WOOZI_COVERAGE_BLOCKED_RETRY_MS") ?? 5 * 60_000,
+);
+
+async function listWithOneRetryWhenBlocked(
+  source: (typeof sources)[number],
+): Promise<Awaited<ReturnType<typeof listSupplierDocuments>>> {
+  try {
+    return await listSupplierDocuments(source, windowFrom, windowTo);
+  } catch (error) {
+    if (!(error instanceof IbabsBlockedError)) {
+      throw error;
+    }
+    console.log(
+      `${source.key.padEnd(26)} blocked by iBabs' edge; waiting ${Math.round(
+        BLOCKED_RETRY_DELAY_MS / 1000,
+      )}s before one more attempt`,
+    );
+    await new Promise((resolve) => setTimeout(resolve, BLOCKED_RETRY_DELAY_MS));
+    return await listSupplierDocuments(source, windowFrom, windowTo);
+  }
+}
+
 let checked = 0;
 let failed = 0;
 for (const source of sources) {
   const started = performance.now();
   const checkedAt = new Date().toISOString();
   try {
-    const listing = await listSupplierDocuments(source, windowFrom, windowTo);
+    const listing = await listWithOneRetryWhenBlocked(source);
     const held = exportLog.listEntityIds(source.key, "document:");
     const comparison = compareCoverage(listing.documentIds, held);
     const ratio =

@@ -96,6 +96,19 @@ services:
       S3_STORAGE_REGION: ${S3_STORAGE_REGION}
       WOOZI_EXTRACTION_SERVICE_URL: ${WOOZI_EXTRACTION_SERVICE_URL:-}
       WOOZI_SCHEDULER_ENABLED: ${WOOZI_SCHEDULER_ENABLED:-1}
+      # The weekly coverage check (scripts/coverage_check.ts) runs in this
+      # container and talks to iBabs from the same address as the workers.
+      # Without these it paced itself as if it were alone on the address
+      # (2026-09-06: iBabs' edge answered 403 "The request is blocked" within
+      # minutes, to the check and to the backfill workers alike). Same values
+      # as the worker service: this process takes one worker's share and
+      # trips the same breaker file.
+      WOOZI_IBABS_WORKERS: ${WOOZI_WORKER_REPLICAS:-1}
+      WOOZI_IBABS_SOAP_PER_MINUTE: ${WOOZI_IBABS_SOAP_PER_MINUTE:-180}
+      WOOZI_IBABS_DOWNLOAD_PER_MINUTE: ${WOOZI_IBABS_DOWNLOAD_PER_MINUTE:-30}
+      WOOZI_IBABS_COOLDOWN_MS: ${WOOZI_IBABS_COOLDOWN_MS:-60000}
+      WOOZI_IBABS_THROTTLE_BASE_MS: ${WOOZI_IBABS_THROTTLE_BASE_MS:-3000}
+      WOOZI_IBABS_BREAKER_PATH: /data/ibabs-breaker.json
       OTEL_DENO: ${OTEL_DENO:-true}
       OTEL_SERVICE_NAME: woozi-web
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
