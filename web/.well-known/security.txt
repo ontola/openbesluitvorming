@@ -1,0 +1,8 @@
+# Security contact for openbesluitvorming.nl (RFC 9116).
+# Found a vulnerability, or personal data that should not be public?
+# Mail us, or open a private security advisory on GitHub.
+Contact: mailto:joep@ontola.io
+Contact: https://github.com/ontola/openbesluitvorming/security/advisories/new
+Expires: 2027-09-06T00:00:00.000Z
+Preferred-Languages: nl, en
+Canonical: https://openbesluitvorming.nl/.well-known/security.txt

@@ -1979,13 +1979,25 @@
               </label>
 
               <label class="search-field search-field--subtle search-field--compact">
-                <span class="sr-only">Van datum</span>
-                <input bind:value={dateFrom} name="dateFrom" type="date" on:change={onFilterChange} />
+                <span class="sr-only">Vanaf vergaderdatum</span>
+                <input
+                  bind:value={dateFrom}
+                  name="dateFrom"
+                  type="date"
+                  title="Vanaf deze vergaderdatum"
+                  on:change={onFilterChange}
+                />
               </label>
 
               <label class="search-field search-field--subtle search-field--compact">
-                <span class="sr-only">Tot datum</span>
-                <input bind:value={dateTo} name="dateTo" type="date" on:change={onFilterChange} />
+                <span class="sr-only">Tot en met vergaderdatum</span>
+                <input
+                  bind:value={dateTo}
+                  name="dateTo"
+                  type="date"
+                  title="Tot en met deze vergaderdatum"
+                  on:change={onFilterChange}
+                />
               </label>
 
               <label class="select-field select-field--subtle select-field--compact">
