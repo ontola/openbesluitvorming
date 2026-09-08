@@ -10,16 +10,16 @@ https://openbesluitvorming.nl
 
 ## Endpoints overview
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/search` | GET | Search meetings, documents, motions and spoken word (recommended) |
-| `/api/stats` | GET | Index statistics (document count, organization count) |
-| `/api/sources` | GET | List available data sources |
-| `/api/status` | GET | Import freshness per organization and per source system, in one call |
-| `/api/entities/{entity_id}` | GET | Full entity detail (text, agenda, motions with votes, recordings with transcript, download URL) |
-| `/api/entities/{entity_id}/pdf/page/{n}` | GET | Rendered PDF page as JPEG image |
-| `/api/export/snapshot` | GET | Bulk export: current state per source (NDJSON) |
-| `/api/export/changes` | GET | Bulk export: change feed per source (NDJSON) |
+| Endpoint | Method | Description | Try it |
+|----------|--------|-------------|--------|
+| [`/api/search`](#search) | GET | Search meetings, documents, motions and spoken word (recommended) | [begroting in Soest](https://openbesluitvorming.nl/api/search?query=begroting&organization=soest&limit=5) |
+| [`/api/stats`](#index-statistics) | GET | Index statistics (document count, organization count) | [live](https://openbesluitvorming.nl/api/stats) |
+| [`/api/sources`](#sources) | GET | List available data sources | [live](https://openbesluitvorming.nl/api/sources) |
+| [`/api/status`](#status) | GET | Import freshness per organization and per source system, in one call | [live](https://openbesluitvorming.nl/api/status) |
+| [`/api/entities/{entity_id}`](#entity-detail) | GET | Full entity detail (text, agenda, motions with votes, recordings with transcript, download URL) | |
+| [`/api/entities/{entity_id}/pdf/page/{n}`](#pdf-page-rendering) | GET | Rendered PDF page as JPEG image | |
+| [`/api/export/snapshot`](#bulk-export) | GET | Bulk export: current state per source (NDJSON) | |
+| [`/api/export/changes`](#bulk-export) | GET | Bulk export: change feed per source (NDJSON) | |
 
 No authentication is required. All endpoints are read-only.
 
@@ -178,8 +178,8 @@ The recommended search endpoint. Returns grouped, deduplicated results with docu
 | `organization` | string | Filter by source key (e.g. `soest`, `amsterdam`). Case-sensitive; an unknown key returns `400`. See [`/api/sources`](#sources). |
 | `entityType` | string | Filter by type: `Meeting`, `Document`, `Motion` or `Recording` (spoken word; matches resolve to their meeting). Case-sensitive; any other value returns `400`. |
 | `sort` | string | Sort order: `date_desc` (default), `date_asc`, `title_asc` or `relevance`. Any other value returns `400`. `title_asc` orders the fetched window rather than the whole result set. |
-| `dateFrom` | string | Start date filter, `YYYY-MM-DD` only (e.g. `2024-01-01`). A value that is not a calendar date returns `400`; a time or time zone on the end is not accepted. |
-| `dateTo` | string | End date filter, same format. Inclusive of the whole day. |
+| `dateFrom` | string | Earliest date, `YYYY-MM-DD` only (e.g. `2024-01-01`), inclusive. Filters on the result's `sortDate`, see [What the date is](#what-the-date-is). A value that is not a calendar date returns `400`; a time or time zone on the end is not accepted. |
+| `dateTo` | string | Latest date, same format, **inclusive of the whole day**: `dateFrom=2026-01-01&dateTo=2026-01-01` returns everything dated 1 January 2026, not nothing. It is a "tot en met", not a "tot". |
 | `offset` | integer | Pagination offset (default: 0). Must be zero or greater. |
 | `limit` | integer | Results per page (default: 24, minimum 1, values above 100 are capped at 100). |
 
@@ -221,6 +221,23 @@ curl "https://openbesluitvorming.nl/api/search?query=begroting&organization=soes
 ```
 
 ---
+
+### What the date is
+
+Every result carries one date, `sortDate` (also rendered as `date`), and that
+is what `dateFrom`, `dateTo` and the date sort orders use. Which date it is
+depends on the type of result:
+
+| Type | `sortDate` is |
+|------|---------------|
+| Meeting | The meeting's start, as scheduled by the organization |
+| Document | The start of the meeting at which the document was (last) discussed. A document that hangs off no meeting, such as a register entry (ingekomen stukken, raadsvragen), gets the date the source system last modified it |
+| Motion | The meeting at which the motion was last discussed, else the date the source system gives it |
+| Recording | The start of the meeting it records |
+
+It is never the date a document was written or published by its author: the
+source systems do not expose that reliably. The value is a UTC timestamp; the
+underlying local time is Dutch time (CET/CEST).
 
 ## Index statistics
 
