@@ -39,17 +39,44 @@ jobs:
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
 
+      # Serializing deploys does not order them by commit: when two image
+      # builds finish close together, whichever deploy queues last runs last,
+      # and twice on 2026-09-06/08 that was the older image, overwriting the
+      # newer one a minute after it landed. A deploy whose commit is no
+      # longer the head of main has been superseded and steps aside. The
+      # trade-off: if the newer commit's image build failed, nothing deploys
+      # until that build is fixed or re-run, which is the right default for
+      # a production host.
+      - name: Step aside when main has moved on
+        id: gate
+        env:
+          THIS_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          main_head=$(git ls-remote --quiet "https://github.com/${{ github.repository }}.git" refs/heads/main | cut -f1)
+          if [ -z "$main_head" ]; then
+            echo "could not read main's head; deploying anyway" >&2
+            echo "deploy=yes" >> "$GITHUB_OUTPUT"
+          elif [ "$main_head" != "$THIS_SHA" ]; then
+            echo "main is at ${main_head:0:7}; this image is ${THIS_SHA:0:7} and has been superseded, not deploying"
+            echo "deploy=no" >> "$GITHUB_OUTPUT"
+          else
+            echo "deploy=yes" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Set up SSH agent
+        if: steps.gate.outputs.deploy == 'yes'
         uses: webfactory/ssh-agent@v0.9.1
         with:
           ssh-private-key: ${{ secrets.BETA_DEPLOY_SSH_KEY }}
 
       - name: Trust production host key
+        if: steps.gate.outputs.deploy == 'yes'
         run: |
           mkdir -p ~/.ssh
           ssh-keyscan -H 91.98.32.151 >> ~/.ssh/known_hosts
 
       - name: Deploy published image to production
+        if: steps.gate.outputs.deploy == 'yes'
         env:
           DEPLOY_REF: ${{ github.event.workflow_run.head_sha }}
           IMAGE_REPOSITORY: ghcr.io/${{ github.event.workflow_run.repository.owner.login }}/openbesluitvorming
