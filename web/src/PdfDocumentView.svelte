@@ -49,6 +49,11 @@
   }
 
   function pageLookahead(centerPage: number): number[] {
+    if (pageCount === 0) {
+      // The first response tells us how long the document is; asking for
+      // pages beyond it before then is a 404 for every page past the end.
+      return [Math.max(1, centerPage)];
+    }
     const bounded = Math.max(1, pageCount > 0 ? Math.min(pageCount, centerPage) : centerPage);
     const start = Math.max(1, bounded - PAGE_FETCH_BEHIND);
     const end = pageCount > 0 ? Math.min(pageCount, bounded + PAGE_FETCH_AHEAD) : bounded + PAGE_FETCH_AHEAD;

@@ -3656,3 +3656,26 @@ select {
     background-position: -20% 0;
   }
 }
+
+/* iOS WebKit only (the feature query matches nothing else). Opening a
+   document there killed the tab with WebKit's "Kan deze pagina niet openen"
+   page (#281): a three-page PDF, page images of 816x1056, no script error and
+   no request loop in Chromium -- a renderer that ran out of memory, not a bug
+   in what it was asked to do. The two screen-sized blurred layers are the
+   heaviest thing on that screen: the reader's backdrop blurs the whole
+   results list underneath, and the hero surface blurs behind that again.
+   Large backdrop-filter layers over scrolling content are a known way to push
+   iOS's per-tab GPU memory over its limit. Trade the blur for a slightly
+   denser tint on iOS; the small page-jump pill keeps its blur, it is a few
+   hundred pixels. */
+@supports (-webkit-touch-callout: none) {
+  .detail-overlay__backdrop {
+    backdrop-filter: none;
+    background: rgba(17, 32, 61, 0.6);
+  }
+
+  .hero::after {
+    backdrop-filter: none;
+    background: rgba(246, 248, 251, 0.96);
+  }
+}
