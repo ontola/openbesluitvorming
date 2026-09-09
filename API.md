@@ -113,6 +113,7 @@ added as needed; an existing one is not renamed or removed without a note here.
 | `invalid_offset` | 400 | `offset` is not an integer, or is negative |
 | `unsupported_phrase_slop` | 400 | `query` uses the proximity notation `"a b"~10` |
 | `invalid_page_number` | 400 | the page number in a PDF page URL is not a positive integer |
+| `invalid_scale` | 400 | `scale` on a PDF page URL is not `1` or `2` |
 | `missing_export_source` | 400 | an export call omitted `source` |
 | `unknown_export_source` | 400 | an export call named a source that does not exist |
 | `invalid_export_cursor` | 400 | `cursor` was not produced by an earlier export response |
@@ -520,6 +521,8 @@ source publishes them. See [voting data](#use-case-voting-data) and
 ## PDF page rendering
 
 ### `GET /api/entities/{entity_id}/pdf/page/{page_number}`
+
+Optional `scale=2` renders the page at 192 dpi instead of 96, for screens with two or more device pixels per CSS pixel; any other value is a `400`.
 
 Returns a rendered page of a PDF document as a JPEG image. Pages are rendered at 96 DPI and cached permanently.
 

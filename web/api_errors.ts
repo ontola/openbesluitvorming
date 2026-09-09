@@ -25,6 +25,7 @@ export const API_ERROR_CODES = [
   "invalid_offset",
   "unsupported_phrase_slop",
   "invalid_page_number",
+  "invalid_scale",
   "missing_export_source",
   "unknown_export_source",
   "invalid_export_cursor",
