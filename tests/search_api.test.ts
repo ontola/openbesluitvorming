@@ -1275,3 +1275,28 @@ Deno.test("an estimate is rounded to three significant figures", async () => {
   assert(roundEstimate(1_234) === 1_230, "1,234 -> 1,230");
   assert(roundEstimate(999) === 999, "under a thousand stays exact");
 });
+
+Deno.test("naming an organization in the query also matches on its source", async () => {
+  // #284: "amersfoort uitnodiging platformbijeenkomst water verbindt" found
+  // nothing while the other four words found the document; Amersfoort is
+  // metadata, not text.
+  const { buildSearchClause } = await import("../web/search_api.ts");
+  const single = buildSearchClause("amersfoort uitnodiging platformbijeenkomst");
+  assert(
+    single === '((amersfoort OR source_key:"amersfoort") AND uitnodiging AND platformbijeenkomst)',
+    `a single-word municipality widens to its source, got ${single}`,
+  );
+  const double = buildSearchClause("west betuwe begroting");
+  assert(
+    double === '(((west AND betuwe) OR source_key:"west_betuwe") AND begroting)',
+    `a two-word label is one source, longest run first, got ${double}`,
+  );
+  assert(
+    buildSearchClause("bergen begroting").includes('source_key:"bergen"'),
+    "a label shared by two sources maps to both",
+  );
+  assert(
+    buildSearchClause("woningbouw") === "woningbouw",
+    "a word that names no organization is left alone",
+  );
+});

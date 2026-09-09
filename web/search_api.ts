@@ -265,7 +265,81 @@ export function queryHasPhrase(text: string): boolean {
  * Without positions in the index a phrase is refused outright rather than
  * approximated, so on a v2 projection the quotes are dropped and the words are
  * searched loose — the behaviour this replaces. */
-function buildSearchClause(text: string): string {
+/** Organization names as a reader types them, mapped to source keys.
+ *
+ * "amersfoort uitnodiging platformbijeenkomst" found nothing while the
+ * three other words found the document, because the word Amersfoort is
+ * nowhere in it: the organization is metadata, not text (#284). A reader
+ * naming a municipality in the search box means "from there", so a run of
+ * bare terms that spells a catalog label or key also matches on
+ * `source_key`. Keys are per source; a label shared by two sources (Bergen)
+ * maps to both. Built once, on first use; the catalog does not change while
+ * the server runs. */
+let organizationTermIndex: Map<string, string[]> | null = null;
+const ORGANIZATION_TERM_MAX_WORDS = 4;
+
+function organizationTerms(): Map<string, string[]> {
+  if (organizationTermIndex) {
+    return organizationTermIndex;
+  }
+  const index = new Map<string, string[]>();
+  const add = (spelling: string, key: string) => {
+    const tokens = tokenizeQueryText(spelling);
+    if (tokens.length === 0 || tokens.length > ORGANIZATION_TERM_MAX_WORDS) {
+      return;
+    }
+    const joined = tokens.join(" ");
+    const keys = index.get(joined) ?? [];
+    if (!keys.includes(key)) {
+      keys.push(key);
+    }
+    index.set(joined, keys);
+  };
+  for (const source of listSources()) {
+    add(source.key, source.key);
+    if (source.label) {
+      add(source.label, source.key);
+    }
+  }
+  organizationTermIndex = index;
+  return index;
+}
+
+/** Bare terms, with each run that names an organization widened to "the
+ * words, or the source". Longest run first, so "west betuwe" is one source
+ * and not the word "west" plus a source called Betuwe. */
+export function organizationAwareTerms(tokens: string[]): string[] {
+  const index = organizationTerms();
+  const clauses: string[] = [];
+  let position = 0;
+  while (position < tokens.length) {
+    let matched = false;
+    for (
+      let length = Math.min(ORGANIZATION_TERM_MAX_WORDS, tokens.length - position);
+      length >= 1;
+      length -= 1
+    ) {
+      const run = tokens.slice(position, position + length);
+      const keys = index.get(run.join(" "));
+      if (!keys) {
+        continue;
+      }
+      const words = run.length === 1 ? run[0] : `(${run.join(" AND ")})`;
+      const sources = keys.map((key) => `source_key:${escapeTerm(key)}`).join(" OR ");
+      clauses.push(`(${words} OR ${sources})`);
+      position += length;
+      matched = true;
+      break;
+    }
+    if (!matched) {
+      clauses.push(tokens[position]);
+      position += 1;
+    }
+  }
+  return clauses;
+}
+
+export function buildSearchClause(text: string): string {
   const { phrases, rest } = splitQuotedPhrases(text);
   const clauses: string[] = [];
 
@@ -287,7 +361,7 @@ function buildSearchClause(text: string): string {
     clauses.push(`(${PHRASE_FIELDS.map((field) => `${field}:${quoted}`).join(" OR ")})`);
   }
 
-  clauses.push(...tokenizeQueryText(rest));
+  clauses.push(...organizationAwareTerms(tokenizeQueryText(rest)));
 
   if (clauses.length === 0) {
     return text.trim() ? MATCHES_NOTHING : "";
