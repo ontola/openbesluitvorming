@@ -57,7 +57,7 @@ Deno.test("every catalog source is reported, including ones we never import", ()
   const response = build({});
 
   // The catalog: 329 ORI sources plus Uitgeest (#256).
-  assertEquals(response.sources.length, 331, "the whole catalog should be one call");
+  assertEquals(response.sources.length, 392, "the whole catalog should be one call");
   // Dongen is withdrawn from importing but its data still answers searches.
   assertEquals(
     source(response, "dongen").state,
@@ -244,7 +244,7 @@ Deno.test("index activity is merged per source and is optional", () => {
   );
   assertEquals(
     withoutActivity.sources.length,
-    331,
+    392,
     "and the import half of the answer still arrives",
   );
 });
