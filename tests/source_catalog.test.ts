@@ -22,8 +22,9 @@ Deno.test("source catalog includes the full ORI inventory with unique source ref
   const refs = new Set(sources.map((source) => source.sourceRef));
   const keys = new Set(sources.map((source) => source.key));
 
-  // The ORI inventory (329) plus what was added since: Uitgeest (#256).
-  assert(sources.length === 331, "expected the full ORI source inventory plus later additions");
+  // The ORI inventory (329) plus what was added since: Uitgeest (#256) and the
+  // 61 organizations of #277.
+  assert(sources.length === 392, "expected the full ORI source inventory plus later additions");
   assert(refs.size === sources.length, "sourceRef must be unique across all imported ORI sources");
   assert(keys.size === sources.length, "key must be globally unique across the source catalog");
   assert(
@@ -61,7 +62,7 @@ Deno.test("implemented catalog sources only use Woozi-supported suppliers", () =
     .map((source) => source.key)
     .sort();
   assert(
-    JSON.stringify(disabled) === JSON.stringify(["dongen"]),
+    JSON.stringify(disabled) === JSON.stringify(["dongen", "zoeterwoude"]),
     `unexpected set of disabled sources: ${JSON.stringify(disabled)}`,
   );
   for (const source of sources) {
