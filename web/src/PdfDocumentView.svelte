@@ -16,7 +16,13 @@
 
   const PAGE_FETCH_BEHIND = 1;
   const PAGE_FETCH_AHEAD = 2;
-  const PAGE_CACHE_BUFFER = 24;
+  // Pages kept decoded on either side of the one being read. A 192 dpi page
+  // decodes to about 14 MB; two dozen of those on each side is what gets a
+  // phone's tab killed, and a reader rarely jumps more than a few pages.
+  const PAGE_CACHE_BUFFER = 6;
+  // A phone shows the page at two or three device pixels per CSS pixel; the
+  // 96 dpi rendering that suits a laptop is mush there once zoomed (#286).
+  const PAGE_SCALE = typeof window !== "undefined" && window.devicePixelRatio >= 1.5 ? 2 : 1;
   const DEFAULT_PAGE_ASPECT_RATIO = 1 / 1.414;
 
   let containerEl: HTMLDivElement | null = null;
@@ -40,7 +46,7 @@
   }
 
   function pageImageUrl(pageNumber: number): string {
-    return `${url}/page/${pageNumber}`;
+    return PAGE_SCALE === 1 ? `${url}/page/${pageNumber}` : `${url}/page/${pageNumber}?scale=${PAGE_SCALE}`;
   }
 
   function applyDocumentPageAspectRatio(ratio: number): void {

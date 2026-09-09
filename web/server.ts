@@ -30,7 +30,12 @@ import {
   startStatsRefreshLoop,
 } from "./search_api.ts";
 import { ObjectStorageClient } from "../src/storage/s3.ts";
-import { pdfPageCacheKey, pdfPageMetaKey, renderPdfPageJpeg } from "../src/documents/thumbnails.ts";
+import {
+  parsePdfPageScale,
+  pdfPageCacheKey,
+  pdfPageMetaKey,
+  renderPdfPageJpeg,
+} from "../src/documents/thumbnails.ts";
 import { getStatus } from "./status_api.ts";
 import { RATE_LIMIT_PAGE_UNIT, RateLimiter, type RateVerdict, requestCost } from "./rate_limit.ts";
 import { apiError } from "./api_errors.ts";
@@ -299,9 +304,7 @@ async function handleRequest(request: Request): Promise<Response> {
 
   // The rendered page fetches this; it also stays the plain-text address the
   // route has always had, now with the extension it always was.
-  if (
-    url.pathname === "/docs/migration-guide.md" || url.pathname === "/docs/migration-guide.txt"
-  ) {
+  if (url.pathname === "/docs/migration-guide.md" || url.pathname === "/docs/migration-guide.txt") {
     return await serveMarkdown("./docs/migration-guide.md");
   }
 
@@ -677,7 +680,19 @@ async function handleRequest(request: Request): Promise<Response> {
       );
     }
 
-    const cacheKey = pdfPageCacheKey(entityId, pageNumber);
+    // `scale=2` renders at 192 dpi for screens with two or more device
+    // pixels per CSS pixel; the default is the 96 dpi page a laptop shows
+    // at its natural size (#286).
+    const scale = parsePdfPageScale(url.searchParams.get("scale"));
+    if (scale === null) {
+      return withServerTiming(
+        apiError("invalid_scale", 400, "Ongeldige schaal; kies 1 of 2"),
+        requestStart,
+        metrics,
+      );
+    }
+
+    const cacheKey = pdfPageCacheKey(entityId, pageNumber, scale);
     const cached = await measureTiming(metrics, "cache", () => storage.getObjectBytes(cacheKey));
     if (cached) {
       const headers = new Headers({
@@ -723,7 +738,7 @@ async function handleRequest(request: Request): Promise<Response> {
       let renderedPage: Awaited<ReturnType<typeof renderPdfPageJpeg>>;
       try {
         renderedPage = await measureTiming(metrics, "render", () =>
-          renderPdfPageJpeg(pdfBytes, pageNumber),
+          renderPdfPageJpeg(pdfBytes, pageNumber, scale),
         );
       } catch (error) {
         const notFound = error instanceof Error && error.message === "PDF page not found";
