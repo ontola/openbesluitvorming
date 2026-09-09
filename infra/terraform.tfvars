@@ -24,7 +24,12 @@
 # finished (queue drained, 5.13M unique documents, 97.3% of the legacy corpus),
 # so the temporary fleet of 8 is no longer earning its EUR188.66/mo -- steady
 # state is EUR47.17.
-extraction_server_count = 2
+#
+# Up to 8 again on 2026-09-09 for the history of the 61 organizations added
+# in #277 (1,500 year-chunks, every document new): on 2 hosts a third of the
+# extractions timed out under 128 concurrent requests. Back to 2 once that
+# queue has drained; the monitor's scale-down reminder fires then.
+extraction_server_count = 8
 
 # 4 uvicorn workers on 2-vCPU hosts: the service downloads the PDF (I/O-bound)
 # before the CPU-bound extraction, so 2x oversubscription overlaps downloads
