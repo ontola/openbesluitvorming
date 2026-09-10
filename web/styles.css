@@ -69,7 +69,13 @@ select {
 
 .hero {
   position: relative;
-  overflow: visible;
+  /* The decorative glows reach past the right edge of a phone screen, and
+     WebKit widens the layout to include them (#290). Clip sideways only:
+     `clip` makes no scroll container, so the sticky search bar and the
+     organisation picker's dropdown keep working, and nothing vertical is
+     cut. */
+  overflow-x: clip;
+  overflow-y: visible;
   padding: 2rem 1.5rem 0;
   min-height: min(82vh, 56rem);
   transition:
@@ -301,7 +307,13 @@ select {
 .brand {
   margin: 0;
   text-align: center;
-  font-size: clamp(2.6rem, 5vw, 4.6rem);
+  /* The floor of 2.6rem set "OpenBesluitvorming" at 41.6px, which is 422px
+     of one unbreakable word on a 375px phone. WebKit does not clip that: it
+     widens the whole layout to fit, so every centred thing sat off-centre and
+     the right edge of the page fell off the screen (#290). Below about 470px
+     the size follows the viewport instead, 8.8vw, which keeps the word inside
+     the padding down to 320px. */
+  font-size: min(clamp(2.6rem, 5vw, 4.6rem), 8.8vw);
   line-height: 0.95;
   font-weight: 800;
   letter-spacing: -0.04em;
