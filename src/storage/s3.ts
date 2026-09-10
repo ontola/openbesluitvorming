@@ -20,6 +20,14 @@ const READ_TIMEOUT_MS = Number(Deno.env.get("WOOZI_S3_READ_TIMEOUT_MS") ?? "1500
  * second apart are three chances to hit the same throttle. A throttle wants
  * patience, not persistence. `Retry-After`, when the server sends one, wins. */
 const READ_ATTEMPTS = 6;
+const DELETE_ATTEMPTS = 4;
+
+/** Shorter than a read's back-off: a purge makes tens of thousands of these,
+ * and a store that answers a few of them with a 5xx usually takes the retry
+ * a moment later. */
+function deleteRetryDelayMs(attempt: number): number {
+  return Math.min(300 * 2 ** (attempt - 1), 2_400);
+}
 const READ_RETRY_BASE_MS = 1_000;
 const READ_RETRY_MAX_MS = 16_000;
 
@@ -340,41 +348,94 @@ export class ObjectStorageClient {
     };
   }
 
+  /** Delete one object, with the same ceiling and retries as a read: the
+   * store answers a few percent of requests slowly or with a 5xx, and one
+   * of those must not stand for the whole batch. 404 is success here. */
+  private async deleteObject(key: string): Promise<void> {
+    const url = this.objectUrl(key);
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= DELETE_ATTEMPTS; attempt += 1) {
+      let response: Response;
+      try {
+        const signed = await this.client.sign(url, { method: "DELETE" });
+        response = await fetch(signed, { signal: AbortSignal.timeout(READ_TIMEOUT_MS) });
+      } catch (error) {
+        lastError = error;
+        await sleep(deleteRetryDelayMs(attempt));
+        continue;
+      }
+      await response.body?.cancel();
+      if (response.ok || response.status === 404) {
+        return;
+      }
+      lastError = new Error(`HTTP ${response.status}`);
+      if (response.status < 500 && response.status !== 429) {
+        break;
+      }
+      await sleep(deleteRetryDelayMs(attempt));
+    }
+    throw describeStorageError("delete", key, lastError);
+  }
+
+  /** Delete these objects, all of them tried. Per-key DELETE instead of the
+   * Multi-Object Delete API: the batch API requires a Content-MD5 header,
+   * which WebCrypto cannot produce.
+   *
+   * A key that still fails after its retries does not stop the others: the
+   * purge of a whole source lists tens of thousands of keys, and aborting
+   * the pass at the first bad one meant starting over from the beginning
+   * every time, which a store that fails a fraction of a percent of
+   * requests never lets finish (2026-09-10, Goeree-Overflakkee). The
+   * failures are reported together at the end, and the caller re-lists the
+   * prefix to pick them up. */
   async deleteObjects(keys: string[]): Promise<void> {
-    // Per-key DELETE instead of the Multi-Object Delete API: our delete
-    // volumes are tiny (takedowns, test cleanup) and the batch API requires
-    // a Content-MD5 header, which WebCrypto cannot produce.
+    const failures: Error[] = [];
     for (const key of keys) {
       try {
-        const response = await this.client.fetch(this.objectUrl(key), { method: "DELETE" });
-        await response.body?.cancel();
-        if (!response.ok && response.status !== 404) {
-          throw new Error(`HTTP ${response.status}`);
-        }
+        await this.deleteObject(key);
       } catch (error) {
-        throw describeStorageError("delete", key, error);
+        failures.push(error instanceof Error ? error : new Error(String(error)));
       }
+    }
+    if (failures.length > 0) {
+      throw new Error(
+        `${failures.length} of ${keys.length} objects could not be deleted; first: ${failures[0].message}`,
+      );
     }
   }
 
-  /** Deletes every object under the prefix. Returns the deleted keys. */
+  /** Deletes every object under the prefix. Returns the deleted keys.
+   *
+   * One pass over the listing; a page whose deletes partly failed does not
+   * stop the pass, the leftovers are reported at the end and are still
+   * there for the next pass to find. */
   async deleteByPrefix(prefix: string): Promise<string[]> {
     if (!prefix || prefix === "/") {
       throw new Error(`Refusing to delete by empty prefix`);
     }
     const deleted: string[] = [];
+    const leftovers: string[] = [];
     let startAfter: string | undefined;
     while (true) {
       const { keys, isTruncated } = await this.listObjects({ prefix, startAfter });
       if (keys.length === 0) {
         break;
       }
-      await this.deleteObjects(keys);
-      deleted.push(...keys);
+      try {
+        await this.deleteObjects(keys);
+        deleted.push(...keys);
+      } catch (error) {
+        leftovers.push(error instanceof Error ? error.message : String(error));
+      }
       if (!isTruncated) {
         break;
       }
       startAfter = keys[keys.length - 1];
+    }
+    if (leftovers.length > 0) {
+      throw new Error(
+        `prefix ${prefix}: ${leftovers.length} page(s) kept objects after one pass (${leftovers[0]})`,
+      );
     }
     return deleted;
   }

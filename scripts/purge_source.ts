@@ -28,7 +28,7 @@
 //      a delete-by-query when you cannot wait for that.
 import { getExportLog } from "../src/exports/log.ts";
 import { QuickwitClient } from "../src/quickwit/client.ts";
-import { getSource } from "../src/sources/index.ts";
+import { getProjectableSource } from "../src/sources/index.ts";
 import { ObjectStorageClient } from "../src/storage/s3.ts";
 import { sourceStoragePrefixes } from "../src/storage/prefixes.ts";
 import type { ExportChangeRecord } from "../src/types.ts";
@@ -71,8 +71,10 @@ async function main(): Promise<void> {
   }
 
   // Resolves through the catalog, so a typo fails here rather than silently
-  // purging nothing.
-  const source = getSource(sourceKey);
+  // purging nothing. Through the projectable lookup, not the runnable one: a
+  // source is switched off in the catalog before its data is removed, and
+  // the runnable lookup refused exactly those (2026-09-10).
+  const source = getProjectableSource(sourceKey);
   const apply = hasFlag("apply");
   const purgeQuickwit = hasFlag("quickwit");
   const keepStorage = hasFlag("keep-storage");
