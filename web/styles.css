@@ -1,5 +1,13 @@
 :root {
   color-scheme: light;
+  /* The hero surface and the reader's backdrop, as tokens: both had their
+     colours written into the rules, so the iOS-only variant (no blur, denser
+     tint, #281) that sits at the end of the file painted the light colours
+     over the dark theme too (#293). The -solid pair is what iOS uses. */
+  --hero-surface-bg: rgba(246, 248, 251, 0.86);
+  --hero-surface-bg-solid: rgba(246, 248, 251, 0.96);
+  --overlay-backdrop-bg: rgba(17, 32, 61, 0.48);
+  --overlay-backdrop-bg-solid: rgba(17, 32, 61, 0.6);
   --bg: #f6f8fb;
   --bg-strong: #ffffff;
   --document-surface: #ffffff;
@@ -107,7 +115,7 @@ select {
   height: var(--hero-surface-height, 100%);
   z-index: -1;
   opacity: 0;
-  background: rgba(246, 248, 251, 0.86);
+  background: var(--hero-surface-bg);
   box-shadow: 0 10px 24px rgba(23, 50, 92, 0.08);
   backdrop-filter: blur(18px);
   pointer-events: none;
@@ -1432,7 +1440,7 @@ select {
 .detail-overlay__backdrop {
   position: absolute;
   inset: -10px;
-  background: rgba(17, 32, 61, 0.48);
+  background: var(--overlay-backdrop-bg);
   backdrop-filter: blur(8px);
 }
 
@@ -2984,6 +2992,10 @@ select {
 @media (prefers-color-scheme: dark) {
   :root {
     color-scheme: dark;
+    --hero-surface-bg: rgba(5, 6, 8, 0.86);
+    --hero-surface-bg-solid: rgba(5, 6, 8, 0.96);
+    --overlay-backdrop-bg: rgba(2, 7, 16, 0.74);
+    --overlay-backdrop-bg-solid: rgba(2, 7, 16, 0.84);
     --bg: #050608;
     --bg-strong: #0d1015;
     --document-surface: #12161c;
@@ -3022,7 +3034,7 @@ select {
      reintroduced the screen-tall pane that pseudo-element exists to avoid:
      the hero's own box is a full screen again while the fold opens. */
   .hero::after {
-    background: rgba(5, 6, 8, 0.86);
+    background: var(--hero-surface-bg);
     box-shadow: 0 16px 32px rgba(0, 0, 0, 0.34);
   }
 
@@ -3147,7 +3159,7 @@ select {
   }
 
   .detail-overlay__backdrop {
-    background: rgba(2, 7, 16, 0.74);
+    background: var(--overlay-backdrop-bg);
   }
 
   .detail-sheet {
@@ -3683,11 +3695,11 @@ select {
 @supports (-webkit-touch-callout: none) {
   .detail-overlay__backdrop {
     backdrop-filter: none;
-    background: rgba(17, 32, 61, 0.6);
+    background: var(--overlay-backdrop-bg-solid);
   }
 
   .hero::after {
     backdrop-filter: none;
-    background: rgba(246, 248, 251, 0.96);
+    background: var(--hero-surface-bg-solid);
   }
 }
