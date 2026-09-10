@@ -134,6 +134,7 @@ export function buildStatusResponse(options: {
         lastErrorMessage,
         latestContentDate: activity?.latestContentDate,
         lastIndexedAt: activity?.lastIndexedAt,
+        indexedDocuments: activity?.documentCount,
         discontinuedAt: source.discontinuedAt,
         succeededBy:
           source.succeededByCbsId && source.succeededByLabel

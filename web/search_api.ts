@@ -1353,6 +1353,10 @@ export interface SourceIndexActivity {
   latestContentDate?: string;
   /** Newest `time`: when we last wrote anything at all for the source. */
   lastIndexedAt?: string;
+  /** Documents in the index for the source, exact at the moment of asking:
+   * one row per document, pages not counted. What a reconciliation against
+   * the source's own list or the legacy index compares with (#260). */
+  documentCount?: number;
 }
 
 /** Quickwit reports datetime metric aggregations as nanoseconds since the
@@ -1418,6 +1422,28 @@ export async function getSourceIndexActivity(): Promise<Map<string, SourceIndexA
     latest_start_date?: { value?: unknown };
   }>;
 
+  // A second request for the document count per source: Quickwit's
+  // aggregations cannot filter inside a bucket, and the first request counts
+  // every row (meetings, pages, motions). One row per Document is the number
+  // people reconcile with.
+  const documentCounts = new Map<string, number>();
+  try {
+    const counted = await quickwit.searchRequest({
+      query: `projection_version:${escapeTerm(currentProjectionVersion())} AND entity_type:Document`,
+      max_hits: 0,
+      aggs: { by_source: { terms: { field: "source_key", size: 500 } } },
+    });
+    const countBuckets = ((counted.aggregations?.by_source as { buckets?: unknown[] })?.buckets ??
+      []) as Array<{ key?: unknown; doc_count?: unknown }>;
+    for (const bucket of countBuckets) {
+      if (typeof bucket.key === "string" && typeof bucket.doc_count === "number") {
+        documentCounts.set(bucket.key, bucket.doc_count);
+      }
+    }
+  } catch {
+    // The activity half still answers; a missing count is absent, not zero.
+  }
+
   const activity = new Map<string, SourceIndexActivity>();
   for (const bucket of buckets) {
     const sourceKey = String(bucket.key ?? "");
@@ -1425,6 +1451,7 @@ export async function getSourceIndexActivity(): Promise<Map<string, SourceIndexA
     activity.set(sourceKey, {
       lastIndexedAt: fromAggregationTimestamp(bucket.last_indexed?.value),
       latestContentDate: fromAggregationTimestamp(bucket.latest_start_date?.value),
+      documentCount: documentCounts.get(sourceKey),
     });
   }
   return activity;
