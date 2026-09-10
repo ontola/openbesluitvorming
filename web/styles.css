@@ -1672,6 +1672,10 @@ select {
   font-size: 0.95rem;
 }
 
+.detail-sheet__date--modified {
+  font-size: 0.85rem;
+}
+
 .button-with-icon {
   display: inline-flex;
   align-items: center;

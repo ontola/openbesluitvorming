@@ -808,6 +808,11 @@ export interface EntityContentResponse {
   organization?: string;
   date?: string;
   sortDate?: string;
+  /** When the source system last changed this entity, formatted, when it
+   * says so. For an iBabs register entry: the day its last document, usually
+   * the answer, was added. */
+  dateModified?: string;
+  dateModifiedIso?: string;
   markdownText?: string;
   downloadUrl?: string;
   contentType?: string;

@@ -61,6 +61,7 @@ type SearchHit = {
     chapters?: MeetingRecording["chapters"];
     speakers?: MeetingRecording["speakers"];
     is_referenced_by?: string;
+    date_modified?: string;
     agenda?: MeetingAgendaItem[];
     motion_type?: string;
     status?: string;
@@ -1589,6 +1590,11 @@ export async function getEntityContent(
     organization: displayOrganization(hit),
     date: formatDate(hit.start_date),
     sortDate: hit.start_date,
+    // When the source system last changed the entity, where it says so. For a
+    // register entry that is the day the answer was added (#294); the date
+    // above stays the day the entry was made, which is what people search by.
+    dateModified: hit.payload?.date_modified ? formatDate(hit.payload.date_modified) : undefined,
+    dateModifiedIso: hit.payload?.date_modified,
     // Fall back to the attachment's text and file for a motion; its own
     // fields are always empty.
     markdownText: markdownText ?? motionAttachment?.markdownText,

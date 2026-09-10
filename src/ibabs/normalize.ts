@@ -318,6 +318,12 @@ export function normalizeIbabsRegisterDocuments(
   const reference = parseAgendaPointReference(pickValue(values, ["Agendapunt"]));
   const meeting = reference && meetings ? meetings.find(reference) : undefined;
   const sourceIri = `ibabs://${source.ibabsSitename}/listentry/${entry.EntryId}`;
+  // A register entry has one date, the day it was entered: the day the
+  // questions were asked, for a raadsvragen entry. The answer is added to the
+  // same entry weeks later, and iBabs dates documents no further than that.
+  // The entry's last modification is the only trace of when the answer
+  // arrived, so every document carries it as date_modified (#294).
+  const dateModified = normalizeMutationDate(entry.MutationDate);
 
   return detail.Documents.map((document) => ({
     id: canonicalDocumentId(source, document.Id),
@@ -328,6 +334,7 @@ export function normalizeIbabsRegisterDocuments(
     identifier_url: `ibabs://${source.ibabsSitename}/document/${document.Id}`,
     file_name: document.FileName,
     size_in_bytes: document.FileSize,
+    date_modified: dateModified,
     last_discussed_at: meeting?.start_date ?? date,
     is_referenced_by: meeting?.id ?? canonicalOrganizationId(source),
     organization: canonicalOrganizationId(source),
@@ -394,4 +401,16 @@ export function normalizeIbabsDocuments(
     },
     raw: document,
   }));
+}
+
+/** iBabs writes MutationDate as a local timestamp without a zone
+ * (`2026-03-25T12:52:40.897`). Kept to the day, at noon UTC, so the date
+ * survives any zone a reader is in. */
+function normalizeMutationDate(value?: string): string | undefined {
+  const match = /^(\d{4}-\d{2}-\d{2})/.exec(value ?? "");
+  if (!match) {
+    return undefined;
+  }
+  const parsed = new Date(`${match[1]}T12:00:00Z`);
+  return Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString();
 }
