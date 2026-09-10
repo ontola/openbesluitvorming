@@ -29,9 +29,16 @@ After=docker.service
 
 [Service]
 Type=oneshot
+WorkingDirectory=/opt/woozi
 # Sources one at a time, sharing the suppliers' request budgets with the
 # nightly import; a full pass over ~330 sources takes a few hours.
-ExecStart=/usr/bin/docker exec woozi-openbesluitvorming-1 deno run -A scripts/coverage_check.ts --months ${COVERAGE_MONTHS}
+#
+# In a container of its own, not exec'd into the web container: every deploy
+# recreates that container and killed the run with it, five times in one
+# week (2026-09-08..10), and its deno process outlived the systemd unit as
+# an orphan. compose run gives it the same image, environment, volume and
+# network, and a life of its own.
+ExecStart=/usr/bin/docker compose -f docker-compose.production.yml run --rm --no-deps -T openbesluitvorming deno run -A scripts/coverage_check.ts --months ${COVERAGE_MONTHS}
 EOF
 
 cat > /etc/systemd/system/woozi-coverage.timer <<EOF
