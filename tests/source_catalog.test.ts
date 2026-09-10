@@ -62,7 +62,9 @@ Deno.test("implemented catalog sources only use Woozi-supported suppliers", () =
     .map((source) => source.key)
     .sort();
   assert(
-    JSON.stringify(disabled) === JSON.stringify(["dongen", "zoeterwoude"]),
+    // Dongen is withdrawn; Zoeterwoude waits for a Parlaeus session id; the
+    // 60 organizations of #277 wait for their own agreement to publication.
+    disabled.length === 62 && disabled.includes("dongen") && disabled.includes("zoeterwoude"),
     `unexpected set of disabled sources: ${JSON.stringify(disabled)}`,
   );
   for (const source of sources) {

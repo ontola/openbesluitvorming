@@ -4675,7 +4675,10 @@ export const sourceCatalog = [
   // Added 2026-09-09 from #277: the organizations the CBS list (86247NED,
   // 2026) has and this catalog did not, all on suppliers already
   // implemented. Ids and sites verified against the live systems by the
-  // reporter on 2026-09-06 and spot-checked here.
+  // reporter on 2026-09-06 and spot-checked here. Switched off again on
+  // 2026-09-10: a source is imported only once its organization has agreed
+  // to publication here, and these had not been asked. The rows stay so
+  // that switching one on is a one-line change when the agreement is there.
   {
     sourceRef: "notubiz:gemeente:de_bilt",
     key: "de_bilt",
@@ -4688,7 +4691,8 @@ export const sourceCatalog = [
     notubizOrganizationId: 2546,
     legacyConfigFile: "ori.notubiz.yaml",
     legacyConfigRoot: "ori.notubiz",
-    implemented: true,
+    // Off until the municipality has agreed to publication here (2026-09-10).
+    implemented: false,
   },
   {
     sourceRef: "notubiz:gemeente:goeree_overflakkee",
@@ -4702,7 +4706,8 @@ export const sourceCatalog = [
     notubizOrganizationId: 1828,
     legacyConfigFile: "ori.notubiz.yaml",
     legacyConfigRoot: "ori.notubiz",
-    implemented: true,
+    // Off until the municipality has agreed to publication here (2026-09-10).
+    implemented: false,
   },
   {
     sourceRef: "notubiz:gemeente:hengelo",
@@ -4716,7 +4721,8 @@ export const sourceCatalog = [
     notubizOrganizationId: 1734,
     legacyConfigFile: "ori.notubiz.yaml",
     legacyConfigRoot: "ori.notubiz",
-    implemented: true,
+    // Off until the municipality has agreed to publication here (2026-09-10).
+    implemented: false,
   },
   {
     sourceRef: "notubiz:gemeente:kampen",
@@ -4730,7 +4736,8 @@ export const sourceCatalog = [
     notubizOrganizationId: 1499,
     legacyConfigFile: "ori.notubiz.yaml",
     legacyConfigRoot: "ori.notubiz",
-    implemented: true,
+    // Off until the municipality has agreed to publication here (2026-09-10).
+    implemented: false,
   },
   {
     sourceRef: "notubiz:gemeente:lisse",
@@ -4744,7 +4751,8 @@ export const sourceCatalog = [
     notubizOrganizationId: 729,
     legacyConfigFile: "ori.notubiz.yaml",
     legacyConfigRoot: "ori.notubiz",
-    implemented: true,
+    // Off until the municipality has agreed to publication here (2026-09-10).
+    implemented: false,
   },
   {
     sourceRef: "notubiz:gemeente:meerssen",
@@ -4758,7 +4766,8 @@ export const sourceCatalog = [
     notubizOrganizationId: 1906,
     legacyConfigFile: "ori.notubiz.yaml",
     legacyConfigRoot: "ori.notubiz",
-    implemented: true,
+    // Off until the municipality has agreed to publication here (2026-09-10).
+    implemented: false,
   },
   {
     sourceRef: "notubiz:gemeente:montferland",
@@ -4772,7 +4781,8 @@ export const sourceCatalog = [
     notubizOrganizationId: 343,
     legacyConfigFile: "ori.notubiz.yaml",
     legacyConfigRoot: "ori.notubiz",
-    implemented: true,
+    // Off until the municipality has agreed to publication here (2026-09-10).
+    implemented: false,
   },
   {
     sourceRef: "notubiz:gemeente:noord_beveland",
@@ -4786,7 +4796,8 @@ export const sourceCatalog = [
     notubizOrganizationId: 2102,
     legacyConfigFile: "ori.notubiz.yaml",
     legacyConfigRoot: "ori.notubiz",
-    implemented: true,
+    // Off until the municipality has agreed to publication here (2026-09-10).
+    implemented: false,
   },
   {
     sourceRef: "notubiz:gemeente:pekela",
@@ -4800,7 +4811,8 @@ export const sourceCatalog = [
     notubizOrganizationId: 1811,
     legacyConfigFile: "ori.notubiz.yaml",
     legacyConfigRoot: "ori.notubiz",
-    implemented: true,
+    // Off until the municipality has agreed to publication here (2026-09-10).
+    implemented: false,
   },
   {
     sourceRef: "notubiz:gemeente:reimerswaal",
@@ -4814,7 +4826,8 @@ export const sourceCatalog = [
     notubizOrganizationId: 998,
     legacyConfigFile: "ori.notubiz.yaml",
     legacyConfigRoot: "ori.notubiz",
-    implemented: true,
+    // Off until the municipality has agreed to publication here (2026-09-10).
+    implemented: false,
   },
   {
     sourceRef: "notubiz:gemeente:utrechtse_heuvelrug",
@@ -4828,7 +4841,8 @@ export const sourceCatalog = [
     notubizOrganizationId: 2048,
     legacyConfigFile: "ori.notubiz.yaml",
     legacyConfigRoot: "ori.notubiz",
-    implemented: true,
+    // Off until the municipality has agreed to publication here (2026-09-10).
+    implemented: false,
   },
   {
     sourceRef: "notubiz:gemeente:veere",
@@ -4842,7 +4856,8 @@ export const sourceCatalog = [
     notubizOrganizationId: 264,
     legacyConfigFile: "ori.notubiz.yaml",
     legacyConfigRoot: "ori.notubiz",
-    implemented: true,
+    // Off until the municipality has agreed to publication here (2026-09-10).
+    implemented: false,
   },
   {
     sourceRef: "notubiz:gemeente:wierden",
@@ -4856,7 +4871,8 @@ export const sourceCatalog = [
     notubizOrganizationId: 514,
     legacyConfigFile: "ori.notubiz.yaml",
     legacyConfigRoot: "ori.notubiz",
-    implemented: true,
+    // Off until the municipality has agreed to publication here (2026-09-10).
+    implemented: false,
   },
   {
     sourceRef: "notubiz:gemeente:lopik",
@@ -4870,7 +4886,8 @@ export const sourceCatalog = [
     notubizOrganizationId: 1855,
     legacyConfigFile: "ori.notubiz.yaml",
     legacyConfigRoot: "ori.notubiz",
-    implemented: true,
+    // Off until the municipality has agreed to publication here (2026-09-10).
+    implemented: false,
   },
   {
     sourceRef: "notubiz:provincie:gelderland",
@@ -4883,7 +4900,8 @@ export const sourceCatalog = [
     notubizOrganizationId: 1769,
     legacyConfigFile: "ori.notubiz.yaml",
     legacyConfigRoot: "ori.notubiz",
-    implemented: true,
+    // Off until the municipality has agreed to publication here (2026-09-10).
+    implemented: false,
   },
   {
     sourceRef: "notubiz:waterschap:rijn_en_ijssel",
@@ -4896,7 +4914,8 @@ export const sourceCatalog = [
     notubizOrganizationId: 2111,
     legacyConfigFile: "ori.notubiz.yaml",
     legacyConfigRoot: "ori.notubiz",
-    implemented: true,
+    // Off until the municipality has agreed to publication here (2026-09-10).
+    implemented: false,
   },
   {
     sourceRef: "notubiz:waterschap:rivierenland",
@@ -4909,7 +4928,8 @@ export const sourceCatalog = [
     notubizOrganizationId: 1684,
     legacyConfigFile: "ori.notubiz.yaml",
     legacyConfigRoot: "ori.notubiz",
-    implemented: true,
+    // Off until the municipality has agreed to publication here (2026-09-10).
+    implemented: false,
   },
   {
     sourceRef: "ibabs:gemeente:aa_en_hunze",
@@ -4923,7 +4943,8 @@ export const sourceCatalog = [
     ibabsSitename: "aaenhunze",
     legacyConfigFile: "ori.ibabs.yaml",
     legacyConfigRoot: "ori.ibabs",
-    implemented: true,
+    // Off until the municipality has agreed to publication here (2026-09-10).
+    implemented: false,
   },
   {
     sourceRef: "ibabs:gemeente:alphen_aan_den_rijn",
@@ -4937,7 +4958,8 @@ export const sourceCatalog = [
     ibabsSitename: "alphenaandenrijn",
     legacyConfigFile: "ori.ibabs.yaml",
     legacyConfigRoot: "ori.ibabs",
-    implemented: true,
+    // Off until the municipality has agreed to publication here (2026-09-10).
+    implemented: false,
   },
   {
     sourceRef: "ibabs:gemeente:beverwijk",
@@ -4951,7 +4973,8 @@ export const sourceCatalog = [
     ibabsSitename: "beverwijk",
     legacyConfigFile: "ori.ibabs.yaml",
     legacyConfigRoot: "ori.ibabs",
-    implemented: true,
+    // Off until the municipality has agreed to publication here (2026-09-10).
+    implemented: false,
   },
   {
     sourceRef: "ibabs:gemeente:bladel",
@@ -4965,7 +4988,8 @@ export const sourceCatalog = [
     ibabsSitename: "bladel",
     legacyConfigFile: "ori.ibabs.yaml",
     legacyConfigRoot: "ori.ibabs",
-    implemented: true,
+    // Off until the municipality has agreed to publication here (2026-09-10).
+    implemented: false,
   },
   {
     sourceRef: "ibabs:gemeente:boekel",
@@ -4979,7 +5003,8 @@ export const sourceCatalog = [
     ibabsSitename: "boekel",
     legacyConfigFile: "ori.ibabs.yaml",
     legacyConfigRoot: "ori.ibabs",
-    implemented: true,
+    // Off until the municipality has agreed to publication here (2026-09-10).
+    implemented: false,
   },
   {
     sourceRef: "ibabs:gemeente:cranendonck",
@@ -4993,7 +5018,8 @@ export const sourceCatalog = [
     ibabsSitename: "cranendonck",
     legacyConfigFile: "ori.ibabs.yaml",
     legacyConfigRoot: "ori.ibabs",
-    implemented: true,
+    // Off until the municipality has agreed to publication here (2026-09-10).
+    implemented: false,
   },
   {
     sourceRef: "ibabs:gemeente:de_fryske_marren",
@@ -5007,7 +5033,8 @@ export const sourceCatalog = [
     ibabsSitename: "dfm",
     legacyConfigFile: "ori.ibabs.yaml",
     legacyConfigRoot: "ori.ibabs",
-    implemented: true,
+    // Off until the municipality has agreed to publication here (2026-09-10).
+    implemented: false,
   },
   {
     sourceRef: "ibabs:gemeente:eemsdelta",
@@ -5021,7 +5048,8 @@ export const sourceCatalog = [
     ibabsSitename: "eemsdelta",
     legacyConfigFile: "ori.ibabs.yaml",
     legacyConfigRoot: "ori.ibabs",
-    implemented: true,
+    // Off until the municipality has agreed to publication here (2026-09-10).
+    implemented: false,
   },
   {
     sourceRef: "ibabs:gemeente:gemert_bakel",
@@ -5035,7 +5063,8 @@ export const sourceCatalog = [
     ibabsSitename: "gemertbakel",
     legacyConfigFile: "ori.ibabs.yaml",
     legacyConfigRoot: "ori.ibabs",
-    implemented: true,
+    // Off until the municipality has agreed to publication here (2026-09-10).
+    implemented: false,
   },
   {
     sourceRef: "ibabs:gemeente:gennep",
@@ -5049,7 +5078,8 @@ export const sourceCatalog = [
     ibabsSitename: "gennep",
     legacyConfigFile: "ori.ibabs.yaml",
     legacyConfigRoot: "ori.ibabs",
-    implemented: true,
+    // Off until the municipality has agreed to publication here (2026-09-10).
+    implemented: false,
   },
   {
     sourceRef: "ibabs:gemeente:heeze_leende",
@@ -5063,7 +5093,8 @@ export const sourceCatalog = [
     ibabsSitename: "heezeleende",
     legacyConfigFile: "ori.ibabs.yaml",
     legacyConfigRoot: "ori.ibabs",
-    implemented: true,
+    // Off until the municipality has agreed to publication here (2026-09-10).
+    implemented: false,
   },
   {
     sourceRef: "ibabs:gemeente:heusden",
@@ -5077,7 +5108,8 @@ export const sourceCatalog = [
     ibabsSitename: "heusden",
     legacyConfigFile: "ori.ibabs.yaml",
     legacyConfigRoot: "ori.ibabs",
-    implemented: true,
+    // Off until the municipality has agreed to publication here (2026-09-10).
+    implemented: false,
   },
   {
     sourceRef: "ibabs:gemeente:land_van_cuijk",
@@ -5091,7 +5123,8 @@ export const sourceCatalog = [
     ibabsSitename: "lvc",
     legacyConfigFile: "ori.ibabs.yaml",
     legacyConfigRoot: "ori.ibabs",
-    implemented: true,
+    // Off until the municipality has agreed to publication here (2026-09-10).
+    implemented: false,
   },
   {
     sourceRef: "ibabs:gemeente:midden_drenthe",
@@ -5105,7 +5138,8 @@ export const sourceCatalog = [
     ibabsSitename: "middendrenthe",
     legacyConfigFile: "ori.ibabs.yaml",
     legacyConfigRoot: "ori.ibabs",
-    implemented: true,
+    // Off until the municipality has agreed to publication here (2026-09-10).
+    implemented: false,
   },
   {
     sourceRef: "ibabs:gemeente:olst_wijhe",
@@ -5119,7 +5153,8 @@ export const sourceCatalog = [
     ibabsSitename: "olstwijhe",
     legacyConfigFile: "ori.ibabs.yaml",
     legacyConfigRoot: "ori.ibabs",
-    implemented: true,
+    // Off until the municipality has agreed to publication here (2026-09-10).
+    implemented: false,
   },
   {
     sourceRef: "ibabs:gemeente:oostzaan",
@@ -5133,7 +5168,8 @@ export const sourceCatalog = [
     ibabsSitename: "oostzaan",
     legacyConfigFile: "ori.ibabs.yaml",
     legacyConfigRoot: "ori.ibabs",
-    implemented: true,
+    // Off until the municipality has agreed to publication here (2026-09-10).
+    implemented: false,
   },
   {
     sourceRef: "ibabs:gemeente:ouder_amstel",
@@ -5147,7 +5183,8 @@ export const sourceCatalog = [
     ibabsSitename: "ouderamstel",
     legacyConfigFile: "ori.ibabs.yaml",
     legacyConfigRoot: "ori.ibabs",
-    implemented: true,
+    // Off until the municipality has agreed to publication here (2026-09-10).
+    implemented: false,
   },
   {
     sourceRef: "ibabs:gemeente:scherpenzeel",
@@ -5161,7 +5198,8 @@ export const sourceCatalog = [
     ibabsSitename: "scherpenzeel",
     legacyConfigFile: "ori.ibabs.yaml",
     legacyConfigRoot: "ori.ibabs",
-    implemented: true,
+    // Off until the municipality has agreed to publication here (2026-09-10).
+    implemented: false,
   },
   {
     sourceRef: "ibabs:gemeente:tholen",
@@ -5175,7 +5213,8 @@ export const sourceCatalog = [
     ibabsSitename: "tholen",
     legacyConfigFile: "ori.ibabs.yaml",
     legacyConfigRoot: "ori.ibabs",
-    implemented: true,
+    // Off until the municipality has agreed to publication here (2026-09-10).
+    implemented: false,
   },
   {
     sourceRef: "ibabs:gemeente:tiel",
@@ -5189,7 +5228,8 @@ export const sourceCatalog = [
     ibabsSitename: "tiel",
     legacyConfigFile: "ori.ibabs.yaml",
     legacyConfigRoot: "ori.ibabs",
-    implemented: true,
+    // Off until the municipality has agreed to publication here (2026-09-10).
+    implemented: false,
   },
   {
     sourceRef: "ibabs:gemeente:uithoorn",
@@ -5203,7 +5243,8 @@ export const sourceCatalog = [
     ibabsSitename: "uithoorn",
     legacyConfigFile: "ori.ibabs.yaml",
     legacyConfigRoot: "ori.ibabs",
-    implemented: true,
+    // Off until the municipality has agreed to publication here (2026-09-10).
+    implemented: false,
   },
   {
     sourceRef: "ibabs:gemeente:vaals",
@@ -5217,7 +5258,8 @@ export const sourceCatalog = [
     ibabsSitename: "vaals",
     legacyConfigFile: "ori.ibabs.yaml",
     legacyConfigRoot: "ori.ibabs",
-    implemented: true,
+    // Off until the municipality has agreed to publication here (2026-09-10).
+    implemented: false,
   },
   {
     sourceRef: "ibabs:gemeente:valkenburg_aan_de_geul",
@@ -5231,7 +5273,8 @@ export const sourceCatalog = [
     ibabsSitename: "valkenburg",
     legacyConfigFile: "ori.ibabs.yaml",
     legacyConfigRoot: "ori.ibabs",
-    implemented: true,
+    // Off until the municipality has agreed to publication here (2026-09-10).
+    implemented: false,
   },
   {
     sourceRef: "ibabs:gemeente:valkenswaard",
@@ -5245,7 +5288,8 @@ export const sourceCatalog = [
     ibabsSitename: "valkenswaard",
     legacyConfigFile: "ori.ibabs.yaml",
     legacyConfigRoot: "ori.ibabs",
-    implemented: true,
+    // Off until the municipality has agreed to publication here (2026-09-10).
+    implemented: false,
   },
   {
     sourceRef: "ibabs:gemeente:westerwolde",
@@ -5259,7 +5303,8 @@ export const sourceCatalog = [
     ibabsSitename: "westerwolde",
     legacyConfigFile: "ori.ibabs.yaml",
     legacyConfigRoot: "ori.ibabs",
-    implemented: true,
+    // Off until the municipality has agreed to publication here (2026-09-10).
+    implemented: false,
   },
   {
     sourceRef: "ibabs:gemeente:wormerland",
@@ -5273,7 +5318,8 @@ export const sourceCatalog = [
     ibabsSitename: "wormerland",
     legacyConfigFile: "ori.ibabs.yaml",
     legacyConfigRoot: "ori.ibabs",
-    implemented: true,
+    // Off until the municipality has agreed to publication here (2026-09-10).
+    implemented: false,
   },
   {
     sourceRef: "ibabs:gemeente:zwijndrecht",
@@ -5287,7 +5333,8 @@ export const sourceCatalog = [
     ibabsSitename: "zwijndrecht",
     legacyConfigFile: "ori.ibabs.yaml",
     legacyConfigRoot: "ori.ibabs",
-    implemented: true,
+    // Off until the municipality has agreed to publication here (2026-09-10).
+    implemented: false,
   },
   {
     sourceRef: "ibabs:provincie:noord_brabant",
@@ -5300,7 +5347,8 @@ export const sourceCatalog = [
     ibabsSitename: "noordbrabant",
     legacyConfigFile: "ori.ibabs.yaml",
     legacyConfigRoot: "ori.ibabs",
-    implemented: true,
+    // Off until the municipality has agreed to publication here (2026-09-10).
+    implemented: false,
   },
   {
     sourceRef: "ibabs:provincie:zeeland",
@@ -5313,7 +5361,8 @@ export const sourceCatalog = [
     ibabsSitename: "zeeland",
     legacyConfigFile: "ori.ibabs.yaml",
     legacyConfigRoot: "ori.ibabs",
-    implemented: true,
+    // Off until the municipality has agreed to publication here (2026-09-10).
+    implemented: false,
   },
   {
     sourceRef: "ibabs:waterschap:noorderzijlvest",
@@ -5326,7 +5375,8 @@ export const sourceCatalog = [
     ibabsSitename: "noorderzijlvest",
     legacyConfigFile: "ori.ibabs.yaml",
     legacyConfigRoot: "ori.ibabs",
-    implemented: true,
+    // Off until the municipality has agreed to publication here (2026-09-10).
+    implemented: false,
   },
   {
     sourceRef: "ibabs:waterschap:rijnland",
@@ -5339,7 +5389,8 @@ export const sourceCatalog = [
     ibabsSitename: "rijnland",
     legacyConfigFile: "ori.ibabs.yaml",
     legacyConfigRoot: "ori.ibabs",
-    implemented: true,
+    // Off until the municipality has agreed to publication here (2026-09-10).
+    implemented: false,
   },
   {
     sourceRef: "ibabs:waterschap:stichtse_rijnlanden",
@@ -5352,7 +5403,8 @@ export const sourceCatalog = [
     ibabsSitename: "hdsr",
     legacyConfigFile: "ori.ibabs.yaml",
     legacyConfigRoot: "ori.ibabs",
-    implemented: true,
+    // Off until the municipality has agreed to publication here (2026-09-10).
+    implemented: false,
   },
   {
     sourceRef: "ibabs:waterschap:schieland_en_de_krimpenerwaard",
@@ -5365,7 +5417,8 @@ export const sourceCatalog = [
     ibabsSitename: "hhsk",
     legacyConfigFile: "ori.ibabs.yaml",
     legacyConfigRoot: "ori.ibabs",
-    implemented: true,
+    // Off until the municipality has agreed to publication here (2026-09-10).
+    implemented: false,
   },
   {
     sourceRef: "ibabs:waterschap:vallei_en_veluwe",
@@ -5378,7 +5431,8 @@ export const sourceCatalog = [
     ibabsSitename: "valleiveluwe",
     legacyConfigFile: "ori.ibabs.yaml",
     legacyConfigRoot: "ori.ibabs",
-    implemented: true,
+    // Off until the municipality has agreed to publication here (2026-09-10).
+    implemented: false,
   },
   {
     sourceRef: "gemeenteoplossingen:gemeente:dalfsen",
@@ -5392,7 +5446,8 @@ export const sourceCatalog = [
     baseUrl: "https://ris.dalfsen.nl/api",
     legacyConfigFile: "ori.go.yaml",
     legacyConfigRoot: "ori.go",
-    implemented: true,
+    // Off until the municipality has agreed to publication here (2026-09-10).
+    implemented: false,
   },
   {
     sourceRef: "gemeenteoplossingen:gemeente:gooise_meren",
@@ -5406,7 +5461,8 @@ export const sourceCatalog = [
     baseUrl: "https://bestuur.gooisemeren.nl/api",
     legacyConfigFile: "ori.go.yaml",
     legacyConfigRoot: "ori.go",
-    implemented: true,
+    // Off until the municipality has agreed to publication here (2026-09-10).
+    implemented: false,
   },
   {
     sourceRef: "gemeenteoplossingen:gemeente:koggenland",
@@ -5420,7 +5476,8 @@ export const sourceCatalog = [
     baseUrl: "https://raad.koggenland.nl/api",
     legacyConfigFile: "ori.go.yaml",
     legacyConfigRoot: "ori.go",
-    implemented: true,
+    // Off until the municipality has agreed to publication here (2026-09-10).
+    implemented: false,
   },
   {
     sourceRef: "gemeenteoplossingen:gemeente:rijssen_holten",
@@ -5434,7 +5491,8 @@ export const sourceCatalog = [
     baseUrl: "https://gemeenteraad.rijssen-holten.nl/api",
     legacyConfigFile: "ori.go.yaml",
     legacyConfigRoot: "ori.go",
-    implemented: true,
+    // Off until the municipality has agreed to publication here (2026-09-10).
+    implemented: false,
   },
   {
     sourceRef: "gemeenteoplossingen:gemeente:tynaarlo",
@@ -5448,7 +5506,8 @@ export const sourceCatalog = [
     baseUrl: "https://raad.tynaarlo.nl/api",
     legacyConfigFile: "ori.go.yaml",
     legacyConfigRoot: "ori.go",
-    implemented: true,
+    // Off until the municipality has agreed to publication here (2026-09-10).
+    implemented: false,
   },
   {
     sourceRef: "gemeenteoplossingen:gemeente:weert",
@@ -5462,7 +5521,8 @@ export const sourceCatalog = [
     baseUrl: "https://gemeenteraad.weert.nl/api",
     legacyConfigFile: "ori.go.yaml",
     legacyConfigRoot: "ori.go",
-    implemented: true,
+    // Off until the municipality has agreed to publication here (2026-09-10).
+    implemented: false,
   },
   {
     sourceRef: "gemeenteoplossingen:gemeente:woerden",
@@ -5476,7 +5536,8 @@ export const sourceCatalog = [
     baseUrl: "https://gemeenteraad.woerden.nl/api",
     legacyConfigFile: "ori.go.yaml",
     legacyConfigRoot: "ori.go",
-    implemented: true,
+    // Off until the municipality has agreed to publication here (2026-09-10).
+    implemented: false,
   },
   {
     sourceRef: "gemeenteoplossingen:provincie:drenthe",
@@ -5489,7 +5550,8 @@ export const sourceCatalog = [
     baseUrl: "https://stateninformatie.drentsparlement.nl/api",
     legacyConfigFile: "ori.go.yaml",
     legacyConfigRoot: "ori.go",
-    implemented: true,
+    // Off until the municipality has agreed to publication here (2026-09-10).
+    implemented: false,
   },
   {
     sourceRef: "gemeenteoplossingen:waterschap:drents_overijsselse_delta",
@@ -5502,7 +5564,8 @@ export const sourceCatalog = [
     baseUrl: "https://bestuursinformatie.wdodelta.nl/api",
     legacyConfigFile: "ori.go.yaml",
     legacyConfigRoot: "ori.go",
-    implemented: true,
+    // Off until the municipality has agreed to publication here (2026-09-10).
+    implemented: false,
   },
   {
     sourceRef: "parlaeus:gemeente:zoeterwoude",
