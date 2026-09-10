@@ -2389,6 +2389,11 @@
             <span class="pill">{detailItem.organization}</span>
             <span class="pill pill--soft">{detailItem.entityTypeLabel}</span>
             <span class="detail-sheet__date">{detailItem.date}</span>
+            {#if detailContent?.dateModified && detailContent.dateModifiedIso?.slice(0, 10) !== detailContent.sortDate?.slice(0, 10)}
+              <span class="detail-sheet__date detail-sheet__date--modified" title="Datum waarop het bronsysteem dit stuk voor het laatst heeft gewijzigd">
+                bijgewerkt {detailContent.dateModified}
+              </span>
+            {/if}
           </div>
 
           <div class="detail-sheet__header-actions">

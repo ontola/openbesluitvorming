@@ -232,7 +232,7 @@ depends on the type of result:
 | Type | `sortDate` is |
 |------|---------------|
 | Meeting | The meeting's start, as scheduled by the organization |
-| Document | The start of the meeting at which the document was (last) discussed. A document that hangs off no meeting, such as a register entry (ingekomen stukken, raadsvragen), gets the date the source system last modified it |
+| Document | The start of the meeting at which the document was (last) discussed. A register document (ingekomen stukken, raadsvragen, toezeggingen) gets the date of its register entry, the day the questions were asked; the entity detail also carries `dateModified`, the day the source system last changed the entry, which for questions is the day the answer was added |
 | Motion | The meeting at which the motion was last discussed, else the date the source system gives it |
 | Recording | The start of the meeting it records |
 

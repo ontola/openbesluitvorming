@@ -318,3 +318,49 @@ Deno.test("iBabs register entries reach the document path without a vote lookup"
     "the failed download is reported against the document",
   );
 });
+
+Deno.test("a register document carries the entry's last modification as date_modified", async () => {
+  // #294: raadsvragen are dated the day they were asked; the answer arrives
+  // in the same entry weeks later, and only the entry's MutationDate says when.
+  const { normalizeIbabsRegisterDocuments } = await import("../src/ibabs/normalize.ts");
+  const { getSource } = await import("../src/sources/index.ts");
+  const source = getSource("harderwijk");
+  const list = { ListId: "L1", ListName: "Schriftelijke vragen en antwoorden" };
+  const entry = { EntryId: "E1", MutationDate: "2026-03-25T12:52:40.897" };
+  const detail = {
+    EntryId: "E1",
+    Values: { Datum: "Feb 28 2026 12:00AM", Onderwerp: "Digitale archief Vervolg" },
+    Documents: [
+      {
+        Id: "D1",
+        FileName: "vragen.pdf",
+        DisplayName: "Schriftelijke vragen",
+        PublicDownloadURL: "https://x/1",
+      },
+      {
+        Id: "D2",
+        FileName: "antwoord.pdf",
+        DisplayName: "Beantwoording",
+        PublicDownloadURL: "https://x/2",
+      },
+    ],
+  };
+  // deno-lint-ignore no-explicit-any
+  const docs = normalizeIbabsRegisterDocuments(
+    source as any,
+    list as any,
+    entry as any,
+    detail as any,
+  );
+  assert(docs.length === 2, "both documents of the entry");
+  for (const doc of docs) {
+    assert(
+      doc.last_discussed_at?.startsWith("2026-02-28"),
+      `the entry date stays the date, got ${doc.last_discussed_at}`,
+    );
+    assert(
+      doc.date_modified === "2026-03-25T12:00:00.000Z",
+      `the modification is the day the answer came, got ${doc.date_modified}`,
+    );
+  }
+});
