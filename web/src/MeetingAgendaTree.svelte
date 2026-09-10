@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { renderDocumentMarkdown } from "./markdown.ts";
+  import { renderDocumentMarkdown, renderSupplierText } from "./markdown.ts";
   import { createEventDispatcher } from "svelte";
   import type { EntityContentResponse, MeetingAgendaItem, MeetingMotion } from "../../src/types.ts";
   import ReaderLoading from "./ReaderLoading.svelte";
@@ -129,7 +129,7 @@
           </header>
 
           {#if item.description}
-            <div class="meeting-agenda__description">{@html item.description}</div>
+            <div class="meeting-agenda__description">{@html renderSupplierText(item.description)}</div>
           {/if}
 
           {#if item.documents?.length}
