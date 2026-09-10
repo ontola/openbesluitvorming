@@ -225,6 +225,7 @@ Deno.test("index activity is merged per source and is optional", () => {
         {
           latestContentDate: "2026-08-20T13:30:00.000Z",
           lastIndexedAt: "2026-08-16T00:09:59.000Z",
+          documentCount: 12345,
         },
       ],
     ]),
@@ -235,6 +236,11 @@ Deno.test("index activity is merged per source and is optional", () => {
     "a meeting already on the agenda for next week",
   );
   assertEquals(withActivity.indexActivityAvailable, true, "the index answered");
+  assertEquals(
+    source(withActivity, "soest").indexedDocuments,
+    12345,
+    "the exact document count travels with the activity (#260)",
+  );
 
   const withoutActivity = build({ indexActivity: null });
   assertEquals(
