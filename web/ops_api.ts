@@ -7,7 +7,7 @@
  * `WOOZI_OPS_TOKEN`; when that is unset the whole route answers 404, as if it
  * did not exist.
  *
- * Reads (`GET runs`, `summary`, one run, jobs) answer directly. Mutating
+ * Reads (`GET health`, `runs`, `summary`, one run, jobs) answer directly. Mutating
  * actions never run here: they are validated and queued as an `ops_job` row,
  * and a worker executes them (see src/ops/jobs.ts). Every request, including
  * a rejected one, writes one structured audit line; the token never appears
@@ -28,6 +28,7 @@ import {
 } from "../src/ops/store.ts";
 import { isOpsAction, OpsValidationError, validateOpsRequest } from "../src/ops/jobs.ts";
 import { RateLimiter } from "./rate_limit.ts";
+import { getOpsHealth } from "./ops_health.ts";
 
 export const OPS_PATH_PREFIX = "/api/ops/";
 export const OPS_RATE_LIMIT_PER_MINUTE = 30;
@@ -196,6 +197,9 @@ async function route(
         offset,
       });
       return ok({ runs: runs.slice(0, limit), hasMore: runs.length > limit });
+    }
+    if (path === "health") {
+      return ok(await getOpsHealth());
     }
     if (path === "summary") {
       return ok({ summary: await getRunSummary() });

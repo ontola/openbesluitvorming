@@ -1569,3 +1569,61 @@ export async function reconcileInterruptedOpsJobs(): Promise<OpsJobRecord[]> {
   }
   return reconciled;
 }
+
+/** What /api/ops/health reports about the queues: is anything waiting, is
+ * anything being worked on, and when did a worker last take something. */
+export interface OpsQueueHealth {
+  queuedRuns: number;
+  runningRuns: number;
+  oldestQueuedRunStartedAt: string | null;
+  lastRunClaimedAt: string | null;
+  lastRunFinishedAt: string | null;
+  queuedOpsJobs: number;
+  runningOpsJobs: number;
+}
+
+export async function getOpsQueueHealth(): Promise<OpsQueueHealth> {
+  const db = await getDatabase();
+  // Status-filtered aggregates only: the partial scans stay small while the
+  // queue is small, which is exactly when this is asked.
+  const runs = db
+    .prepare(
+      `SELECT
+         SUM(status = 'queued') AS queued,
+         SUM(status = 'running') AS running,
+         MIN(CASE WHEN status = 'queued' THEN started_at END) AS oldest_queued,
+         MAX(CASE WHEN status = 'running' THEN claimed_at END) AS last_claimed
+       FROM ingest_run
+       WHERE status IN ('queued', 'running')`,
+    )
+    .get() as {
+    queued: number | null;
+    running: number | null;
+    oldest_queued: string | null;
+    last_claimed: string | null;
+  };
+  const lastClaimed = db.prepare(`SELECT MAX(claimed_at) AS value FROM ingest_run`).get() as {
+    value: string | null;
+  };
+  const lastFinished = db
+    .prepare(
+      `SELECT MAX(finished_at) AS value FROM ingest_run
+       WHERE execution_mode = 'full' AND finished_at IS NOT NULL`,
+    )
+    .get() as { value: string | null };
+  const jobs = db
+    .prepare(
+      `SELECT SUM(status = 'queued') AS queued, SUM(status = 'running') AS running
+       FROM ops_job WHERE status IN ('queued', 'running')`,
+    )
+    .get() as { queued: number | null; running: number | null };
+  return {
+    queuedRuns: runs.queued ?? 0,
+    runningRuns: runs.running ?? 0,
+    oldestQueuedRunStartedAt: runs.oldest_queued,
+    lastRunClaimedAt: lastClaimed.value ?? runs.last_claimed,
+    lastRunFinishedAt: lastFinished.value,
+    queuedOpsJobs: jobs.queued ?? 0,
+    runningOpsJobs: jobs.running ?? 0,
+  };
+}

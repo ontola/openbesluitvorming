@@ -438,3 +438,50 @@ Deno.test("delete_document validates entity ids and is confirmed by id or count"
   assertEquals([job.action, job.apply], ["delete_document", false], "queued as a dry run");
   clearJobs();
 });
+
+Deno.test("health reports every section, and one failing dependency does not hide the others", async () => {
+  const { getOpsHealth } = await import("../web/ops_health.ts");
+  const dataDir = await Deno.makeTempDir();
+  const now = Date.parse("2026-09-28T12:00:00Z");
+  await Deno.writeTextFile(`${dataDir}/.woozi-backup-stamp`, "x");
+  await Deno.utime(
+    `${dataDir}/.woozi-backup-stamp`,
+    new Date(now - 3 * 3_600_000),
+    new Date(now - 3 * 3_600_000),
+  );
+
+  const health = await getOpsHealth({
+    dataDir,
+    now: () => now,
+    extractors: () => Promise.resolve([{ url: "http://extract-1", status: "unreachable" }]),
+    quickwit: {
+      configuredIndexId: "woozi-test",
+      isReady: () => Promise.resolve(true),
+      describeIndex: () => Promise.reject(new Error("Quickwit request failed 404")),
+    },
+  });
+
+  const host = health.host as { memory: { total_mb: number }; disk: { free_gb: number } };
+  assert(host.memory.total_mb > 0, "host memory is read");
+  assert(typeof host.disk.free_gb === "number", "disk of the state volume is read");
+  assertEquals(
+    health.extractors,
+    [{ url: "http://extract-1", status: "unreachable" }],
+    "extractors",
+  );
+  assertEquals(
+    health.quickwit,
+    { ready: true, index_id: "woozi-test", index: { error: "Quickwit request failed 404" } },
+    "a failed describe is reported next to a ready node",
+  );
+  assertEquals((health.backup as { age_hours: number }).age_hours, 3, "backup age from the stamp");
+  const imports = health.imports as { queuedRuns: number; queuedOpsJobs: number };
+  assert(typeof imports.queuedRuns === "number", "run queue");
+  assert(typeof imports.queuedOpsJobs === "number", "ops job queue");
+});
+
+Deno.test("health is served behind the token", async () => {
+  const { handle } = handler();
+  const refused = await handle(request("/api/ops/health", { token: null }), "1.2.3.4");
+  assertEquals(refused.status, 401, "no token, no health");
+});
