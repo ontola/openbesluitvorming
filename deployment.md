@@ -835,7 +835,7 @@ ssh root@91.98.32.151 'cd /opt/woozi && docker compose -f docker-compose.product
 
 To rotate, replace the value and recreate the container again; to disable,
 remove the line. Keep the token out of shell history and chat logs; it grants
-the purge action below.
+the purge and takedown actions below.
 
 ### Requests
 
@@ -860,10 +860,13 @@ Mutating actions are `POST /api/ops/<action>` with a JSON body:
 | `rerun_source` | `source`, `mode` (`full` default, or `reindex_only`), `dateFrom`/`dateTo` (`YYYY-MM-DD`, required for `full`, forbidden for `reindex_only`) | enqueues one import run, like "Opnieuw draaien" in the admin UI; only sources with `implemented: true` |
 | `reenqueue_failed_windows` | optional `source`, `statuses` (`["failed","partial"]` default), `minWindowDays` (20), `fromYear`, `toYear` | same as `scripts/reenqueue_failed_windows.ts` |
 | `purge_source` | `source`, optional `quickwit` (bool), `keepStorage` (bool) | same as `scripts/purge_source.ts` |
+| `delete_document` | `entityIds` (1 to 100 document entity ids), optional `reason` (short label, `takedown` default, e.g. `bsn`) | same as `scripts/delete_document.ts`: delete markers and a delete task in Quickwit, the document's objects, an export tombstone, and a blocklist entry |
 
 Every action is a **dry run** unless the body has `"apply": true` and
 `"confirm"` equal to the source key (or `"all"` for a re-enqueue without a
-`source`). A dry run still goes through the worker and its output shows what
+`source`). A `delete_document` is confirmed with the entity id when it names
+one document, and with `"<n> documents"` (e.g. `"3 documents"`) when it names
+several. A dry run still goes through the worker and its output shows what
 would happen.
 
 A valid request answers `202` with the queued job. The web container does not
@@ -892,8 +895,10 @@ curl -sS -X POST https://openbesluitvorming.nl/api/ops/purge_source \
 ```
 
 Out of scope on purpose: arbitrary scripts, catalog edits,
-`enqueue_full_history`, Quickwit index management and document takedowns
-(`scripts/delete_document.ts`). Those still need a shell on the host.
+`enqueue_full_history` and Quickwit index management. Those still need a shell
+on the host. A takedown through `delete_document` follows the same runbook as
+the script (`docs_internal/`): the endpoint only replaces the shell, not the
+review of whether a document has to go.
 
 ### Rate limit and audit
 

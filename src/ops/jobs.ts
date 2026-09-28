@@ -9,13 +9,15 @@
  *
  * Every action is a dry run unless the request carries `apply: true` and a
  * `confirm` equal to the source key it acts on (or `"all"` for a re-enqueue
- * across every source).
+ * across every source). A takedown is confirmed with the document's entity id,
+ * or with `"<n> documents"` when it names several.
  */
 
 import { startIngest } from "../ingest.ts";
 import { getProjectableSource, getSource } from "../sources/index.ts";
 import { findActiveRun, type OpsJobRecord } from "./store.ts";
 import { purgeSource } from "./purge_source.ts";
+import { deleteDocuments, parseDocumentEntityId } from "./delete_document.ts";
 import {
   DEFAULT_MIN_WINDOW_DAYS,
   DEFAULT_REENQUEUE_STATUSES,
@@ -24,7 +26,12 @@ import {
   type ReenqueueStatus,
 } from "./reenqueue_failed_windows.ts";
 
-export const OPS_ACTIONS = ["rerun_source", "reenqueue_failed_windows", "purge_source"] as const;
+export const OPS_ACTIONS = [
+  "rerun_source",
+  "reenqueue_failed_windows",
+  "purge_source",
+  "delete_document",
+] as const;
 export type OpsAction = (typeof OPS_ACTIONS)[number];
 
 export function isOpsAction(value: string): value is OpsAction {
@@ -55,7 +62,21 @@ export interface PurgeSourceParams {
   keepStorage: boolean;
 }
 
-export type OpsJobParams = RerunSourceParams | ReenqueueParams | PurgeSourceParams;
+export interface DeleteDocumentParams {
+  entityIds: string[];
+  reason: string;
+}
+
+/** Most documents one takedown job may name. A BSN finding set is usually a
+ * handful; a larger batch is a sign something other than a takedown is going
+ * on, and belongs on the host where someone watches it. */
+export const MAX_DELETE_DOCUMENTS = 100;
+
+export type OpsJobParams =
+  | RerunSourceParams
+  | ReenqueueParams
+  | PurgeSourceParams
+  | DeleteDocumentParams;
 
 export class OpsValidationError extends Error {
   constructor(message: string) {
@@ -74,6 +95,8 @@ export interface ValidatedOpsRequest {
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const YEAR = /^\d{4}$/;
+// Stored in the blocklist and shown in dry runs; kept to a short label.
+const REASON = /^[a-z0-9_-]{1,40}$/;
 
 function optionalString(body: Record<string, unknown>, key: string): string | undefined {
   const value = body[key];
@@ -209,6 +232,40 @@ function validatePurge(body: Record<string, unknown>): PurgeSourceParams {
   };
 }
 
+function validateDeleteDocument(body: Record<string, unknown>): DeleteDocumentParams {
+  const raw = body.entityIds;
+  if (!Array.isArray(raw) || raw.length === 0) {
+    throw new OpsValidationError(`"entityIds" must be a non-empty list of document entity ids.`);
+  }
+  if (raw.length > MAX_DELETE_DOCUMENTS) {
+    throw new OpsValidationError(
+      `At most ${MAX_DELETE_DOCUMENTS} documents per job; use scripts/delete_document.ts for more.`,
+    );
+  }
+  const entityIds = new Set<string>();
+  for (const value of raw) {
+    if (typeof value !== "string") {
+      throw new OpsValidationError(`"entityIds" must contain strings.`);
+    }
+    const entityId = value.trim();
+    let sourceKey: string;
+    try {
+      sourceKey = parseDocumentEntityId(entityId).sourceKey;
+    } catch (error) {
+      throw new OpsValidationError(error instanceof Error ? error.message : String(error));
+    }
+    // The id's source has to exist, so a mangled id is a 400 rather than a
+    // job that inspects nothing.
+    resolveSourceKey(sourceKey, false);
+    entityIds.add(entityId);
+  }
+  const reason = optionalString(body, "reason") ?? "takedown";
+  if (!REASON.test(reason)) {
+    throw new OpsValidationError(`"reason" must be a short label such as "bsn" or "takedown".`);
+  }
+  return { entityIds: [...entityIds], reason };
+}
+
 function validateParams(action: OpsAction, body: Record<string, unknown>): OpsJobParams {
   switch (action) {
     case "rerun_source":
@@ -217,10 +274,17 @@ function validateParams(action: OpsAction, body: Record<string, unknown>): OpsJo
       return validateReenqueue(body);
     case "purge_source":
       return validatePurge(body);
+    case "delete_document":
+      return validateDeleteDocument(body);
   }
 }
 
 function confirmTargetFor(params: OpsJobParams): string {
+  if ("entityIds" in params) {
+    return params.entityIds.length === 1
+      ? params.entityIds[0]
+      : `${params.entityIds.length} documents`;
+  }
   return params.source ?? CONFIRM_ALL_SOURCES;
 }
 
@@ -287,6 +351,16 @@ export async function executeOpsJob(
       );
       if (!result.storageComplete) {
         throw new Error("Object storage was not fully cleared; re-running is safe.");
+      }
+      return;
+    }
+    case "delete_document": {
+      const p = params as DeleteDocumentParams;
+      const result = await deleteDocuments(p.entityIds, { apply, reason: p.reason }, log);
+      if (result.failures > 0) {
+        throw new Error(
+          `${result.failures} of ${result.inspected} document(s) failed; re-running is safe.`,
+        );
       }
       return;
     }

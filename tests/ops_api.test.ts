@@ -388,3 +388,53 @@ Deno.test("re-enqueueing failed windows: dry run counts, apply enqueues, active 
   const again = await reenqueueFailedWindows({ ...options, apply: true }, () => {});
   assertEquals([again.enqueued, again.skipped], [0, 1], "an active window is skipped");
 });
+
+Deno.test("delete_document validates entity ids and is confirmed by id or count", async () => {
+  clearJobs();
+  const one = `document:notubiz:municipality:${RUNNABLE}:12345`;
+  const two = `document:notubiz:municipality:${RUNNABLE}:67890`;
+
+  const single = validateOpsRequest("delete_document", {
+    entityIds: [one, one],
+    reason: "bsn",
+    apply: true,
+    confirm: one,
+  });
+  assertEquals(single.params, { entityIds: [one], reason: "bsn" }, "duplicates collapse");
+  assertEquals(single.confirmTarget, one, "one document is confirmed by its id");
+
+  const several = validateOpsRequest("delete_document", { entityIds: [one, two] });
+  assertEquals(several.confirmTarget, "2 documents", "several are confirmed by count");
+  assertEquals(several.params, { entityIds: [one, two], reason: "takedown" }, "default reason");
+
+  const invalid = [
+    {},
+    { entityIds: [] },
+    { entityIds: "document:notubiz:municipality:x:1" },
+    { entityIds: [`meeting:notubiz:municipality:${RUNNABLE}:1`] },
+    { entityIds: ["document:notubiz:municipality:no_such_source:1"] },
+    { entityIds: [`document:notubiz:municipality:${RUNNABLE}`] },
+    { entityIds: [one], reason: "Een vrije zin met spaties" },
+    { entityIds: Array.from({ length: 101 }, (_, i) => `${one}${i}`) },
+    { entityIds: [one, two], apply: true, confirm: one },
+  ];
+  for (const body of invalid) {
+    let rejected = false;
+    try {
+      validateOpsRequest("delete_document", body);
+    } catch (error) {
+      rejected = error instanceof OpsValidationError;
+    }
+    assert(rejected, `rejects ${JSON.stringify(body).slice(0, 120)}`);
+  }
+
+  const { handle } = handler();
+  const queued = await handle(
+    request("/api/ops/delete_document", { body: { entityIds: [one] }, actor: "joep" }),
+    "1.2.3.4",
+  );
+  assertEquals(queued.status, 202, "a dry-run takedown is queued");
+  const { job } = await queued.json();
+  assertEquals([job.action, job.apply], ["delete_document", false], "queued as a dry run");
+  clearJobs();
+});
