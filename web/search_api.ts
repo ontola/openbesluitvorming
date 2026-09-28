@@ -19,6 +19,7 @@ import {
   projectionSupportsPhraseSearch,
 } from "../src/pipeline/versioning.ts";
 import { QuickwitClient } from "../src/quickwit/client.ts";
+import { listCatalogSources } from "../src/sources/catalog.ts";
 import { getProjectableSource, getSource, listSources } from "../src/sources/index.ts";
 import { ObjectStorageClient } from "../src/storage/s3.ts";
 import { readTranscript } from "../src/recordings/storage.ts";
@@ -277,6 +278,28 @@ export function queryHasPhrase(text: string): boolean {
  * maps to both. Built once, on first use; the catalog does not change while
  * the server runs. */
 let organizationTermIndex: Map<string, string[]> | null = null;
+let predecessorIndex: Map<string, string[]> | null = null;
+
+/** The source keys an organization covers: its own, plus those of the
+ * organizations merged into it (*herindelingen*). Weesp became part of
+ * Amsterdam in 2022, so searching Amsterdam includes Weesp's older records.
+ * The catalog's `succeededBySourceKey` is the one place this is recorded;
+ * a predecessor keeps its own key, so filtering on it alone still works. */
+export function organizationSourceKeys(key: string): string[] {
+  if (!predecessorIndex) {
+    const index = new Map<string, string[]>();
+    for (const source of listCatalogSources()) {
+      if (!source.implemented || !source.succeededBySourceKey) {
+        continue;
+      }
+      const keys = index.get(source.succeededBySourceKey) ?? [];
+      keys.push(source.key);
+      index.set(source.succeededBySourceKey, keys);
+    }
+    predecessorIndex = index;
+  }
+  return [key, ...(predecessorIndex.get(key) ?? [])];
+}
 const ORGANIZATION_TERM_MAX_WORDS = 4;
 
 function organizationTerms(): Map<string, string[]> {
@@ -297,9 +320,11 @@ function organizationTerms(): Map<string, string[]> {
     index.set(joined, keys);
   };
   for (const source of listSources()) {
-    add(source.key, source.key);
-    if (source.label) {
-      add(source.label, source.key);
+    for (const key of organizationSourceKeys(source.key)) {
+      add(source.key, key);
+      if (source.label) {
+        add(source.label, key);
+      }
     }
   }
   organizationTermIndex = index;
@@ -438,7 +463,12 @@ function buildQuickwitQuery(
     // public, so nothing confidential was reachable, but a caller could still
     // shape an arbitrarily expensive query while the rate limiter charged it a
     // single unit.
-    parts.push(`source_key:${escapeTerm(organization)}`);
+    const keys = organizationSourceKeys(organization);
+    parts.push(
+      keys.length === 1
+        ? `source_key:${escapeTerm(organization)}`
+        : `(${keys.map((key) => `source_key:${escapeTerm(key)}`).join(" OR ")})`,
+    );
   }
 
   if (query) {
