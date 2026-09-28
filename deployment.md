@@ -73,6 +73,10 @@ Common app/runtime values:
 - `INGEST_MIN_FREE_MEMORY_MB`
 - `QUICKWIT_BATCH_SIZE`
 
+Optional:
+
+- `WOOZI_OPS_TOKEN` enables `/api/ops/*` (see [Ops Endpoint](#ops-endpoint))
+
 ## Docker Runtime
 
 The production image is built from [Dockerfile.web](Dockerfile.web).
@@ -796,6 +800,122 @@ Example `.env` value:
 
 ```env
 ADMIN_PASSWORD_HASH=$$2a$$14$$exampleexampleexampleexampleexampleexampleexampleexample
+```
+
+## Ops Endpoint
+
+`/api/ops/*` lets an operator (or an agent acting for one) check imports and
+start a fixed set of maintenance actions without a shell on the server. It is
+not part of the public API contract and is deliberately absent from API.md.
+
+It is separate from the admin protection above: Caddy passes `/api/ops/*`
+straight through, and the app authenticates it with a bearer token from
+`WOOZI_OPS_TOKEN` (compared in constant time). When the variable is unset or
+empty, every path under `/api/ops/` answers 404.
+
+### Setting the token
+
+Generate a token (hex only, so no `$` escaping is needed in `.env`):
+
+```sh
+openssl rand -hex 32
+```
+
+Add it to `/opt/woozi/.env` on the production host:
+
+```env
+WOOZI_OPS_TOKEN=<the generated value>
+```
+
+and recreate the web container so it picks it up:
+
+```sh
+ssh root@91.98.32.151 'cd /opt/woozi && docker compose -f docker-compose.production.yml up -d --no-deps openbesluitvorming'
+```
+
+To rotate, replace the value and recreate the container again; to disable,
+remove the line. Keep the token out of shell history and chat logs; it grants
+the purge and takedown actions below.
+
+### Requests
+
+Every request carries `Authorization: Bearer <token>`, and should carry
+`X-Ops-Actor: <who>` (free text, stored with jobs and logged; defaults to
+`unknown`).
+
+Reads answer directly:
+
+| Request | Returns |
+| --- | --- |
+| `GET /api/ops/runs?source=&status=&limit=&offset=` | import runs, newest first (`{ runs, hasMore }`) |
+| `GET /api/ops/summary` | the run summary the admin dashboard shows |
+| `GET /api/ops/runs/<id>` | one run with its issues |
+| `GET /api/ops/jobs?status=&limit=&offset=` | ops jobs, newest first (`{ jobs, hasMore }`) |
+| `GET /api/ops/jobs/<id>` | one job, including its captured output |
+
+Mutating actions are `POST /api/ops/<action>` with a JSON body:
+
+| Action | Body | Does |
+| --- | --- | --- |
+| `rerun_source` | `source`, `mode` (`full` default, or `reindex_only`), `dateFrom`/`dateTo` (`YYYY-MM-DD`, required for `full`, forbidden for `reindex_only`) | enqueues one import run, like "Opnieuw draaien" in the admin UI; only sources with `implemented: true` |
+| `reenqueue_failed_windows` | optional `source`, `statuses` (`["failed","partial"]` default), `minWindowDays` (20), `fromYear`, `toYear` | same as `scripts/reenqueue_failed_windows.ts` |
+| `purge_source` | `source`, optional `quickwit` (bool), `keepStorage` (bool) | same as `scripts/purge_source.ts` |
+| `delete_document` | `entityIds` (1 to 100 document entity ids), optional `reason` (short label, `takedown` default, e.g. `bsn`) | same as `scripts/delete_document.ts`: delete markers and a delete task in Quickwit, the document's objects, an export tombstone, and a blocklist entry |
+
+Every action is a **dry run** unless the body has `"apply": true` and
+`"confirm"` equal to the source key (or `"all"` for a re-enqueue without a
+`source`). A `delete_document` is confirmed with the entity id when it names
+one document, and with `"<n> documents"` (e.g. `"3 documents"`) when it names
+several. A dry run still goes through the worker and its output shows what
+would happen.
+
+A valid request answers `202` with the queued job. The web container does not
+execute it: a worker (`src/worker.ts`) claims it from the `ops_job` table in
+the ops SQLite, runs it next to its imports (one job at a time per worker),
+and writes the output lines into the row. Poll `GET /api/ops/jobs/<id>` until
+`status` is `succeeded` or `failed`. Only one apply job can be queued or
+running at a time; a second one gets `409` with `activeJobId`. A job
+interrupted by a worker restart is requeued once and failed the second time;
+a deploy's SIGTERM hands it back to the queue directly. Every action is
+idempotent, but a requeued `rerun_source` whose run was already created fails
+with "already queued", which is the correct outcome.
+
+Example, dry run then apply:
+
+```sh
+curl -sS -X POST https://openbesluitvorming.nl/api/ops/purge_source \
+  -H "Authorization: Bearer $WOOZI_OPS_TOKEN" -H "X-Ops-Actor: joep" \
+  -H "content-type: application/json" \
+  -d '{"source":"waterschap_limburg"}'
+
+curl -sS -X POST https://openbesluitvorming.nl/api/ops/purge_source \
+  -H "Authorization: Bearer $WOOZI_OPS_TOKEN" -H "X-Ops-Actor: joep" \
+  -H "content-type: application/json" \
+  -d '{"source":"waterschap_limburg","apply":true,"confirm":"waterschap_limburg"}'
+```
+
+Out of scope on purpose: arbitrary scripts, catalog edits,
+`enqueue_full_history` and Quickwit index management. Those still need a shell
+on the host. A takedown through `delete_document` follows the same runbook as
+the script (`docs_internal/`): the endpoint only replaces the shell, not the
+review of whether a document has to go.
+
+### Rate limit and audit
+
+The endpoint is excluded from the public rate limiter and has its own: 30
+requests per minute for the token, and a separate 30 per minute per client
+address for failed authentication. Over budget answers `429` with
+`Retry-After`.
+
+Every request writes one JSON line to the web container's log with
+`event: "ops_request"`, method, path, actor, client address, outcome
+(`ok`, `queued`, `missing_token`, `invalid_token`, `rate_limited`,
+`bad_request`, `conflict`, `not_found`, `disabled`, `error`), status and,
+for actions, the action, `apply` and job id. The token is never logged. To
+review:
+
+```sh
+ssh root@91.98.32.151 'cd /opt/woozi && docker compose -f docker-compose.production.yml logs openbesluitvorming --since 24h | grep ops_request'
 ```
 
 ## Monitoring and Backups

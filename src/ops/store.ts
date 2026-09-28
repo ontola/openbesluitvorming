@@ -111,7 +111,23 @@ async function getDatabase(): Promise<DatabaseSync> {
           supplier TEXT PRIMARY KEY,
           start_offset INTEGER NOT NULL DEFAULT 0
         );
+        CREATE TABLE IF NOT EXISTS ops_job (
+          id TEXT PRIMARY KEY,
+          action TEXT NOT NULL,
+          params TEXT NOT NULL,
+          apply INTEGER NOT NULL DEFAULT 0,
+          actor TEXT NOT NULL,
+          status TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          started_at TEXT,
+          finished_at TEXT,
+          claimed_at TEXT,
+          interrupted_count INTEGER NOT NULL DEFAULT 0,
+          output TEXT NOT NULL DEFAULT '',
+          error TEXT
+        );
       `);
+      db.exec(`CREATE INDEX IF NOT EXISTS ops_job_status ON ops_job (status, created_at)`);
       try {
         db.exec("ALTER TABLE ingest_run_issue ADD COLUMN details TEXT");
       } catch {
@@ -1271,4 +1287,285 @@ export async function latestCoverageChecks(): Promise<CoverageCheckRecord[]> {
     missing_sample: JSON.parse(row.missing_sample) as string[],
     error: row.error ?? undefined,
   }));
+}
+
+/** A full-history backfill window whose last attempts all failed or came back
+ * partial, and that no later attempt has completed. See
+ * src/ops/reenqueue_failed_windows.ts. */
+export interface FailedBackfillWindow {
+  source_key: string;
+  supplier: string;
+  date_from: string;
+  date_to: string;
+}
+
+export async function listFailedBackfillWindows(options: {
+  statuses: ("failed" | "partial")[];
+  minWindowDays: number;
+  sourceKey?: string;
+  fromYear?: string;
+  toYear?: string;
+}): Promise<FailedBackfillWindow[]> {
+  const db = await getDatabase();
+  // The statuses are checked against a closed set by the caller's type, and
+  // bound as parameters all the same.
+  const statusParams = options.statuses.map((_, index) => `@status_${index}`);
+  const params: Record<string, string | number | null> = {
+    min_window_days: options.minWindowDays,
+    source: options.sourceKey ?? null,
+    from_year: options.fromYear ?? null,
+    to_year: options.toYear ?? null,
+  };
+  options.statuses.forEach((status, index) => {
+    params[`status_${index}`] = status;
+  });
+  return db
+    .prepare(
+      `SELECT DISTINCT r.source_key, r.supplier, r.date_from, r.date_to
+       FROM ingest_run r
+       WHERE r.trigger_mode IN ('scheduled', 'backfill')
+         AND r.execution_mode = 'full'
+         AND r.status IN (${statusParams.join(", ")})
+         AND (julianday(r.date_to) - julianday(r.date_from)) > @min_window_days
+         AND (@source IS NULL OR r.source_key = @source)
+         AND (@from_year IS NULL OR substr(r.date_from, 1, 4) >= @from_year)
+         AND (@to_year IS NULL OR substr(r.date_from, 1, 4) <= @to_year)
+         AND NOT EXISTS (
+           SELECT 1 FROM ingest_run r2
+           WHERE r2.source_key = r.source_key
+             AND r2.date_from = r.date_from
+             AND r2.date_to = r.date_to
+             AND r2.status = 'succeeded'
+         )
+       ORDER BY r.date_from DESC`,
+    )
+    .all(params) as unknown as FailedBackfillWindow[];
+}
+
+// --- Ops jobs ----------------------------------------------------------------
+//
+// Mutating requests to /api/ops/* are not executed by the web container: they
+// become a row here, and a worker (src/worker.ts) claims and runs it. The web
+// process answers searches on a single event loop, and a purge reads a whole
+// source out of the export log.
+
+export type OpsJobStatus = "queued" | "running" | "succeeded" | "failed";
+
+export interface OpsJobRecord {
+  id: string;
+  action: string;
+  params: Record<string, unknown>;
+  apply: boolean;
+  actor: string;
+  status: OpsJobStatus;
+  created_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+  output: string;
+  error: string | null;
+}
+
+interface OpsJobRow {
+  id: string;
+  action: string;
+  params: string;
+  apply: number;
+  actor: string;
+  status: OpsJobStatus;
+  created_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+  output: string;
+  error: string | null;
+}
+
+const OPS_JOB_COLUMNS = `id, action, params, apply, actor, status, created_at, started_at,
+  finished_at, output, error`;
+
+/** Captured output is for reading back what a job did, not an archive. A purge
+ * prints a dozen lines, so this only bites a job that runs away. */
+const OPS_JOB_OUTPUT_LIMIT = 64 * 1024;
+
+function toOpsJob(row: OpsJobRow): OpsJobRecord {
+  let params: Record<string, unknown> = {};
+  try {
+    params = JSON.parse(row.params) as Record<string, unknown>;
+  } catch {
+    // Keep the job readable even if its params are not.
+  }
+  return { ...row, params, apply: row.apply === 1 };
+}
+
+/** Thrown when an apply job is requested while another one is still queued or
+ * running. */
+export class OpsJobConflictError extends Error {
+  constructor(readonly activeJobId: string) {
+    super(`Apply job ${activeJobId} is still queued or running.`);
+    this.name = "OpsJobConflictError";
+  }
+}
+
+/** Queue a job. At most one apply job may be queued or running at a time; the
+ * check and the insert are one statement, so two requests racing for the slot
+ * cannot both win it. */
+export async function createOpsJob(job: {
+  action: string;
+  params: Record<string, unknown>;
+  apply: boolean;
+  actor: string;
+}): Promise<OpsJobRecord> {
+  const db = await getDatabase();
+  const id = crypto.randomUUID();
+  const inserted = db
+    .prepare(
+      `INSERT INTO ops_job (id, action, params, apply, actor, status, created_at)
+       SELECT @id, @action, @params, @apply, @actor, 'queued', @created_at
+       WHERE @apply = 0 OR NOT EXISTS (
+         SELECT 1 FROM ops_job WHERE apply = 1 AND status IN ('queued', 'running')
+       )`,
+    )
+    .run({
+      id,
+      action: job.action,
+      params: JSON.stringify(job.params),
+      apply: job.apply ? 1 : 0,
+      actor: job.actor,
+      created_at: new Date().toISOString(),
+    });
+  if (Number(inserted.changes) === 0) {
+    const active = db
+      .prepare(
+        `SELECT id FROM ops_job WHERE apply = 1 AND status IN ('queued', 'running')
+         ORDER BY created_at LIMIT 1`,
+      )
+      .get() as { id: string } | undefined;
+    throw new OpsJobConflictError(active?.id ?? "unknown");
+  }
+  return (await getOpsJob(id))!;
+}
+
+export async function getOpsJob(id: string): Promise<OpsJobRecord | null> {
+  const db = await getDatabase();
+  const row = db.prepare(`SELECT ${OPS_JOB_COLUMNS} FROM ops_job WHERE id = ?`).get(id) as
+    | OpsJobRow
+    | undefined;
+  return row ? toOpsJob(row) : null;
+}
+
+export async function listOpsJobs(
+  options: { status?: string; limit?: number; offset?: number } = {},
+): Promise<OpsJobRecord[]> {
+  const db = await getDatabase();
+  const rows = db
+    .prepare(
+      `SELECT ${OPS_JOB_COLUMNS} FROM ops_job
+       WHERE (@status IS NULL OR status = @status)
+       ORDER BY created_at DESC
+       LIMIT @limit OFFSET @offset`,
+    )
+    .all({
+      status: options.status ?? null,
+      limit: options.limit ?? 50,
+      offset: Math.max(0, options.offset ?? 0),
+    }) as unknown as OpsJobRow[];
+  return rows.map(toOpsJob);
+}
+
+/** Take the oldest queued job for this process. Same pattern as
+ * claimQueuedRun: the status guard means at most one worker gets it. */
+export async function claimQueuedOpsJob(): Promise<OpsJobRecord | null> {
+  const db = await getDatabase();
+  const now = new Date().toISOString();
+  const row = db
+    .prepare(
+      `UPDATE ops_job
+       SET status = 'running', started_at = @now, claimed_at = @now, error = NULL
+       WHERE id = (
+         SELECT id FROM ops_job WHERE status = 'queued' ORDER BY created_at LIMIT 1
+       ) AND status = 'queued'
+       RETURNING ${OPS_JOB_COLUMNS}`,
+    )
+    .get({ now }) as OpsJobRow | undefined;
+  return row ? toOpsJob(row) : null;
+}
+
+export async function appendOpsJobOutput(id: string, line: string): Promise<void> {
+  const db = await getDatabase();
+  db.prepare(
+    `UPDATE ops_job
+     SET output = CASE
+       WHEN length(output) >= @limit THEN output
+       ELSE substr(output || @line || char(10), 1, @limit)
+     END
+     WHERE id = @id`,
+  ).run({ id, line, limit: OPS_JOB_OUTPUT_LIMIT });
+}
+
+export async function finishOpsJob(
+  id: string,
+  result: { status: "succeeded" | "failed"; error?: string },
+): Promise<void> {
+  const db = await getDatabase();
+  db.prepare(
+    `UPDATE ops_job SET status = @status, finished_at = @finished_at, error = @error
+     WHERE id = @id AND status = 'running'`,
+  ).run({
+    id,
+    status: result.status,
+    finished_at: new Date().toISOString(),
+    error: result.error ?? null,
+  });
+}
+
+/** Hand a claimed job back to the queue, for a worker that is shutting down. */
+export async function releaseOpsJob(id: string): Promise<void> {
+  const db = await getDatabase();
+  db.prepare(
+    `UPDATE ops_job SET status = 'queued', started_at = NULL, claimed_at = NULL
+     WHERE id = ? AND status = 'running'`,
+  ).run(id);
+}
+
+/** Every ops action is idempotent (a purge of a purged source is a no-op, a
+ * re-enqueue skips active runs), so an interrupted job is requeued like an
+ * interrupted import -- but only once: a job that keeps killing its worker
+ * should stop, not loop. */
+const MAX_OPS_JOB_REQUEUES = 1;
+
+/** Startup counterpart of reconcileInterruptedRuns for ops jobs, with the same
+ * claim-age margin so a sibling worker's fresh claim is left alone. */
+export async function reconcileInterruptedOpsJobs(): Promise<OpsJobRecord[]> {
+  const db = await getDatabase();
+  const claimedBefore = new Date(Date.now() - RECONCILE_MIN_CLAIM_AGE_MS).toISOString();
+  const rows = db
+    .prepare(
+      `SELECT ${OPS_JOB_COLUMNS}, interrupted_count FROM ops_job
+       WHERE status = 'running' AND COALESCE(claimed_at, started_at, created_at) < ?`,
+    )
+    .all(claimedBefore) as unknown as (OpsJobRow & { interrupted_count: number })[];
+  const requeue = db.prepare(
+    `UPDATE ops_job SET status = 'queued', started_at = NULL, claimed_at = NULL,
+       interrupted_count = interrupted_count + 1,
+       output = output || @note
+     WHERE id = @id AND status = 'running'`,
+  );
+  const fail = db.prepare(
+    `UPDATE ops_job SET status = 'failed', finished_at = @finished_at, error = @error
+     WHERE id = @id AND status = 'running'`,
+  );
+  const reconciled: OpsJobRecord[] = [];
+  for (const row of rows) {
+    if (row.interrupted_count < MAX_OPS_JOB_REQUEUES) {
+      requeue.run({
+        id: row.id,
+        note: "[worker] Interrupted by a process restart; requeued.\n",
+      });
+      reconciled.push(toOpsJob({ ...row, status: "queued" }));
+    } else {
+      const error = "Process terminated before completion; not requeued again.";
+      fail.run({ id: row.id, finished_at: new Date().toISOString(), error });
+      reconciled.push(toOpsJob({ ...row, status: "failed", error }));
+    }
+  }
+  return reconciled;
 }

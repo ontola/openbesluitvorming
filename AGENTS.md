@@ -164,6 +164,14 @@ Current implemented slices:
   exposes it as `coverage` per source. "Last import succeeded" only says the
   run finished; `coverage` says whether it asked for everything (#258 found
   a Notubiz source at 11% for 2025 while its status was green).
+- `/api/ops/*` (`web/ops_api.ts`, enabled by `WOOZI_OPS_TOKEN`) is a
+  bearer-token endpoint for status reads and a fixed set of actions
+  (`src/ops/jobs.ts`). Mutating actions are queued in `ops_job` and run by
+  the worker, never in the web container; dry run unless `apply` plus
+  `confirm`. `scripts/purge_source.ts`, `scripts/reenqueue_failed_windows.ts`
+  and `scripts/delete_document.ts` are thin wrappers around the same modules
+  in `src/ops/`. See deployment.md,
+  "Ops Endpoint".
 - The admin dashboard polls every 5s. Any per-run work it does (e.g. fetching run detail) multiplies by the number of visible runs — keep the dashboard cheap so it doesn't starve the single-threaded `openbesluitvorming` process and slow down user searches.
 
 ### iBabs specifics

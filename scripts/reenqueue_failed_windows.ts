@@ -32,10 +32,12 @@
  */
 
 import { parseArgs } from "node:util";
-import { DatabaseSync } from "node:sqlite";
-import { createRun, findActiveRun } from "../src/ops/store.ts";
-import { currentDerivationVersion, currentProjectionVersion } from "../src/pipeline/versioning.ts";
-import { getConfigValue } from "../src/config.ts";
+import {
+  DEFAULT_MIN_WINDOW_DAYS,
+  parseReenqueueStatuses,
+  reenqueueFailedWindows,
+  type ReenqueueStatus,
+} from "../src/ops/reenqueue_failed_windows.ts";
 
 const { values: args } = parseArgs({
   args: Deno.args,
@@ -46,7 +48,7 @@ const { values: args } = parseArgs({
     // the 14-day daily-scheduler windows -- identified by width. Matches
     // both trigger values since older backfill rows may still carry
     // "scheduled" from before it was split out into "backfill".
-    "min-window-days": { type: "string", default: "20" },
+    "min-window-days": { type: "string", default: String(DEFAULT_MIN_WINDOW_DAYS) },
     // Narrow the sweep to the window's start year, so the highest-yield
     // periods can be re-run first instead of queueing everything at once.
     "from-year": { type: "string" },
@@ -59,82 +61,19 @@ const { values: args } = parseArgs({
   },
 });
 
-const statuses = args.status.split(",").map((s) => s.trim()).filter(Boolean);
-for (const status of statuses) {
-  if (status !== "failed" && status !== "partial") {
-    console.error(`Unknown --status value ${status}; expected "failed" and/or "partial".`);
-    Deno.exit(1);
-  }
+let statuses: ReenqueueStatus[];
+try {
+  statuses = parseReenqueueStatuses(args.status);
+} catch (error) {
+  console.error(error instanceof Error ? error.message : String(error));
+  Deno.exit(1);
 }
 
-const dbPath = await getConfigValue("WOOZI_KV_PATH", "./woozi-ops.sqlite3");
-const readDb = new DatabaseSync(dbPath, { readOnly: true });
-
-const rows = readDb
-  .prepare(
-    `SELECT DISTINCT r.source_key, r.supplier, r.date_from, r.date_to
-     FROM ingest_run r
-     WHERE r.trigger_mode IN ('scheduled', 'backfill')
-       AND r.execution_mode = 'full'
-       AND r.status IN (${statuses.map((s) => `'${s}'`).join(", ")})
-       AND (julianday(r.date_to) - julianday(r.date_from)) > @min_window_days
-       AND (@source IS NULL OR r.source_key = @source)
-       AND (@from_year IS NULL OR substr(r.date_from, 1, 4) >= @from_year)
-       AND (@to_year IS NULL OR substr(r.date_from, 1, 4) <= @to_year)
-       AND NOT EXISTS (
-         SELECT 1 FROM ingest_run r2
-         WHERE r2.source_key = r.source_key
-           AND r2.date_from = r.date_from
-           AND r2.date_to = r.date_to
-           AND r2.status = 'succeeded'
-       )
-     ORDER BY r.date_from DESC`,
-  )
-  .all({
-    min_window_days: Number(args["min-window-days"]),
-    source: args.source ?? null,
-    from_year: args["from-year"] ?? null,
-    to_year: args["to-year"] ?? null,
-  }) as Array<{ source_key: string; supplier: string; date_from: string; date_to: string }>;
-
-readDb.close();
-
-console.log(
-  `${args.apply ? "Re-enqueueing" : "[dry-run] Would re-enqueue"} ${rows.length} failed/partial window(s)` +
-    (args.source ? ` for source ${args.source}` : "") + ".",
-);
-
-let enqueued = 0;
-let skipped = 0;
-
-for (const row of rows) {
-  const existing = await findActiveRun({
-    sourceKey: row.source_key,
-    dateFrom: row.date_from,
-    dateTo: row.date_to,
-    executionMode: "full",
-  });
-  if (existing) {
-    skipped += 1;
-    continue;
-  }
-  if (args.apply) {
-    await createRun({
-      source_key: row.source_key,
-      supplier: row.supplier,
-      date_from: row.date_from,
-      date_to: row.date_to,
-      trigger: "backfill",
-      execution_mode: "full",
-      parent_run_id: undefined,
-      projection_version: currentProjectionVersion(),
-      derivation_version: currentDerivationVersion(),
-      status: "queued",
-    });
-  }
-  enqueued += 1;
-}
-
-console.log(
-  `${args.apply ? "Enqueued" : "[dry-run] Would enqueue"} ${enqueued} runs (${skipped} skipped as already active).`,
-);
+await reenqueueFailedWindows({
+  apply: args.apply,
+  source: args.source,
+  minWindowDays: Number(args["min-window-days"]),
+  fromYear: args["from-year"],
+  toYear: args["to-year"],
+  statuses,
+});

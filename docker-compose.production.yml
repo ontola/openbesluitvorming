@@ -96,6 +96,9 @@ services:
       S3_STORAGE_REGION: ${S3_STORAGE_REGION}
       WOOZI_EXTRACTION_SERVICE_URL: ${WOOZI_EXTRACTION_SERVICE_URL:-}
       WOOZI_SCHEDULER_ENABLED: ${WOOZI_SCHEDULER_ENABLED:-1}
+      # Bearer token for /api/ops/* (deployment.md, "Ops Endpoint"). Empty
+      # disables the endpoint: every path under it answers 404.
+      WOOZI_OPS_TOKEN: ${WOOZI_OPS_TOKEN:-}
       # The weekly coverage check (scripts/coverage_check.ts) runs in this
       # container and talks to iBabs from the same address as the workers.
       # Without these it paced itself as if it were alone on the address
