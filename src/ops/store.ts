@@ -128,6 +128,19 @@ async function getDatabase(): Promise<DatabaseSync> {
         );
       `);
       db.exec(`CREATE INDEX IF NOT EXISTS ops_job_status ON ops_job (status, created_at)`);
+      // Written by the host agent (scripts/ops_host_agent.py) on every tick:
+      // one row per compose service, as `docker compose ps` reports it. The
+      // containers cannot see each other; this is how the web container does.
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS host_service_status (
+          service TEXT PRIMARY KEY,
+          state TEXT NOT NULL,
+          health TEXT,
+          status TEXT,
+          replicas INTEGER NOT NULL,
+          seen_at TEXT NOT NULL
+        );
+      `);
       try {
         db.exec("ALTER TABLE ingest_run_issue ADD COLUMN details TEXT");
       } catch {
@@ -1473,6 +1486,12 @@ export async function listOpsJobs(
 
 /** Take the oldest queued job for this process. Same pattern as
  * claimQueuedRun: the status guard means at most one worker gets it. */
+/** Ops actions the host agent runs (see HOST_ACTIONS in jobs.ts and
+ * scripts/ops_host_agent.py). Defined here, not in jobs.ts, because the claim
+ * and reconcile queries below must leave them alone. */
+export const HOST_OPS_ACTIONS = ["restart_service", "service_logs"] as const;
+const HOST_OPS_ACTIONS_SQL = HOST_OPS_ACTIONS.map((action) => `'${action}'`).join(", ");
+
 export async function claimQueuedOpsJob(): Promise<OpsJobRecord | null> {
   const db = await getDatabase();
   const now = new Date().toISOString();
@@ -1481,7 +1500,9 @@ export async function claimQueuedOpsJob(): Promise<OpsJobRecord | null> {
       `UPDATE ops_job
        SET status = 'running', started_at = @now, claimed_at = @now, error = NULL
        WHERE id = (
-         SELECT id FROM ops_job WHERE status = 'queued' ORDER BY created_at LIMIT 1
+         SELECT id FROM ops_job
+         WHERE status = 'queued' AND action NOT IN (${HOST_OPS_ACTIONS_SQL})
+         ORDER BY created_at LIMIT 1
        ) AND status = 'queued'
        RETURNING ${OPS_JOB_COLUMNS}`,
     )
@@ -1540,7 +1561,8 @@ export async function reconcileInterruptedOpsJobs(): Promise<OpsJobRecord[]> {
   const rows = db
     .prepare(
       `SELECT ${OPS_JOB_COLUMNS}, interrupted_count FROM ops_job
-       WHERE status = 'running' AND COALESCE(claimed_at, started_at, created_at) < ?`,
+       WHERE status = 'running' AND COALESCE(claimed_at, started_at, created_at) < ?
+         AND action NOT IN (${HOST_OPS_ACTIONS_SQL})`,
     )
     .all(claimedBefore) as unknown as (OpsJobRow & { interrupted_count: number })[];
   const requeue = db.prepare(
@@ -1626,4 +1648,25 @@ export async function getOpsQueueHealth(): Promise<OpsQueueHealth> {
     queuedOpsJobs: jobs.queued ?? 0,
     runningOpsJobs: jobs.running ?? 0,
   };
+}
+
+export interface HostServiceStatus {
+  service: string;
+  state: string;
+  health: string | null;
+  status: string | null;
+  replicas: number;
+  seen_at: string;
+}
+
+/** Compose services as the host agent last saw them. Empty until the agent is
+ * installed. */
+export async function listHostServiceStatus(): Promise<HostServiceStatus[]> {
+  const db = await getDatabase();
+  return db
+    .prepare(
+      `SELECT service, state, health, status, replicas, seen_at
+       FROM host_service_status ORDER BY service`,
+    )
+    .all() as unknown as HostServiceStatus[];
 }

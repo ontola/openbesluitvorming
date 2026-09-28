@@ -13,14 +13,20 @@
  * - `quickwit`: readiness and the served index's published counters.
  * - `backup`: age of the last successful state backup (its stamp file).
  * - `imports`: the run and ops-job queues from the ops SQLite.
+ * - `services`: each compose service as the host agent last saw it
+ *   (scripts/ops_host_agent.py). `agent_stale` is true when that was more than
+ *   HOST_AGENT_STALE_SECONDS ago, i.e. the agent is not running.
  */
 
 import { getConfigValue } from "../src/config.ts";
-import { getOpsQueueHealth } from "../src/ops/store.ts";
+import { getOpsQueueHealth, listHostServiceStatus } from "../src/ops/store.ts";
 import { QuickwitClient } from "../src/quickwit/client.ts";
 import { fetchExtractorStats } from "./extractors.ts";
 
 const BACKUP_STAMP_FILE = ".woozi-backup-stamp";
+/** The agent ticks every 15 seconds; four missed ticks means it is not
+ * running. */
+export const HOST_AGENT_STALE_SECONDS = 60;
 
 export interface OpsHealthOptions {
   /** Directory holding the ops SQLite, the backup stamp and the host status
@@ -105,7 +111,7 @@ export async function getOpsHealth(
   const dataDir = options.dataDir ?? (await defaultDataDir());
   const quickwit = options.quickwit ?? new QuickwitClient();
 
-  const [host, extractors, quickwitHealth, backup, imports] = await Promise.all([
+  const [host, extractors, quickwitHealth, backup, imports, services] = await Promise.all([
     section(async () => await (options.host ?? readHostStatus)(dataDir)),
     section(async () => await (options.extractors ?? fetchExtractorStats)()),
     section(async () => {
@@ -140,6 +146,21 @@ export async function getOpsHealth(
       }
     }),
     section(getOpsQueueHealth),
+    section(async () => {
+      const rows = await listHostServiceStatus();
+      if (rows.length === 0) {
+        return { agent_seen_at: null, agent_stale: true, services: [] };
+      }
+      const seenAt = rows.reduce(
+        (latest, row) => (row.seen_at > latest ? row.seen_at : latest),
+        "",
+      );
+      return {
+        agent_seen_at: seenAt,
+        agent_stale: (now() - Date.parse(seenAt)) / 1000 > HOST_AGENT_STALE_SECONDS,
+        services: rows,
+      };
+    }),
   ]);
 
   return {
@@ -149,5 +170,6 @@ export async function getOpsHealth(
     quickwit: quickwitHealth,
     backup,
     imports,
+    services,
   };
 }

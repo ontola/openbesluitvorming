@@ -170,7 +170,9 @@ Current implemented slices:
   the worker, never in the web container; dry run unless `apply` plus
   `confirm`. `scripts/purge_source.ts`, `scripts/reenqueue_failed_windows.ts`
   and `scripts/delete_document.ts` are thin wrappers around the same modules
-  in `src/ops/`. See deployment.md,
+  in `src/ops/`. `restart_service` and `service_logs` need Docker, so the
+  worker skips them and `scripts/ops_host_agent.py` (a systemd timer on the
+  host) runs them; no container gets the Docker socket. See deployment.md,
   "Ops Endpoint".
 - The admin dashboard polls every 5s. Any per-run work it does (e.g. fetching run detail) multiplies by the number of visible runs — keep the dashboard cheap so it doesn't starve the single-threaded `openbesluitvorming` process and slow down user searches.
 
