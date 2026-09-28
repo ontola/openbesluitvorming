@@ -4341,7 +4341,7 @@ export const sourceCatalog = [
   {
     sourceRef: "notubiz:gemeente:weesp",
     key: "weesp",
-    label: "Weesp",
+    label: "Stadsgebied Weesp",
     sourceName: "Weesp",
     supplier: "notubiz",
     organizationType: "gemeente",

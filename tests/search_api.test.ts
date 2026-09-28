@@ -1300,3 +1300,25 @@ Deno.test("naming an organization in the query also matches on its source", asyn
     "a word that names no organization is left alone",
   );
 });
+
+Deno.test("an organization covers the organizations merged into it", async () => {
+  // Weesp became part of Amsterdam on 24 March 2022; searching Amsterdam
+  // should include Weesp's records from before the merger.
+  const { buildSearchClause, organizationSourceKeys } = await import("../web/search_api.ts");
+  const amsterdam = organizationSourceKeys("amsterdam");
+  assert(amsterdam[0] === "amsterdam", `own key first, got ${amsterdam}`);
+  assert(amsterdam.includes("weesp"), `Amsterdam includes Weesp, got ${amsterdam}`);
+  assert(
+    organizationSourceKeys("weesp").join() === "weesp",
+    "a predecessor still filters on its own",
+  );
+  assert(
+    organizationSourceKeys("amersfoort").join() === "amersfoort",
+    "an organization without predecessors is only itself",
+  );
+  const clause = buildSearchClause("amsterdam begroting");
+  assert(
+    clause.includes('source_key:"amsterdam"') && clause.includes('source_key:"weesp"'),
+    `naming Amsterdam in the query also matches Weesp, got ${clause}`,
+  );
+});
