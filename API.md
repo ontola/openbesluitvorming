@@ -404,7 +404,7 @@ at all — i.e. how long the outage has lasted.
 | `lastSuccessAt` | When a full import last succeeded. A partially successful import counts: it means the source was reached and most of it landed |
 | `lastRunAt` / `lastRunStatus` | The most recent full import attempt, whatever its outcome |
 | `lastErrorMessage` | Why the last run failed. Present only when it did. Query strings are stripped |
-| `latestContentDate` | Newest meeting date held for this organization. Often in the future — an agenda is published before the meeting happens |
+| `latestContentDate` | Newest meeting date held for this organization. Often in the future — an agenda is published before the meeting happens. Dates more than two years ahead are typos at the source and are left out |
 | `lastIndexedAt` | When anything was last written to the search index for this organization |
 | `indexedDocuments` | Documents in the search index for this organization, exact at the moment of the request: one per document, pages not counted. The number to reconcile against the source system's own list. Absent when the index did not answer |
 | `coverage` | Present once the weekly coverage check has covered this organization. What the source system's own API listed for a date window, against what the index holds: `supplierDocuments`, `heldDocuments`, `missingDocuments` (the first two partition the third), `ratio` (held over supplier; 1 means complete), `windowFrom`/`windowTo`, `checkedAt`, `missingSample` (a few missing document ids), `lowerBound` (true when some supplier requests failed, so the gap may be larger), and `error` when the check itself failed. `state: "ok"` says the last import ran; `coverage` says whether it asked for everything |

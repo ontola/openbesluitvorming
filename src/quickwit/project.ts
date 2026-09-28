@@ -11,6 +11,7 @@ import type {
 } from "../types.ts";
 import { currentProjectionVersion } from "../pipeline/versioning.ts";
 import { supplierDateTimeToUtc } from "../util/local_time.ts";
+import { isPlausibleDate } from "../util/plausible_date.ts";
 
 export interface QuickwitSearchDocument {
   time: string;
@@ -60,6 +61,14 @@ function documentReferenceDate(payload?: DocumentEntity): string | undefined {
  * through unchecked. A missing value costs one badly-sorted row — it sorts
  * last in both directions — where an unparseable one costs the whole entity. */
 function toIndexDateTime(value?: string): string | undefined {
+  const indexed = parseIndexDateTime(value);
+  // A date decades ahead is a typo at the source (2078, 2099), and as the
+  // newest date it would head every date-sorted list for its organisation.
+  // Unsorted beats first.
+  return isPlausibleDate(indexed) ? indexed : undefined;
+}
+
+function parseIndexDateTime(value?: string): string | undefined {
   const trimmed = value?.trim();
   if (!trimmed) {
     return undefined;
@@ -106,7 +115,7 @@ function toDocumentMonth(value?: string): string | undefined {
   }
 
   const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
+  if (Number.isNaN(parsed.getTime()) || !isPlausibleDate(value)) {
     return undefined;
   }
 

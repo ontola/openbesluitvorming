@@ -23,6 +23,7 @@ import { getProjectableSource, getSource, listSources } from "../src/sources/ind
 import { ObjectStorageClient } from "../src/storage/s3.ts";
 import { readTranscript } from "../src/recordings/storage.ts";
 import { pdfPageCacheKey } from "../src/documents/thumbnails.ts";
+import { futureDateHorizon } from "../src/util/plausible_date.ts";
 
 type SearchHit = {
   time?: string;
@@ -1397,7 +1398,6 @@ export async function getSourceIndexActivity(): Promise<Map<string, SourceIndexA
           terms: { field: "source_key", size: 500 },
           aggs: {
             last_indexed: { max: { field: "time" } },
-            ...(withStartDate ? { latest_start_date: { max: { field: "start_date" } } } : {}),
           },
         },
       },
@@ -1419,8 +1419,39 @@ export async function getSourceIndexActivity(): Promise<Map<string, SourceIndexA
     []) as Array<{
     key?: unknown;
     last_indexed?: { value?: unknown };
-    latest_start_date?: { value?: unknown };
   }>;
+
+  // The newest content date in a request of its own, bounded to what can be
+  // true: rows already projected with a typo'd year (Oirschot's 2078) would
+  // otherwise report that as the organisation's newest content. The bound
+  // cannot go on the request above, because a range clause also drops the
+  // rows that have no start_date from `last_indexed`.
+  const latestStartDates = new Map<string, string>();
+  if (withStartDate) {
+    const horizon = `${futureDateHorizon().toISOString().slice(0, 19)}Z`;
+    try {
+      const dated = await quickwit.searchRequest({
+        query: `projection_version:${escapeTerm(currentProjectionVersion())} AND start_date:[* TO ${horizon}]`,
+        max_hits: 0,
+        aggs: {
+          by_source: {
+            terms: { field: "source_key", size: 500 },
+            aggs: { latest_start_date: { max: { field: "start_date" } } },
+          },
+        },
+      });
+      const datedBuckets = ((dated.aggregations?.by_source as { buckets?: unknown[] })?.buckets ??
+        []) as Array<{ key?: unknown; latest_start_date?: { value?: unknown } }>;
+      for (const bucket of datedBuckets) {
+        const latest = fromAggregationTimestamp(bucket.latest_start_date?.value);
+        if (typeof bucket.key === "string" && latest) {
+          latestStartDates.set(bucket.key, latest);
+        }
+      }
+    } catch {
+      // As with the count: absent, and the rest still answers.
+    }
+  }
 
   // A second request for the document count per source: Quickwit's
   // aggregations cannot filter inside a bucket, and the first request counts
@@ -1450,7 +1481,7 @@ export async function getSourceIndexActivity(): Promise<Map<string, SourceIndexA
     if (!sourceKey) continue;
     activity.set(sourceKey, {
       lastIndexedAt: fromAggregationTimestamp(bucket.last_indexed?.value),
-      latestContentDate: fromAggregationTimestamp(bucket.latest_start_date?.value),
+      latestContentDate: latestStartDates.get(sourceKey),
       documentCount: documentCounts.get(sourceKey),
     });
   }
