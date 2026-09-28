@@ -243,6 +243,32 @@ export class QuickwitClient {
     throw new Error("Quickwit did not become ready in time");
   }
 
+  /** Whether the node answers its readiness probe. Never throws. */
+  async isReady(timeoutMs = 5000): Promise<boolean> {
+    try {
+      const response = await fetch(`${this.baseUrl}/health/readyz`, {
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+      await response.body?.cancel();
+      return response.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  /** Quickwit's own counters for the configured index: published documents,
+   * splits and their size. */
+  async describeIndex(timeoutMs = 5000): Promise<Record<string, unknown>> {
+    return await fetchJson<Record<string, unknown>>(
+      `${this.baseUrl}/api/v1/indexes/${encodeURIComponent(this.indexId)}/describe`,
+      { signal: AbortSignal.timeout(timeoutMs) },
+    );
+  }
+
+  get configuredIndexId(): string {
+    return this.indexId;
+  }
+
   async ensureIndex(configPath: string): Promise<void> {
     const config = applyIndexConfigOverrides(
       JSON.parse(await Deno.readTextFile(configPath)) as Record<string, unknown>,

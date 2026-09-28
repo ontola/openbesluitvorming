@@ -41,6 +41,7 @@ import { RATE_LIMIT_PAGE_UNIT, RateLimiter, type RateVerdict, requestCost } from
 import { apiError } from "./api_errors.ts";
 import { validateSearchParams } from "./search_params.ts";
 import { createOpsHandler, OPS_PATH_PREFIX } from "./ops_api.ts";
+import { fetchExtractorStats } from "./extractors.ts";
 
 const root = new URL("./", import.meta.url);
 const distRoot = new URL("./dist/", import.meta.url);
@@ -447,32 +448,7 @@ async function handleRequest(request: Request): Promise<Response> {
   }
 
   if (url.pathname === "/api/admin/extractors" && request.method === "GET") {
-    const raw = Deno.env.get("WOOZI_EXTRACTION_SERVICE_URL")?.trim() ?? "";
-    const urls = raw
-      ? raw
-          .split(",")
-          .map((u) => u.trim())
-          .filter(Boolean)
-      : [];
-    const workers = await Promise.all(
-      urls.map(async (workerUrl) => {
-        try {
-          // 3s was too tight under load — extractors at CPU load ~2 can
-          // legitimately take longer to respond, causing the dashboard
-          // to flap some nodes to "unreachable" even though they're
-          // actively processing.
-          const response = await fetch(`${workerUrl}/stats`, {
-            signal: AbortSignal.timeout(8_000),
-          });
-          if (!response.ok) throw new Error(`HTTP ${response.status}`);
-          const stats = await response.json();
-          return { url: workerUrl, status: "ok" as const, ...stats };
-        } catch {
-          return { url: workerUrl, status: "unreachable" as const };
-        }
-      }),
-    );
-    return Response.json({ workers });
+    return Response.json({ workers: await fetchExtractorStats() });
   }
 
   if (url.pathname === "/api/admin/coverage" && request.method === "GET") {

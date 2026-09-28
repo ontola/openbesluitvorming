@@ -847,6 +847,7 @@ Reads answer directly:
 
 | Request | Returns |
 | --- | --- |
+| `GET /api/ops/health` | host load, memory and state-volume disk; extraction workers; Quickwit readiness and index counters; backup age; run and job queues (see below) |
 | `GET /api/ops/runs?source=&status=&limit=&offset=` | import runs, newest first (`{ runs, hasMore }`) |
 | `GET /api/ops/summary` | the run summary the admin dashboard shows |
 | `GET /api/ops/runs/<id>` | one run with its issues |
@@ -893,6 +894,23 @@ curl -sS -X POST https://openbesluitvorming.nl/api/ops/purge_source \
   -H "content-type: application/json" \
   -d '{"source":"waterschap_limburg","apply":true,"confirm":"waterschap_limburg"}'
 ```
+
+`GET /api/ops/health` answers in one request, each section on its own so a
+failing dependency shows as `{ "error": ... }` in its section only:
+
+- `host`: load average, CPU count, memory and swap, and free space on the
+  state volume. Read from inside the web container, which shares the host
+  kernel, so these are the production host's figures.
+- `extractors`: each extraction worker's own `/stats` (load, free disk,
+  request counters), or `unreachable`. Same data as `/api/admin/extractors`.
+- `quickwit`: `ready` from `/health/readyz`, plus published docs, splits and
+  size of the served index.
+- `backup`: when the last state backup completed (its stamp file) and its age.
+- `imports`: queued and running runs, the oldest queued run, the last claim
+  and last finished full run, and queued/running ops jobs.
+
+Not in it: per-container state, restarts and logs. Those need the Docker
+socket, which no container gets; use SSH (or SigNoz for logs).
 
 Out of scope on purpose: arbitrary scripts, catalog edits,
 `enqueue_full_history` and Quickwit index management. Those still need a shell
