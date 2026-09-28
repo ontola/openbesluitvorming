@@ -6,11 +6,18 @@
 
 import { executeIngest } from "./ingest.ts";
 import {
+  appendOpsJobOutput,
+  claimQueuedOpsJob,
   claimQueuedRun,
+  finishOpsJob,
   listQueuedRuns,
+  type OpsJobRecord,
+  reconcileInterruptedOpsJobs,
   reconcileInterruptedRuns,
+  releaseOpsJob,
   updateRun,
 } from "./ops/store.ts";
+import { executeOpsJob } from "./ops/jobs.ts";
 import { computeAllowedIngestConcurrency } from "./ingest_scheduler.ts";
 import { IngestStallError, raceStallWatchdog } from "./ingest_watchdog.ts";
 import { ingestStallTimeoutMs } from "./ingest_stall_timeout.ts";
@@ -155,6 +162,61 @@ async function pollAndExecute(): Promise<void> {
   }
 }
 
+// --- Ops jobs ---
+//
+// Actions queued through /api/ops/* (src/ops/jobs.ts). They run here rather
+// than in the web container, one at a time per worker and outside the ingest
+// slots: a purge is mostly waiting on object storage, and should neither wait
+// for an import slot nor take one away.
+
+let activeOpsJob: OpsJobRecord | null = null;
+let opsJobBusy = false;
+
+async function pollOpsJobs(): Promise<void> {
+  if (opsJobBusy) {
+    return;
+  }
+  opsJobBusy = true;
+  try {
+    const job = await claimQueuedOpsJob();
+    if (job) {
+      activeOpsJob = job;
+      await runOpsJob(job);
+    }
+  } finally {
+    activeOpsJob = null;
+    opsJobBusy = false;
+  }
+}
+
+async function runOpsJob(job: OpsJobRecord): Promise<void> {
+  console.log(
+    `[worker ${workerId}] claimed ops job ${job.id} (${job.action}, apply=${job.apply}, actor=${job.actor})`,
+  );
+  // Output is appended in order; a failed write is logged, never fatal.
+  let pending = Promise.resolve();
+  const log = (line: string) => {
+    pending = pending.then(() =>
+      appendOpsJobOutput(job.id, line).catch((error) => {
+        console.error(`[worker ${workerId}] could not store output of ops job ${job.id}`, error);
+      }),
+    );
+  };
+  try {
+    await executeOpsJob(job, log);
+    await pending;
+    await finishOpsJob(job.id, { status: "succeeded" });
+    console.log(`[worker ${workerId}] ops job ${job.id} succeeded`);
+  } catch (error) {
+    await pending;
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`[worker ${workerId}] ops job ${job.id} failed: ${message}`);
+    await finishOpsJob(job.id, { status: "failed", error: message }).catch((updateError) => {
+      console.error(`[worker ${workerId}] could not mark ops job ${job.id} failed`, updateError);
+    });
+  }
+}
+
 // --- Startup ---
 
 // Reconciliation runs in every worker on startup. It's idempotent — the first
@@ -164,6 +226,13 @@ const reconciled = await reconcileInterruptedRuns();
 if (reconciled.length > 0) {
   console.log(
     `[worker ${workerId}] reconciled ${reconciled.length} interrupted import(s) on startup.`,
+  );
+}
+
+const reconciledOpsJobs = await reconcileInterruptedOpsJobs();
+if (reconciledOpsJobs.length > 0) {
+  console.log(
+    `[worker ${workerId}] reconciled ${reconciledOpsJobs.length} interrupted ops job(s) on startup.`,
   );
 }
 
@@ -194,6 +263,12 @@ async function releaseActiveRunsAndExit(): Promise<void> {
       ),
     );
   }
+  if (activeOpsJob) {
+    console.log(`[worker ${workerId}] SIGTERM: releasing ops job ${activeOpsJob.id} to the queue`);
+    await releaseOpsJob(activeOpsJob.id).catch((error) => {
+      console.error(`[worker ${workerId}] could not release ops job on shutdown:`, error);
+    });
+  }
   Deno.exit(0);
 }
 Deno.addSignalListener("SIGTERM", () => void releaseActiveRunsAndExit());
@@ -205,5 +280,8 @@ while (true) {
   } catch (error) {
     console.error("Poll cycle error", error);
   }
+  // Not awaited: an ops job can run for minutes and must not hold up the
+  // ingest queue. pollOpsJobs returns at once while one is active.
+  void pollOpsJobs().catch((error) => console.error("Ops job poll error", error));
   await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
 }

@@ -40,6 +40,7 @@ import { getStatus } from "./status_api.ts";
 import { RATE_LIMIT_PAGE_UNIT, RateLimiter, type RateVerdict, requestCost } from "./rate_limit.ts";
 import { apiError } from "./api_errors.ts";
 import { validateSearchParams } from "./search_params.ts";
+import { createOpsHandler, OPS_PATH_PREFIX } from "./ops_api.ts";
 
 const root = new URL("./", import.meta.url);
 const distRoot = new URL("./dist/", import.meta.url);
@@ -985,8 +986,15 @@ function rateLimitedResponse(verdict: RateVerdict): Response {
   return response;
 }
 
+// /api/ops/* authenticates itself with a bearer token and has its own, much
+// smaller budget (see ops_api.ts). Unset token: the route answers 404.
+const handleOpsRequest = createOpsHandler({ token: Deno.env.get("WOOZI_OPS_TOKEN") });
+
 Deno.serve({ port }, async (request, info) => {
   const url = new URL(request.url);
+  if (url.pathname.startsWith(OPS_PATH_PREFIX) || url.pathname === "/api/ops") {
+    return await handleOpsRequest(request, clientKey(request, info?.remoteAddr));
+  }
   // /api/admin/* sits behind Caddy basic auth and is used by ops tooling.
   const rateLimited =
     rateLimitEnabled && url.pathname.startsWith("/api/") && !url.pathname.startsWith("/api/admin/");
