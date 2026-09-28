@@ -847,7 +847,7 @@ Reads answer directly:
 
 | Request | Returns |
 | --- | --- |
-| `GET /api/ops/health` | host load, memory and state-volume disk; extraction workers; Quickwit readiness and index counters; backup age; run and job queues (see below) |
+| `GET /api/ops/health` | host load, memory and state-volume disk; extraction workers; Quickwit readiness and index counters; backup age; run and job queues; compose services (see below) |
 | `GET /api/ops/runs?source=&status=&limit=&offset=` | import runs, newest first (`{ runs, hasMore }`) |
 | `GET /api/ops/summary` | the run summary the admin dashboard shows |
 | `GET /api/ops/runs/<id>` | one run with its issues |
@@ -862,12 +862,14 @@ Mutating actions are `POST /api/ops/<action>` with a JSON body:
 | `reenqueue_failed_windows` | optional `source`, `statuses` (`["failed","partial"]` default), `minWindowDays` (20), `fromYear`, `toYear` | same as `scripts/reenqueue_failed_windows.ts` |
 | `purge_source` | `source`, optional `quickwit` (bool), `keepStorage` (bool) | same as `scripts/purge_source.ts` |
 | `delete_document` | `entityIds` (1 to 100 document entity ids), optional `reason` (short label, `takedown` default, e.g. `bsn`) | same as `scripts/delete_document.ts`: delete markers and a delete task in Quickwit, the document's objects, an export tombstone, and a blocklist entry |
+| `restart_service` | `service`: `worker`, `openbesluitvorming`, `otel-collector` or `quickwit` | `docker compose restart <service>`, run by the host agent (below); never Caddy |
+| `service_logs` | `service` (the same, plus `caddy`), optional `sinceMinutes` (60, at most 1440), `lines` (200, at most 2000) | the service's newest log lines, with timestamps, as the job's output; read-only, so no `apply` |
 
 Every action is a **dry run** unless the body has `"apply": true` and
 `"confirm"` equal to the source key (or `"all"` for a re-enqueue without a
 `source`). A `delete_document` is confirmed with the entity id when it names
 one document, and with `"<n> documents"` (e.g. `"3 documents"`) when it names
-several. A dry run still goes through the worker and its output shows what
+several. A `restart_service` is confirmed with the service name. A dry run still goes through the worker and its output shows what
 would happen.
 
 A valid request answers `202` with the queued job. The web container does not
@@ -908,9 +910,40 @@ failing dependency shows as `{ "error": ... }` in its section only:
 - `backup`: when the last state backup completed (its stamp file) and its age.
 - `imports`: queued and running runs, the oldest queued run, the last claim
   and last finished full run, and queued/running ops jobs.
+- `services`: every compose service's state, health, status line and replica
+  count as the host agent last saw it, with `agent_seen_at`. `agent_stale` is
+  true when the agent has not ticked for a minute (or was never installed).
 
-Not in it: per-container state, restarts and logs. Those need the Docker
-socket, which no container gets; use SSH (or SigNoz for logs).
+### Host agent: restarts and logs
+
+Restarting a service and reading its logs need the Docker daemon, and no
+container gets the Docker socket: with it, the ops token would be worth as
+much as root on the host. Those two actions are run instead by
+`scripts/ops_host_agent.py`, a standard-library Python script that a systemd
+timer starts every 15 seconds on the production host. Each tick it records
+`docker compose ps` into `host_service_status` (the `services` section of
+health), fails host jobs left `running` for 15 minutes by a dead agent, and
+claims queued `restart_service` / `service_logs` jobs from `ops_job`. The
+Deno worker never claims those two. The agent re-checks every parameter
+against its own allow-list rather than trusting the row, and runs nothing but
+`docker compose ps`, `restart <service>` and `logs <service>` in
+`/opt/woozi`. A host job is not retried when the agent dies mid-job.
+
+Install once (deploys keep the script itself in sync through
+`deploy-production-infra.sh`):
+
+```sh
+scripts/install-production-ops-agent.sh
+```
+
+Check it with `systemctl list-timers woozi-ops-agent.timer` and
+`journalctl -u woozi-ops-agent.service`. To stop it:
+`systemctl disable --now woozi-ops-agent.timer`.
+
+Logs can hold search terms from request paths and personal data from
+documents being imported. `service_logs` output is stored in the job row like
+any other output, so it lands in the ops SQLite and its daily backup; keep
+`lines` and `sinceMinutes` to what the question needs.
 
 Out of scope on purpose: arbitrary scripts, catalog edits,
 `enqueue_full_history` and Quickwit index management. Those still need a shell

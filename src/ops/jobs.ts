@@ -15,7 +15,7 @@
 
 import { startIngest } from "../ingest.ts";
 import { getProjectableSource, getSource } from "../sources/index.ts";
-import { findActiveRun, type OpsJobRecord } from "./store.ts";
+import { findActiveRun, HOST_OPS_ACTIONS, type OpsJobRecord } from "./store.ts";
 import { purgeSource } from "./purge_source.ts";
 import { deleteDocuments, parseDocumentEntityId } from "./delete_document.ts";
 import {
@@ -31,8 +31,32 @@ export const OPS_ACTIONS = [
   "reenqueue_failed_windows",
   "purge_source",
   "delete_document",
+  "restart_service",
+  "service_logs",
 ] as const;
 export type OpsAction = (typeof OPS_ACTIONS)[number];
+
+/** Actions the Deno worker never claims. They need Docker, which no container
+ * is given; the host agent (scripts/ops_host_agent.py, a systemd timer on the
+ * production host) claims and runs them instead. Keep this list in sync with
+ * HOST_ACTIONS there. */
+export const HOST_ACTIONS = HOST_OPS_ACTIONS;
+
+/** Compose services the host agent may restart. Caddy is left out on purpose:
+ * restarting the one process that terminates TLS is how an operator would
+ * lock themselves out of this very endpoint. */
+export const RESTARTABLE_SERVICES = [
+  "worker",
+  "openbesluitvorming",
+  "otel-collector",
+  "quickwit",
+] as const;
+
+/** Compose services whose logs may be read. */
+export const LOGGABLE_SERVICES = [...RESTARTABLE_SERVICES, "caddy"] as const;
+
+export const MAX_LOG_SINCE_MINUTES = 24 * 60;
+export const MAX_LOG_LINES = 2000;
 
 export function isOpsAction(value: string): value is OpsAction {
   return (OPS_ACTIONS as readonly string[]).includes(value);
@@ -72,7 +96,19 @@ export interface DeleteDocumentParams {
  * on, and belongs on the host where someone watches it. */
 export const MAX_DELETE_DOCUMENTS = 100;
 
+export interface RestartServiceParams {
+  service: string;
+}
+
+export interface ServiceLogsParams {
+  service: string;
+  sinceMinutes: number;
+  lines: number;
+}
+
 export type OpsJobParams =
+  | RestartServiceParams
+  | ServiceLogsParams
   | RerunSourceParams
   | ReenqueueParams
   | PurgeSourceParams
@@ -266,6 +302,43 @@ function validateDeleteDocument(body: Record<string, unknown>): DeleteDocumentPa
   return { entityIds: [...entityIds], reason };
 }
 
+function service(body: Record<string, unknown>, allowed: readonly string[]): string {
+  const name = requiredString(body, "service");
+  if (!allowed.includes(name)) {
+    throw new OpsValidationError(`"service" must be one of ${allowed.join(", ")}.`);
+  }
+  return name;
+}
+
+function boundedInteger(
+  body: Record<string, unknown>,
+  key: string,
+  fallback: number,
+  max: number,
+): number {
+  const value = body[key];
+  if (value === undefined || value === null) {
+    return fallback;
+  }
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 1 || value > max) {
+    throw new OpsValidationError(`"${key}" must be a whole number from 1 to ${max}.`);
+  }
+  return value;
+}
+
+function validateServiceLogs(body: Record<string, unknown>): ServiceLogsParams {
+  if (optionalBoolean(body, "apply")) {
+    // Reading logs changes nothing, so there is nothing to apply; accepting
+    // the flag would suggest otherwise and take the one apply slot.
+    throw new OpsValidationError(`"service_logs" only reads; leave out "apply".`);
+  }
+  return {
+    service: service(body, LOGGABLE_SERVICES),
+    sinceMinutes: boundedInteger(body, "sinceMinutes", 60, MAX_LOG_SINCE_MINUTES),
+    lines: boundedInteger(body, "lines", 200, MAX_LOG_LINES),
+  };
+}
+
 function validateParams(action: OpsAction, body: Record<string, unknown>): OpsJobParams {
   switch (action) {
     case "rerun_source":
@@ -276,10 +349,17 @@ function validateParams(action: OpsAction, body: Record<string, unknown>): OpsJo
       return validatePurge(body);
     case "delete_document":
       return validateDeleteDocument(body);
+    case "restart_service":
+      return { service: service(body, RESTARTABLE_SERVICES) };
+    case "service_logs":
+      return validateServiceLogs(body);
   }
 }
 
 function confirmTargetFor(params: OpsJobParams): string {
+  if ("service" in params) {
+    return params.service;
+  }
   if ("entityIds" in params) {
     return params.entityIds.length === 1
       ? params.entityIds[0]
@@ -316,6 +396,10 @@ export async function executeOpsJob(
 ): Promise<void> {
   if (!isOpsAction(job.action)) {
     throw new Error(`Unknown ops action "${job.action}".`);
+  }
+  if ((HOST_ACTIONS as readonly string[]).includes(job.action)) {
+    // claimQueuedOpsJob never hands these out; reaching here is a bug.
+    throw new Error(`"${job.action}" runs on the host agent, not in a worker.`);
   }
   const { action, params, apply } = validateOpsRequest(job.action, {
     ...job.params,
@@ -354,6 +438,9 @@ export async function executeOpsJob(
       }
       return;
     }
+    case "restart_service":
+    case "service_logs":
+      return;
     case "delete_document": {
       const p = params as DeleteDocumentParams;
       const result = await deleteDocuments(p.entityIds, { apply, reason: p.reason }, log);

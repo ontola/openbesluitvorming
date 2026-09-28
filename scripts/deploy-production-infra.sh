@@ -15,6 +15,7 @@ rsync -azR --inplace \
   ./quickwit/quickwit.yaml \
   ./otel/collector.yaml \
   ./scripts/monitor-production.sh \
+  ./scripts/ops_host_agent.py \
   "$DEPLOY_HOST:$DEPLOY_DIR/"
 
 echo "Synced production infra files to $DEPLOY_HOST:$DEPLOY_DIR"
