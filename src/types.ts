@@ -505,6 +505,10 @@ export interface SourceCatalogEntry extends SourceDefinitionBase {
   succeededByCbsId?: string;
   succeededByLabel?: string;
   succeededBySourceKey?: string;
+  /** Catalog key of the organization this one is part of and searched under,
+   * for a body that is not merged away but lives on inside it: Stadsgebied
+   * Weesp inside Amsterdam. */
+  partOfSourceKey?: string;
   notubizOrganizationId?: number;
   ibabsSitename?: string;
   baseUrl?: string;

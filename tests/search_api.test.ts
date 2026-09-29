@@ -1309,6 +1309,10 @@ Deno.test("an organization covers the organizations merged into it", async () =>
   assert(amsterdam[0] === "amsterdam", `own key first, got ${amsterdam}`);
   assert(amsterdam.includes("weesp"), `Amsterdam includes Weesp, got ${amsterdam}`);
   assert(
+    amsterdam.includes("amsterdam_weesp"),
+    `Amsterdam includes Stadsgebied Weesp, got ${amsterdam}`,
+  );
+  assert(
     organizationSourceKeys("weesp").join() === "weesp",
     "a predecessor still filters on its own",
   );
