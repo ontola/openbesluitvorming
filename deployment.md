@@ -863,7 +863,7 @@ Mutating actions are `POST /api/ops/<action>` with a JSON body:
 | `purge_source` | `source`, optional `quickwit` (bool), `keepStorage` (bool) | same as `scripts/purge_source.ts` |
 | `delete_document` | `entityIds` (1 to 100 document entity ids), optional `reason` (short label, `takedown` default, e.g. `bsn`) | same as `scripts/delete_document.ts`: delete markers and a delete task in Quickwit, the document's objects, an export tombstone, and a blocklist entry |
 | `restart_service` | `service`: `worker`, `openbesluitvorming`, `otel-collector` or `quickwit` | `docker compose restart <service>`, run by the host agent (below); never Caddy |
-| `service_logs` | `service` (the same, plus `caddy`), optional `sinceMinutes` (60, at most 1440), `lines` (200, at most 2000) | the service's newest log lines, with timestamps, as the job's output; read-only, so no `apply` |
+| `service_logs` | `service` (the same, plus `caddy`), optional `sinceMinutes` (60, at most 1440), `lines` (200, at most 2000), `runs` (bool) | the service's newest log lines, with timestamps, as the job's output; read-only, so no `apply`. `runs: true` reads the service's `docker compose run` containers instead (such as the weekly coverage check), which `compose logs` leaves out |
 
 Every action is a **dry run** unless the body has `"apply": true` and
 `"confirm"` equal to the source key (or `"all"` for a re-enqueue without a
@@ -911,7 +911,9 @@ failing dependency shows as `{ "error": ... }` in its section only:
 - `imports`: queued and running runs, the oldest queued run, the last claim
   and last finished full run, and queued/running ops jobs.
 - `services`: every compose service's state, health, status line and replica
-  count as the host agent last saw it, with `agent_seen_at`. `agent_stale` is
+  count as the host agent last saw it, with `agent_seen_at`. A service's
+  `docker compose run` containers (the weekly coverage check runs as one of
+  `openbesluitvorming`) are listed separately as `<service>:run`. `agent_stale` is
   true when the agent has not ticked for a minute (or was never installed).
 
 ### Host agent: restarts and logs
