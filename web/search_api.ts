@@ -281,20 +281,22 @@ let organizationTermIndex: Map<string, string[]> | null = null;
 let predecessorIndex: Map<string, string[]> | null = null;
 
 /** The source keys an organization covers: its own, plus those of the
- * organizations merged into it (*herindelingen*). Weesp became part of
- * Amsterdam in 2022, so searching Amsterdam includes Weesp's older records.
- * The catalog's `succeededBySourceKey` is the one place this is recorded;
- * a predecessor keeps its own key, so filtering on it alone still works. */
+ * organizations merged into it (*herindelingen*, `succeededBySourceKey`) and
+ * of the bodies that are part of it (`partOfSourceKey`). Weesp became part of
+ * Amsterdam in 2022, so searching Amsterdam includes both the old municipality
+ * and Stadsgebied Weesp. Each keeps its own key, so filtering on it alone
+ * still works. */
 export function organizationSourceKeys(key: string): string[] {
   if (!predecessorIndex) {
     const index = new Map<string, string[]>();
     for (const source of listCatalogSources()) {
-      if (!source.implemented || !source.succeededBySourceKey) {
+      const parent = source.succeededBySourceKey ?? source.partOfSourceKey;
+      if (!source.implemented || !parent) {
         continue;
       }
-      const keys = index.get(source.succeededBySourceKey) ?? [];
+      const keys = index.get(parent) ?? [];
       keys.push(source.key);
-      index.set(source.succeededBySourceKey, keys);
+      index.set(parent, keys);
     }
     predecessorIndex = index;
   }

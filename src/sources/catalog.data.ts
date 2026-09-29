@@ -2993,6 +2993,26 @@ export const sourceCatalog = [
     implemented: true,
   },
   {
+    sourceRef: "notubiz:gemeente:amsterdam_weesp",
+    key: "amsterdam_weesp",
+    label: "Stadsgebied Weesp",
+    sourceName: "Bestuurscommissie Weesp",
+    supplier: "notubiz",
+    organizationType: "gemeente",
+    // Amsterdam's: the Notubiz import does not use it, and the stadsgebied's
+    // own Allmanak entry has not been verified.
+    allmanakId: 25698,
+    cbsId: "GM0363",
+    notubizOrganizationId: 4187,
+    // Not in the ORI inventory: added 2026-09-29 on request of VNG. Weesp's
+    // own feed (`weesp`) stops at the merger of 24 March 2022; the
+    // Bestuurscommissie Weesp has published here since.
+    partOfSourceKey: "amsterdam",
+    legacyConfigFile: "ori.notubiz.yaml",
+    legacyConfigRoot: "ori.notubiz",
+    implemented: true,
+  },
+  {
     sourceRef: "notubiz:gemeente:baarle_nassau",
     key: "baarle_nassau",
     label: "Baarle Nassau",
@@ -4341,7 +4361,7 @@ export const sourceCatalog = [
   {
     sourceRef: "notubiz:gemeente:weesp",
     key: "weesp",
-    label: "Stadsgebied Weesp",
+    label: "Weesp",
     sourceName: "Weesp",
     supplier: "notubiz",
     organizationType: "gemeente",

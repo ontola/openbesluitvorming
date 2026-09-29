@@ -351,7 +351,7 @@ they ceased to exist and who took over:
 ```json
 {
   "sourceKey": "weesp",
-  "label": "Stadsgebied Weesp",
+  "label": "Weesp",
   "state": "discontinued",
   "discontinuedAt": "2022-03-24",
   "succeededBy": { "cbsId": "GM0363", "label": "Amsterdam", "sourceKey": "amsterdam" },
