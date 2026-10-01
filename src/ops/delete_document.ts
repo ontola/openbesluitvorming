@@ -93,7 +93,7 @@ function documentStoragePrefixes(parsed: ParsedEntityId): string[] {
 }
 
 async function collectPageEntityIds(
-  quickwit: QuickwitClient,
+  quickwit: Pick<QuickwitClient, "searchRequest">,
   entityId: string,
 ): Promise<{ pageIds: string[]; totalHits: number }> {
   const response = await quickwit.searchRequest({
@@ -176,6 +176,7 @@ async function deleteOne(
     supplier: parsed.supplier,
     entityId,
     entityType: "Document",
+    reason: "takedown",
   });
   await exportLog.flush(parsed.sourceKey);
   log(tombstone ? "  recorded export tombstone" : "  export tombstone skipped (never exported)");
@@ -224,51 +225,98 @@ export async function deleteDocuments(
   return { inspected: entityIds.length, failures };
 }
 
+export interface RetractionStorage {
+  deleteByPrefix(prefix: string): Promise<string[]>;
+}
+
+export type RetractionQuickwit = Pick<
+  QuickwitClient,
+  "searchRequest" | "ingestDocuments" | "createDeleteTask"
+>;
+
+export interface RetractionOutcome {
+  entityId: string;
+  /** How far the document got. "deleted" is all of it; anything else names
+   * the step that failed, with everything before it done. */
+  reached: "nothing" | "hidden" | "tombstoned" | "deleted";
+  error?: string;
+}
+
 /**
- * Take documents out of search, storage and the export feed because their
+ * Take documents out of search, the export feed and storage because their
  * source no longer lists them (see src/pipeline/source_removals.ts).
  *
  * The same steps as a takedown with one difference: nothing is blocklisted.
  * If the source publishes a document again, the next import brings it back
  * with a newer row; the delete task only reaches rows that exist when it is
- * created. All documents share one delete task, because each task makes
- * Quickwit rewrite the splits it matches.
+ * created.
+ *
+ * Each document is finished before the next one starts, in the order that
+ * leaves the least wrong state behind when a step fails: hide it from search,
+ * record the tombstone (with reason and meeting) so the feed and its readers
+ * agree, then empty storage. A failure stops that document only, and the
+ * outcome says which step it reached, so the run can report exactly what is
+ * left to do. One delete task covers every document that got as far as the
+ * tombstone, because each task makes Quickwit rewrite the splits it matches.
  */
 export async function retractDocumentsGoneAtSource(
-  entityIds: string[],
+  entries: Array<{ entityId: string; meetingId: string }>,
   options: {
-    quickwit: QuickwitClient;
-    storage: ObjectStorageClient;
+    quickwit: RetractionQuickwit;
+    storage: RetractionStorage;
     exportLog: { recordDelete: ExportChangesLog["recordDelete"] };
   },
-): Promise<void> {
-  if (entityIds.length === 0) {
-    return;
-  }
-  const parsed = entityIds.map(parseDocumentEntityId);
-  const markers: QuickwitSearchDocument[] = [];
-  for (const { entityId } of parsed) {
-    const { pageIds } = await collectPageEntityIds(options.quickwit, entityId);
-    markers.push(
-      deleteMarker(entityId, null, "removed_at_source"),
-      ...pageIds.map((pageId) => deleteMarker(pageId, entityId, "removed_at_source")),
-    );
-  }
-  await options.quickwit.ingestDocuments(markers);
-  await options.quickwit.createDeleteTask(
-    parsed
-      .map(({ entityId }) => `entity_id:${quote(entityId)} OR parent_entity_id:${quote(entityId)}`)
-      .join(" OR "),
-  );
-  for (const entry of parsed) {
-    for (const prefix of documentStoragePrefixes(entry)) {
-      await options.storage.deleteByPrefix(prefix);
+): Promise<RetractionOutcome[]> {
+  const outcomes: RetractionOutcome[] = [];
+  for (const { entityId, meetingId } of entries) {
+    const outcome: RetractionOutcome = { entityId, reached: "nothing" };
+    outcomes.push(outcome);
+    try {
+      const parsed = parseDocumentEntityId(entityId);
+      const { pageIds } = await collectPageEntityIds(options.quickwit, entityId);
+      await options.quickwit.ingestDocuments([
+        deleteMarker(entityId, null, "removed_at_source"),
+        ...pageIds.map((pageId) => deleteMarker(pageId, entityId, "removed_at_source")),
+      ]);
+      outcome.reached = "hidden";
+      options.exportLog.recordDelete({
+        sourceKey: parsed.sourceKey,
+        supplier: parsed.supplier,
+        entityId,
+        entityType: "Document",
+        reason: "removed_at_source",
+        meetingId,
+      });
+      outcome.reached = "tombstoned";
+      for (const prefix of documentStoragePrefixes(parsed)) {
+        await options.storage.deleteByPrefix(prefix);
+      }
+      outcome.reached = "deleted";
+    } catch (error) {
+      outcome.error = error instanceof Error ? error.message : String(error);
     }
-    options.exportLog.recordDelete({
-      sourceKey: entry.sourceKey,
-      supplier: entry.supplier,
-      entityId: entry.entityId,
-      entityType: "Document",
-    });
   }
+
+  const tombstoned = outcomes.filter(
+    (outcome) => outcome.reached === "tombstoned" || outcome.reached === "deleted",
+  );
+  if (tombstoned.length > 0) {
+    try {
+      await options.quickwit.createDeleteTask(
+        tombstoned
+          .map(
+            ({ entityId }) => `entity_id:${quote(entityId)} OR parent_entity_id:${quote(entityId)}`,
+          )
+          .join(" OR "),
+      );
+    } catch (error) {
+      // The markers already hide these documents; without the task their old
+      // rows stay in the index, which a later takedown task can still reach.
+      const message = `delete task: ${error instanceof Error ? error.message : String(error)}`;
+      for (const outcome of tombstoned) {
+        outcome.error ??= message;
+      }
+    }
+  }
+  return outcomes;
 }

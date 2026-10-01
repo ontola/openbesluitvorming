@@ -351,7 +351,7 @@ export interface ExtractionStats {
 }
 
 export interface ExtractionIssue {
-  severity: "warning" | "error";
+  severity: "info" | "warning" | "error";
   step:
     | "list_events"
     | "get_meeting"
@@ -854,7 +854,14 @@ export interface ExportChangeRecord {
   content_hash?: string;
   schema_version?: string;
   payload?: unknown;
+  /** Delete records only: why the entity went. */
+  reason?: ExportDeleteReason;
+  /** Delete records with reason "removed_at_source": the meeting the source
+   * took the document off. */
+  meeting_id?: string;
 }
+
+export type ExportDeleteReason = "takedown" | "removed_at_source" | "source_purged";
 
 export interface ExportPage {
   records: ExportChangeRecord[];

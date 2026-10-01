@@ -313,8 +313,12 @@ export async function executeIngest(
 /**
  * Retract the documents this run found taken off their meeting at the source.
  * Runs after extraction so a document that only moved has been seen by then.
- * A failure here is a warning on the run, not a failed import: everything the
- * run imported is already written.
+ *
+ * Every decision lands in the run's issues with the supplier's answer as
+ * evidence: retracted and kept documents as "info", anything left half done
+ * as "warning" naming the step it reached, so it can be finished by hand
+ * with scripts/delete_document.ts. A failure here never fails the import:
+ * everything the run imported is already written.
  */
 async function retractRemovedDocuments(
   runId: string,
@@ -323,60 +327,89 @@ async function retractRemovedDocuments(
   quickwit: QuickwitClient,
   exportLog: Awaited<ReturnType<typeof getExportLog>>,
 ): Promise<void> {
-  const sourceKey = source.key;
+  const step = "source_removals" as const;
+  const note = (
+    severity: "info" | "warning",
+    message: string,
+    entityId?: string,
+    details?: unknown,
+  ) =>
+    appendRunIssue(runId, {
+      severity,
+      step,
+      message,
+      ...(entityId ? { entity_id: entityId } : {}),
+      ...(details === undefined ? {} : { details: JSON.stringify(details) }),
+    });
+
   try {
     const plan = removals.plan(maxSourceRemovalsPerRun());
     for (const meetingId of plan.skippedMeetings) {
-      console.log(`[source-removals] ${sourceKey} ${meetingId} lost every document, left as is`);
+      await note(
+        "info",
+        "Vergadering verloor al haar documenten tegelijk; niets ingetrokken.",
+        meetingId,
+      );
     }
     if (plan.capExceeded) {
-      await appendRunIssue(runId, {
-        severity: "warning",
-        step: "source_removals",
-        message:
-          `${plan.capExceeded.candidates} documenten lijken bij de bron verwijderd, meer dan ` +
-          `${plan.capExceeded.max} per run; niets verwijderd, controleer handmatig.`,
-      });
+      await note(
+        "warning",
+        `${plan.capExceeded.candidates} documenten lijken bij de bron verwijderd, meer dan ` +
+          `${plan.capExceeded.max} per run; niets ingetrokken, controleer handmatig.`,
+      );
       return;
     }
     const confirmed = await confirmRemovalsAtSource(plan, {
-      sourceKey,
+      sourceKey: source.key,
       supplier: source.supplier,
       log: exportLog,
       probe: probeDocumentAtSource,
     });
-    if (confirmed.controlFailed) {
-      console.log(
-        `[source-removals] ${sourceKey} control document answered ${confirmed.controlFailed}, ` +
-          `kept ${plan.remove.length} candidate(s)`,
-      );
-    }
     for (const entry of confirmed.kept) {
-      if (!confirmed.controlFailed) {
-        console.log(
-          `[source-removals] ${sourceKey} kept ${entry.entityId}: off the agenda, source says ${entry.presence}`,
-        );
-      }
+      await note(
+        "info",
+        confirmed.controlFailed
+          ? "Van de agenda gehaald; niet ingetrokken omdat het controledocument niet als beschikbaar antwoordde."
+          : "Van de agenda gehaald maar nog beschikbaar bij de bron; niet ingetrokken.",
+        entry.entityId,
+        { meeting_id: entry.meetingId, probe: entry.probe, control: confirmed.control },
+      );
     }
     if (confirmed.remove.length === 0) {
       return;
     }
-    await retractDocumentsGoneAtSource(
-      confirmed.remove.map((entry) => entry.entityId),
-      { quickwit, storage: await ObjectStorageClient.fromEnvironment(), exportLog },
-    );
-    for (const entry of confirmed.remove) {
-      console.log(
-        `[source-removals] ${sourceKey} retracted ${entry.entityId} (no longer on ${entry.meetingId})`,
-      );
+    const outcomes = await retractDocumentsGoneAtSource(confirmed.remove, {
+      quickwit,
+      storage: await ObjectStorageClient.fromEnvironment(),
+      exportLog,
+    });
+    for (const outcome of outcomes) {
+      const entry = confirmed.remove.find((candidate) => candidate.entityId === outcome.entityId)!;
+      const details = {
+        meeting_id: entry.meetingId,
+        probe: entry.probe,
+        control: confirmed.control,
+        reached: outcome.reached,
+        ...(outcome.error ? { error: outcome.error } : {}),
+      };
+      if (outcome.reached === "deleted" && !outcome.error) {
+        await note("info", "Ingetrokken: verwijderd bij de bron.", outcome.entityId, details);
+      } else {
+        await note(
+          "warning",
+          `Intrekking onvolledig (stap bereikt: ${outcome.reached}): ${outcome.error ?? "onbekend"}`,
+          outcome.entityId,
+          details,
+        );
+      }
     }
   } catch (error) {
-    await appendRunIssue(runId, {
-      severity: "warning",
-      step: "source_removals",
-      message:
-        error instanceof Error ? error.message : "Verwijderen van vervallen documenten mislukt",
-    });
+    await note(
+      "warning",
+      `Intrekken van bij de bron verwijderde documenten mislukt: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
   }
 }
 

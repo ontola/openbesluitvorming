@@ -601,10 +601,14 @@ Both endpoints return NDJSON (`application/x-ndjson`): one record per line.
   markdown via `GET /api/entities/{entity_id}` or the object key in
   `payload.derived_content.markdown_key`.
 - `op` is `"upsert"` or `"delete"`. A delete record (tombstone) has no
-  `payload`; remove the entity from your copy. Documents get one when they
-  are taken down, and when an import finds a document taken off its meeting
-  and the source confirms it can no longer be downloaded. A tombstoned
-  document can come back as a new `upsert` if the source publishes it again.
+  `payload`; remove the entity from your copy. Since October 2026 a delete
+  record says why in `reason`: `"takedown"` (removed on request, e.g. a
+  privacy report), `"removed_at_source"` (an import found the document taken
+  off its meeting and the source confirmed it can no longer be downloaded;
+  `meeting_id` names that meeting) or `"source_purged"` (a whole source was
+  withdrawn). Older delete records have no `reason`. A document removed at
+  the source can come back as a new `upsert` if the source publishes it
+  again.
 - The feed is deduplicated on `content_hash`: re-indexing unchanged data adds
   no records, so polling stays cheap.
 - `seq` is monotonic per source. Cursors are stable: the same cursor always

@@ -25,6 +25,9 @@
 //     reached the confirmation threshold, for manual review and (if
 //     legitimate) manual deletion via scripts/delete_document.ts.
 //
+// The calibration below lives in src/documents/source_presence.ts, shared
+// with the import's own retraction of documents taken off a meeting.
+//
 // Calibrated "definitely gone" signals (tested 2026-07-23 against known live
 // and known-gone documents, using OpenBesluitvorming's own original_url
 // shapes -- these differ from ori3's, so ori3's calibration does NOT
@@ -49,19 +52,22 @@ import {
   recordRevalidationResult,
   setRevalidationCursor,
 } from "../src/ops/store.ts";
+import {
+  probeDocumentAtSource,
+  type SourcePresence,
+} from "../src/documents/source_presence.ts";
 import { currentProjectionVersion } from "../src/pipeline/versioning.ts";
 import { QuickwitClient } from "../src/quickwit/client.ts";
 import type { QuickwitSearchDocument } from "../src/quickwit/project.ts";
 
 const QUICKWIT_PAGE_SIZE = 100;
-const REQUEST_TIMEOUT_MS = 10_000;
 const SLEEP_BETWEEN_REQUESTS_MS = 250;
 
 const ORG_DOWN_MIN_SAMPLE = 10;
 const ORG_DOWN_RATIO = 0.95;
 const CONFIRM_THRESHOLD = 3;
 
-type Status = "live" | "gone" | "unknown";
+type Status = SourcePresence;
 
 interface ParsedEntityId {
   entityId: string;
@@ -81,59 +87,8 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function fetchStatus(url: string): Promise<{ status: number | null; body: string }> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-  try {
-    const response = await fetch(url, {
-      signal: controller.signal,
-      headers: { "User-Agent": "woozi-revalidate/1.0" },
-    });
-    const body = await response.text();
-    return { status: response.status, body };
-  } catch {
-    return { status: null, body: "" }; // timeout, DNS failure, connection reset, ...
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-async function classifyIbabs(url: string | undefined): Promise<Status> {
-  if (!url) {
-    return "unknown";
-  }
-  const { status } = await fetchStatus(url);
-  if (status === 200) {
-    return "live";
-  }
-  if (status === 403 || status === 404) {
-    return "gone";
-  }
-  return "unknown";
-}
-
-async function classifyNotubiz(url: string | undefined): Promise<Status> {
-  if (!url) {
-    return "unknown";
-  }
-  const { status, body } = await fetchStatus(url);
-  if (status === 200) {
-    return "live";
-  }
-  if (status === 400 && body.includes("<error_code>")) {
-    return "gone";
-  }
-  return "unknown";
-}
-
 async function classify(supplier: string, url: string | undefined): Promise<Status> {
-  if (supplier === "ibabs") {
-    return await classifyIbabs(url);
-  }
-  if (supplier === "notubiz") {
-    return await classifyNotubiz(url);
-  }
-  return "unknown"; // parlaeus, gemeenteoplossingen: not yet calibrated
+  return (await probeDocumentAtSource(supplier, url)).presence;
 }
 
 interface DocumentHit {
