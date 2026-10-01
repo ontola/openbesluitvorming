@@ -169,6 +169,10 @@ Current implemented slices:
   `docs_internal/bsn-takedown.md` ("Stap 6") for the per-supplier
   "genuinely gone" calibration and the org-wide-outage-vs-real-deletion
   distinction.
+- The scheduler (`src/scheduler.ts`) enqueues a -7..+7 day window for every
+  source nightly, and on Saturday night also the 90..8 days before it. That
+  sweep catches documents attached to a meeting weeks after it took place
+  (besluitenlijsten, notulen), which the nightly window never sees again.
 - A weekly coverage check (`scripts/coverage_check.ts`, `woozi-coverage.timer`)
   compares the document ids each supplier's API lists for the last 12 months
   with the export log and stores the result in `coverage_check`; `/api/status`

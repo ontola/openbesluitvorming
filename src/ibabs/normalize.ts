@@ -18,6 +18,7 @@ import {
   splitProposers,
   tallyVotes,
 } from "../motions/normalize.ts";
+import { isPlausibleDate } from "../util/plausible_date.ts";
 import type {
   DocumentEntity,
   IbabsList,
@@ -311,10 +312,15 @@ export function normalizeIbabsRegisterDocuments(
     pickValue(values, ["Onderwerp", "Titel", "Toezegging", "Vraag"]) ??
     entry.EntryTitle ??
     `${list.ListName} ${entry.EntryId}`;
-  const date =
-    parseMotionDate(
-      pickValue(values, ["Datum", "Datum ontvangst", "Datum indiening", "Datum toezegging"]),
-    ) ?? parseMotionDate(entry.MutationDate);
+  // The date field is typed by hand at the griffie, and a typo there lands a
+  // document decades ahead of everything else ("1-1-2078" at Oirschot). The
+  // entry's own last modification is then the better answer.
+  const enteredDate = parseMotionDate(
+    pickValue(values, ["Datum", "Datum ontvangst", "Datum indiening", "Datum toezegging"]),
+  );
+  const date = isPlausibleDate(enteredDate)
+    ? (enteredDate ?? parseMotionDate(entry.MutationDate))
+    : parseMotionDate(entry.MutationDate);
   const reference = parseAgendaPointReference(pickValue(values, ["Agendapunt"]));
   const meeting = reference && meetings ? meetings.find(reference) : undefined;
   const sourceIri = `ibabs://${source.ibabsSitename}/listentry/${entry.EntryId}`;
