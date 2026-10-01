@@ -363,6 +363,7 @@ export interface ExtractionIssue {
     | "upload_s3"
     | "ingest_quickwit"
     | "export_log_flush"
+    | "source_removals"
     | "bsn_quarantine";
   entity_id?: string;
   message: string;

@@ -17,6 +17,14 @@ import {
 } from "./ops/store.ts";
 import { QuickwitClient } from "./quickwit/client.ts";
 import { reindexSource } from "./pipeline/reindex.ts";
+import {
+  confirmRemovalsAtSource,
+  maxSourceRemovalsPerRun,
+  SourceRemovalTracker,
+  sourceRemovalsEnabled,
+} from "./pipeline/source_removals.ts";
+import { canProbeSupplier, probeDocumentAtSource } from "./documents/source_presence.ts";
+import { retractDocumentsGoneAtSource } from "./ops/delete_document.ts";
 import { ObjectStorageClient } from "./storage/s3.ts";
 import { currentDerivationVersion, currentProjectionVersion } from "./pipeline/versioning.ts";
 import { getProjectableSource, getSource } from "./sources/index.ts";
@@ -161,6 +169,10 @@ export async function executeIngest(
     }
 
     const exportLog = options.ingestToQuickwit ? await getExportLog() : null;
+    const removals =
+      exportLog && sourceRemovalsEnabled() && canProbeSupplier(source.supplier)
+        ? new SourceRemovalTracker(source.key, exportLog)
+        : null;
 
     const extraction = await runExtractor(source, dateFrom, dateTo, {
       executionMode: options.executionMode,
@@ -193,6 +205,7 @@ export async function executeIngest(
       },
       onEntity: async (entity) => {
         options.onHeartbeat?.();
+        removals?.observeEmitted(entity.id);
         // Blocklisted entities (taken down, e.g. BSN) are neither indexed nor
         // exported. materializeDocument also refuses to re-materialize
         // documents, but this guard covers every extractor path centrally.
@@ -225,6 +238,11 @@ export async function executeIngest(
         // Project immediately to compact Quickwit documents and discard the
         // large entity (md_text, page_chunks, raw) right away. Only the small
         // projected documents are buffered until the next flush.
+        if (entity.type === "Meeting") {
+          // Before the commit below overwrites the meeting's previous
+          // document list.
+          removals?.observeMeeting(entity);
+        }
         const event = await buildEntityCommitEvent(entity);
         exportLog?.recordCommit(event);
         const projected = projectEntityCommitToQuickwitDocuments(event);
@@ -235,6 +253,10 @@ export async function executeIngest(
       },
     });
     await flushQuickwitBatch();
+
+    if (removals && quickwit && exportLog) {
+      await retractRemovedDocuments(run.id, source, removals, quickwit, exportLog);
+    }
 
     if (exportLog) {
       try {
@@ -285,6 +307,76 @@ export async function executeIngest(
       issue_count: issueCount || 1,
     });
     throw new Error(`Run ${updated.id} failed: ${message}`);
+  }
+}
+
+/**
+ * Retract the documents this run found taken off their meeting at the source.
+ * Runs after extraction so a document that only moved has been seen by then.
+ * A failure here is a warning on the run, not a failed import: everything the
+ * run imported is already written.
+ */
+async function retractRemovedDocuments(
+  runId: string,
+  source: SourceDefinition,
+  removals: SourceRemovalTracker,
+  quickwit: QuickwitClient,
+  exportLog: Awaited<ReturnType<typeof getExportLog>>,
+): Promise<void> {
+  const sourceKey = source.key;
+  try {
+    const plan = removals.plan(maxSourceRemovalsPerRun());
+    for (const meetingId of plan.skippedMeetings) {
+      console.log(`[source-removals] ${sourceKey} ${meetingId} lost every document, left as is`);
+    }
+    if (plan.capExceeded) {
+      await appendRunIssue(runId, {
+        severity: "warning",
+        step: "source_removals",
+        message:
+          `${plan.capExceeded.candidates} documenten lijken bij de bron verwijderd, meer dan ` +
+          `${plan.capExceeded.max} per run; niets verwijderd, controleer handmatig.`,
+      });
+      return;
+    }
+    const confirmed = await confirmRemovalsAtSource(plan, {
+      sourceKey,
+      supplier: source.supplier,
+      log: exportLog,
+      probe: probeDocumentAtSource,
+    });
+    if (confirmed.controlFailed) {
+      console.log(
+        `[source-removals] ${sourceKey} control document answered ${confirmed.controlFailed}, ` +
+          `kept ${plan.remove.length} candidate(s)`,
+      );
+    }
+    for (const entry of confirmed.kept) {
+      if (!confirmed.controlFailed) {
+        console.log(
+          `[source-removals] ${sourceKey} kept ${entry.entityId}: off the agenda, source says ${entry.presence}`,
+        );
+      }
+    }
+    if (confirmed.remove.length === 0) {
+      return;
+    }
+    await retractDocumentsGoneAtSource(
+      confirmed.remove.map((entry) => entry.entityId),
+      { quickwit, storage: await ObjectStorageClient.fromEnvironment(), exportLog },
+    );
+    for (const entry of confirmed.remove) {
+      console.log(
+        `[source-removals] ${sourceKey} retracted ${entry.entityId} (no longer on ${entry.meetingId})`,
+      );
+    }
+  } catch (error) {
+    await appendRunIssue(runId, {
+      severity: "warning",
+      step: "source_removals",
+      message:
+        error instanceof Error ? error.message : "Verwijderen van vervallen documenten mislukt",
+    });
   }
 }
 
