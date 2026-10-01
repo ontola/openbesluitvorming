@@ -373,6 +373,46 @@ export class ExportChangesLog {
     return rows.map((row) => row.entity_id);
   }
 
+  /** The latest record for one entity, tombstone included, or null when the
+   * entity was never exported. */
+  getEntityRecord(sourceKey: string, entityId: string): ExportChangeRecord | null {
+    const row = this.db
+      .prepare("SELECT record FROM export_entity_state WHERE source_key = ? AND entity_id = ?")
+      .get(sourceKey, entityId) as { record: string } | undefined;
+    return row ? (JSON.parse(row.record) as ExportChangeRecord) : null;
+  }
+
+  /** Which of `entityIds` a live entity of the source under one of `prefixes`
+   * still mentions in its record, e.g. a meeting that lists a document among
+   * its attachments. One pass over those rows, whatever the number of ids. */
+  findReferencedEntityIds(sourceKey: string, entityIds: string[], prefixes: string[]): Set<string> {
+    const pending = new Set(entityIds);
+    const referenced = new Set<string>();
+    for (const prefix of prefixes) {
+      if (pending.size === 0) {
+        break;
+      }
+      const statement = this.db.prepare(
+        `SELECT record FROM export_entity_state
+         WHERE source_key = ? AND op = 'upsert' AND entity_id >= ? AND entity_id < ?`,
+      );
+      for (const row of statement.iterate(sourceKey, prefix, `${prefix}￿`) as Iterable<{
+        record: string;
+      }>) {
+        for (const entityId of pending) {
+          if (row.record.includes(JSON.stringify(entityId))) {
+            referenced.add(entityId);
+            pending.delete(entityId);
+          }
+        }
+        if (pending.size === 0) {
+          break;
+        }
+      }
+    }
+    return referenced;
+  }
+
   /** Read the current state per entity (latest upsert record, tombstones
    * excluded), ordered by entity_id. Cursor is the last entity_id of the
    * previous page. */

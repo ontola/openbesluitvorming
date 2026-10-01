@@ -145,6 +145,17 @@ Current implemented slices:
   `woozi-backup.timer` running `scripts/backup_state.ts` inside the web
   container (14-day retention, `backups/sqlite/` prefix). Install with
   `scripts/install-production-backup.sh`.
+- Imports retract documents the source took off a meeting
+  (`src/pipeline/source_removals.ts`): each run compares a meeting's
+  `attachment` with the one in the export log, and a dropped document is
+  removed from search, object storage and the export feed (tombstone, no
+  blocklist, so it can come back) only after the supplier confirms it is gone
+  with the sweep's calibrated responses and a still-listed document of the
+  same run answers "live". iBabs and Notubiz only. A meeting that lost every
+  document is left alone, and a run with more than
+  `WOOZI_SOURCE_REMOVALS_MAX_PER_RUN` (default 25) candidates removes nothing
+  and logs a run warning. `WOOZI_SOURCE_REMOVALS=0` turns it off. It only sees
+  meetings inside the run's window, so the daily -7..+7 days.
 - A source revalidation sweep runs daily via `woozi-revalidate.timer`
   (`scripts/revalidate_documents.ts`, one run per calibrated supplier —
   currently iBabs and Notubiz): checks whether documents we still serve have

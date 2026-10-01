@@ -601,7 +601,10 @@ Both endpoints return NDJSON (`application/x-ndjson`): one record per line.
   markdown via `GET /api/entities/{entity_id}` or the object key in
   `payload.derived_content.markdown_key`.
 - `op` is `"upsert"` or `"delete"`. A delete record (tombstone) has no
-  `payload`; remove the entity from your copy.
+  `payload`; remove the entity from your copy. Documents get one when they
+  are taken down, and when an import finds a document taken off its meeting
+  and the source confirms it can no longer be downloaded. A tombstoned
+  document can come back as a new `upsert` if the source publishes it again.
 - The feed is deduplicated on `content_hash`: re-indexing unchanged data adds
   no records, so polling stays cheap.
 - `seq` is monotonic per source. Cursors are stable: the same cursor always
