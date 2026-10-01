@@ -1,9 +1,16 @@
 import { DatabaseSync } from "node:sqlite";
 import { buildEntityCommitEvent } from "../src/events/entity_commit.ts";
 import { ExportChangesLog, type ExportSegmentStorage } from "../src/exports/log.ts";
-import type { SourcePresence } from "../src/documents/source_presence.ts";
+import type { SourcePresence, SourceProbe } from "../src/documents/source_presence.ts";
+import { retractDocumentsGoneAtSource } from "../src/ops/delete_document.ts";
 import { confirmRemovalsAtSource, SourceRemovalTracker } from "../src/pipeline/source_removals.ts";
 import type { DocumentEntity, MeetingEntity, MotionEntity, WooziEntity } from "../src/types.ts";
+
+function assert(condition: unknown, message: string): asserts condition {
+  if (!condition) {
+    throw new Error(message);
+  }
+}
 
 function assertEquals(actual: unknown, expected: unknown, message: string): void {
   const actualJson = JSON.stringify(actual);
@@ -156,10 +163,11 @@ Deno.test("more removals than the cap removes none and says so", async () => {
 
 function probeAnswering(answers: Record<number, SourcePresence>) {
   const asked: number[] = [];
-  const probe = (_supplier: string, url: string | undefined): Promise<SourcePresence> => {
+  const probe = (_supplier: string, url: string | undefined): Promise<SourceProbe> => {
     const n = Number(/document\/(\d+)\//.exec(url ?? "")?.[1]);
     asked.push(n);
-    return Promise.resolve(answers[n] ?? "unknown");
+    const presence = answers[n] ?? "unknown";
+    return Promise.resolve({ presence, url, status: presence === "live" ? 200 : 400 });
   };
   return { probe, asked };
 }
@@ -185,7 +193,17 @@ Deno.test("only documents the supplier confirms gone are removed", async () => {
     [docId(2)],
     "document 3 was only unlinked and still downloads",
   );
-  assertEquals(result.kept, [{ entityId: docId(3), presence: "live" }], "and is kept");
+  assertEquals(
+    result.kept.map((entry) => [entry.entityId, entry.probe?.presence]),
+    [[docId(3), "live"]],
+    "and is kept",
+  );
+  assertEquals(
+    result.remove[0].probe,
+    { presence: "gone", url: "https://api.notubiz.nl/document/2/1", status: 400 },
+    "the supplier's answer travels along as evidence",
+  );
+  assertEquals(result.control?.entityId, docId(1), "so does the control document");
 });
 
 Deno.test("an unanswered probe keeps the document", async () => {
@@ -200,6 +218,103 @@ Deno.test("an unanswered probe keeps the document", async () => {
 Deno.test("when the control document is not live, nothing is removed", async () => {
   const { result, asked } = await confirm({ 1: "gone", 2: "gone", 3: "gone" });
   assertEquals(result.remove, [], "an outage looks like every document gone");
-  assertEquals(result.controlFailed, "gone", "and is reported as such");
+  assertEquals(result.controlFailed, true, "and is reported as such");
+  assertEquals(result.kept.length, 2, "every candidate is kept");
   assertEquals(asked, [1], "the candidates are not even asked");
+});
+
+class FakeQuickwit {
+  readonly ingested: string[][] = [];
+  readonly deleteTasks: string[] = [];
+  searchRequest() {
+    return Promise.resolve({ hits: [], num_hits: 0 } as never);
+  }
+  ingestDocuments(documents: Array<{ entity_id?: string }>) {
+    this.ingested.push(documents.map((document) => document.entity_id ?? ""));
+    return Promise.resolve() as never;
+  }
+  createDeleteTask(query: string) {
+    this.deleteTasks.push(query);
+    return Promise.resolve();
+  }
+}
+
+Deno.test("a retraction hides, tombstones with its reason, then empties storage", async () => {
+  const log = await seeded();
+  const quickwit = new FakeQuickwit();
+  const deleted: string[] = [];
+  const outcomes = await retractDocumentsGoneAtSource(
+    [{ entityId: docId(2), meetingId: meeting(1, []).id }],
+    {
+      quickwit,
+      storage: {
+        deleteByPrefix: (prefix) => {
+          deleted.push(prefix);
+          return Promise.resolve([]);
+        },
+      },
+      exportLog: log,
+    },
+  );
+  assertEquals(outcomes, [{ entityId: docId(2), reached: "deleted" }], "fully retracted");
+  assertEquals(quickwit.ingested, [[docId(2)]], "a delete marker hides it from search");
+  assertEquals(quickwit.deleteTasks.length, 1, "one delete task");
+  assertEquals(deleted.length, 4, "every storage prefix is emptied");
+  const tombstone = log.getEntityRecord(SOURCE, docId(2));
+  assertEquals(
+    [tombstone?.op, tombstone?.reason, tombstone?.meeting_id],
+    ["delete", "removed_at_source", meeting(1, []).id],
+    "the tombstone says why and from which meeting",
+  );
+});
+
+Deno.test("a storage failure halfway leaves the feed and search in step", async () => {
+  const log = await seeded();
+  const quickwit = new FakeQuickwit();
+  const outcomes = await retractDocumentsGoneAtSource(
+    [
+      { entityId: docId(2), meetingId: meeting(1, []).id },
+      { entityId: docId(3), meetingId: meeting(1, []).id },
+    ],
+    {
+      quickwit,
+      storage: {
+        deleteByPrefix: (prefix) =>
+          prefix.includes(`${SOURCE}/2/`)
+            ? Promise.reject(new Error("simulated S3 outage"))
+            : Promise.resolve([]),
+      },
+      exportLog: log,
+    },
+  );
+  assertEquals(
+    outcomes,
+    [
+      { entityId: docId(2), reached: "tombstoned", error: "simulated S3 outage" },
+      { entityId: docId(3), reached: "deleted" },
+    ],
+    "the failing document reports the step it reached, the next one still runs",
+  );
+  assertEquals(
+    log.getEntityRecord(SOURCE, docId(2))?.op,
+    "delete",
+    "a document hidden from search is also gone from the feed",
+  );
+  assert(
+    quickwit.deleteTasks[0].includes(docId(2)) && quickwit.deleteTasks[0].includes(docId(3)),
+    "both are in the delete task",
+  );
+});
+
+Deno.test("a failure before the marker leaves the document untouched", async () => {
+  const log = await seeded();
+  const quickwit = new FakeQuickwit();
+  quickwit.ingestDocuments = () => Promise.reject(new Error("quickwit down")) as never;
+  const outcomes = await retractDocumentsGoneAtSource(
+    [{ entityId: docId(2), meetingId: meeting(1, []).id }],
+    { quickwit, storage: { deleteByPrefix: () => Promise.resolve([]) }, exportLog: log },
+  );
+  assertEquals(outcomes, [{ entityId: docId(2), reached: "nothing", error: "quickwit down" }], "");
+  assertEquals(log.getEntityRecord(SOURCE, docId(2))?.op, "upsert", "still in the feed");
+  assertEquals(quickwit.deleteTasks, [], "no delete task for it");
 });

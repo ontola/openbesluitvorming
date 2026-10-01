@@ -146,16 +146,26 @@ Current implemented slices:
   container (14-day retention, `backups/sqlite/` prefix). Install with
   `scripts/install-production-backup.sh`.
 - Imports retract documents the source took off a meeting
-  (`src/pipeline/source_removals.ts`): each run compares a meeting's
-  `attachment` with the one in the export log, and a dropped document is
-  removed from search, object storage and the export feed (tombstone, no
-  blocklist, so it can come back) only after the supplier confirms it is gone
-  with the sweep's calibrated responses and a still-listed document of the
-  same run answers "live". iBabs and Notubiz only. A meeting that lost every
-  document is left alone, and a run with more than
-  `WOOZI_SOURCE_REMOVALS_MAX_PER_RUN` (default 25) candidates removes nothing
-  and logs a run warning. `WOOZI_SOURCE_REMOVALS=0` turns it off. It only sees
-  meetings inside the run's window, so the daily -7..+7 days.
+  (`src/pipeline/source_removals.ts`). This is a deliberate policy change
+  from October 2026: inside the import window a source-side deletion is
+  acted on automatically, not after a human review; outside it the sweep
+  below still only reports. Each run compares a meeting's `attachment` with
+  the one in the export log; a dropped document is retracted only after the
+  supplier confirms it is gone (`src/documents/source_presence.ts`, the same
+  calibration the sweep uses) and a still-listed document of the same run
+  answers "live". iBabs and Notubiz only. A meeting that lost every document
+  is left alone, and a run with more than `WOOZI_SOURCE_REMOVALS_MAX_PER_RUN`
+  (default 25) candidates removes nothing. `WOOZI_SOURCE_REMOVALS=0` turns it
+  off. It only sees meetings inside the run's window, so the daily -7..+7
+  days.
+- A retraction leaves a trail: the tombstone carries `reason:
+  "removed_at_source"` and `meeting_id`, and every retracted, kept or half
+  finished document is a run issue (`step: "source_removals"`, `info` or
+  `warning`) with the supplier's answer as evidence. Per document the order is
+  delete marker, tombstone, then object storage; a failure stops at that
+  step and the warning names it, so it can be finished with
+  `scripts/delete_document.ts`. No blocklist: a republished document comes
+  back.
 - A source revalidation sweep runs daily via `woozi-revalidate.timer`
   (`scripts/revalidate_documents.ts`, one run per calibrated supplier —
   currently iBabs and Notubiz): checks whether documents we still serve have
@@ -163,7 +173,8 @@ Current implemented slices:
   a source-side deletion eventually surfaces without a manual takedown
   report. Confirmed-gone documents (3+ consecutive daily misses, tracked in
   `document_revalidation`/`revalidation_cursor` in the ops SQLite) are only
-  reported, never auto-deleted — review and delete via
+  reported, never auto-deleted by the sweep (the import's own retraction
+  above is the one automatic path) — review and delete via
   `scripts/delete_document.ts`. Install with
   `scripts/install-production-revalidate.sh`. See
   `docs_internal/bsn-takedown.md` ("Stap 6") for the per-supplier

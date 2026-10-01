@@ -14,18 +14,30 @@ import { ibabsDownloadRateLimiter } from "../ibabs/rate_limit.ts";
 
 export type SourcePresence = "live" | "gone" | "unknown";
 
+/** Shared by the import and the revalidation sweep. The sweep used 10 s on
+ * its own; a slow supplier then answers "unknown", which removes nothing. */
 const PROBE_TIMEOUT_MS = 30_000;
 
 export function canProbeSupplier(supplier: string): boolean {
   return supplier === "ibabs" || supplier === "notubiz";
 }
 
+/** What the supplier answered, kept as evidence beside the verdict. */
+export interface SourceProbe {
+  presence: SourcePresence;
+  url?: string;
+  /** HTTP status, or null when no response arrived. */
+  status: number | null;
+  /** Notubiz's `<error_code>` when its 400 carried one. */
+  error_code?: string;
+}
+
 export async function probeDocumentAtSource(
   supplier: string,
   url: string | undefined,
-): Promise<SourcePresence> {
+): Promise<SourceProbe> {
   if (!url || !canProbeSupplier(supplier)) {
-    return "unknown";
+    return { presence: "unknown", url, status: null };
   }
   if (supplier === "ibabs") {
     // Same address, same budget as a download. No recordThrottle on 403:
@@ -39,20 +51,24 @@ export async function probeDocumentAtSource(
       headers: { accept: "*/*", "user-agent": "woozi-revalidate/1.0" },
     });
   } catch {
-    return "unknown";
+    return { presence: "unknown", url, status: null };
   }
+  const status = response.status;
   try {
-    if (response.status === 200) {
-      return "live";
+    if (status === 200) {
+      return { presence: "live", url, status };
     }
     if (supplier === "ibabs") {
-      return response.status === 403 || response.status === 404 ? "gone" : "unknown";
+      return { presence: status === 403 || status === 404 ? "gone" : "unknown", url, status };
     }
-    if (response.status === 400) {
+    if (status === 400) {
       const body = await response.text().catch(() => "");
-      return body.includes("<error_code>") ? "gone" : "unknown";
+      const errorCode = /<error_code>([^<]*)<\/error_code>/.exec(body)?.[1]?.trim();
+      return body.includes("<error_code>")
+        ? { presence: "gone", url, status, ...(errorCode ? { error_code: errorCode } : {}) }
+        : { presence: "unknown", url, status };
     }
-    return "unknown";
+    return { presence: "unknown", url, status };
   } finally {
     await response.body?.cancel().catch(() => undefined);
   }

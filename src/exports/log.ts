@@ -2,7 +2,13 @@ import { DatabaseSync } from "node:sqlite";
 import { getConfigValue } from "../config.ts";
 import { compactEntityPayload } from "../quickwit/project.ts";
 import { ObjectStorageClient } from "../storage/s3.ts";
-import type { EntityCommitEvent, ExportChangeRecord, ExportPage, WooziEntity } from "../types.ts";
+import type {
+  EntityCommitEvent,
+  ExportChangeRecord,
+  ExportDeleteReason,
+  ExportPage,
+  WooziEntity,
+} from "../types.ts";
 
 export const EXPORT_BATCH_LIMIT_MAX = 1000;
 export const EXPORT_BATCH_LIMIT_DEFAULT = 500;
@@ -155,6 +161,8 @@ export class ExportChangesLog {
     entityId: string;
     entityType: string;
     time?: string;
+    reason?: ExportDeleteReason;
+    meetingId?: string;
   }): ExportChangeRecord | null {
     return this.append({
       seq: 0,
@@ -164,6 +172,8 @@ export class ExportChangesLog {
       entity_type: options.entityType,
       source_key: options.sourceKey,
       supplier: options.supplier,
+      ...(options.reason ? { reason: options.reason } : {}),
+      ...(options.meetingId ? { meeting_id: options.meetingId } : {}),
     });
   }
 

@@ -27,7 +27,7 @@
  *     still lists is asked first and has to answer "live".
  */
 
-import type { SourcePresence } from "../documents/source_presence.ts";
+import type { SourceProbe } from "../documents/source_presence.ts";
 import type { ExportChangeRecord, MeetingEntity } from "../types.ts";
 
 const DEFAULT_MAX_REMOVALS_PER_RUN = 25;
@@ -140,11 +140,15 @@ export class SourceRemovalTracker {
 }
 
 export interface ConfirmedRemovals {
-  remove: Array<{ entityId: string; meetingId: string }>;
-  /** Candidates the supplier still serves, or could not say about. */
-  kept: Array<{ entityId: string; presence: SourcePresence }>;
-  /** Set when the control document did not answer "live". */
-  controlFailed?: SourcePresence;
+  /** Confirmed gone, each with the supplier's answer as evidence. */
+  remove: Array<{ entityId: string; meetingId: string; probe: SourceProbe }>;
+  /** Candidates the supplier still serves, or could not say about. Without a
+   * probe when the control document stopped the run before asking. */
+  kept: Array<{ entityId: string; meetingId: string; probe?: SourceProbe }>;
+  /** The still-listed document asked first, and its answer. */
+  control?: { entityId: string; probe: SourceProbe };
+  /** True when the control document did not answer "live". */
+  controlFailed?: boolean;
 }
 
 function originalUrl(record: ExportChangeRecord | null): string | undefined {
@@ -159,7 +163,7 @@ export async function confirmRemovalsAtSource(
     sourceKey: string;
     supplier: string;
     log: SourceRemovalLog;
-    probe: (supplier: string, url: string | undefined) => Promise<SourcePresence>;
+    probe: (supplier: string, url: string | undefined) => Promise<SourceProbe>;
   },
 ): Promise<ConfirmedRemovals> {
   const urlOf = (entityId: string) =>
@@ -168,24 +172,23 @@ export async function confirmRemovalsAtSource(
     return { remove: [], kept: [] };
   }
   const control = plan.controlEntityId
-    ? await options.probe(options.supplier, urlOf(plan.controlEntityId))
-    : "unknown";
-  if (control !== "live") {
-    return {
-      remove: [],
-      kept: plan.remove.map(({ entityId }) => ({ entityId, presence: "unknown" as const })),
-      controlFailed: control,
-    };
+    ? {
+        entityId: plan.controlEntityId,
+        probe: await options.probe(options.supplier, urlOf(plan.controlEntityId)),
+      }
+    : undefined;
+  if (control?.probe.presence !== "live") {
+    return { remove: [], kept: plan.remove, control, controlFailed: true };
   }
   const remove: ConfirmedRemovals["remove"] = [];
   const kept: ConfirmedRemovals["kept"] = [];
   for (const entry of plan.remove) {
-    const presence = await options.probe(options.supplier, urlOf(entry.entityId));
-    if (presence === "gone") {
-      remove.push(entry);
+    const probe = await options.probe(options.supplier, urlOf(entry.entityId));
+    if (probe.presence === "gone") {
+      remove.push({ ...entry, probe });
     } else {
-      kept.push({ entityId: entry.entityId, presence });
+      kept.push({ ...entry, probe });
     }
   }
-  return { remove, kept };
+  return { remove, kept, control };
 }
