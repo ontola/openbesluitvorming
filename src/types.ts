@@ -936,10 +936,12 @@ export interface SourceCoverage {
   checkedAt: string;
   windowFrom: string;
   windowTo: string;
-  supplierDocuments: number;
-  heldDocuments: number;
-  missingDocuments: number;
-  ratio: number;
+  /** `null` in this and the next three fields when `error` is set: the check
+   * measured nothing, which is not the same as measuring zero. */
+  supplierDocuments: number | null;
+  heldDocuments: number | null;
+  missingDocuments: number | null;
+  ratio: number | null;
   lowerBound: boolean;
   /** A few of the missing document ids, for a human to verify. */
   missingSample: string[];
