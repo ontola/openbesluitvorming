@@ -172,3 +172,29 @@ Deno.test("a failed check publishes no numbers instead of zeros", async () => {
   assertEquals(coverage?.ratio, null);
   assertEquals(coverage?.lowerBound, true);
 });
+
+Deno.test("a supplier listing nothing has no ratio instead of 1", async () => {
+  await recordCoverageCheck({
+    source_key: "leiden",
+    checked_at: "2026-09-28T21:23:57.006Z",
+    window_from: "2025-09-27",
+    window_to: "2026-09-27",
+    supplier_documents: 0,
+    held_documents: 0,
+    missing_documents: 0,
+    missing_sample: [],
+    supplier_meetings: 0,
+    register_entries: 0,
+    warnings: 0,
+  });
+  const response = statusTest.buildStatusResponse({
+    runStatus: { sources: [], supplierWindows: [] },
+    indexActivity: null,
+    coverageChecks: await latestCoverageChecks(),
+    now: Date.parse("2026-09-29T12:00:00Z"),
+    windowHours: 36,
+  });
+  const coverage = response.sources.find((row) => row.sourceKey === "leiden")?.coverage;
+  assertEquals(coverage?.supplierDocuments, 0);
+  assertEquals(coverage?.ratio, null);
+});
