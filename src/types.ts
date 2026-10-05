@@ -933,7 +933,8 @@ export interface SourceStatus {
 
 /** Result of one coverage check (src/coverage/check.ts). `heldDocuments` and
  * `missingDocuments` partition `supplierDocuments`; `ratio` is held over
- * supplier, 1 meaning every document the supplier lists is in the index.
+ * supplier, 1 meaning every document the supplier lists is in the index; `null`
+ * when the supplier listed none, which says nothing about completeness.
  * `lowerBound` is true when some supplier requests failed, so the supplier
  * count (and the gap) may be larger than reported. */
 export interface SourceCoverage {

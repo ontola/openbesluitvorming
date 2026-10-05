@@ -224,7 +224,11 @@ function toSourceCoverage(check: CoverageCheckRecord): SourceCoverage {
     ratio:
       check.supplier_documents > 0
         ? Math.round((check.held_documents / check.supplier_documents) * 1000) / 1000
-        : 1,
+        : // 0 of 0 is not "complete": the supplier listed nothing, which is also what
+          // a source looks like when it publishes through a module we do not read, or
+          // elsewhere altogether (Leiden, Zaanstad, Purmerend, all "1" with content
+          // ending in 2022 or 2025).
+          null,
     lowerBound: check.warnings > 0,
     missingSample: check.missing_sample,
   };
