@@ -234,3 +234,49 @@ Deno.test("relevance keeps the order the index scored, on either projection", ()
     "the other orders are unaffected",
   );
 });
+
+Deno.test("agenda documents that look like a PDF get a link that works (#313)", () => {
+  const agenda = __test__.withDownloadUrls([
+    {
+      id: "agenda_item:ibabs:gemeente:hilversum:1",
+      documents: [
+        {
+          id: "document:ibabs:gemeente:hilversum:a1",
+          name: "Dossier",
+          file_name: "voorblad.pdf",
+          original_url: "https://api1.ibabs.eu/publicdownload.aspx?site=Hilversum&id=a1",
+        },
+        { id: "document:ibabs:gemeente:hilversum:a2", name: "Tabel", file_name: "tabel.xlsx" },
+      ],
+      agenda_items: [
+        {
+          id: "agenda_item:ibabs:gemeente:hilversum:2",
+          documents: [
+            {
+              id: "document:ibabs:gemeente:hilversum:a3",
+              name: "Bijlage",
+              content_type: "application/pdf",
+            },
+          ],
+        },
+      ],
+    },
+  ]);
+  const [top] = agenda ?? [];
+  assertEquals(
+    top.documents?.[0].downloadUrl,
+    "/api/entities/document%3Aibabs%3Agemeente%3Ahilversum%3Aa1/pdf",
+    "a PDF gets our own link",
+  );
+  assertEquals(
+    top.documents?.[0].original_url?.startsWith("https://api1.ibabs.eu"),
+    true,
+    "the supplier link stays",
+  );
+  assertEquals(top.documents?.[1].downloadUrl, undefined, "not a PDF, so no PDF link");
+  assertEquals(
+    top.agenda_items?.[0].documents?.[0].downloadUrl,
+    "/api/entities/document%3Aibabs%3Agemeente%3Ahilversum%3Aa3/pdf",
+    "nested agenda items too",
+  );
+});

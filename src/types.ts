@@ -58,6 +58,10 @@ export interface MeetingAgendaDocumentLink {
   file_name?: string;
   content_type?: string;
   original_url?: string;
+  /** Where to fetch the PDF from us. Present on documents that look like a
+   * PDF. `original_url` points at the supplier, which for part of iBabs
+   * answers 403 for a file we hold and serve (#313). */
+  downloadUrl?: string;
 }
 
 export interface MeetingAgendaItem {
@@ -351,7 +355,7 @@ export interface ExtractionStats {
 }
 
 export interface ExtractionIssue {
-  severity: "warning" | "error";
+  severity: "info" | "warning" | "error";
   step:
     | "list_events"
     | "get_meeting"
@@ -363,6 +367,7 @@ export interface ExtractionIssue {
     | "upload_s3"
     | "ingest_quickwit"
     | "export_log_flush"
+    | "source_removals"
     | "bsn_quarantine";
   entity_id?: string;
   message: string;
@@ -505,6 +510,10 @@ export interface SourceCatalogEntry extends SourceDefinitionBase {
   succeededByCbsId?: string;
   succeededByLabel?: string;
   succeededBySourceKey?: string;
+  /** Catalog key of the organization this one is part of and searched under,
+   * for a body that is not merged away but lives on inside it: Stadsgebied
+   * Weesp inside Amsterdam. */
+  partOfSourceKey?: string;
   notubizOrganizationId?: number;
   ibabsSitename?: string;
   baseUrl?: string;
@@ -849,7 +858,14 @@ export interface ExportChangeRecord {
   content_hash?: string;
   schema_version?: string;
   payload?: unknown;
+  /** Delete records only: why the entity went. */
+  reason?: ExportDeleteReason;
+  /** Delete records with reason "removed_at_source": the meeting the source
+   * took the document off. */
+  meeting_id?: string;
 }
+
+export type ExportDeleteReason = "takedown" | "removed_at_source" | "source_purged";
 
 export interface ExportPage {
   records: ExportChangeRecord[];
@@ -924,10 +940,12 @@ export interface SourceCoverage {
   checkedAt: string;
   windowFrom: string;
   windowTo: string;
-  supplierDocuments: number;
-  heldDocuments: number;
-  missingDocuments: number;
-  ratio: number;
+  /** `null` in this and the next three fields when `error` is set: the check
+   * measured nothing, which is not the same as measuring zero. */
+  supplierDocuments: number | null;
+  heldDocuments: number | null;
+  missingDocuments: number | null;
+  ratio: number | null;
   lowerBound: boolean;
   /** A few of the missing document ids, for a human to verify. */
   missingSample: string[];

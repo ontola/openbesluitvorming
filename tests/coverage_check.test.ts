@@ -17,7 +17,12 @@ Deno.test("coverage compares what the supplier lists against what we hold", () =
   assertEquals(comparison.supplierDocuments, 3);
   assertEquals(comparison.heldDocuments, 1);
   assertEquals(comparison.missingDocuments, 2);
-  assertEquals(comparison.missingSample, ["document:x:1", "document:x:3"]);
+  assertEquals(comparison.missingSample, ["document:x:3", "document:x:1"], "newest first (#331)");
+  // Numbers compare as numbers: 10 is newer than 9.
+  assertEquals(compareCoverage(["document:x:9", "document:x:10"], []).missingSample, [
+    "document:x:10",
+    "document:x:9",
+  ]);
   // What we hold beyond the supplier's listing is not a gap.
   assertEquals(compareCoverage([], ["document:x:9"]).missingDocuments, 0);
 });
@@ -133,4 +138,37 @@ Deno.test("a recorded check surfaces on the status response as coverage", async 
   assertEquals(source?.coverage?.lowerBound, true, "two failed requests make it a lower bound");
   const other = response.sources.find((row) => row.sourceKey === "dongen");
   assertEquals(other?.coverage, undefined, "no check, no field");
+});
+
+Deno.test("a failed check publishes no numbers instead of zeros", async () => {
+  // The shape of #309: the supplier timed out, the check stored 0/0/0 and the
+  // status read as a ratio of 1 for a source holding 5,890 documents.
+  await recordCoverageCheck({
+    source_key: "texel",
+    checked_at: "2026-09-12T09:25:50.606Z",
+    window_from: "2025-09-11",
+    window_to: "2026-09-11",
+    supplier_documents: 0,
+    held_documents: 0,
+    missing_documents: 0,
+    missing_sample: [],
+    supplier_meetings: 0,
+    register_entries: 0,
+    warnings: 0,
+    error: "Execution Timeout Expired.",
+  });
+  const response = statusTest.buildStatusResponse({
+    runStatus: { sources: [], supplierWindows: [] },
+    indexActivity: null,
+    coverageChecks: await latestCoverageChecks(),
+    now: Date.parse("2026-09-14T12:00:00Z"),
+    windowHours: 36,
+  });
+  const coverage = response.sources.find((row) => row.sourceKey === "texel")?.coverage;
+  assertEquals(coverage?.error, "Execution Timeout Expired.");
+  assertEquals(coverage?.supplierDocuments, null);
+  assertEquals(coverage?.heldDocuments, null);
+  assertEquals(coverage?.missingDocuments, null);
+  assertEquals(coverage?.ratio, null);
+  assertEquals(coverage?.lowerBound, true);
 });

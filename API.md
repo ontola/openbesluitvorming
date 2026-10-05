@@ -181,7 +181,7 @@ The recommended search endpoint. Returns grouped, deduplicated results with docu
 | `sort` | string | Sort order: `date_desc` (default), `date_asc`, `title_asc` or `relevance`. Any other value returns `400`. `title_asc` orders the fetched window rather than the whole result set. |
 | `dateFrom` | string | Earliest date, `YYYY-MM-DD` only (e.g. `2024-01-01`), inclusive. Filters on the result's `sortDate`, see [What the date is](#what-the-date-is). A value that is not a calendar date returns `400`; a time or time zone on the end is not accepted. |
 | `dateTo` | string | Latest date, same format, **inclusive of the whole day**: `dateFrom=2026-01-01&dateTo=2026-01-01` returns everything dated 1 January 2026, not nothing. It is a "tot en met", not a "tot". |
-| `offset` | integer | Pagination offset (default: 0). Must be zero or greater. |
+| `offset` | integer | Pagination offset (default: 0). Must be zero or greater. Pages are cut from the deduplicated results, which are read from the top, so paging reaches a limited depth (a few hundred to about a thousand results). To go further, narrow with `dateFrom` and `dateTo`, or harvest through the [export API](#bulk-export). |
 | `limit` | integer | Results per page (default: 24, minimum 1, values above 100 are capped at 100). |
 
 Parameters that cannot be honoured are refused with `400` rather than ignored:
@@ -407,7 +407,7 @@ at all — i.e. how long the outage has lasted.
 | `latestContentDate` | Newest meeting date held for this organization. Often in the future — an agenda is published before the meeting happens. Dates more than two years ahead are typos at the source and are left out |
 | `lastIndexedAt` | When anything was last written to the search index for this organization |
 | `indexedDocuments` | Documents in the search index for this organization, exact at the moment of the request: one per document, pages not counted. The number to reconcile against the source system's own list. Absent when the index did not answer |
-| `coverage` | Present once the weekly coverage check has covered this organization. What the source system's own API listed for a date window, against what the index holds: `supplierDocuments`, `heldDocuments`, `missingDocuments` (the first two partition the third), `ratio` (held over supplier; 1 means complete), `windowFrom`/`windowTo`, `checkedAt`, `missingSample` (a few missing document ids), `lowerBound` (true when some supplier requests failed, so the gap may be larger), and `error` when the check itself failed. `state: "ok"` says the last import ran; `coverage` says whether it asked for everything |
+| `coverage` | Present once the weekly coverage check has covered this organization. What the source system's own API listed for a date window, against what the index holds: `supplierDocuments`, `heldDocuments`, `missingDocuments` (the first two partition the third), `ratio` (held over supplier, so the share that is complete; 1 means complete), `windowFrom`/`windowTo` (calendar dates, both inclusive: the window is `windowFrom` 00:00 through the whole of `windowTo`), `checkedAt`, `missingSample` (up to 25 missing document ids, highest first, which for suppliers that number their documents as they create them means the most recent), `lowerBound` (true when some supplier requests failed, so the gap may be larger), and `error` when the check itself failed. When `error` is set the four numbers `supplierDocuments`, `heldDocuments`, `missingDocuments` and `ratio` are `null`: the check measured nothing, which is not the same as measuring zero. `state: "ok"` says the last import ran; `coverage` says whether it asked for everything |
 | `discontinuedAt` | The date the organization ceased to exist. Only on `discontinued` |
 | `succeededBy` | `{ cbsId, label, sourceKey }` of the organization that took over. `sourceKey` is absent when we do not import the successor. Only on `discontinued` |
 
@@ -472,7 +472,8 @@ curl "https://openbesluitvorming.nl/api/entities/document%3Anotubiz%3Agemeente%3
         {
           "id": "document:notubiz:gemeente:soest:12345",
           "name": "Raadsvoorstel begroting 2024",
-          "original_url": "https://..."
+          "original_url": "https://...",
+          "downloadUrl": "/api/entities/document%3Anotubiz%3Agemeente%3Asoest%3A12345/pdf"
         }
       ],
       "agenda_items": []
@@ -512,6 +513,8 @@ curl "https://openbesluitvorming.nl/api/entities/document%3Anotubiz%3Agemeente%3
   ]
 }
 ```
+
+`original_url` is the supplier's own link and for part of iBabs answers `403` for a document we hold. A document that looks like a PDF also carries `downloadUrl`, a path on this API that serves our stored copy; prefer it over `original_url`.
 
 `motions` and `recordings` are present only on a `Meeting`, and only when the
 source publishes them. See [voting data](#use-case-voting-data) and
@@ -601,7 +604,14 @@ Both endpoints return NDJSON (`application/x-ndjson`): one record per line.
   markdown via `GET /api/entities/{entity_id}` or the object key in
   `payload.derived_content.markdown_key`.
 - `op` is `"upsert"` or `"delete"`. A delete record (tombstone) has no
-  `payload`; remove the entity from your copy.
+  `payload`; remove the entity from your copy. Since October 2026 a delete
+  record says why in `reason`: `"takedown"` (removed on request, e.g. a
+  privacy report), `"removed_at_source"` (an import found the document taken
+  off its meeting and the source confirmed it can no longer be downloaded;
+  `meeting_id` names that meeting) or `"source_purged"` (a whole source was
+  withdrawn). Older delete records have no `reason`. A document removed at
+  the source can come back as a new `upsert` if the source publishes it
+  again.
 - The feed is deduplicated on `content_hash`: re-indexing unchanged data adds
   no records, so polling stays cheap.
 - `seq` is monotonic per source. Cursors are stable: the same cursor always

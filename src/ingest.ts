@@ -17,6 +17,14 @@ import {
 } from "./ops/store.ts";
 import { QuickwitClient } from "./quickwit/client.ts";
 import { reindexSource } from "./pipeline/reindex.ts";
+import {
+  confirmRemovalsAtSource,
+  maxSourceRemovalsPerRun,
+  SourceRemovalTracker,
+  sourceRemovalsEnabled,
+} from "./pipeline/source_removals.ts";
+import { canProbeSupplier, probeDocumentAtSource } from "./documents/source_presence.ts";
+import { retractDocumentsGoneAtSource } from "./ops/delete_document.ts";
 import { ObjectStorageClient } from "./storage/s3.ts";
 import { currentDerivationVersion, currentProjectionVersion } from "./pipeline/versioning.ts";
 import { getProjectableSource, getSource } from "./sources/index.ts";
@@ -161,6 +169,10 @@ export async function executeIngest(
     }
 
     const exportLog = options.ingestToQuickwit ? await getExportLog() : null;
+    const removals =
+      exportLog && sourceRemovalsEnabled() && canProbeSupplier(source.supplier)
+        ? new SourceRemovalTracker(source.key, exportLog)
+        : null;
 
     const extraction = await runExtractor(source, dateFrom, dateTo, {
       executionMode: options.executionMode,
@@ -193,6 +205,7 @@ export async function executeIngest(
       },
       onEntity: async (entity) => {
         options.onHeartbeat?.();
+        removals?.observeEmitted(entity.id);
         // Blocklisted entities (taken down, e.g. BSN) are neither indexed nor
         // exported. materializeDocument also refuses to re-materialize
         // documents, but this guard covers every extractor path centrally.
@@ -225,6 +238,11 @@ export async function executeIngest(
         // Project immediately to compact Quickwit documents and discard the
         // large entity (md_text, page_chunks, raw) right away. Only the small
         // projected documents are buffered until the next flush.
+        if (entity.type === "Meeting") {
+          // Before the commit below overwrites the meeting's previous
+          // document list.
+          removals?.observeMeeting(entity);
+        }
         const event = await buildEntityCommitEvent(entity);
         exportLog?.recordCommit(event);
         const projected = projectEntityCommitToQuickwitDocuments(event);
@@ -235,6 +253,10 @@ export async function executeIngest(
       },
     });
     await flushQuickwitBatch();
+
+    if (removals && quickwit && exportLog) {
+      await retractRemovedDocuments(run.id, source, removals, quickwit, exportLog);
+    }
 
     if (exportLog) {
       try {
@@ -285,6 +307,109 @@ export async function executeIngest(
       issue_count: issueCount || 1,
     });
     throw new Error(`Run ${updated.id} failed: ${message}`);
+  }
+}
+
+/**
+ * Retract the documents this run found taken off their meeting at the source.
+ * Runs after extraction so a document that only moved has been seen by then.
+ *
+ * Every decision lands in the run's issues with the supplier's answer as
+ * evidence: retracted and kept documents as "info", anything left half done
+ * as "warning" naming the step it reached, so it can be finished by hand
+ * with scripts/delete_document.ts. A failure here never fails the import:
+ * everything the run imported is already written.
+ */
+async function retractRemovedDocuments(
+  runId: string,
+  source: SourceDefinition,
+  removals: SourceRemovalTracker,
+  quickwit: QuickwitClient,
+  exportLog: Awaited<ReturnType<typeof getExportLog>>,
+): Promise<void> {
+  const step = "source_removals" as const;
+  const note = (
+    severity: "info" | "warning",
+    message: string,
+    entityId?: string,
+    details?: unknown,
+  ) =>
+    appendRunIssue(runId, {
+      severity,
+      step,
+      message,
+      ...(entityId ? { entity_id: entityId } : {}),
+      ...(details === undefined ? {} : { details: JSON.stringify(details) }),
+    });
+
+  try {
+    const plan = removals.plan(maxSourceRemovalsPerRun());
+    for (const meetingId of plan.skippedMeetings) {
+      await note(
+        "info",
+        "Vergadering verloor al haar documenten tegelijk; niets ingetrokken.",
+        meetingId,
+      );
+    }
+    if (plan.capExceeded) {
+      await note(
+        "warning",
+        `${plan.capExceeded.candidates} documenten lijken bij de bron verwijderd, meer dan ` +
+          `${plan.capExceeded.max} per run; niets ingetrokken, controleer handmatig.`,
+      );
+      return;
+    }
+    const confirmed = await confirmRemovalsAtSource(plan, {
+      sourceKey: source.key,
+      supplier: source.supplier,
+      log: exportLog,
+      probe: probeDocumentAtSource,
+    });
+    for (const entry of confirmed.kept) {
+      await note(
+        "info",
+        confirmed.controlFailed
+          ? "Van de agenda gehaald; niet ingetrokken omdat het controledocument niet als beschikbaar antwoordde."
+          : "Van de agenda gehaald maar nog beschikbaar bij de bron; niet ingetrokken.",
+        entry.entityId,
+        { meeting_id: entry.meetingId, probe: entry.probe, control: confirmed.control },
+      );
+    }
+    if (confirmed.remove.length === 0) {
+      return;
+    }
+    const outcomes = await retractDocumentsGoneAtSource(confirmed.remove, {
+      quickwit,
+      storage: await ObjectStorageClient.fromEnvironment(),
+      exportLog,
+    });
+    for (const outcome of outcomes) {
+      const entry = confirmed.remove.find((candidate) => candidate.entityId === outcome.entityId)!;
+      const details = {
+        meeting_id: entry.meetingId,
+        probe: entry.probe,
+        control: confirmed.control,
+        reached: outcome.reached,
+        ...(outcome.error ? { error: outcome.error } : {}),
+      };
+      if (outcome.reached === "deleted" && !outcome.error) {
+        await note("info", "Ingetrokken: verwijderd bij de bron.", outcome.entityId, details);
+      } else {
+        await note(
+          "warning",
+          `Intrekking onvolledig (stap bereikt: ${outcome.reached}): ${outcome.error ?? "onbekend"}`,
+          outcome.entityId,
+          details,
+        );
+      }
+    }
+  } catch (error) {
+    await note(
+      "warning",
+      `Intrekken van bij de bron verwijderde documenten mislukt: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
   }
 }
 

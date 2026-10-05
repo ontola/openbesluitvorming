@@ -2,7 +2,13 @@ import { DatabaseSync } from "node:sqlite";
 import { getConfigValue } from "../config.ts";
 import { compactEntityPayload } from "../quickwit/project.ts";
 import { ObjectStorageClient } from "../storage/s3.ts";
-import type { EntityCommitEvent, ExportChangeRecord, ExportPage, WooziEntity } from "../types.ts";
+import type {
+  EntityCommitEvent,
+  ExportChangeRecord,
+  ExportDeleteReason,
+  ExportPage,
+  WooziEntity,
+} from "../types.ts";
 
 export const EXPORT_BATCH_LIMIT_MAX = 1000;
 export const EXPORT_BATCH_LIMIT_DEFAULT = 500;
@@ -155,6 +161,8 @@ export class ExportChangesLog {
     entityId: string;
     entityType: string;
     time?: string;
+    reason?: ExportDeleteReason;
+    meetingId?: string;
   }): ExportChangeRecord | null {
     return this.append({
       seq: 0,
@@ -164,6 +172,8 @@ export class ExportChangesLog {
       entity_type: options.entityType,
       source_key: options.sourceKey,
       supplier: options.supplier,
+      ...(options.reason ? { reason: options.reason } : {}),
+      ...(options.meetingId ? { meeting_id: options.meetingId } : {}),
     });
   }
 
@@ -371,6 +381,61 @@ export class ExportChangesLog {
       )
       .all(sourceKey, prefix, `${prefix}\uffff`) as Array<{ entity_id: string }>;
     return rows.map((row) => row.entity_id);
+  }
+
+  /** Live records of a source under an id prefix, one at a time so a source of
+   * millions of rows is never held in memory. Parses every record in the range,
+   * so it is for a job that runs in the worker or a script, not a request. */
+  *iterateLiveRecords(sourceKey: string, prefix: string): Generator<ExportChangeRecord> {
+    const statement = this.db.prepare(
+      `SELECT record FROM export_entity_state
+       WHERE source_key = ? AND op = 'upsert' AND entity_id >= ? AND entity_id < ?`,
+    );
+    for (const row of statement.iterate(sourceKey, prefix, `${prefix}\uffff`) as Iterable<{
+      record: string;
+    }>) {
+      yield JSON.parse(row.record) as ExportChangeRecord;
+    }
+  }
+
+  /** The latest record for one entity, tombstone included, or null when the
+   * entity was never exported. */
+  getEntityRecord(sourceKey: string, entityId: string): ExportChangeRecord | null {
+    const row = this.db
+      .prepare("SELECT record FROM export_entity_state WHERE source_key = ? AND entity_id = ?")
+      .get(sourceKey, entityId) as { record: string } | undefined;
+    return row ? (JSON.parse(row.record) as ExportChangeRecord) : null;
+  }
+
+  /** Which of `entityIds` a live entity of the source under one of `prefixes`
+   * still mentions in its record, e.g. a meeting that lists a document among
+   * its attachments. One pass over those rows, whatever the number of ids. */
+  findReferencedEntityIds(sourceKey: string, entityIds: string[], prefixes: string[]): Set<string> {
+    const pending = new Set(entityIds);
+    const referenced = new Set<string>();
+    for (const prefix of prefixes) {
+      if (pending.size === 0) {
+        break;
+      }
+      const statement = this.db.prepare(
+        `SELECT record FROM export_entity_state
+         WHERE source_key = ? AND op = 'upsert' AND entity_id >= ? AND entity_id < ?`,
+      );
+      for (const row of statement.iterate(sourceKey, prefix, `${prefix}￿`) as Iterable<{
+        record: string;
+      }>) {
+        for (const entityId of pending) {
+          if (row.record.includes(JSON.stringify(entityId))) {
+            referenced.add(entityId);
+            pending.delete(entityId);
+          }
+        }
+        if (pending.size === 0) {
+          break;
+        }
+      }
+    }
+    return referenced;
   }
 
   /** Read the current state per entity (latest upsert record, tombstones

@@ -118,6 +118,7 @@ export async function purgeSource(
       supplier: record.supplier,
       entityId: record.entity_id,
       entityType: record.entity_type,
+      reason: "source_purged",
     });
     if (appended) {
       result.tombstones += 1;

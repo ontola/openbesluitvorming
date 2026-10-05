@@ -222,6 +222,20 @@ Deno.test("listMeetingsAdaptive halves the chunk on SOAP timeout", async () => {
   assert(calls.length === 3, "one failed full-range call + two half-range calls");
 });
 
+Deno.test("isSoapTimeout also recognises the database timeout iBabs returns as ERR", () => {
+  const { isSoapTimeout } = ibabsExtractorTest;
+  // Worded as in #309; it arrives as an ordinary Error, not a TimeoutError.
+  assert(
+    isSoapTimeout(
+      new Error(
+        "Execution Timeout Expired.  The timeout period elapsed prior to completion of the operation or the server is not responding.",
+      ),
+    ),
+    "the iBabs database timeout is a timeout",
+  );
+  assert(!isSoapTimeout(new Error("No public account!")), "other errors are not");
+});
+
 Deno.test("listMeetingsAdaptive stops splitting below the floor and rethrows", async () => {
   const { listMeetingsAdaptive } = ibabsExtractorTest;
   const source = getIbabsSource("amstelveen");
