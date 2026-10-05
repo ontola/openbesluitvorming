@@ -181,7 +181,7 @@ The recommended search endpoint. Returns grouped, deduplicated results with docu
 | `sort` | string | Sort order: `date_desc` (default), `date_asc`, `title_asc` or `relevance`. Any other value returns `400`. `title_asc` orders the fetched window rather than the whole result set. |
 | `dateFrom` | string | Earliest date, `YYYY-MM-DD` only (e.g. `2024-01-01`), inclusive. Filters on the result's `sortDate`, see [What the date is](#what-the-date-is). A value that is not a calendar date returns `400`; a time or time zone on the end is not accepted. |
 | `dateTo` | string | Latest date, same format, **inclusive of the whole day**: `dateFrom=2026-01-01&dateTo=2026-01-01` returns everything dated 1 January 2026, not nothing. It is a "tot en met", not a "tot". |
-| `offset` | integer | Pagination offset (default: 0). Must be zero or greater. |
+| `offset` | integer | Pagination offset (default: 0). Must be zero or greater. Pages are cut from the deduplicated results, which are read from the top, so paging reaches a limited depth (a few hundred to about a thousand results). To go further, narrow with `dateFrom` and `dateTo`, or harvest through the [export API](#bulk-export). |
 | `limit` | integer | Results per page (default: 24, minimum 1, values above 100 are capped at 100). |
 
 Parameters that cannot be honoured are refused with `400` rather than ignored:

@@ -464,9 +464,12 @@ Deno.test("searchMeetings caps broad document scans after grouping", async () =>
 
     assert(response.results.length === 1, "duplicate documents should still collapse");
     assert(response.hasMore === true, "capped broad scans should still advertise more results");
+    // Every window is read from the top (#312), so the scan has to be bounded
+    // by a row budget rather than by the page size.
+    const rowsRead = startOffsets.length > 0 ? Math.max(...startOffsets) : 0;
     assert(
-      startOffsets.every((offset) => offset < 49),
-      "broad document scans should not continue into deep Quickwit offsets",
+      startOffsets.length <= 20 && rowsRead < 6000,
+      `a scan of nothing but duplicates must stop at the row budget, made ${startOffsets.length} requests`,
     );
   } finally {
     globalThis.fetch = originalFetch;
@@ -1005,6 +1008,76 @@ Deno.test("a full page is delivered even when rows collapse seven to one", async
       wide.results.length === 100,
       `limit=100 should return 100 results, got ${wide.results.length}`,
     );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+/** #312: paging a browse without a query repeated documents.
+ *
+ * A document is committed again by every import that re-emits it, and Quickwit
+ * hands back a sort tie split by split, so the copies of one document are a
+ * whole page of rows apart: rows 0..39 are the 40 documents once, rows 40..79
+ * the same 40 again, and so on. Skipping `offset` rows then lands page two on
+ * the second copy of page one. Pages have to be cut from the deduplicated
+ * results, so they must be disjoint and together cover every document once.
+ */
+Deno.test("paging a browse without a query neither repeats nor skips documents", async () => {
+  const originalFetch = globalThis.fetch;
+  const DOCUMENTS = 40;
+  const COPIES = 5;
+
+  globalThis.fetch = async (_input, init) => {
+    const body = JSON.parse(String((init as { body?: string } | undefined)?.body ?? "{}"));
+    const startOffset = Number(body.start_offset ?? 0);
+    const maxHits = Number(body.max_hits);
+    const totalRows = DOCUMENTS * COPIES;
+    const count = Math.max(0, Math.min(maxHits, totalRows - startOffset));
+
+    const hits = Array.from({ length: count }, (_, index) => {
+      const row = startOffset + index;
+      const copy = Math.floor(row / DOCUMENTS);
+      return {
+        time: `2026-03-31T0${copy}:00:00Z`,
+        entity_id: `document:notubiz:gemeente:amsterdam:${row % DOCUMENTS}`,
+        entity_type: "Document",
+        name: `Document ${row % DOCUMENTS}`,
+        start_date: "2025-03-27T00:00:00Z",
+        source_key: "amsterdam",
+        content: `Document ${row % DOCUMENTS}`,
+      };
+    });
+
+    return new Response(JSON.stringify({ num_hits: totalRows, hits }), {
+      headers: { "content-type": "application/json" },
+    });
+  };
+
+  try {
+    const seen: string[] = [];
+    for (const offset of [0, 10, 20, 30]) {
+      const page = await searchMeetings({
+        organization: "amsterdam",
+        entityType: "Document",
+        sort: "date_desc",
+        limit: 10,
+        offset,
+      });
+      assert(page.results.length === 10, `offset ${offset} should hold 10 results`);
+      seen.push(...page.results.map((result) => result.entityId));
+    }
+
+    assert(new Set(seen).size === seen.length, "no document may appear on two pages");
+    assert(seen.length === DOCUMENTS, `every document appears once, saw ${seen.length}`);
+
+    const last = await searchMeetings({
+      organization: "amsterdam",
+      entityType: "Document",
+      sort: "date_desc",
+      limit: 10,
+      offset: 30,
+    });
+    assert(last.hasMore === false, "the fourth page is the last one");
   } finally {
     globalThis.fetch = originalFetch;
   }
