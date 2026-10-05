@@ -58,6 +58,10 @@ export interface MeetingAgendaDocumentLink {
   file_name?: string;
   content_type?: string;
   original_url?: string;
+  /** Where to fetch the PDF from us. Present on documents that look like a
+   * PDF. `original_url` points at the supplier, which for part of iBabs
+   * answers 403 for a file we hold and serve (#313). */
+  downloadUrl?: string;
 }
 
 export interface MeetingAgendaItem {

@@ -17,7 +17,12 @@ Deno.test("coverage compares what the supplier lists against what we hold", () =
   assertEquals(comparison.supplierDocuments, 3);
   assertEquals(comparison.heldDocuments, 1);
   assertEquals(comparison.missingDocuments, 2);
-  assertEquals(comparison.missingSample, ["document:x:1", "document:x:3"]);
+  assertEquals(comparison.missingSample, ["document:x:3", "document:x:1"], "newest first (#331)");
+  // Numbers compare as numbers: 10 is newer than 9.
+  assertEquals(compareCoverage(["document:x:9", "document:x:10"], []).missingSample, [
+    "document:x:10",
+    "document:x:9",
+  ]);
   // What we hold beyond the supplier's listing is not a gap.
   assertEquals(compareCoverage([], ["document:x:9"]).missingDocuments, 0);
 });

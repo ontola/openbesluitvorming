@@ -809,6 +809,34 @@ function dedupeLatestHits(hits: SearchHit[]): SearchHit[] {
   return [...byEntityId.values()].filter((hit) => hit.op !== "delete");
 }
 
+/** Give every agenda document a link that works. The stored link points at the
+ * supplier, and for part of iBabs that answers 403 for a document we hold and
+ * serve through `/api/entities/{id}/pdf` (#313). */
+function withDownloadUrls(items: MeetingAgendaItem[] | undefined): MeetingAgendaItem[] | undefined {
+  if (!Array.isArray(items)) {
+    return items;
+  }
+  return items.map((item) => {
+    if (typeof item !== "object" || item === null) {
+      return item;
+    }
+    return {
+      ...item,
+      documents: item.documents?.map((document) =>
+        document.id &&
+        looksLikePdf({
+          contentType: document.content_type,
+          fileName: document.file_name,
+          url: document.original_url,
+        })
+          ? { ...document, downloadUrl: `/api/entities/${encodeURIComponent(document.id)}/pdf` }
+          : document,
+      ),
+      agenda_items: withDownloadUrls(item.agenda_items),
+    };
+  });
+}
+
 function hasStructuredAgenda(agenda: MeetingAgendaItem[] | undefined): boolean {
   if (!Array.isArray(agenda) || agenda.length === 0) {
     return false;
@@ -1672,7 +1700,7 @@ export async function getEntityContent(
     pdfUrl: pdfUrl ?? motionAttachment?.pdfUrl,
     pdfEntityId: pdfUrl ? undefined : motionAttachment?.entityId,
     meetingId: hit.payload?.is_referenced_by ?? hit.payload?.meeting,
-    agenda,
+    agenda: withDownloadUrls(agenda),
     motions: motions && motions.length > 0 ? motions : undefined,
     recordings: recordings && recordings.length > 0 ? recordings : undefined,
     motion,
@@ -2059,4 +2087,5 @@ export const __test__ = {
   searchResultEntityId,
   searchResultEntityType,
   preferIndexedHit,
+  withDownloadUrls,
 };

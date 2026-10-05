@@ -407,7 +407,7 @@ at all — i.e. how long the outage has lasted.
 | `latestContentDate` | Newest meeting date held for this organization. Often in the future — an agenda is published before the meeting happens |
 | `lastIndexedAt` | When anything was last written to the search index for this organization |
 | `indexedDocuments` | Documents in the search index for this organization, exact at the moment of the request: one per document, pages not counted. The number to reconcile against the source system's own list. Absent when the index did not answer |
-| `coverage` | Present once the weekly coverage check has covered this organization. What the source system's own API listed for a date window, against what the index holds: `supplierDocuments`, `heldDocuments`, `missingDocuments` (the first two partition the third), `ratio` (held over supplier; 1 means complete), `windowFrom`/`windowTo`, `checkedAt`, `missingSample` (a few missing document ids), `lowerBound` (true when some supplier requests failed, so the gap may be larger), and `error` when the check itself failed. When `error` is set the four numbers `supplierDocuments`, `heldDocuments`, `missingDocuments` and `ratio` are `null`: the check measured nothing, which is not the same as measuring zero. `state: "ok"` says the last import ran; `coverage` says whether it asked for everything |
+| `coverage` | Present once the weekly coverage check has covered this organization. What the source system's own API listed for a date window, against what the index holds: `supplierDocuments`, `heldDocuments`, `missingDocuments` (the first two partition the third), `ratio` (held over supplier, so the share that is complete; 1 means complete), `windowFrom`/`windowTo` (calendar dates, both inclusive: the window is `windowFrom` 00:00 through the whole of `windowTo`), `checkedAt`, `missingSample` (up to 25 missing document ids, highest first, which for suppliers that number their documents as they create them means the most recent), `lowerBound` (true when some supplier requests failed, so the gap may be larger), and `error` when the check itself failed. When `error` is set the four numbers `supplierDocuments`, `heldDocuments`, `missingDocuments` and `ratio` are `null`: the check measured nothing, which is not the same as measuring zero. `state: "ok"` says the last import ran; `coverage` says whether it asked for everything |
 | `discontinuedAt` | The date the organization ceased to exist. Only on `discontinued` |
 | `succeededBy` | `{ cbsId, label, sourceKey }` of the organization that took over. `sourceKey` is absent when we do not import the successor. Only on `discontinued` |
 
@@ -472,7 +472,8 @@ curl "https://openbesluitvorming.nl/api/entities/document%3Anotubiz%3Agemeente%3
         {
           "id": "document:notubiz:gemeente:soest:12345",
           "name": "Raadsvoorstel begroting 2024",
-          "original_url": "https://..."
+          "original_url": "https://...",
+          "downloadUrl": "/api/entities/document%3Anotubiz%3Agemeente%3Asoest%3A12345/pdf"
         }
       ],
       "agenda_items": []
@@ -512,6 +513,8 @@ curl "https://openbesluitvorming.nl/api/entities/document%3Anotubiz%3Agemeente%3
   ]
 }
 ```
+
+`original_url` is the supplier's own link and for part of iBabs answers `403` for a document we hold. A document that looks like a PDF also carries `downloadUrl`, a path on this API that serves our stored copy; prefer it over `original_url`.
 
 `motions` and `recordings` are present only on a `Meeting`, and only when the
 source publishes them. See [voting data](#use-case-voting-data) and
