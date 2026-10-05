@@ -2476,13 +2476,18 @@
         </div>
 
         <div class="detail-sheet__header-top">
-          {#if detailContent?.meetingId}
+          <!-- meetingId is whatever the document is referenced by. For a register
+               entry or an attachment without a meeting that is the organization,
+               and a link to it only led back to the search page (#334). -->
+          {#if detailContent?.meetingId?.startsWith("meeting:") || detailContent?.meetingId?.startsWith("motion:")}
             <button
               type="button"
               class="detail-sheet__meeting-crumb"
               on:click={() => void openDetailById(detailContent.meetingId)}
             >
-              ← Bekijk vergadering
+              ← {detailContent.meetingId.startsWith("motion:")
+                ? "Bekijk motie"
+                : "Bekijk vergadering"}
             </button>
           {/if}
           <h2 id="detail-title">{detailItem.title}</h2>
