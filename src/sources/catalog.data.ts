@@ -127,6 +127,7 @@ export const sourceCatalog = [
     supplier: "gemeenteoplossingen",
     organizationType: "gemeente",
     allmanakId: 40563,
+    cbsId: "GM0505",
     baseUrl: "https://raad.dordrecht.nl/api",
     legacyConfigFile: "ori.go.yaml",
     legacyConfigRoot: "ori.go",

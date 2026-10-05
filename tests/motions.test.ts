@@ -541,6 +541,8 @@ Deno.test("an unparseable date is dropped rather than passed to the index", asyn
     ["2024-13-45", undefined],
     ["", undefined],
     ["   ", undefined],
+    // A typo'd year at the source would head every date-sorted list.
+    ["2099-06-01T19:30:00Z", undefined],
   ];
 
   for (const [raw, expected] of cases) {

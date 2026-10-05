@@ -29,3 +29,22 @@ Deno.test("isoDate returns YYYY-MM-DD in UTC", () => {
   assert(__test__.isoDate(new Date("2026-04-21T23:59:59Z")) === "2026-04-21", "UTC end-of-day");
   assert(__test__.isoDate(new Date("2026-04-22T00:00:00Z")) === "2026-04-22", "UTC midnight");
 });
+
+Deno.test("a weeknight enqueues only the nightly window", () => {
+  // Tuesday 2026-09-29, 02:00 CEST.
+  const windows = __test__.scheduledWindows(new Date("2026-09-29T00:00:00Z"));
+  assert(windows.length === 1, `got ${JSON.stringify(windows)}`);
+  assert(windows[0].dateFrom === "2026-09-22" && windows[0].dateTo === "2026-10-06", "±7 days");
+});
+
+Deno.test("Saturday night adds the sweep, adjacent to the nightly window", () => {
+  // Saturday 2026-10-03, 02:00 CEST. Documents attached weeks after a
+  // meeting fall outside the nightly window; the sweep picks them up.
+  const windows = __test__.scheduledWindows(new Date("2026-10-03T00:00:00Z"));
+  assert(windows.length === 2, `got ${JSON.stringify(windows)}`);
+  assert(windows[0].dateFrom === "2026-09-26", "nightly window starts 7 days back");
+  assert(
+    windows[1].dateFrom === "2026-07-05" && windows[1].dateTo === "2026-09-25",
+    `sweep covers 90..8 days back, got ${JSON.stringify(windows[1])}`,
+  );
+});

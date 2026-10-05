@@ -138,3 +138,25 @@ Deno.test("an unknown source is unknown to both lookups", () => {
     assert(threw, `${name} should reject an unknown key`);
   }
 });
+
+Deno.test("every municipality carries its own well-formed CBS code", () => {
+  // VNG's weekly check normalises municipalities by CBS code, so a gemeente
+  // without one drops out of the coverage count (Dordrecht did until
+  // September 2026). The Amsterdam stadsdelen are the one deliberate share:
+  // they are parts of GM0363, not municipalities of their own.
+  const byCode = new Map<string, string[]>();
+  for (const source of listCatalogSources()) {
+    if (source.organizationType !== "gemeente") continue;
+    assert(source.cbsId, `${source.key} has no CBS code`);
+    assert(/^GM\d{4}$/.test(source.cbsId), `${source.key} has malformed CBS code ${source.cbsId}`);
+    byCode.set(source.cbsId, [...(byCode.get(source.cbsId) ?? []), source.key]);
+  }
+  for (const [code, keys] of byCode) {
+    const shared = keys.filter((key) => key !== "amsterdam" && !key.startsWith("amsterdam_"));
+    assert(
+      keys.length === 1 || shared.length === 0,
+      `CBS code ${code} is shared by ${keys.join(", ")}`,
+    );
+  }
+  assert(getCatalogSourceByKey("dordrecht").cbsId === "GM0505", "expected Dordrecht's CBS code");
+});
