@@ -196,6 +196,24 @@ let cached: { value: StatusResponse; expiresAt: number } | null = null;
 let inFlight: Promise<StatusResponse> | null = null;
 
 function toSourceCoverage(check: CoverageCheckRecord): SourceCoverage {
+  // A check that failed measured nothing. The stored zeros are the absence of an
+  // answer, and published as numbers they read as "the supplier lists nothing"
+  // with a ratio of 1, which is how Texel came to be reported as complete while
+  // its supplier timed out (#309). `null` is what "unknown" looks like.
+  if (check.error) {
+    return {
+      checkedAt: check.checked_at,
+      windowFrom: check.window_from,
+      windowTo: check.window_to,
+      supplierDocuments: null,
+      heldDocuments: null,
+      missingDocuments: null,
+      ratio: null,
+      lowerBound: true,
+      missingSample: [],
+      error: check.error,
+    };
+  }
   return {
     checkedAt: check.checked_at,
     windowFrom: check.window_from,
@@ -209,7 +227,6 @@ function toSourceCoverage(check: CoverageCheckRecord): SourceCoverage {
         : 1,
     lowerBound: check.warnings > 0,
     missingSample: check.missing_sample,
-    error: check.error,
   };
 }
 

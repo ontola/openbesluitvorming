@@ -367,3 +367,18 @@ Deno.test("countLiveEntities dedupes commits and excludes deletes", async () => 
   assertEquals(log.countLiveEntities("document:"), 2, "unique live documents");
   assertEquals(log.countLiveEntities("meeting:"), 0, "prefix scopes the count");
 });
+
+Deno.test("iterateLiveRecords yields a source's live records under a prefix", async () => {
+  const { log } = makeLog();
+  await commit(log, makeDocument({ nativeId: "1" }));
+  await commit(log, makeDocument({ nativeId: "2" }));
+  await commit(log, makeDocument({ sourceKey: "haarlem", nativeId: "9" }));
+
+  const ids = [...log.iterateLiveRecords("soest", "document:")].map((record) => record.entity_id);
+  assertEquals(
+    ids,
+    ["document:notubiz:gemeente:soest:1", "document:notubiz:gemeente:soest:2"],
+    "only this source's documents",
+  );
+  assertEquals([...log.iterateLiveRecords("soest", "meeting:")], [], "no meetings, none returned");
+});

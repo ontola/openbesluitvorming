@@ -111,6 +111,9 @@ type SearchTimingRecorder = (metric: SearchTimingMetric) => void;
  * is hit the response says so through `totalIsApproximate` and `hasMore`
  * rather than quietly presenting a truncated set as complete. */
 const INITIAL_ROWS_PER_RESULT = 8;
+// Without a query a result is one document row plus any re-commits, not a PDF
+// page per row, so the first request does not need to be sized for 8 per result.
+const INITIAL_BROWSE_ROWS_PER_RESULT = 2;
 const MIN_SCAN_BATCH_ROWS = 32;
 const SCAN_BATCH_ROWS = 500;
 const MAX_SCAN_ROWS = 6000;
@@ -806,6 +809,34 @@ function dedupeLatestHits(hits: SearchHit[]): SearchHit[] {
   return [...byEntityId.values()].filter((hit) => hit.op !== "delete");
 }
 
+/** Give every agenda document a link that works. The stored link points at the
+ * supplier, and for part of iBabs that answers 403 for a document we hold and
+ * serve through `/api/entities/{id}/pdf` (#313). */
+function withDownloadUrls(items: MeetingAgendaItem[] | undefined): MeetingAgendaItem[] | undefined {
+  if (!Array.isArray(items)) {
+    return items;
+  }
+  return items.map((item) => {
+    if (typeof item !== "object" || item === null) {
+      return item;
+    }
+    return {
+      ...item,
+      documents: item.documents?.map((document) =>
+        document.id &&
+        looksLikePdf({
+          contentType: document.content_type,
+          fileName: document.file_name,
+          url: document.original_url,
+        })
+          ? { ...document, downloadUrl: `/api/entities/${encodeURIComponent(document.id)}/pdf` }
+          : document,
+      ),
+      agenda_items: withDownloadUrls(item.agenda_items),
+    };
+  });
+}
+
 function hasStructuredAgenda(agenda: MeetingAgendaItem[] | undefined): boolean {
   if (!Array.isArray(agenda) || agenda.length === 0) {
     return false;
@@ -1075,8 +1106,7 @@ async function collectSearchWindow(
     options.dateTo,
   );
   const sortBy = quickwitSortBy(options.sort);
-  const isDirectWindow = !options.query.trim();
-  const targetCount = isDirectWindow ? options.limit + 1 : options.offset + options.limit + 1;
+  const targetCount = options.offset + options.limit + 1;
   // Scan until the page is full, not until a fixed number of rows is spent.
   //
   // The index holds several rows per result -- one per page of a PDF, plus one
@@ -1087,10 +1117,19 @@ async function collectSearchWindow(
   // true (#193). Measured on the reindexed data: 6.7 page rows per document.
   //
   // The loop already knew how to keep going; only its budget was wrong.
-  const scanBudget = isDirectWindow ? options.offset + options.limit + 1 : MAX_SCAN_ROWS;
+  //
+  // A browse without a query used to skip the first `offset` *rows* instead of
+  // the first `offset` *results* and read just one page of rows. That is only
+  // right when a row is a result, and it is not: on #312 four consecutive pages
+  // of 100 held 399 results of which 108 were distinct. The copies of one
+  // document sit rows apart (an import that re-emits a document commits it
+  // again), so a window cut from the middle of the rows repeats what an earlier
+  // window already returned. Dedup can only count results it has seen, so every
+  // window is read from the top, and the row budget bounds how deep that goes.
+  const scanBudget = MAX_SCAN_ROWS;
   const collected = new Map<string, SearchResult>();
   const previewKeys = new Map<string, string>();
-  let rawOffset = isDirectWindow ? options.offset : 0;
+  let rawOffset = 0;
   let rawSeen = 0;
   let rawNumHits: number | undefined;
   let exhausted = false;
@@ -1099,14 +1138,18 @@ async function collectSearchWindow(
   let shapeMs = 0;
   // Refined from what comes back, so a corpus with few pages per document does
   // not pay for a pessimistic guess and one with many still fills its page.
-  let rowsPerResult = INITIAL_ROWS_PER_RESULT;
+  let rowsPerResult = options.query.trim()
+    ? INITIAL_ROWS_PER_RESULT
+    : INITIAL_BROWSE_ROWS_PER_RESULT;
 
   while (!exhausted && collected.size < targetCount && rawSeen < scanBudget) {
     const { snippetFields } = searchSamplingOptions(options.query, options.offset, options.limit);
     const wanted = Math.ceil((targetCount - collected.size) * rowsPerResult);
-    const requestMaxHits = isDirectWindow
-      ? Math.min(options.limit + 1, scanBudget - rawSeen)
-      : Math.min(Math.max(wanted, MIN_SCAN_BATCH_ROWS), SCAN_BATCH_ROWS, scanBudget - rawSeen);
+    const requestMaxHits = Math.min(
+      Math.max(wanted, MIN_SCAN_BATCH_ROWS),
+      SCAN_BATCH_ROWS,
+      scanBudget - rawSeen,
+    );
     const quickwitStart = performance.now();
     const response = await quickwit.searchRequest({
       query: queryString,
@@ -1203,12 +1246,11 @@ async function collectSearchWindow(
   const filterSortMs = performance.now() - filterSortStart;
 
   const pageResults = sortedResults.slice(options.offset, options.offset + options.limit);
-  const pageWindowResults = isDirectWindow ? sortedResults.slice(0, options.limit) : pageResults;
-  const pageHasResults = pageWindowResults.length > 0;
+  const pageHasResults = pageResults.length > 0;
   const previewStart = performance.now();
   if (options.previewUrlForKey) {
     await Promise.all(
-      pageWindowResults.map(async (result) => {
+      pageResults.map(async (result) => {
         const key = previewKeys.get(result.entityId);
         if (!key) {
           return;
@@ -1259,16 +1301,12 @@ async function collectSearchWindow(
   }
 
   return {
-    results: pageWindowResults,
+    results: pageResults,
     totalCount,
     totalIsApproximate: !scannedEverything,
     hasMore:
       pageHasResults &&
-      ((isDirectWindow
-        ? sortedResults.length > options.limit
-        : sortedResults.length > options.offset + options.limit) ||
-        !exhausted ||
-        scanLimitReached),
+      (sortedResults.length > options.offset + options.limit || !exhausted || scanLimitReached),
   };
 }
 
@@ -1662,7 +1700,7 @@ export async function getEntityContent(
     pdfUrl: pdfUrl ?? motionAttachment?.pdfUrl,
     pdfEntityId: pdfUrl ? undefined : motionAttachment?.entityId,
     meetingId: hit.payload?.is_referenced_by ?? hit.payload?.meeting,
-    agenda,
+    agenda: withDownloadUrls(agenda),
     motions: motions && motions.length > 0 ? motions : undefined,
     recordings: recordings && recordings.length > 0 ? recordings : undefined,
     motion,
@@ -2049,4 +2087,5 @@ export const __test__ = {
   searchResultEntityId,
   searchResultEntityType,
   preferIndexedHit,
+  withDownloadUrls,
 };

@@ -58,6 +58,10 @@ export interface MeetingAgendaDocumentLink {
   file_name?: string;
   content_type?: string;
   original_url?: string;
+  /** Where to fetch the PDF from us. Present on documents that look like a
+   * PDF. `original_url` points at the supplier, which for part of iBabs
+   * answers 403 for a file we hold and serve (#313). */
+  downloadUrl?: string;
 }
 
 export interface MeetingAgendaItem {
@@ -936,10 +940,12 @@ export interface SourceCoverage {
   checkedAt: string;
   windowFrom: string;
   windowTo: string;
-  supplierDocuments: number;
-  heldDocuments: number;
-  missingDocuments: number;
-  ratio: number;
+  /** `null` in this and the next three fields when `error` is set: the check
+   * measured nothing, which is not the same as measuring zero. */
+  supplierDocuments: number | null;
+  heldDocuments: number | null;
+  missingDocuments: number | null;
+  ratio: number | null;
   lowerBound: boolean;
   /** A few of the missing document ids, for a human to verify. */
   missingSample: string[];

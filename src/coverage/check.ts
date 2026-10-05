@@ -64,7 +64,8 @@ export interface CoverageComparison {
   heldDocuments: number;
   /** Supplier documents absent from the export log. */
   missingDocuments: number;
-  /** Up to `sampleSize` missing ids, for a human to look at. */
+  /** Up to `sampleSize` missing ids, highest (usually newest) first, for a human
+   * to look at. */
   missingSample: string[];
 }
 
@@ -87,13 +88,26 @@ export function compareCoverage(
       missing.push(id);
     }
   }
-  missing.sort();
+  // Newest first. Ids are not dates, but a supplier numbers its documents as it
+  // creates them, so for the suppliers that use numbers the highest ids are the
+  // most recent, which is what a person checking a sample wants to see (#331).
+  // Compared as numbers where both are, so 9 sorts below 10.
+  missing.sort((left, right) => compareIdsDescending(left, right));
   return {
     supplierDocuments: supplier.size,
     heldDocuments: heldInWindow,
     missingDocuments: missing.length,
     missingSample: missing.slice(0, sampleSize),
   };
+}
+
+function compareIdsDescending(left: string, right: string): number {
+  const leftNumber = Number(left.slice(left.lastIndexOf(":") + 1));
+  const rightNumber = Number(right.slice(right.lastIndexOf(":") + 1));
+  if (Number.isFinite(leftNumber) && Number.isFinite(rightNumber) && leftNumber !== rightNumber) {
+    return rightNumber - leftNumber;
+  }
+  return right < left ? -1 : right > left ? 1 : 0;
 }
 
 const NOTUBIZ_MEETING_CONCURRENCY = 4;

@@ -383,6 +383,21 @@ export class ExportChangesLog {
     return rows.map((row) => row.entity_id);
   }
 
+  /** Live records of a source under an id prefix, one at a time so a source of
+   * millions of rows is never held in memory. Parses every record in the range,
+   * so it is for a job that runs in the worker or a script, not a request. */
+  *iterateLiveRecords(sourceKey: string, prefix: string): Generator<ExportChangeRecord> {
+    const statement = this.db.prepare(
+      `SELECT record FROM export_entity_state
+       WHERE source_key = ? AND op = 'upsert' AND entity_id >= ? AND entity_id < ?`,
+    );
+    for (const row of statement.iterate(sourceKey, prefix, `${prefix}\uffff`) as Iterable<{
+      record: string;
+    }>) {
+      yield JSON.parse(row.record) as ExportChangeRecord;
+    }
+  }
+
   /** The latest record for one entity, tombstone included, or null when the
    * entity was never exported. */
   getEntityRecord(sourceKey: string, entityId: string): ExportChangeRecord | null {
