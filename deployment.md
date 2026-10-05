@@ -1018,6 +1018,21 @@ Three systemd timers run on the production host:
   `docker exec woozi-openbesluitvorming-1 deno run -A scripts/coverage_check.ts
   --source ermelo --dry-run`. Install with
   [scripts/install-production-coverage.sh](scripts/install-production-coverage.sh).
+- **Sitemaps** (`woozi-sitemaps.timer`, daily, 09:30): `scripts/generate_sitemaps.ts`
+  walks the export log per source and writes the meetings and documents of the
+  last 12 months, with `lastmod` from the log, as one sitemap per organization
+  (split at 50,000 addresses) plus an index, to object storage under
+  `sitemaps/`. The web container serves them as `/sitemap.xml` and
+  `/sitemaps/<name>.xml` and `robots.txt` points to the index. Crawlers get the
+  address of every recent stuk instead of finding them through search results.
+  The job parses every live meeting and document record of every source, so the
+  first run says how long it takes; it only reads the log, which is safe next
+  to the workers. An organization that drops out keeps stale files in storage
+  but leaves the index. Run one source by hand with `docker exec
+  woozi-openbesluitvorming-1 deno run -A scripts/generate_sitemaps.ts --source
+  ermelo --dry-run`. Install with
+  [scripts/install-production-sitemaps.sh](scripts/install-production-sitemaps.sh);
+  until it has run once `/sitemap.xml` answers 404.
 
 To restore: download the newest `backups/sqlite/...` object, gunzip, stop the
 `openbesluitvorming` and `worker` containers, replace the file on the

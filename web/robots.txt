@@ -22,3 +22,7 @@ Disallow: /api/export/
 # in de browser via die endpoints, dus een crawler die ze niet mag ophalen
 # ziet een lege pagina — precies het tegenovergestelde van wat dit bestand
 # moet bereiken.
+
+# Per organisatie een sitemap met de vergaderingen en stukken van de laatste
+# twaalf maanden, elke nacht bijgewerkt.
+Sitemap: https://openbesluitvorming.nl/sitemap.xml

@@ -72,6 +72,9 @@ Current implemented slices:
 - BSN detection during ingest (detect-only by default) + document blocklist
   with a takedown script (`scripts/delete_document.ts`)
 - public search UI
+- sitemaps for search engines (#206): `scripts/generate_sitemaps.ts` writes `sitemap.xml`
+  and per-organization sitemaps (meetings and documents of the last 12 months) to object
+  storage from the export log; the web container only serves them
 - admin UI for imports and reruns
 
 ## Best Practices
