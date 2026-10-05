@@ -63,7 +63,15 @@ function isSoapTimeout(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
   if (error.name === "TimeoutError" || error.name === "AbortError") return true;
   const msg = error.message.toLowerCase();
-  return msg.includes("signal timed out") || msg.includes("timed out");
+  // iBabs reports its own database timeout as `Status=ERR` inside an HTTP 200,
+  // worded "Execution Timeout Expired", which contains neither "timed out" nor
+  // arrives as a TimeoutError. It is the same condition, a window too heavy to
+  // answer in time, so halving the window applies to it as well (#309).
+  return (
+    msg.includes("signal timed out") ||
+    msg.includes("timed out") ||
+    msg.includes("execution timeout expired")
+  );
 }
 
 async function listMeetingsAdaptive(
