@@ -51,7 +51,11 @@ case "$*" in
   *" ps "*)
     echo '{"Service":"worker","State":"running","Status":"Up 2 hours"}'
     echo '{"Service":"worker","State":"running","Status":"Up 2 hours"}'
-    echo '{"Service":"openbesluitvorming","State":"running","Health":"","Status":"Up 3 hours"}'
+    echo '{"Service":"openbesluitvorming","State":"running","Health":"","Status":"Up 3 hours","Labels":"com.docker.compose.oneoff=False"}'
+    echo '{"Service":"openbesluitvorming","Name":"woozi-openbesluitvorming-run-abc","State":"running","Status":"Up 26 hours","Labels":"com.docker.compose.oneoff=True,com.docker.compose.service=openbesluitvorming"}'
+    ;;
+  "logs "*)
+    echo "coverage: 120/263 sources"
     ;;
   *" logs "*)
     for i in 1 2 3 4 5 6 7 8; do echo "worker-1 | line $i"; done
@@ -118,7 +122,11 @@ Deno.test("restart_service and service_logs accept only allow-listed services", 
   assert(rejects("service_logs", { service: "worker", sinceMinutes: 1441 }), "24h cap");
   assert(rejects("service_logs", { service: "worker", lines: 1.5 }), "whole numbers");
   const logs = validateOpsRequest("service_logs", { service: "caddy" });
-  assertEquals(logs.params, { service: "caddy", sinceMinutes: 60, lines: 200 }, "defaults");
+  assertEquals(
+    logs.params,
+    { service: "caddy", sinceMinutes: 60, lines: 200, runs: false },
+    "defaults",
+  );
 });
 
 Deno.test("the Deno worker never claims a host action", async () => {
@@ -184,6 +192,7 @@ Deno.test("the host agent records services, runs dry runs and restarts, and trim
     services.map((row) => [row.service, row.state, row.replicas]),
     [
       ["openbesluitvorming", "running", 1],
+      ["openbesluitvorming:run", "running", 1],
       ["worker", "running", 2],
     ],
     "service status recorded",
@@ -233,11 +242,40 @@ Deno.test("health reports services and whether the agent is still ticking", asyn
   };
   const fresh = (await getOpsHealth(options)) as { services: Record<string, unknown> };
   assertEquals(fresh.services.agent_stale, false, "just ticked");
-  assertEquals((fresh.services.services as unknown[]).length, 2, "two services");
+  assertEquals((fresh.services.services as unknown[]).length, 3, "three service rows");
 
   const later = (await getOpsHealth({
     ...options,
     now: () => Date.now() + 5 * 60_000,
   })) as { services: Record<string, unknown> };
   assertEquals(later.services.agent_stale, true, "five minutes without a tick");
+});
+
+Deno.test("run containers' logs come from docker logs, one container at a time", async () => {
+  clearJobs();
+  const job = await createOpsJob({
+    action: "service_logs",
+    params: validateOpsRequest("service_logs", {
+      service: "openbesluitvorming",
+      runs: true,
+      sinceMinutes: 1440,
+    }).params as unknown as Record<string, unknown>,
+    apply: false,
+    actor: "test",
+  });
+  await runAgent();
+  const done = (await getOpsJob(job.id))!;
+  assertEquals(done.status, "succeeded", `run logs: ${done.error}`);
+  assertEquals(
+    done.output.trim(),
+    "woozi-openbesluitvorming-run-abc | coverage: 120/263 sources",
+    "prefixed with the container",
+  );
+  assert(
+    (await dockerCalls()).includes(
+      "logs --timestamps --since 1440m --tail 200 woozi-openbesluitvorming-run-abc",
+    ),
+    "docker logs on the run container",
+  );
+  clearJobs();
 });

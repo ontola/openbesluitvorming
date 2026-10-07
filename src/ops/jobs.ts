@@ -104,6 +104,9 @@ export interface ServiceLogsParams {
   service: string;
   sinceMinutes: number;
   lines: number;
+  /** The service's `docker compose run` containers (such as the weekly
+   * coverage check) instead of its own replicas. */
+  runs: boolean;
 }
 
 export type OpsJobParams =
@@ -336,6 +339,7 @@ function validateServiceLogs(body: Record<string, unknown>): ServiceLogsParams {
     service: service(body, LOGGABLE_SERVICES),
     sinceMinutes: boundedInteger(body, "sinceMinutes", 60, MAX_LOG_SINCE_MINUTES),
     lines: boundedInteger(body, "lines", 200, MAX_LOG_LINES),
+    runs: optionalBoolean(body, "runs"),
   };
 }
 
