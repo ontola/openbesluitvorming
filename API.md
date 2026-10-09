@@ -448,7 +448,8 @@ curl "https://openbesluitvorming.nl/api/entities/document%3Anotubiz%3Agemeente%3
   "downloadUrl": "https://...",
   "contentType": "application/pdf",
   "pdfUrl": "https://...",
-  "meetingId": "meeting:notubiz:gemeente:soest:830424"
+  "meetingId": "meeting:notubiz:gemeente:soest:830424",
+  "sourceUrl": "https://api.notubiz.nl/document/12345/1"
 }
 ```
 
@@ -463,6 +464,7 @@ curl "https://openbesluitvorming.nl/api/entities/document%3Anotubiz%3Agemeente%3
   "organization": "Soest",
   "date": "7 november 2024",
   "sortDate": "2024-11-07 20:00:00",
+  "sourceUrl": "https://soest.notubiz.nl/vergadering/830424/Raadsvergadering",
   "agenda": [
     {
       "id": "...",
@@ -513,6 +515,8 @@ curl "https://openbesluitvorming.nl/api/entities/document%3Anotubiz%3Agemeente%3
   ]
 }
 ```
+
+`sourceUrl` is where the entity is published at the source: for a meeting the supplier's portal page, which has documents published after our last import and, during the meeting, the live stream; for a document the supplier's own file, the same address as `original_url`. Notubiz meetings carry it from their next import on; iBabs meetings link to `https://<site>.bestuurlijkeinformatie.nl/Agenda/Index/<id>`. It is absent when the source gives none.
 
 `original_url` is the supplier's own link and for part of iBabs answers `403` for a document we hold. A document that looks like a PDF also carries `downloadUrl`, a path on this API that serves our stored copy; prefer it over `original_url`.
 

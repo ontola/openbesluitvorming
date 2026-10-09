@@ -43,6 +43,7 @@ type SearchHit = {
   source_key?: string;
   payload?: {
     original_url?: string;
+    source_url?: string;
     media_urls?: Array<{
       url?: string;
       content_type?: string;
@@ -1731,11 +1732,44 @@ export async function getEntityContent(
     pdfUrl: pdfUrl ?? motionAttachment?.pdfUrl,
     pdfEntityId: pdfUrl ? undefined : motionAttachment?.entityId,
     meetingId: hit.payload?.is_referenced_by ?? hit.payload?.meeting,
+    sourceUrl: entitySourceUrl(hit, hit.entity_id ?? entityId),
     agenda: withDownloadUrls(agenda),
     motions: motions && motions.length > 0 ? motions : undefined,
     recordings: recordings && recordings.length > 0 ? recordings : undefined,
     motion,
   };
+}
+
+/** Where an entity is published at the source (#340).
+ *
+ * A document's own file at the supplier. A meeting's portal page: Notubiz
+ * names it, and for iBabs it follows from the site and the meeting id, the
+ * same address the iBabs portal links to
+ * (https://<site>.bestuurlijkeinformatie.nl/Agenda/Index/<id>). Derived at
+ * read time so the meetings imported before the field existed have it too. */
+function entitySourceUrl(hit: SearchHit, entityId: string): string | undefined {
+  if (hit.entity_type === "Document") {
+    return hit.payload?.original_url;
+  }
+  if (hit.entity_type !== "Meeting") {
+    return undefined;
+  }
+  if (hit.payload?.source_url) {
+    return hit.payload.source_url;
+  }
+  if (!hit.source_key) {
+    return undefined;
+  }
+  try {
+    const source = getProjectableSource(hit.source_key);
+    const meetingId = entityId.split(":").at(-1);
+    if (source.supplier === "ibabs" && meetingId) {
+      return `https://${encodeURIComponent(source.ibabsSitename)}.bestuurlijkeinformatie.nl/Agenda/Index/${encodeURIComponent(meetingId)}`;
+    }
+  } catch {
+    // A source no longer in the catalog has no portal to point at.
+  }
+  return undefined;
 }
 
 /** Shape a Motion search hit into the payload the detail endpoint returns. */
@@ -2119,4 +2153,5 @@ export const __test__ = {
   searchResultEntityType,
   preferIndexedHit,
   withDownloadUrls,
+  entitySourceUrl,
 };
