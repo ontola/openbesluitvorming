@@ -50,8 +50,14 @@ const DEFAULT_REGISTER_LIMIT = 2000;
 const DEFAULT_MOTION_CONCURRENCY = 2;
 // Some sitenames (e.g. Rotterdam) return SOAP payloads large enough to exceed
 // the 90s client timeout at 6-month chunks. When that happens we recursively
-// halve the chunk; this floor stops the recursion if something else is wrong.
-const MIN_ADAPTIVE_CHUNK_DAYS = 14;
+// halve the chunk, down to a single day.
+//
+// The floor used to be 14 days, which a chunk had to be twice as long as to be
+// split at all. The nightly window is 14 days, so the one run that matters most
+// never split: Rotterdam and Texel failed every night on the first call (#309).
+// A floor of one day costs little when iBabs is down altogether: the left half
+// is tried first and a failing leaf rethrows, so a run that cannot be answered
+// stops after about log2(days) calls rather than trying every day.
 
 function rangeDays(from: string, to: string): number {
   const fromMs = new Date(`${from}T00:00:00Z`).getTime();
@@ -84,17 +90,20 @@ async function listMeetingsAdaptive(
   try {
     return await client.listMeetingsByDateRange(source, from, to);
   } catch (error) {
-    if (!isSoapTimeout(error) || rangeDays(from, to) < MIN_ADAPTIVE_CHUNK_DAYS * 2) {
+    const days = rangeDays(from, to);
+    if (!isSoapTimeout(error) || days < 1) {
       throw error;
     }
+    // Both bounds are inclusive days, so the halves are from..leftEnd and the
+    // day after leftEnd..to. Splitting on a millisecond midpoint instead gave a
+    // left half that ended before it began once the range was two days long.
     const fromMs = new Date(`${from}T00:00:00Z`).getTime();
-    const toMs = new Date(`${to}T00:00:00Z`).getTime();
-    const midMs = fromMs + Math.floor((toMs - fromMs) / 2);
-    const midDate = new Date(midMs).toISOString().slice(0, 10);
-    const beforeMid = new Date(midMs - 86_400_000).toISOString().slice(0, 10);
+    const leftEndMs = fromMs + Math.floor(days / 2) * 86_400_000;
+    const leftEnd = new Date(leftEndMs).toISOString().slice(0, 10);
+    const rightStart = new Date(leftEndMs + 86_400_000).toISOString().slice(0, 10);
     await onSplit(from, to);
-    const left = await listMeetingsAdaptive(client, source, from, beforeMid, onSplit);
-    const right = await listMeetingsAdaptive(client, source, midDate, to, onSplit);
+    const left = await listMeetingsAdaptive(client, source, from, leftEnd, onSplit);
+    const right = await listMeetingsAdaptive(client, source, rightStart, to, onSplit);
     return [...left, ...right];
   }
 }
