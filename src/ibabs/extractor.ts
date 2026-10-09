@@ -25,6 +25,7 @@ import {
 } from "./normalize.ts";
 import { MeetingIndex, parseAgendaPointReference } from "../motions/normalize.ts";
 import { IbabsClient } from "./client.ts";
+import { belongsToSiteSibling, ibabsSiteSiblingLabels } from "./shared_site.ts";
 import { mapLimit } from "../util/map_limit.ts";
 import { splitDateRange } from "../util/date_range.ts";
 
@@ -80,7 +81,7 @@ function isSoapTimeout(error: unknown): boolean {
   );
 }
 
-async function listMeetingsAdaptive(
+export async function listMeetingsAdaptive(
   client: IbabsClient,
   source: IbabsSourceDefinition,
   from: string,
@@ -254,6 +255,7 @@ export class IbabsMeetingExtractor {
     const chunks =
       options.executionMode === "motions_only" ? [] : splitDateRange(dateFrom, dateTo, chunkMonths);
 
+    const siteSiblings = ibabsSiteSiblingLabels(source);
     for (const [chunkFrom, chunkTo] of chunks) {
       const rawMeetings = await listMeetingsAdaptive(
         this.client,
@@ -273,6 +275,9 @@ export class IbabsMeetingExtractor {
 
       for (const rawMeeting of rawMeetings) {
         const meeting = normalizeIbabsMeeting(source, rawMeeting, meetingTypeMap);
+        if (belongsToSiteSibling(meeting.name, source.label, siteSiblings)) {
+          continue;
+        }
         meetingCount += 1;
         meetingIndex.add(meeting);
         if (retainEntities) {
@@ -437,8 +442,13 @@ export class IbabsMeetingExtractor {
     // and we did not, and #226 measured 117,746 register entries ORI held
     // across iBabs sources.
     const isMotionList = (list: IbabsList) => MOTION_LIST_PATTERN.test(list.ListName);
-    const targets = lists.filter((list) =>
-      isMotionList(list) ? limit > 0 : registerLimit > 0 && list.ListName.trim().length > 0,
+    // On a site shared with another organization, a list named after that
+    // organization is theirs (see ibabsSiteSiblingLabels).
+    const siteSiblings = ibabsSiteSiblingLabels(source);
+    const targets = lists.filter(
+      (list) =>
+        !belongsToSiteSibling(list.ListName, source.label, siteSiblings) &&
+        (isMotionList(list) ? limit > 0 : registerLimit > 0 && list.ListName.trim().length > 0),
     );
     if (targets.length === 0) {
       return;
