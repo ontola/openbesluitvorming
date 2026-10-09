@@ -25,6 +25,7 @@ import {
 } from "./normalize.ts";
 import { MeetingIndex, parseAgendaPointReference } from "../motions/normalize.ts";
 import { IbabsClient } from "./client.ts";
+import { belongsToSiteSibling, ibabsSiteSiblingLabels } from "./shared_site.ts";
 import { mapLimit } from "../util/map_limit.ts";
 import { splitDateRange } from "../util/date_range.ts";
 
@@ -50,8 +51,14 @@ const DEFAULT_REGISTER_LIMIT = 2000;
 const DEFAULT_MOTION_CONCURRENCY = 2;
 // Some sitenames (e.g. Rotterdam) return SOAP payloads large enough to exceed
 // the 90s client timeout at 6-month chunks. When that happens we recursively
-// halve the chunk; this floor stops the recursion if something else is wrong.
-const MIN_ADAPTIVE_CHUNK_DAYS = 14;
+// halve the chunk, down to a single day.
+//
+// The floor used to be 14 days, which a chunk had to be twice as long as to be
+// split at all. The nightly window is 14 days, so the one run that matters most
+// never split: Rotterdam and Texel failed every night on the first call (#309).
+// A floor of one day costs little when iBabs is down altogether: the left half
+// is tried first and a failing leaf rethrows, so a run that cannot be answered
+// stops after about log2(days) calls rather than trying every day.
 
 function rangeDays(from: string, to: string): number {
   const fromMs = new Date(`${from}T00:00:00Z`).getTime();
@@ -74,7 +81,7 @@ function isSoapTimeout(error: unknown): boolean {
   );
 }
 
-async function listMeetingsAdaptive(
+export async function listMeetingsAdaptive(
   client: IbabsClient,
   source: IbabsSourceDefinition,
   from: string,
@@ -84,17 +91,20 @@ async function listMeetingsAdaptive(
   try {
     return await client.listMeetingsByDateRange(source, from, to);
   } catch (error) {
-    if (!isSoapTimeout(error) || rangeDays(from, to) < MIN_ADAPTIVE_CHUNK_DAYS * 2) {
+    const days = rangeDays(from, to);
+    if (!isSoapTimeout(error) || days < 1) {
       throw error;
     }
+    // Both bounds are inclusive days, so the halves are from..leftEnd and the
+    // day after leftEnd..to. Splitting on a millisecond midpoint instead gave a
+    // left half that ended before it began once the range was two days long.
     const fromMs = new Date(`${from}T00:00:00Z`).getTime();
-    const toMs = new Date(`${to}T00:00:00Z`).getTime();
-    const midMs = fromMs + Math.floor((toMs - fromMs) / 2);
-    const midDate = new Date(midMs).toISOString().slice(0, 10);
-    const beforeMid = new Date(midMs - 86_400_000).toISOString().slice(0, 10);
+    const leftEndMs = fromMs + Math.floor(days / 2) * 86_400_000;
+    const leftEnd = new Date(leftEndMs).toISOString().slice(0, 10);
+    const rightStart = new Date(leftEndMs + 86_400_000).toISOString().slice(0, 10);
     await onSplit(from, to);
-    const left = await listMeetingsAdaptive(client, source, from, beforeMid, onSplit);
-    const right = await listMeetingsAdaptive(client, source, midDate, to, onSplit);
+    const left = await listMeetingsAdaptive(client, source, from, leftEnd, onSplit);
+    const right = await listMeetingsAdaptive(client, source, rightStart, to, onSplit);
     return [...left, ...right];
   }
 }
@@ -245,6 +255,7 @@ export class IbabsMeetingExtractor {
     const chunks =
       options.executionMode === "motions_only" ? [] : splitDateRange(dateFrom, dateTo, chunkMonths);
 
+    const siteSiblings = ibabsSiteSiblingLabels(source);
     for (const [chunkFrom, chunkTo] of chunks) {
       const rawMeetings = await listMeetingsAdaptive(
         this.client,
@@ -264,6 +275,9 @@ export class IbabsMeetingExtractor {
 
       for (const rawMeeting of rawMeetings) {
         const meeting = normalizeIbabsMeeting(source, rawMeeting, meetingTypeMap);
+        if (belongsToSiteSibling(meeting.name, source.label, siteSiblings)) {
+          continue;
+        }
         meetingCount += 1;
         meetingIndex.add(meeting);
         if (retainEntities) {
@@ -428,8 +442,13 @@ export class IbabsMeetingExtractor {
     // and we did not, and #226 measured 117,746 register entries ORI held
     // across iBabs sources.
     const isMotionList = (list: IbabsList) => MOTION_LIST_PATTERN.test(list.ListName);
-    const targets = lists.filter((list) =>
-      isMotionList(list) ? limit > 0 : registerLimit > 0 && list.ListName.trim().length > 0,
+    // On a site shared with another organization, a list named after that
+    // organization is theirs (see ibabsSiteSiblingLabels).
+    const siteSiblings = ibabsSiteSiblingLabels(source);
+    const targets = lists.filter(
+      (list) =>
+        !belongsToSiteSibling(list.ListName, source.label, siteSiblings) &&
+        (isMotionList(list) ? limit > 0 : registerLimit > 0 && list.ListName.trim().length > 0),
     );
     if (targets.length === 0) {
       return;

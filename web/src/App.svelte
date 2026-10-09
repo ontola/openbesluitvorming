@@ -2424,6 +2424,22 @@
                   </button>
                 </div>
               {/if}
+            <!-- The supplier's own page (#340): for a meeting the portal, with
+                 late documents and the live stream. A document's source is
+                 usually the very file Download already links to, so it only
+                 gets its own button when it is somewhere else. -->
+            {#if detailContent?.sourceUrl && detailContent.sourceUrl !== (detailContent.downloadUrl ?? detailItem.downloadUrl)}
+              <a
+                class="ghost-button button-with-icon"
+                href={detailContent.sourceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Bekijk bij de bron"
+              >
+                <span class="button-icon" aria-hidden="true">↗</span>
+                <span class="button-label">Bron</span>
+              </a>
+            {/if}
             {#if detailContent?.downloadUrl || detailItem.downloadUrl}
               <a
                 class="primary-button button-with-icon"
