@@ -40,6 +40,7 @@ export const API_ERROR_CODES = [
   "rate_limited",
   // 5xx — our side failed; the caller may retry.
   "search_failed",
+  "search_timeout",
   "stats_failed",
   "status_failed",
   "export_failed",

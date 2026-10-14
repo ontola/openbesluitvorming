@@ -40,6 +40,7 @@ Deno.test("the published set of error codes is stable", () => {
       "pdf_render_failed",
       "rate_limited",
       "search_failed",
+      "search_timeout",
       "stats_failed",
       "status_failed",
       "unknown_entity_type",

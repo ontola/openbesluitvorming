@@ -34,17 +34,31 @@ type QuickwitSearchResponse = {
   aggregations?: Record<string, unknown>;
 };
 
+/** Whether a failed search is worth a second attempt.
+ *
+ * A timeout is not. A query that took the whole budget once takes it again,
+ * and Quickwit keeps working on the abandoned one, so the retry doubled both
+ * the wait and the load: a heavy nationwide phrase answered HTTP 500 after
+ * twice the 8 s budget (#348). It now fails once, as a SearchTimeoutError the
+ * API can answer for what it is. */
 function isRetryableSearchError(error: unknown): boolean {
   if (!(error instanceof Error)) {
     return false;
   }
 
   return (
-    error.name === "TimeoutError" ||
     error.name === "AbortError" ||
     error.message.includes("Quickwit request failed 500") ||
     error.message.includes("No such file or directory")
   );
+}
+
+/** A search that did not finish within QUICKWIT_SEARCH_TIMEOUT_MS. */
+export class SearchTimeoutError extends Error {
+  constructor(readonly timeoutMs: number) {
+    super(`Quickwit search exceeded ${timeoutMs} ms`);
+    this.name = "SearchTimeoutError";
+  }
 }
 
 /** Whether an ingest is worth trying again.
@@ -464,6 +478,9 @@ export class QuickwitClient {
           },
         );
       } catch (error) {
+        if (error instanceof Error && error.name === "TimeoutError") {
+          throw new SearchTimeoutError(getSearchTimeoutMs());
+        }
         lastError = error;
         if (attempt === attempts || !isRetryableSearchError(error)) {
           throw error;
@@ -511,4 +528,4 @@ export class QuickwitClient {
   }
 }
 
-export const __test__ = { isRetryableIngestError, shouldHalveBatch };
+export const __test__ = { isRetryableIngestError, isRetryableSearchError, shouldHalveBatch };

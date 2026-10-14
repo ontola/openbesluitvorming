@@ -124,6 +124,7 @@ added as needed; an existing one is not renamed or removed without a note here.
 | `entity_removed` | 410 | the entity was removed; the body carries `reason` (as on a delete record in the change feed), `removedAt` and, for a document removed at the source, `meetingId` |
 | `rate_limited` | 429 | budget spent; see [Rate limits](#rate-limits) |
 | `search_failed` | 500 | the search could not be completed |
+| `search_timeout` | 504 | the search took longer than the server allows; narrow it with `organization`, a period or `entityType` rather than retrying it unchanged |
 | `stats_failed` | 500 | `/api/stats` could not be assembled |
 | `status_failed` | 500 | `/api/status` could not be assembled |
 | `export_failed` | 500 | an export page could not be read |

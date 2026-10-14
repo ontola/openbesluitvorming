@@ -41,6 +41,7 @@ import { RATE_LIMIT_PAGE_UNIT, RateLimiter, type RateVerdict, requestCost } from
 import { apiError } from "./api_errors.ts";
 import { validateSearchParams } from "./search_params.ts";
 import { entityGoneResponse, sourceKeyOfEntityId } from "./entity_gone.ts";
+import { SearchTimeoutError } from "../src/quickwit/client.ts";
 import { createOpsHandler, OPS_PATH_PREFIX } from "./ops_api.ts";
 import { fetchExtractorStats } from "./extractors.ts";
 import { SITEMAP_FILE_PATTERN, SITEMAP_INDEX_KEY, SITEMAP_PREFIX } from "../src/exports/sitemap.ts";
@@ -637,6 +638,17 @@ async function handleRequest(request: Request): Promise<Response> {
 
       return withServerTiming(Response.json(results), requestStart, metrics);
     } catch (error) {
+      // Too heavy is not broken. A 500 invites the same request again, which
+      // only adds load; this says what to change instead (#348).
+      if (error instanceof SearchTimeoutError) {
+        return withServerTiming(
+          apiError("search_timeout", 504, "Deze zoekvraag duurde te lang.", {
+            hint: "Beperk de vraag met een organization, een periode (dateFrom, dateTo) of een entityType, of gebruik minder woorden in een frase.",
+          }),
+          requestStart,
+          metrics,
+        );
+      }
       // Never hand the caller what went wrong verbatim. This used to return the
       // search engine's own message, which carried the generated query with its
       // field names and projection_version, and on the schema-error path an
