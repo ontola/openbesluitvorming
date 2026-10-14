@@ -121,6 +121,7 @@ added as needed; an existing one is not renamed or removed without a note here.
 | `entity_not_found` | 404 | no entity with that id |
 | `pdf_not_found` | 404 | the entity exists but carries no PDF |
 | `pdf_page_not_found` | 404 | the PDF exists but has no such page |
+| `entity_removed` | 410 | the entity was removed; the body carries `reason` (as on a delete record in the change feed), `removedAt` and, for a document removed at the source, `meetingId` |
 | `rate_limited` | 429 | budget spent; see [Rate limits](#rate-limits) |
 | `search_failed` | 500 | the search could not be completed |
 | `stats_failed` | 500 | `/api/stats` could not be assembled |
@@ -427,6 +428,20 @@ download URL, a meeting with its agenda plus the motions decided in it and the
 recordings of it, a motion with its outcome and votes.
 
 > **Note:** `entity_id` values contain colons. URL-encode them: `document:notubiz:gemeente:soest:12345` → `document%3Anotubiz%3Agemeente%3Asoest%3A12345`.
+
+An entity that was removed answers `410` with code `entity_removed` instead of `404`, with the same `reason` a delete record in the change feed carries, `removedAt`, and for a document the source took off a meeting, `meetingId`:
+
+```json
+{
+  "code": "entity_removed",
+  "error": "De bron stelt dit document niet meer beschikbaar. Neem voor de inhoud contact op met de griffie.",
+  "reason": "removed_at_source",
+  "removedAt": "2026-10-10T01:50:40.454Z",
+  "meetingId": "meeting:ibabs:gemeente:harderwijk:7566f1e5-d552-4bcb-b2f5-7fc2303b44d6"
+}
+```
+
+`404` keeps meaning that no entity with that id was ever exported.
 
 **Example:**
 

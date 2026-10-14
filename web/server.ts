@@ -40,6 +40,7 @@ import { getStatus } from "./status_api.ts";
 import { RATE_LIMIT_PAGE_UNIT, RateLimiter, type RateVerdict, requestCost } from "./rate_limit.ts";
 import { apiError } from "./api_errors.ts";
 import { validateSearchParams } from "./search_params.ts";
+import { entityGoneResponse, sourceKeyOfEntityId } from "./entity_gone.ts";
 import { createOpsHandler, OPS_PATH_PREFIX } from "./ops_api.ts";
 import { fetchExtractorStats } from "./extractors.ts";
 import { SITEMAP_FILE_PATTERN, SITEMAP_INDEX_KEY, SITEMAP_PREFIX } from "../src/exports/sitemap.ts";
@@ -878,6 +879,13 @@ async function handleRequest(request: Request): Promise<Response> {
     try {
       const content = await measureTiming(metrics, "content", () => getEntityContent(entityId));
       if (!content) {
+        const sourceKey = sourceKeyOfEntityId(entityId);
+        const gone = sourceKey
+          ? entityGoneResponse((await getExportLog()).getEntityRecord(sourceKey, entityId))
+          : null;
+        if (gone) {
+          return withServerTiming(gone, requestStart, metrics);
+        }
         return withServerTiming(
           apiError("entity_not_found", 404, "Resultaat niet gevonden"),
           requestStart,

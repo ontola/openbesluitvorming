@@ -34,6 +34,8 @@ export const API_ERROR_CODES = [
   "entity_not_found",
   "pdf_not_found",
   "pdf_page_not_found",
+  // 410 — the thing was here and has been removed; the body says why.
+  "entity_removed",
   // 429
   "rate_limited",
   // 5xx — our side failed; the caller may retry.

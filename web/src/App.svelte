@@ -991,6 +991,12 @@
         return null;
       }
 
+      // Removed, and the body says why: say that rather than a load failure.
+      if (response.status === 410) {
+        const gone = (await response.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(gone?.error ?? "Dit resultaat is verwijderd.");
+      }
+
       if (!response.ok) {
         throw new Error("Documentdetail kon niet worden geladen.");
       }

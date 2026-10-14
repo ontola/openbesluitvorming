@@ -24,6 +24,7 @@ Deno.test("the published set of error codes is stable", () => {
     [
       "entity_content_failed",
       "entity_not_found",
+      "entity_removed",
       "export_failed",
       "invalid_date",
       "invalid_export_cursor",
