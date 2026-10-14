@@ -255,6 +255,7 @@ function contentType(pathname: string): string {
   if (pathname.endsWith(".js")) return "application/javascript; charset=utf-8";
   if (pathname.endsWith(".mjs")) return "application/javascript; charset=utf-8";
   if (pathname.endsWith(".json")) return "application/json; charset=utf-8";
+  if (pathname.endsWith(".map")) return "application/json; charset=utf-8";
   if (pathname.endsWith(".svg")) return "image/svg+xml";
   if (pathname.endsWith(".png")) return "image/png";
   if (pathname.endsWith(".ico")) return "image/x-icon";
