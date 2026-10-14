@@ -32,6 +32,7 @@ Deno.test("the published set of error codes is stable", () => {
       "invalid_page_number",
       "invalid_scale",
       "missing_export_source",
+      "missing_query",
       "pdf_fetch_failed",
       "pdf_not_found",
       "pdf_page_not_found",

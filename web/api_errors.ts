@@ -24,6 +24,7 @@ export const API_ERROR_CODES = [
   "invalid_limit",
   "invalid_offset",
   "unsupported_phrase_slop",
+  "missing_query",
   "invalid_page_number",
   "invalid_scale",
   "missing_export_source",

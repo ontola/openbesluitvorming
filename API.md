@@ -112,6 +112,7 @@ added as needed; an existing one is not renamed or removed without a note here.
 | `invalid_limit` | 400 | `limit` is not an integer, or is below 1 |
 | `invalid_offset` | 400 | `offset` is not an integer, or is negative |
 | `unsupported_phrase_slop` | 400 | `query` uses the proximity notation `"a b"~10` |
+| `missing_query` | 400 | neither `query` nor `organization` was given; the hint names any parameter the API does not know, such as `q` |
 | `invalid_page_number` | 400 | the page number in a PDF page URL is not a positive integer |
 | `invalid_scale` | 400 | `scale` on a PDF page URL is not `1` or `2` |
 | `missing_export_source` | 400 | an export call omitted `source` |
@@ -650,8 +651,8 @@ curl "https://openbesluitvorming.nl/api/search?query=woningbouw&entityType=Motio
 ```
 
 Add `organization=<source key>` to scope to one municipality. Note that a
-search **requires a `query`** — an empty query returns no results for any
-entity type.
+search **requires a `query` or an `organization`**: without both the API
+answers `400` with `missing_query`.
 
 ### Fetch one motion
 

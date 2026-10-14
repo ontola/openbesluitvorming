@@ -1282,6 +1282,23 @@
       return;
     }
 
+    // A type or a period alone gives the API nothing to search or browse, and
+    // it refuses that (#349). The answer was always empty; say so without the
+    // round trip.
+    if (!query.trim() && !organization.trim()) {
+      searchAbortController?.abort();
+      searchAbortController = null;
+      searched = true;
+      searchError = null;
+      results = [];
+      totalCount = 0;
+      totalIsApproximate = false;
+      hasMore = false;
+      activeSearchSignature = currentSearchSignature();
+      if (mode) writeRouteState(mode);
+      return;
+    }
+
     loading = true;
     loadingMore = false;
     searchError = null;
