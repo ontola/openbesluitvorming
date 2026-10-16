@@ -746,3 +746,60 @@ Deno.test("an iBabs motion gets a date from wherever its griffie put one (#378)"
     "nothing at all: the entry's last change, as for a register entry",
   );
 });
+
+Deno.test("a negated adoption is a rejection, and other spellings are read (#357)", () => {
+  assertEquals(normalizeMotionResult("Niet aangenomen"), "verworpen", "Bronckhorst, Waalre");
+  assertEquals(normalizeMotionResult("niet aanvaard"), "verworpen", "negated aanvaard");
+  assertEquals(normalizeMotionResult("Aanvaard"), "aangenomen", "Oirschot");
+  assertEquals(normalizeMotionResult("afgewezen"), "verworpen", "Rozendaal");
+  assertEquals(normalizeMotionResult("Oannommen"), "aangenomen", "Fryslân");
+  assertEquals(normalizeMotionResult("Fersmiten"), "verworpen", "Fryslân");
+  assertEquals(normalizeMotionResult("Ynlutsen"), "ingetrokken", "Fryslân");
+  assertEquals(normalizeMotionResult("unaniem aangenomen"), "aangenomen", "unchanged");
+  assertEquals(normalizeMotionResult("Afgehandeld"), "overig", "follow-up is not an outcome");
+});
+
+Deno.test("an iBabs motion reads its outcome from Conclusie or Status (besluit raad) (#357)", async () => {
+  const source = getIbabsSource("utrecht");
+  const lists = ibabsClientTest.parseListsXml(await fixture("ibabs_lists_response.xml"));
+  const list = lists.find((candidate) => candidate.ListName === "Moties")!;
+  const entries = ibabsClientTest.parseListEntriesXml(
+    await fixture("ibabs_list_entries_response.xml"),
+  );
+  const detail = ibabsClientTest.parseListEntryXml(
+    await fixture("ibabs_list_entry_response.xml"),
+    entries[0].EntryId,
+  );
+  const base = { ...detail.Values };
+  delete base["Status"];
+  const motionWith = (values: Record<string, string>) =>
+    normalizeIbabsMotion(
+      source,
+      list,
+      entries[0],
+      { ...detail, Values: { ...base, ...values } },
+      [],
+    );
+
+  assertEquals(motionWith({ Conclusie: "Verworpen" }).result, "verworpen", "Maashorst");
+  const zevenaar = motionWith({
+    "Status (besluit raad)": "Aanvaard",
+    "Status afhandeling": "Afgedaan",
+  });
+  assertEquals(zevenaar.result, "aangenomen", "Zevenaar");
+  assertEquals(zevenaar.status, "Aanvaard", "the outcome field is kept as status");
+  assertEquals(
+    motionWith({ Status: "Afgehandeld", Conclusie: "Aangenomen" }).result,
+    "aangenomen",
+    "an outcome wins over a follow-up status",
+  );
+  assertEquals(motionWith({ Status: "Afgehandeld" }).status, "Afgehandeld", "else kept verbatim");
+});
+
+Deno.test("the iBabs parser decodes numeric references such as &#xD; (#376)", () => {
+  const detail = ibabsClientTest.parseListEntryXml(
+    `<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body><GetListEntryResponse xmlns="http://tempuri.org/"><GetListEntryResult xmlns:a="http://schemas.datacontract.org/2004/07/iBabsWCFObjects.Public"><Status xmlns="http://schemas.datacontract.org/2004/07/iBabsWCFObjects.Base">OK</Status><a:Documents/><a:Values xmlns:b="http://schemas.microsoft.com/2003/10/Serialization/Arrays"><b:KeyValueOfstringstring><b:Key>Toelichting</b:Key><b:Value>Voor: PVV&#xD; Tegen: VVD Financi&#235;le</b:Value></b:KeyValueOfstringstring></a:Values></GetListEntryResult></GetListEntryResponse></s:Body></s:Envelope>`,
+    "x",
+  );
+  assertEquals(detail.Values["Toelichting"], "Voor: PVV\r Tegen: VVD Financiële", "decoded");
+});

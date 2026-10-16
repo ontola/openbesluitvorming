@@ -191,6 +191,22 @@ function motionVotes(source: IbabsSourceDefinition, votes: IbabsListEntryVote[])
     }));
 }
 
+/** Fields that can carry a motion's outcome. Maashorst writes it under
+ * "Conclusie" and Zevenaar under "Status (besluit raad)", so with only
+ * "Status" read their motions had a tally and no result (#357). Not every
+ * field starting with "Status": Zevenaar's "Status afhandeling" says how far
+ * the follow-up is, not how the council voted. */
+const MOTION_STATUS_FIELDS = ["Status", "Status (besluit raad)", "Conclusie", "Besluit"];
+
+/** The first candidate that names an outcome, as Notubiz's pickStatus does;
+ * otherwise the first one filled in, which keeps `status` verbatim. */
+function motionStatus(values: Record<string, string>): string | undefined {
+  const candidates = MOTION_STATUS_FIELDS.map((field) => pickValue(values, [field])).filter(
+    (value): value is string => Boolean(value),
+  );
+  return candidates.find((value) => normalizeMotionResult(value) !== "overig") ?? candidates[0];
+}
+
 /** Date fields of a motion, as griffies name them. Tried in this order, then
  * any other field whose name says it is a date. */
 const MOTION_DATE_FIELDS = [
@@ -244,7 +260,7 @@ export function normalizeIbabsMotion(
     pickValue(values, ["Onderwerp", "Titel", "Toezegging"]) ??
     entry.EntryTitle ??
     `${list.ListName} ${entry.EntryId}`;
-  const status = pickValue(values, ["Status"]);
+  const status = motionStatus(values);
   const enteredDate = motionDate(values);
   const date = isPlausibleDate(enteredDate) ? enteredDate : undefined;
 

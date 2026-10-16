@@ -726,7 +726,11 @@ The response carries a `motion` object:
 ```
 
 `result` is normalised to `aangenomen`, `verworpen`, `ingetrokken`,
-`aangehouden` or `overig`; `status` keeps the supplier's own wording.
+`aangehouden` or `overig`; `status` keeps the supplier's own wording. `overig`
+also covers a status that describes the follow-up rather than the vote
+("Afgehandeld", "In behandeling") and a tie. A motion with `tally` and no
+`result` is usually one whose source left the status field empty: the vote
+is there, the outcome was not written down.
 
 ### The text of a motion
 

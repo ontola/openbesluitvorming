@@ -20,16 +20,25 @@ export function normalizeMotionResult(status?: string): MotionEntity["result"] |
   const text = status.toLowerCase();
   // Check "ingetrokken" and "aangehouden" before the aangenomen/verworpen pair:
   // a withdrawn motion is sometimes phrased "ingetrokken, niet aangenomen".
-  if (text.includes("ingetrokken")) {
+  // Fryslân writes its statuses in Frisian ("Ynlutsen", "Oannommen",
+  // "Fersmiten"), which made all 553 of its motions `overig` (#357).
+  if (/ingetrokken|ynlutsen/.test(text)) {
     return "ingetrokken";
   }
   if (text.includes("aangehouden")) {
     return "aangehouden";
   }
-  if (text.includes("aangenomen")) {
+  // A negated adoption is a rejection. Matching "aangenomen" anywhere in the
+  // text turned "Niet aangenomen" into `aangenomen`: 181 rejected motions at
+  // Bronckhorst, Waalre and Brabantse Delta, 107 of them beside a tally with
+  // a majority against (#357).
+  if (/\bniet\s+(aangenomen|aanvaard)/.test(text)) {
+    return "verworpen";
+  }
+  if (/aangenomen|aanvaard|oannommen/.test(text)) {
     return "aangenomen";
   }
-  if (text.includes("verworpen")) {
+  if (/verworpen|afgewezen|fersmiten/.test(text)) {
     return "verworpen";
   }
   return "overig";

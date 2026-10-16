@@ -1467,3 +1467,49 @@ Deno.test("a phrase search makes no sample request, and none after a failed coun
     globalThis.fetch = originalFetch;
   }
 });
+
+Deno.test("summary is plain text with or without a search term (#376)", async () => {
+  const originalFetch = globalThis.fetch;
+  const serve = async (_input: unknown, init?: unknown) => {
+    const body = JSON.parse(String((init as { body?: string } | undefined)?.body ?? "{}"));
+    const hit = {
+      time: "2026-03-31T11:00:00Z",
+      entity_id: "motion:ibabs:gemeente:oss:1",
+      entity_type: "Motion",
+      name: "Motie",
+      start_date: "2025-12-11T00:00:00Z",
+      source_key: "oss",
+      content: "Voor: PVV&#xD; Tegen: VVD&#xD; <p>Raad</p>&nbsp;Oss",
+    };
+    return new Response(
+      JSON.stringify({
+        num_hits: 1,
+        hits: body.max_hits === 0 ? [] : [hit],
+        snippets: body.snippet_fields
+          ? [{ content: ["Voor: PVV&amp;#xD; <b>Tegen</b>: VVD&amp;#xD;"] }]
+          : undefined,
+      }),
+    );
+  };
+  try {
+    globalThis.fetch = serve as typeof globalThis.fetch;
+    await withV3Projection(async () => {
+      const browse = await searchMeetings({ organization: "oss", entityType: "Motion" });
+      assert(
+        browse.results[0].summary === "Voor: PVV Tegen: VVD Raad Oss",
+        `without a term, got ${JSON.stringify(browse.results[0].summary)}`,
+      );
+      const searched = await searchMeetings({ query: "tegen", organization: "oss" });
+      assert(
+        !searched.results[0].summary.includes("&#"),
+        `with a term, got ${JSON.stringify(searched.results[0].summary)}`,
+      );
+      assert(
+        !(searched.results[0].summaryHtml ?? "").includes("&amp;#"),
+        `summaryHtml, got ${JSON.stringify(searched.results[0].summaryHtml)}`,
+      );
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

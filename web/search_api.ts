@@ -659,7 +659,13 @@ function summarizeContent(content?: string): string {
     return "Geen samenvatting beschikbaar.";
   }
 
-  const compact = content.replaceAll(/\s+/g, " ").trim();
+  // The same cleaning as a snippet gets. Without a search term there is no
+  // snippet, and Notubiz's `<p>` and `&nbsp;` and iBabs's `&#xD;` went into
+  // `summary` as they were (#376).
+  const compact = decodeNumericReferences(decodeHtmlEntities(content))
+    .replaceAll(/<[^>]*>/g, " ")
+    .replaceAll(/\s+/g, " ")
+    .trim();
   if (compact.length <= 240) {
     return compact;
   }
@@ -719,6 +725,22 @@ function decodeHtmlEntities(value: string): string {
   });
 }
 
+/** A second round for numeric references only. Rows indexed before the
+ * iBabs parser decoded them carry `&#xD;`, which reaches a snippet escaped as
+ * `&amp;#xD;` and survives the one round above (#376). No council text means
+ * a literal `&#13;`, unlike `&lt;`, so this round cannot eat real content. */
+function decodeNumericReferences(value: string): string {
+  return value.replaceAll(/&#(x[0-9a-f]+|[0-9]+);/gi, (match, body: string) => {
+    const codePoint =
+      body[0] === "x" || body[0] === "X"
+        ? Number.parseInt(body.slice(1), 16)
+        : Number.parseInt(body, 10);
+    return Number.isFinite(codePoint) && codePoint > 0 && codePoint <= 0x10ffff
+      ? String.fromCodePoint(codePoint)
+      : match;
+  });
+}
+
 /** Quickwit marks the matched terms with `<b>`; everything around them is text
  * that may itself contain markup from the source document. So the highlight is
  * set aside, the rest is decoded and stripped back to prose, and only then is
@@ -735,7 +757,9 @@ function sanitizeSnippet(snippet?: string): { text: string; html: string } | und
     .replaceAll("<b>", HIGHLIGHT_OPEN)
     .replaceAll("</b>", HIGHLIGHT_CLOSE);
 
-  const asProse = stripMarkdownPreviewSyntax(decodeHtmlEntities(withPlaceholders))
+  const asProse = stripMarkdownPreviewSyntax(
+    decodeNumericReferences(decodeHtmlEntities(withPlaceholders)),
+  )
     // Whatever markup the source carried is not part of a text preview. A
     // `<br>` used to be shown to the reader as those four characters.
     .replaceAll(/<[^>]*>/g, "")
