@@ -251,12 +251,19 @@ depends on the type of result:
 |------|---------------|
 | Meeting | The meeting's start, as scheduled by the organization |
 | Document | The start of the meeting at which the document was (last) discussed. A register document (ingekomen stukken, raadsvragen, toezeggingen) gets the date of its register entry, the day the questions were asked; the entity detail also carries `dateModified`, the day the source system last changed the entry, which for questions is the day the answer was added |
-| Motion | The meeting at which the motion was last discussed, else the date the source system gives it |
+| Motion | The meeting at which the motion was last discussed; else the day its agenda field names; else a date field of the motion (submitted, discussed); else, for iBabs, the day the source system last changed the entry |
 | Recording | The start of the meeting it records |
 
 It is never the date a document was written or published by its author: the
 source systems do not expose that reliably. The value is a UTC timestamp; the
 underlying local time is Dutch time (CET/CEST).
+
+A result can lack a date. It then has no `sortDate`, `date` reads "Datum
+onbekend", a date sort puts it last in either direction, and `dateFrom` or
+`dateTo` never return it, so a window that counts zero does not prove there is
+nothing from that period. Until October 2026 this applied to about 3,000 iBabs
+motions, whose date sat in a field the import did not read (#378); they get a
+date as each one is imported again.
 
 ## Index statistics
 

@@ -11,6 +11,7 @@ import {
 import {
   findAgendaItemId,
   type MeetingIndex,
+  findDateInText,
   normalizeMotionResult,
   parseAgendaPointReference,
   parseMotionDate,
@@ -190,6 +191,46 @@ function motionVotes(source: IbabsSourceDefinition, votes: IbabsListEntryVote[])
     }));
 }
 
+/** Date fields of a motion, as griffies name them. Tried in this order, then
+ * any other field whose name says it is a date. */
+const MOTION_DATE_FIELDS = [
+  "Datum",
+  "Datum motie",
+  "Datum indiening",
+  "Datum ingediend",
+  "Ingediend",
+  "Datum behandeling",
+  "Behandeld",
+  "Datum vergadering",
+];
+
+const DATE_FIELD_NAME = /^datum\b|\bingediend\b|\bbehandeld\b/i;
+
+/** Dates of what happened after the vote, not of the motion itself. */
+const LATER_DATE_FIELD_NAME = /afdoening|afgedaan|eind|deadline/i;
+
+function motionDate(values: Record<string, string>): string | undefined {
+  const named = parseMotionDate(pickValue(values, MOTION_DATE_FIELDS));
+  if (named) {
+    return named;
+  }
+  for (const [key, value] of Object.entries(values)) {
+    if (DATE_FIELD_NAME.test(key.trim()) && !LATER_DATE_FIELD_NAME.test(key)) {
+      const parsed = parseMotionDate(value);
+      if (parsed) {
+        return parsed;
+      }
+    }
+  }
+  return undefined;
+}
+
+/** The field that names the meeting a motion belongs to. Most griffies call
+ * it "Agendapunt"; Oss calls it "Agenda" (#378). */
+export function motionAgendaValue(values: Record<string, string>): string | undefined {
+  return pickValue(values, ["Agendapunt", "Agenda", "Vergadering"]);
+}
+
 export function normalizeIbabsMotion(
   source: IbabsSourceDefinition,
   list: IbabsList,
@@ -204,7 +245,8 @@ export function normalizeIbabsMotion(
     entry.EntryTitle ??
     `${list.ListName} ${entry.EntryId}`;
   const status = pickValue(values, ["Status"]);
-  const date = parseMotionDate(pickValue(values, ["Datum", "Datum motie", "Datum indiening"]));
+  const enteredDate = motionDate(values);
+  const date = isPlausibleDate(enteredDate) ? enteredDate : undefined;
 
   const proposers = splitProposers(pickValue(values, ["Indiener(s)", "Indieners", "Indiener"]));
   const coProposers = splitProposers(
@@ -218,10 +260,23 @@ export function normalizeIbabsMotion(
     ),
   ];
 
-  const reference = parseAgendaPointReference(pickValue(values, ["Agendapunt"]));
+  const agendaValue = motionAgendaValue(values);
+  const reference = parseAgendaPointReference(agendaValue);
   const meeting = reference && meetings ? meetings.find(reference) : undefined;
   const agendaItemId = meeting && reference ? findAgendaItemId(meeting, reference) : undefined;
   const normalizedVotes = motionVotes(source, votes);
+  // The meeting first, then the day the agenda field names even when the
+  // meeting itself is not found, then a date field, then the entry's last
+  // change, as a register entry already does. Without the last three, 2,973
+  // motions at 58 sources had no date at all, every one of them at Oss,
+  // Rotterdam and Leidschendam-Voorburg. Their portals show the date under
+  // "Agenda", "Datum ingediend" or "Behandeld", which were not read (#378).
+  const agendaDate = reference ? `${reference.meetingDate}T00:00:00Z` : findDateInText(agendaValue);
+  const lastDiscussedAt =
+    meeting?.start_date ??
+    (isPlausibleDate(agendaDate) ? agendaDate : undefined) ??
+    date ??
+    normalizeMutationDate(entry.MutationDate);
 
   return {
     id: canonicalMotionId(source, entry.EntryId),
@@ -243,10 +298,10 @@ export function normalizeIbabsMotion(
     // Keep the raw reference when we couldn't resolve it: the meeting may
     // simply fall outside this run's window, and the string still tells a
     // reader which meeting the motion belongs to.
-    agenda_item_hint: meeting && agendaItemId ? undefined : pickValue(values, ["Agendapunt"]),
+    agenda_item_hint: meeting && agendaItemId ? undefined : agendaValue,
     attachment: detail.Documents.map((document) => canonicalDocumentId(source, document.Id)),
     organization: canonicalOrganizationId(source),
-    last_discussed_at: meeting?.start_date ?? date,
+    last_discussed_at: lastDiscussedAt,
     source_info: {
       supplier: source.supplier,
       source: source.key,

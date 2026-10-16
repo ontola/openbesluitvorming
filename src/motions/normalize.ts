@@ -115,6 +115,55 @@ export function parseMotionDate(value?: string): string | undefined {
   return undefined;
 }
 
+const DUTCH_MONTHS: Record<string, string> = {
+  januari: "01",
+  februari: "02",
+  maart: "03",
+  april: "04",
+  mei: "05",
+  juni: "06",
+  juli: "07",
+  augustus: "08",
+  september: "09",
+  oktober: "10",
+  november: "11",
+  december: "12",
+};
+
+/** The first calendar date anywhere in a free-text value.
+ *
+ * For an agenda field that is not the `<name> <d-m-yyyy>` shape
+ * parseAgendaPointReference needs. Griffies fill these by hand and the
+ * portal shows Oss's as "Gemeenteraad 2025, donderdag 11 december" (#378),
+ * so beside `29-1-2026` and `2026-01-29` this reads `11 december 2025`, and
+ * `11 december` with the only year elsewhere in the text. */
+export function findDateInText(value?: string): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+  const text = value.toLowerCase();
+  const pad = (part: string) => part.padStart(2, "0");
+
+  const dutchNumeric = text.match(/\b(\d{1,2})-(\d{1,2})-(\d{4})\b/);
+  if (dutchNumeric) {
+    return `${dutchNumeric[3]}-${pad(dutchNumeric[2])}-${pad(dutchNumeric[1])}T00:00:00Z`;
+  }
+  const iso = text.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
+  if (iso) {
+    return `${iso[1]}-${iso[2]}-${iso[3]}T00:00:00Z`;
+  }
+  const monthNames = Object.keys(DUTCH_MONTHS).join("|");
+  const written = text.match(new RegExp(`\\b(\\d{1,2})\\s+(${monthNames})\\b(?:\\s+(\\d{4}))?`));
+  if (written) {
+    const years = [...text.matchAll(/\b(19|20)\d{2}\b/g)].map((match) => match[0]);
+    const year = written[3] ?? (new Set(years).size === 1 ? years[0] : undefined);
+    if (year) {
+      return `${year}-${DUTCH_MONTHS[written[2]]}-${pad(written[1])}T00:00:00Z`;
+    }
+  }
+  return undefined;
+}
+
 export interface AgendaPointReference {
   meetingName: string;
   meetingDate: string;

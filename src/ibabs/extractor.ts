@@ -18,6 +18,7 @@ import type {
 import { ObjectStorageClient } from "../storage/s3.ts";
 import {
   normalizeIbabsDocuments,
+  motionAgendaValue,
   normalizeIbabsMeeting,
   normalizeIbabsMotion,
   normalizeIbabsMotionDocuments,
@@ -567,7 +568,9 @@ export class IbabsMeetingExtractor {
       try {
         const detail = await this.client.getListEntry(source, list.ListId, entry.EntryId);
 
-        const reference = parseAgendaPointReference(detail.Values["Agendapunt"]);
+        const reference = parseAgendaPointReference(
+          isMotion ? motionAgendaValue(detail.Values) : detail.Values["Agendapunt"],
+        );
         if (reference) {
           await ensureMeetingsForDate(reference.meetingDate);
         }
