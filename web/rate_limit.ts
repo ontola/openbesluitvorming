@@ -77,12 +77,32 @@ export function requestCost(url: URL): number {
   if (url.pathname !== "/api/search") {
     return 1;
   }
+  const phrase = phraseWordCount(url.searchParams.get("query") ?? "");
   const limit = Number(url.searchParams.get("limit") ?? String(RATE_LIMIT_PAGE_UNIT));
   if (!Number.isFinite(limit) || limit <= 0) {
-    return 1;
+    return 1 + phrase;
   }
   const billable = Math.min(limit, MAX_SEARCH_LIMIT);
-  return 1 + Math.max(0, billable - RATE_LIMIT_PAGE_UNIT) / ROWS_PER_EXTRA_UNIT;
+  return 1 + phrase + Math.max(0, billable - RATE_LIMIT_PAGE_UNIT) / ROWS_PER_EXTRA_UNIT;
+}
+
+/** Words inside quoted phrases of two words or more: one unit each.
+ *
+ * A phrase is not one search's worth of work. Quickwit loads the positions of
+ * every word in it from every split before it runs, so the cost grows with
+ * the words: a reuser measured three words at 12 s, four at 22 s and five at
+ * 31 s on 2026-10-15, against about 1 s for an ordinary search (#348). A single quoted word
+ * is a plain term and costs nothing extra. Same tokenisation as the query
+ * builder in `search_api.ts`, kept here so this file stays self-contained. */
+export function phraseWordCount(query: string): number {
+  let words = 0;
+  for (const match of query.matchAll(/"([^"]*)"/g)) {
+    const tokens = match[1].split(/[^\p{L}\p{N}]+/u).filter(Boolean).length;
+    if (tokens > 1) {
+      words += tokens;
+    }
+  }
+  return words;
 }
 
 export class RateLimiter {

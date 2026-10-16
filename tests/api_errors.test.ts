@@ -39,6 +39,7 @@ Deno.test("the published set of error codes is stable", () => {
       "pdf_page_not_found",
       "pdf_render_failed",
       "rate_limited",
+      "search_busy",
       "search_failed",
       "search_timeout",
       "stats_failed",

@@ -1399,3 +1399,71 @@ Deno.test("an organization covers the organizations merged into it", async () =>
     `naming Amsterdam in the query also matches Weesp, got ${clause}`,
   );
 });
+
+Deno.test("a phrase search makes no sample request, and none after a failed count (#348)", async () => {
+  // Every Quickwit request loads the postings of every searched word again,
+  // with positions for a phrase. The count and the 2,000-row sample were each
+  // a full request on top of the scan, and for a nationwide phrase they took
+  // most of the time.
+  const originalFetch = globalThis.fetch;
+  const requests: Array<Record<string, unknown>> = [];
+  let countFails = false;
+  const serve = async (_input: unknown, init?: unknown) => {
+    const body = JSON.parse(String((init as { body?: string } | undefined)?.body ?? "{}"));
+    requests.push(body);
+    if (body.count_all) {
+      if (countFails) {
+        return new Response("boom", { status: 400 });
+      }
+      return new Response(JSON.stringify({ num_hits: 500_000, hits: [] }));
+    }
+    const maxHits = Number(body.max_hits);
+    const startOffset = Number(body.start_offset ?? 0);
+    const hits = Array.from({ length: maxHits }, (_, index) => {
+      const row = startOffset + index;
+      const documentIndex = Math.floor(row / 2);
+      return {
+        time: "2026-03-31T11:00:00Z",
+        entity_id: `document:notubiz:gemeente:ermelo:${documentIndex}#page=${(row % 2) + 1}`,
+        parent_entity_id: `document:notubiz:gemeente:ermelo:${documentIndex}`,
+        page_number: (row % 2) + 1,
+        entity_type: "DocumentPage",
+        name: `Motie ${documentIndex}`,
+        start_date: "2025-01-14T17:00:00Z",
+        source_key: "ermelo",
+        content: "motie vreemd aan de orde van de dag",
+      };
+    });
+    return new Response(JSON.stringify({ num_hits: 4190, hits }));
+  };
+  const isSample = (body: Record<string, unknown>) =>
+    !body.count_all && body.start_offset === undefined;
+
+  try {
+    globalThis.fetch = serve as typeof globalThis.fetch;
+    await withV3Projection(async () => {
+      const phrase = await searchMeetings({
+        query: '"motie vreemd aan de orde"',
+        sort: "date_desc",
+        limit: 24,
+      });
+      assert(phrase.totalIsApproximate, "a capped scan is still an estimate");
+      assert(
+        requests.some((body) => body.count_all),
+        "the count still runs",
+      );
+      assert(!requests.some(isSample), "but no sample for a phrase");
+
+      requests.length = 0;
+      await searchMeetings({ query: "motie vreemd", sort: "date_desc", limit: 24 });
+      assert(requests.some(isSample), "loose words under a sort are still sampled");
+
+      requests.length = 0;
+      countFails = true;
+      await searchMeetings({ query: "motie orde", sort: "date_desc", limit: 24 });
+      assert(!requests.some(isSample), "no sample once the count has failed");
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

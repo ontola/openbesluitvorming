@@ -26,6 +26,7 @@ import {
   getEntityContent,
   getEntityPdfInfo,
   getIndexStats,
+  queryHasPhrase,
   searchMeetings,
   startStatsRefreshLoop,
 } from "./search_api.ts";
@@ -42,6 +43,7 @@ import { apiError } from "./api_errors.ts";
 import { validateSearchParams } from "./search_params.ts";
 import { entityGoneResponse, sourceKeyOfEntityId } from "./entity_gone.ts";
 import { SearchTimeoutError } from "../src/quickwit/client.ts";
+import { phraseSearchSlots, SearchGate } from "./search_gate.ts";
 import { createOpsHandler, OPS_PATH_PREFIX } from "./ops_api.ts";
 import { fetchExtractorStats } from "./extractors.ts";
 import { SITEMAP_FILE_PATTERN, SITEMAP_INDEX_KEY, SITEMAP_PREFIX } from "../src/exports/sitemap.ts";
@@ -621,6 +623,22 @@ async function handleRequest(request: Request): Promise<Response> {
     if (invalidParam) {
       return withServerTiming(invalidParam, requestStart, metrics);
     }
+    let releasePhraseSlot: (() => void) | undefined;
+    if (queryHasPhrase(url.searchParams.get("query") ?? "")) {
+      releasePhraseSlot = phraseSearchGate.tryAcquire();
+      if (!releasePhraseSlot) {
+        const response = apiError(
+          "search_busy",
+          503,
+          "Er lopen al andere zoekvragen met een frase. Probeer het over enkele seconden opnieuw.",
+          {
+            hint: "Zoekvragen met een frase tussen aanhalingstekens zijn zwaar en lopen beperkt tegelijk. Zonder aanhalingstekens zoek je op dezelfde woorden los, en dat kan altijd.",
+          },
+        );
+        response.headers.set("retry-after", String(PHRASE_BUSY_RETRY_AFTER_SECONDS));
+        return withServerTiming(response, requestStart, metrics);
+      }
+    }
     try {
       const results = await measureTiming(metrics, "search", () =>
         searchMeetings({
@@ -643,7 +661,7 @@ async function handleRequest(request: Request): Promise<Response> {
       if (error instanceof SearchTimeoutError) {
         return withServerTiming(
           apiError("search_timeout", 504, "Deze zoekvraag duurde te lang.", {
-            hint: "Beperk de vraag met een organization, een periode (dateFrom, dateTo) of een entityType, of gebruik minder woorden in een frase.",
+            hint: "Een frase tussen aanhalingstekens kost tijd per woord, en veel meer bij veelvoorkomende woorden zoals 'de', 'van' of 'aan'. Een organization of periode maakt zo'n frase nauwelijks lichter; minder of zeldzamere woorden in de frase wel. Probeer dezelfde vraag niet ongewijzigd opnieuw.",
           }),
           requestStart,
           metrics,
@@ -678,6 +696,8 @@ async function handleRequest(request: Request): Promise<Response> {
         requestStart,
         metrics,
       );
+    } finally {
+      releasePhraseSlot?.();
     }
   }
 
@@ -962,6 +982,8 @@ async function handleRequest(request: Request): Promise<Response> {
 const RATE_LIMIT_PER_MINUTE = Number(Deno.env.get("WOOZI_RATE_LIMIT_PER_MIN") ?? "60");
 const rateLimitEnabled = Number.isFinite(RATE_LIMIT_PER_MINUTE) && RATE_LIMIT_PER_MINUTE > 0;
 const rateLimiter = new RateLimiter(RATE_LIMIT_PER_MINUTE);
+const phraseSearchGate = new SearchGate(phraseSearchSlots());
+const PHRASE_BUSY_RETRY_AFTER_SECONDS = 5;
 
 /** Caddy appends the peer it actually observed to X-Forwarded-For, so the
  * rightmost entry is the trustworthy one -- a client-supplied prefix cannot

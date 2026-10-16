@@ -201,7 +201,8 @@ export function getIngestCommitMode(): IngestCommitMode {
   return value as IngestCommitMode;
 }
 
-function getSearchTimeoutMs(): number {
+/** The time one public search may spend in Quickwit, across all its requests. */
+export function getSearchTimeoutMs(): number {
   const value = Number(Deno.env.get("QUICKWIT_SEARCH_TIMEOUT_MS") ?? DEFAULT_SEARCH_TIMEOUT_MS);
   return Number.isFinite(value) && value > 0 ? value : DEFAULT_SEARCH_TIMEOUT_MS;
 }
@@ -460,8 +461,14 @@ export class QuickwitClient {
     });
   }
 
-  async searchRequest(body: QuickwitSearchRequest): Promise<QuickwitSearchResponse> {
+  /** `timeoutMs` narrows the budget for this request, so a caller that makes
+   * several requests for one answer can keep their total within one budget. */
+  async searchRequest(
+    body: QuickwitSearchRequest,
+    options: { timeoutMs?: number } = {},
+  ): Promise<QuickwitSearchResponse> {
     const attempts = getSearchAttempts();
+    const timeoutMs = Math.max(1, Math.min(options.timeoutMs ?? Infinity, getSearchTimeoutMs()));
     let lastError: unknown;
 
     for (let attempt = 1; attempt <= attempts; attempt += 1) {
@@ -473,13 +480,13 @@ export class QuickwitClient {
             headers: {
               "content-type": "application/json",
             },
-            signal: AbortSignal.timeout(getSearchTimeoutMs()),
+            signal: AbortSignal.timeout(timeoutMs),
             body: JSON.stringify(body),
           },
         );
       } catch (error) {
         if (error instanceof Error && error.name === "TimeoutError") {
-          throw new SearchTimeoutError(getSearchTimeoutMs());
+          throw new SearchTimeoutError(timeoutMs);
         }
         lastError = error;
         if (attempt === attempts || !isRetryableSearchError(error)) {

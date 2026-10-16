@@ -35,12 +35,13 @@ Planning something that makes a lot of requests? See [Rate limits](#rate-limits)
 continuously (a token bucket, not a fixed window — you do not have to wait for a
 minute boundary).
 
-Most requests cost **1 unit**. Two exceptions:
+Most requests cost **1 unit**. The exceptions:
 
 | Request | Cost |
 |---------|------|
 | `/api/search` with `limit=24` or lower (the default) | 1 unit |
 | `/api/search` with a higher `limit` | 1 unit, plus 1 further unit per 250 results above the first 24 — so `limit=100` costs 1.3 |
+| `/api/search` with a quoted phrase of two words or more | 1 further unit per word in the phrase — `query="motie vreemd aan de orde"` costs 6 |
 | `/api/entities/{id}/pdf/page/{n}` | 1/8 unit — a long agenda's thumbnails should not drain your budget |
 
 Nearly all of a search's cost is the query itself, evaluated over the index, and
@@ -48,6 +49,19 @@ that is charged once whatever the page size; the rows it returns add about 1/250
 of it each. So **asking for fewer, larger pages is the cheap way to read in
 bulk**: 1000 results at `limit=100` costs 13 units, where paging the same 1000
 at the default size costs 42.
+
+A phrase is the exception to "the query is charged once": before the search
+engine evaluates it, it loads the word positions of every word in it from the
+whole index, and limiting the search to an `organization` or a period does not
+avoid that. Words that occur everywhere, such as "de", "van" or "aan", make a
+phrase heavy. Only a few phrase searches run at the same time; when they are
+all taken, a phrase search is refused at once with 503 `search_busy` and a
+`Retry-After` header. The same words without quotes are an ordinary search.
+
+A search has one time budget, about 8 seconds, for all the work behind its
+answer. When the estimate of `totalCount` does not fit in what is left of it,
+`totalCount` is the cruder estimate from the rows already read, still marked
+`totalIsApproximate: true`.
 
 Harvesting the whole corpus is better served by the [bulk export API](#bulk-export) than
 by paging through search.
@@ -124,7 +138,8 @@ added as needed; an existing one is not renamed or removed without a note here.
 | `entity_removed` | 410 | the entity was removed; the body carries `reason` (as on a delete record in the change feed), `removedAt` and, for a document removed at the source, `meetingId` |
 | `rate_limited` | 429 | budget spent; see [Rate limits](#rate-limits) |
 | `search_failed` | 500 | the search could not be completed |
-| `search_timeout` | 504 | the search took longer than the server allows; narrow it with `organization`, a period or `entityType` rather than retrying it unchanged |
+| `search_busy` | 503 | the slots for phrase searches are all taken; retry after `Retry-After` seconds, or search the same words without quotes |
+| `search_timeout` | 504 | the search did not finish within its time budget; for a phrase, use fewer or rarer words rather than retrying it unchanged (an `organization` or period helps a phrase little, see [Rate limits](#rate-limits)) |
 | `stats_failed` | 500 | `/api/stats` could not be assembled |
 | `status_failed` | 500 | `/api/status` could not be assembled |
 | `export_failed` | 500 | an export page could not be read |

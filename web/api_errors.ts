@@ -41,6 +41,7 @@ export const API_ERROR_CODES = [
   // 5xx — our side failed; the caller may retry.
   "search_failed",
   "search_timeout",
+  "search_busy",
   "stats_failed",
   "status_failed",
   "export_failed",

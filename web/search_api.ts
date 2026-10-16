@@ -18,7 +18,7 @@ import {
   projectionSupportsDateSort,
   projectionSupportsPhraseSearch,
 } from "../src/pipeline/versioning.ts";
-import { QuickwitClient } from "../src/quickwit/client.ts";
+import { getSearchTimeoutMs, QuickwitClient, SearchTimeoutError } from "../src/quickwit/client.ts";
 import { listCatalogSources } from "../src/sources/catalog.ts";
 import { getProjectableSource, getSource, listSources } from "../src/sources/index.ts";
 import { ObjectStorageClient } from "../src/storage/s3.ts";
@@ -874,6 +874,10 @@ function dedupeLatestIndexedHits(items: IndexedHit[]): IndexedHit[] {
  * order the user did not choose. */
 const RATIO_SAMPLE_ROWS = 2000;
 
+/** Below this much budget the count is not attempted: it would only time out
+ * and leave the scan's own figure anyway. */
+const MIN_ESTIMATE_BUDGET_MS = 500;
+
 /** Estimate how many results a capped scan would have produced.
  *
  * Two things made this number move (#265): the same query showed 146,881,
@@ -898,26 +902,47 @@ async function estimateTotal(
   queryString: string,
   sortBy: string | undefined,
   scan: { scannedRows: number; scannedResults: number; fallbackRows: number },
+  budget: { deadline: number; phrase: boolean },
 ): Promise<number> {
   let rows = scan.fallbackRows;
+  let ratio = scan.scannedResults > 0 ? scan.scannedRows / scan.scannedResults : 1;
+
+  // The count and the sample are each a full Quickwit query, and each loads
+  // every searched word's postings from every split again before it runs
+  // (#348). For a phrase that means the positions of words like "de" and
+  // "van": one nationwide three-word phrase spent 5.5 s on the scan and 19 s
+  // in all (measured 2026-10-16). So both share what is left of the one
+  // search budget, a phrase skips the sample, and a count that ran out of
+  // time is not followed by a sample that would run out too.
+  let remaining = budget.deadline - performance.now();
+  if (remaining < MIN_ESTIMATE_BUDGET_MS) {
+    return roundEstimate(rows / Math.max(ratio, 1));
+  }
   try {
-    const counted = await quickwit.searchRequest({
-      query: queryString,
-      max_hits: 0,
-      count_all: true,
-    });
+    const counted = await quickwit.searchRequest(
+      { query: queryString, max_hits: 0, count_all: true },
+      { timeoutMs: remaining },
+    );
     rows = counted.num_hits;
   } catch {
     // The scan's own num_hits stays as the fallback; it is at least a number.
+    return roundEstimate(rows / Math.max(ratio, 1));
   }
 
   // The scan's own sample is only usable when it is both relevance-ordered
   // and large enough. A first page stops after a few dozen rows, and 32 rows
   // are not a ratio: measured on production, 447,000 from the scan against
   // 195,000 from a proper sample for the same query.
-  let ratio = scan.scannedResults > 0 ? scan.scannedRows / scan.scannedResults : 1;
-  if (sortBy || scan.scannedRows < RATIO_SAMPLE_ROWS) {
-    const sampled = await sampledRowsPerResult(quickwit, queryString);
+  //
+  // A phrase keeps the scan's ratio whatever it is worth. The estimate then
+  // moves a little with the sort again (#265), which is the smaller cost.
+  remaining = budget.deadline - performance.now();
+  if (
+    !budget.phrase &&
+    remaining >= MIN_ESTIMATE_BUDGET_MS &&
+    (sortBy || scan.scannedRows < RATIO_SAMPLE_ROWS)
+  ) {
+    const sampled = await sampledRowsPerResult(quickwit, queryString, remaining);
     if (sampled !== undefined) {
       ratio = sampled;
     }
@@ -936,6 +961,7 @@ const RATIO_CACHE_MAX = 500;
 async function sampledRowsPerResult(
   quickwit: QuickwitClient,
   queryString: string,
+  timeoutMs: number,
 ): Promise<number | undefined> {
   const now = Date.now();
   const cached = ratioCache.get(queryString);
@@ -943,11 +969,10 @@ async function sampledRowsPerResult(
     return cached.ratio;
   }
   try {
-    const sample = await quickwit.searchRequest({
-      query: queryString,
-      max_hits: RATIO_SAMPLE_ROWS,
-      count_all: false,
-    });
+    const sample = await quickwit.searchRequest(
+      { query: queryString, max_hits: RATIO_SAMPLE_ROWS, count_all: false },
+      { timeoutMs },
+    );
     const hits = sample.hits as SearchHit[];
     const distinct = new Set(hits.map((hit) => searchResultEntityId(hit)));
     if (distinct.size === 0) {
@@ -1129,6 +1154,12 @@ async function collectSearchWindow(
   // window already returned. Dedup can only count results it has seen, so every
   // window is read from the top, and the row budget bounds how deep that goes.
   const scanBudget = MAX_SCAN_ROWS;
+  // One time budget for the whole answer, not one per Quickwit request. A
+  // search makes several requests -- the scan in batches, then a count and a
+  // sample -- and with 8 s each a single heavy phrase could hold the engine
+  // for half a minute and still answer 200 (#348).
+  const deadline = performance.now() + getSearchTimeoutMs();
+  const phrase = queryHasPhrase(options.query);
   const collected = new Map<string, SearchResult>();
   const previewKeys = new Map<string, string>();
   let rawOffset = 0;
@@ -1153,18 +1184,25 @@ async function collectSearchWindow(
       scanBudget - rawSeen,
     );
     const quickwitStart = performance.now();
-    const response = await quickwit.searchRequest({
-      query: queryString,
-      max_hits: requestMaxHits,
-      start_offset: rawOffset,
-      // Undocumented in Quickwit 0.8.1's search API, so possibly a no-op --
-      // but it was added deliberately, and if it does bind, dropping it turns
-      // on full hit counting for every public search. Left alone until someone
-      // measures it.
-      count_all: false,
-      ...(sortBy ? { sort_by: sortBy } : {}),
-      ...(snippetFields.length > 0 ? { snippet_fields: snippetFields.join(",") } : {}),
-    });
+    const remaining = deadline - quickwitStart;
+    if (remaining <= 0) {
+      throw new SearchTimeoutError(getSearchTimeoutMs());
+    }
+    const response = await quickwit.searchRequest(
+      {
+        query: queryString,
+        max_hits: requestMaxHits,
+        start_offset: rawOffset,
+        // Undocumented in Quickwit 0.8.1's search API, so possibly a no-op --
+        // but it was added deliberately, and if it does bind, dropping it turns
+        // on full hit counting for every public search. Left alone until someone
+        // measures it.
+        count_all: false,
+        ...(sortBy ? { sort_by: sortBy } : {}),
+        ...(snippetFields.length > 0 ? { snippet_fields: snippetFields.join(",") } : {}),
+      },
+      { timeoutMs: remaining },
+    );
     quickwitMs += performance.now() - quickwitStart;
 
     // num_hits describes the query, not the window, so it is taken once. The
@@ -1294,11 +1332,17 @@ async function collectSearchWindow(
   if (!scannedEverything) {
     totalCount = Math.max(
       groupedCount,
-      await estimateTotal(quickwit, queryString, sortBy, {
-        scannedRows: rawSeen,
-        scannedResults: collected.size,
-        fallbackRows: rawNumHits ?? 0,
-      }),
+      await estimateTotal(
+        quickwit,
+        queryString,
+        sortBy,
+        {
+          scannedRows: rawSeen,
+          scannedResults: collected.size,
+          fallbackRows: rawNumHits ?? 0,
+        },
+        { deadline, phrase },
+      ),
     );
   }
 
