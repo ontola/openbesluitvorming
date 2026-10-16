@@ -48,6 +48,10 @@ export interface MeetingEntity {
   parent?: string;
   agenda?: MeetingAgendaItem[];
   attachment?: string[];
+  /** The meeting's page on the supplier's own portal, where a visitor finds
+   * documents published after our last import and the live stream (#340).
+   * Notubiz names it; for iBabs the detail endpoint derives it from the site. */
+  source_url?: string;
   source_info: SourceInfo;
   raw: unknown;
 }
@@ -827,6 +831,9 @@ export interface EntityContentResponse {
   contentType?: string;
   pdfUrl?: string;
   meetingId?: string;
+  /** Where this entity is published at the source: the supplier's portal page
+   * for a meeting, the supplier's file for a document (#340). */
+  sourceUrl?: string;
   agenda?: MeetingAgendaItem[];
   /** Motions decided in this meeting, when the entity is a Meeting. */
   motions?: MeetingMotion[];

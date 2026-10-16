@@ -24,6 +24,7 @@ export const API_ERROR_CODES = [
   "invalid_limit",
   "invalid_offset",
   "unsupported_phrase_slop",
+  "missing_query",
   "invalid_page_number",
   "invalid_scale",
   "missing_export_source",
@@ -33,10 +34,14 @@ export const API_ERROR_CODES = [
   "entity_not_found",
   "pdf_not_found",
   "pdf_page_not_found",
+  // 410 — the thing was here and has been removed; the body says why.
+  "entity_removed",
   // 429
   "rate_limited",
   // 5xx — our side failed; the caller may retry.
   "search_failed",
+  "search_timeout",
+  "search_busy",
   "stats_failed",
   "status_failed",
   "export_failed",

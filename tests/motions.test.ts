@@ -2,6 +2,7 @@ import { __test__ as ibabsClientTest } from "../src/ibabs/client.ts";
 import { IbabsMeetingExtractor, __test__ as ibabsExtractorTest } from "../src/ibabs/extractor.ts";
 import { normalizeIbabsMotion, normalizeIbabsMotionDocuments } from "../src/ibabs/normalize.ts";
 import {
+  findDateInText,
   MeetingIndex,
   normalizeMotionResult,
   parseAgendaPointReference,
@@ -671,4 +672,134 @@ Deno.test("a throttled meeting-type call fails a full run but not a motions_only
     thrown = error;
   }
   assert(String(thrown).includes("403"), "a full run still fails loudly");
+});
+
+Deno.test("findDateInText reads the date shapes griffies type into an agenda field (#378)", () => {
+  assertEquals(findDateInText("Gemeenteraad 29-1-2026 extra"), "2026-01-29T00:00:00Z", "d-m-yyyy");
+  assertEquals(findDateInText("Raad 2026-01-29"), "2026-01-29T00:00:00Z", "iso");
+  assertEquals(findDateInText("Raad van 11 december 2025"), "2025-12-11T00:00:00Z", "written");
+  assertEquals(
+    findDateInText("Gemeenteraad 2025, donderdag 11 december, 19:30 tot 23:00"),
+    "2025-12-11T00:00:00Z",
+    "written without a year, the one year elsewhere in the text",
+  );
+  assertEquals(findDateInText("Raad 2024 en 2025, 11 december"), undefined, "two years: no guess");
+  assertEquals(findDateInText("geen datum"), undefined, "nothing to find");
+});
+
+Deno.test("an iBabs motion gets a date from wherever its griffie put one (#378)", async () => {
+  const source = getIbabsSource("utrecht");
+  const lists = ibabsClientTest.parseListsXml(await fixture("ibabs_lists_response.xml"));
+  const list = lists.find((candidate) => candidate.ListName === "Moties")!;
+  const entries = ibabsClientTest.parseListEntriesXml(
+    await fixture("ibabs_list_entries_response.xml"),
+  );
+  const detail = ibabsClientTest.parseListEntryXml(
+    await fixture("ibabs_list_entry_response.xml"),
+    entries[0].EntryId,
+  );
+  const base = { ...detail.Values };
+  delete base["Agendapunt"];
+  delete base["Datum"];
+  const motionWith = (values: Record<string, string>) =>
+    normalizeIbabsMotion(
+      source,
+      list,
+      entries[0],
+      { ...detail, Values: { ...base, ...values } },
+      [],
+      new MeetingIndex(),
+    );
+
+  assertEquals(
+    motionWith({ Agendapunt: "Gemeenteraad 29-1-2026\n23 Iets" }).last_discussed_at,
+    "2026-01-29T00:00:00Z",
+    "the agenda's day, also when the meeting is outside the run's window",
+  );
+  assertEquals(
+    motionWith({ Agenda: "Gemeenteraad 2025, donderdag 11 december, 19:30 tot 23:00" })
+      .last_discussed_at,
+    "2025-12-11T00:00:00Z",
+    "Oss calls the field Agenda",
+  );
+  const amstelveen = motionWith({ "Datum ingediend": "22-04-2014" });
+  assertEquals(amstelveen.date, "2014-04-22T00:00:00Z", "Datum ingediend is the motion's date");
+  assertEquals(amstelveen.last_discussed_at, "2014-04-22T00:00:00Z", "and its sort date");
+  assertEquals(
+    motionWith({ Behandeld: "20-04-2017" }).last_discussed_at,
+    "2017-04-20T00:00:00Z",
+    "Aalsmeer's Behandeld",
+  );
+  assertEquals(
+    motionWith({ "Datum publicatie": "3-3-2023" }).last_discussed_at,
+    "2023-03-03T00:00:00Z",
+    "any other field named Datum ...",
+  );
+  assertEquals(
+    motionWith({ "Datum afdoening": "1-1-2027" }).last_discussed_at,
+    "2026-06-25T12:00:00.000Z",
+    "but not the day it was settled; then the entry's last change",
+  );
+  assertEquals(
+    motionWith({}).last_discussed_at,
+    "2026-06-25T12:00:00.000Z",
+    "nothing at all: the entry's last change, as for a register entry",
+  );
+});
+
+Deno.test("a negated adoption is a rejection, and other spellings are read (#357)", () => {
+  assertEquals(normalizeMotionResult("Niet aangenomen"), "verworpen", "Bronckhorst, Waalre");
+  assertEquals(normalizeMotionResult("niet aanvaard"), "verworpen", "negated aanvaard");
+  assertEquals(normalizeMotionResult("Aanvaard"), "aangenomen", "Oirschot");
+  assertEquals(normalizeMotionResult("afgewezen"), "verworpen", "Rozendaal");
+  assertEquals(normalizeMotionResult("Oannommen"), "aangenomen", "Fryslân");
+  assertEquals(normalizeMotionResult("Fersmiten"), "verworpen", "Fryslân");
+  assertEquals(normalizeMotionResult("Ynlutsen"), "ingetrokken", "Fryslân");
+  assertEquals(normalizeMotionResult("unaniem aangenomen"), "aangenomen", "unchanged");
+  assertEquals(normalizeMotionResult("Afgehandeld"), "overig", "follow-up is not an outcome");
+});
+
+Deno.test("an iBabs motion reads its outcome from Conclusie or Status (besluit raad) (#357)", async () => {
+  const source = getIbabsSource("utrecht");
+  const lists = ibabsClientTest.parseListsXml(await fixture("ibabs_lists_response.xml"));
+  const list = lists.find((candidate) => candidate.ListName === "Moties")!;
+  const entries = ibabsClientTest.parseListEntriesXml(
+    await fixture("ibabs_list_entries_response.xml"),
+  );
+  const detail = ibabsClientTest.parseListEntryXml(
+    await fixture("ibabs_list_entry_response.xml"),
+    entries[0].EntryId,
+  );
+  const base = { ...detail.Values };
+  delete base["Status"];
+  const motionWith = (values: Record<string, string>) =>
+    normalizeIbabsMotion(
+      source,
+      list,
+      entries[0],
+      { ...detail, Values: { ...base, ...values } },
+      [],
+    );
+
+  assertEquals(motionWith({ Conclusie: "Verworpen" }).result, "verworpen", "Maashorst");
+  const zevenaar = motionWith({
+    "Status (besluit raad)": "Aanvaard",
+    "Status afhandeling": "Afgedaan",
+  });
+  assertEquals(zevenaar.result, "aangenomen", "Zevenaar");
+  assertEquals(zevenaar.status, "Aanvaard", "the outcome field is kept as status");
+  assertEquals(
+    motionWith({ Status: "Afgehandeld", Conclusie: "Aangenomen" }).result,
+    "aangenomen",
+    "an outcome wins over a follow-up status",
+  );
+  assertEquals(motionWith({ Status: "Afgehandeld" }).status, "Afgehandeld", "else kept verbatim");
+});
+
+Deno.test("the iBabs parser decodes numeric references such as &#xD; (#376)", () => {
+  const detail = ibabsClientTest.parseListEntryXml(
+    `<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body><GetListEntryResponse xmlns="http://tempuri.org/"><GetListEntryResult xmlns:a="http://schemas.datacontract.org/2004/07/iBabsWCFObjects.Public"><Status xmlns="http://schemas.datacontract.org/2004/07/iBabsWCFObjects.Base">OK</Status><a:Documents/><a:Values xmlns:b="http://schemas.microsoft.com/2003/10/Serialization/Arrays"><b:KeyValueOfstringstring><b:Key>Toelichting</b:Key><b:Value>Voor: PVV&#xD; Tegen: VVD Financi&#235;le</b:Value></b:KeyValueOfstringstring></a:Values></GetListEntryResult></GetListEntryResponse></s:Body></s:Envelope>`,
+    "x",
+  );
+  assertEquals(detail.Values["Toelichting"], "Voor: PVV\r Tegen: VVD Financiële", "decoded");
 });
