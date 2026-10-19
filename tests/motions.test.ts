@@ -750,6 +750,8 @@ Deno.test("an iBabs motion gets a date from wherever its griffie put one (#378)"
 
 Deno.test("a negated adoption is a rejection, and other spellings are read (#357)", () => {
   assertEquals(normalizeMotionResult("Niet aangenomen"), "verworpen", "Bronckhorst, Waalre");
+  assertEquals(normalizeMotionResult("Niet-aangenomen"), "verworpen", "#385");
+  assertEquals(normalizeMotionResult("Net oannommen"), "verworpen", "Frisian");
   assertEquals(normalizeMotionResult("niet aanvaard"), "verworpen", "negated aanvaard");
   assertEquals(normalizeMotionResult("Aanvaard"), "aangenomen", "Oirschot");
   assertEquals(normalizeMotionResult("afgewezen"), "verworpen", "Rozendaal");

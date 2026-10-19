@@ -31,8 +31,9 @@ export function normalizeMotionResult(status?: string): MotionEntity["result"] |
   // A negated adoption is a rejection. Matching "aangenomen" anywhere in the
   // text turned "Niet aangenomen" into `aangenomen`: 181 rejected motions at
   // Bronckhorst, Waalre and Brabantse Delta, 107 of them beside a tally with
-  // a majority against (#357).
-  if (/\bniet\s+(aangenomen|aanvaard)/.test(text)) {
+  // a majority against (#357, #385). Also "Niet-aangenomen" and the Frisian
+  // "Net oannommen".
+  if (/\b(niet|net)[\s-]+(aangenomen|aanvaard|oannommen)/.test(text)) {
     return "verworpen";
   }
   if (/aangenomen|aanvaard|oannommen/.test(text)) {
