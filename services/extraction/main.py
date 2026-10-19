@@ -5,6 +5,7 @@ import os
 import json
 import shutil
 import tempfile
+import threading
 import time
 from pathlib import Path
 
@@ -157,12 +158,32 @@ class ExtractRequest(BaseModel):
     max_pages: int = MAX_PAGES_DEFAULT
 
 
+# One PDF at a time per process. PyMuPDF does not support threads, and up to
+# 1.28.0 its table detection keeps the characters and ruling lines of the page
+# it is reading in module-level lists (EDGES, CHARS in table.py). Since
+# materialize_document moved into asyncio.to_thread (31 July 2026), two
+# requests in one uvicorn worker read pages at the same time and took each
+# other's characters and table grids: Castricum's besluitenlijst carried a
+# passage from a De Ronde Venen inspraakreactie, and some 6% of the documents
+# read in October were damaged (#371). Download and upload stay concurrent;
+# only the parsing below is serialised, and the processes uvicorn runs side by
+# side still read in parallel.
+_pdf_lock = threading.Lock()
+
+
 def materialize_document(
     pdf_bytes: bytes, max_pages: int, want_thumbnail: bool
 ) -> tuple[int, list[dict], str, bytes | None, list[str]]:
     """Blocking half of an extraction: write the PDF, parse it, build the
     per-page markdown and optionally the thumbnail. Kept synchronous and run
     via asyncio.to_thread by the caller, so it cannot stall the event loop."""
+    with _pdf_lock:
+        return _materialize_document(pdf_bytes, max_pages, want_thumbnail)
+
+
+def _materialize_document(
+    pdf_bytes: bytes, max_pages: int, want_thumbnail: bool
+) -> tuple[int, list[dict], str, bytes | None, list[str]]:
     warnings: list[str] = []
     WORK_ROOT.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(dir=WORK_ROOT) as work_dir:
