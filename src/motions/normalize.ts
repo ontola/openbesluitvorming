@@ -44,6 +44,43 @@ export function normalizeMotionResult(status?: string): MotionEntity["result"] |
   return "overig";
 }
 
+/** Statuses that are deliberately `overig`: they say how far the follow-up
+ * is, or that the vote was tied, not whether the motion was adopted. Counted
+ * on 2026-10-15 across 63 sources: "Afgehandeld" (294), "In behandeling"
+ * (66), "Afgedaan" (56), "Overgenomen" (27), staking van stemmen in five
+ * spellings (#357). */
+const KNOWN_OTHER_STATUS =
+  /afgehandeld|afgedaan|in behandeling|in uitvoering|aangekondigd|overgenomen|vervallen|niet ingediend|openstaand|staking|staakten|gelijke stemming|stûkjende stimmen/;
+
+/** Whether a status maps onto a result we chose, rather than falling through
+ * to `overig` because nobody has seen the spelling yet. A reviewer on #342
+ * pointed out that a new spelling, a dialect or a typo ("Aangneomen") was
+ * indistinguishable from a deliberate `overig`. The public result stays
+ * `overig` either way; the importers log the unmapped ones so a new spelling
+ * is noticed and added here. */
+export function isMappedMotionStatus(status?: string): boolean {
+  if (!status) {
+    return true;
+  }
+  return (
+    normalizeMotionResult(status) !== "overig" || KNOWN_OTHER_STATUS.test(status.toLowerCase())
+  );
+}
+
+/** One log line per unmapped status per run, not per motion. */
+export function createUnmappedStatusReporter(sourceKey: string): (status?: string) => void {
+  const seen = new Set<string>();
+  return (status) => {
+    if (!status || isMappedMotionStatus(status) || seen.has(status)) {
+      return;
+    }
+    seen.add(status);
+    console.warn(
+      JSON.stringify({ level: "warn", event: "motion_status_unmapped", source: sourceKey, status }),
+    );
+  };
+}
+
 export function tallyVotes(votes: MotionVote[]): MotionVoteTally | undefined {
   if (votes.length === 0) {
     return undefined;

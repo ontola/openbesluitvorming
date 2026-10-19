@@ -3,6 +3,7 @@ import { IbabsMeetingExtractor, __test__ as ibabsExtractorTest } from "../src/ib
 import { normalizeIbabsMotion, normalizeIbabsMotionDocuments } from "../src/ibabs/normalize.ts";
 import {
   findDateInText,
+  isMappedMotionStatus,
   MeetingIndex,
   normalizeMotionResult,
   parseAgendaPointReference,
@@ -802,4 +803,32 @@ Deno.test("the iBabs parser decodes numeric references such as &#xD; (#376)", ()
     "x",
   );
   assertEquals(detail.Values["Toelichting"], "Voor: PVV\r Tegen: VVD Financiële", "decoded");
+});
+
+Deno.test("overig is either a known non-outcome or flagged as unmapped (#342 review)", () => {
+  for (const status of [
+    "Afgehandeld",
+    "Afgehandeld zie bijlage",
+    "In behandeling",
+    "Afgedaan",
+    "Aangekondigd",
+    "Overgenomen",
+    "Overgenomen met voorwaarden",
+    "Vervallen",
+    "Niet ingediend",
+    "Stemmen staakten",
+    "Staking van stemmen",
+    "gelijke stemming - wordt opnieuw in stemming gebracht",
+    "Stûkjende stimmen",
+  ]) {
+    assertEquals(normalizeMotionResult(status), "overig", `${status} is overig`);
+    assertEquals(isMappedMotionStatus(status), true, `${status} is a deliberate overig`);
+  }
+  for (const status of ["Fersmiten", "Niet aangenomen", undefined]) {
+    assertEquals(isMappedMotionStatus(status), true, `${status} maps or is absent`);
+  }
+  // A typo or a new spelling is still overig, but no longer looks deliberate.
+  for (const status of ["Aangneomen", "Akkoord bevonden", "xyz"]) {
+    assertEquals(isMappedMotionStatus(status), false, `${status} is not mapped yet`);
+  }
 });

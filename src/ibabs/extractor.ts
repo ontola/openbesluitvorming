@@ -24,7 +24,11 @@ import {
   normalizeIbabsMotionDocuments,
   normalizeIbabsRegisterDocuments,
 } from "./normalize.ts";
-import { MeetingIndex, parseAgendaPointReference } from "../motions/normalize.ts";
+import {
+  createUnmappedStatusReporter,
+  MeetingIndex,
+  parseAgendaPointReference,
+} from "../motions/normalize.ts";
 import { IbabsClient } from "./client.ts";
 import { belongsToSiteSibling, ibabsSiteSiblingLabels } from "./shared_site.ts";
 import { mapLimit } from "../util/map_limit.ts";
@@ -564,6 +568,7 @@ export class IbabsMeetingExtractor {
       return load;
     };
 
+    const reportUnmappedStatus = createUnmappedStatusReporter(source.key);
     await mapLimit(pending, context.concurrency, async ({ list, entry, motion: isMotion }) => {
       try {
         const detail = await this.client.getListEntry(source, list.ListId, entry.EntryId);
@@ -599,6 +604,7 @@ export class IbabsMeetingExtractor {
           votes,
           context.meetingIndex,
         );
+        reportUnmappedStatus(motion.status);
         await context.onMotion(motion, normalizeIbabsMotionDocuments(source, motion, detail));
       } catch (error) {
         await context.registerIssue({
