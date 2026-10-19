@@ -161,6 +161,87 @@ Deno.test("more removals than the cap removes none and says so", async () => {
   assertEquals(plan.capExceeded, { candidates: 2, max: 1 }, "the cap is reported");
 });
 
+/** The same run as `run`, with suspects from earlier runs. */
+async function runWithSuspects(
+  log: ExportChangesLog,
+  entities: WooziEntity[],
+  suspects: Array<{ entityId: string; meetingId: string; firstSeenAt: string }>,
+  now = new Date("2026-10-15T03:00:00Z"),
+) {
+  const tracker = new SourceRemovalTracker(SOURCE, log);
+  for (const entity of entities) {
+    tracker.observeEmitted(entity.id);
+    if (entity.type === "Meeting") {
+      tracker.observeMeeting(entity);
+    }
+    await commit(log, entity);
+  }
+  return tracker.plan(25, { suspects, now, minSuspectAgeMs: 12 * 3_600_000 });
+}
+
+const lastNight = "2026-10-14T03:00:00Z";
+const meetingOne = meeting(1, []).id;
+
+Deno.test("a first sighting carries no firstSeenAt, so it only becomes a suspect", async () => {
+  const log = await seeded();
+  const plan = await runWithSuspects(log, [meeting(1, [1, 3])], []);
+  assertEquals(plan.remove, [{ entityId: docId(2), meetingId: meetingOne }], "no firstSeenAt");
+});
+
+Deno.test("a suspect the meeting still leaves out the next night is retracted", async () => {
+  const log = await seeded();
+  // The first night already committed the meeting without document 2.
+  await commit(log, meeting(1, [1, 3]));
+  const plan = await runWithSuspects(
+    log,
+    [meeting(1, [1, 3])],
+    [{ entityId: docId(2), meetingId: meetingOne, firstSeenAt: lastNight }],
+  );
+  assertEquals(
+    plan.remove,
+    [{ entityId: docId(2), meetingId: meetingOne, firstSeenAt: lastNight }],
+    "second sighting",
+  );
+  assertEquals(plan.controlEntityId, docId(1), "a still-listed document is the control");
+});
+
+Deno.test("a suspect back on its meeting is forgotten (#380)", async () => {
+  const log = await seeded();
+  await commit(log, meeting(1, [1, 3]));
+  const plan = await runWithSuspects(
+    log,
+    [meeting(1, [1, 2, 3]), document(2)],
+    [{ entityId: docId(2), meetingId: meetingOne, firstSeenAt: lastNight }],
+  );
+  assertEquals(plan.remove, [], "the agenda bundle came back");
+  assertEquals(plan.clearSuspects, [docId(2)], "and is no longer a suspect");
+});
+
+Deno.test("a second run the same night is not a second sighting", async () => {
+  const log = await seeded();
+  await commit(log, meeting(1, [1, 3]));
+  const plan = await runWithSuspects(
+    log,
+    [meeting(1, [1, 3])],
+    [{ entityId: docId(2), meetingId: meetingOne, firstSeenAt: lastNight }],
+    new Date("2026-10-14T05:00:00Z"),
+  );
+  assertEquals(plan.remove, [], "two hours later is too soon");
+  assertEquals(plan.clearSuspects, undefined, "and the suspect stays");
+});
+
+Deno.test("a suspect whose meeting did not come back stays a suspect", async () => {
+  const log = await seeded();
+  await commit(log, meeting(1, [1, 3]));
+  const plan = await runWithSuspects(
+    log,
+    [],
+    [{ entityId: docId(2), meetingId: meetingOne, firstSeenAt: lastNight }],
+  );
+  assertEquals(plan.remove, [], "no meeting, no sighting");
+  assertEquals(plan.clearSuspects, undefined, "but nothing is forgotten either");
+});
+
 function probeAnswering(answers: Record<number, SourcePresence>) {
   const asked: number[] = [];
   const probe = (_supplier: string, url: string | undefined): Promise<SourceProbe> => {

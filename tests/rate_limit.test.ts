@@ -178,3 +178,23 @@ Deno.test("a full agenda of page thumbnails fits inside one minute's budget", ()
   // The proxy that streams the whole file is not a thumbnail.
   assertEquals(requestCost(new URL("https://openbesluitvorming.nl/api/entities/doc/pdf")), 1);
 });
+
+Deno.test("a phrase costs a unit per word in it (#348)", () => {
+  const phrase = encodeURIComponent('"motie vreemd aan de orde"');
+  assertEquals(requestCost(searchUrl(`query=${phrase}`)), 6, "five words, five units extra");
+  assertEquals(
+    requestCost(searchUrl(`query=${encodeURIComponent('"fietspad"')}`)),
+    1,
+    "one quoted word is a plain term",
+  );
+  assertEquals(
+    requestCost(searchUrl(`query=${encodeURIComponent('"vreemd aan" orde')}`)),
+    3,
+    "loose words beside a phrase cost nothing extra",
+  );
+  assertEquals(
+    requestCost(searchUrl(`query=${phrase}&limit=100`)),
+    6 + 76 / 250,
+    "the page size is charged on top",
+  );
+});

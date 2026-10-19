@@ -20,19 +20,66 @@ export function normalizeMotionResult(status?: string): MotionEntity["result"] |
   const text = status.toLowerCase();
   // Check "ingetrokken" and "aangehouden" before the aangenomen/verworpen pair:
   // a withdrawn motion is sometimes phrased "ingetrokken, niet aangenomen".
-  if (text.includes("ingetrokken")) {
+  // Fryslân writes its statuses in Frisian ("Ynlutsen", "Oannommen",
+  // "Fersmiten"), which made all 553 of its motions `overig` (#357).
+  if (/ingetrokken|ynlutsen/.test(text)) {
     return "ingetrokken";
   }
   if (text.includes("aangehouden")) {
     return "aangehouden";
   }
-  if (text.includes("aangenomen")) {
+  // A negated adoption is a rejection. Matching "aangenomen" anywhere in the
+  // text turned "Niet aangenomen" into `aangenomen`: 181 rejected motions at
+  // Bronckhorst, Waalre and Brabantse Delta, 107 of them beside a tally with
+  // a majority against (#357, #385). Also "Niet-aangenomen" and the Frisian
+  // "Net oannommen".
+  if (/\b(niet|net)[\s-]+(aangenomen|aanvaard|oannommen)/.test(text)) {
+    return "verworpen";
+  }
+  if (/aangenomen|aanvaard|oannommen/.test(text)) {
     return "aangenomen";
   }
-  if (text.includes("verworpen")) {
+  if (/verworpen|afgewezen|fersmiten/.test(text)) {
     return "verworpen";
   }
   return "overig";
+}
+
+/** Statuses that are deliberately `overig`: they say how far the follow-up
+ * is, or that the vote was tied, not whether the motion was adopted. Counted
+ * on 2026-10-15 across 63 sources: "Afgehandeld" (294), "In behandeling"
+ * (66), "Afgedaan" (56), "Overgenomen" (27), staking van stemmen in five
+ * spellings (#357). */
+const KNOWN_OTHER_STATUS =
+  /afgehandeld|afgedaan|in behandeling|in uitvoering|aangekondigd|overgenomen|vervallen|niet ingediend|openstaand|staking|staakten|gelijke stemming|stûkjende stimmen/;
+
+/** Whether a status maps onto a result we chose, rather than falling through
+ * to `overig` because nobody has seen the spelling yet. A reviewer on #342
+ * pointed out that a new spelling, a dialect or a typo ("Aangneomen") was
+ * indistinguishable from a deliberate `overig`. The public result stays
+ * `overig` either way; the importers log the unmapped ones so a new spelling
+ * is noticed and added here. */
+export function isMappedMotionStatus(status?: string): boolean {
+  if (!status) {
+    return true;
+  }
+  return (
+    normalizeMotionResult(status) !== "overig" || KNOWN_OTHER_STATUS.test(status.toLowerCase())
+  );
+}
+
+/** One log line per unmapped status per run, not per motion. */
+export function createUnmappedStatusReporter(sourceKey: string): (status?: string) => void {
+  const seen = new Set<string>();
+  return (status) => {
+    if (!status || isMappedMotionStatus(status) || seen.has(status)) {
+      return;
+    }
+    seen.add(status);
+    console.warn(
+      JSON.stringify({ level: "warn", event: "motion_status_unmapped", source: sourceKey, status }),
+    );
+  };
 }
 
 export function tallyVotes(votes: MotionVote[]): MotionVoteTally | undefined {
@@ -112,6 +159,55 @@ export function parseMotionDate(value?: string): string | undefined {
     return `${isoFormat[1]}-${isoFormat[2]}-${isoFormat[3]}T00:00:00Z`;
   }
 
+  return undefined;
+}
+
+const DUTCH_MONTHS: Record<string, string> = {
+  januari: "01",
+  februari: "02",
+  maart: "03",
+  april: "04",
+  mei: "05",
+  juni: "06",
+  juli: "07",
+  augustus: "08",
+  september: "09",
+  oktober: "10",
+  november: "11",
+  december: "12",
+};
+
+/** The first calendar date anywhere in a free-text value.
+ *
+ * For an agenda field that is not the `<name> <d-m-yyyy>` shape
+ * parseAgendaPointReference needs. Griffies fill these by hand and the
+ * portal shows Oss's as "Gemeenteraad 2025, donderdag 11 december" (#378),
+ * so beside `29-1-2026` and `2026-01-29` this reads `11 december 2025`, and
+ * `11 december` with the only year elsewhere in the text. */
+export function findDateInText(value?: string): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+  const text = value.toLowerCase();
+  const pad = (part: string) => part.padStart(2, "0");
+
+  const dutchNumeric = text.match(/\b(\d{1,2})-(\d{1,2})-(\d{4})\b/);
+  if (dutchNumeric) {
+    return `${dutchNumeric[3]}-${pad(dutchNumeric[2])}-${pad(dutchNumeric[1])}T00:00:00Z`;
+  }
+  const iso = text.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
+  if (iso) {
+    return `${iso[1]}-${iso[2]}-${iso[3]}T00:00:00Z`;
+  }
+  const monthNames = Object.keys(DUTCH_MONTHS).join("|");
+  const written = text.match(new RegExp(`\\b(\\d{1,2})\\s+(${monthNames})\\b(?:\\s+(\\d{4}))?`));
+  if (written) {
+    const years = [...text.matchAll(/\b(19|20)\d{2}\b/g)].map((match) => match[0]);
+    const year = written[3] ?? (new Set(years).size === 1 ? years[0] : undefined);
+    if (year) {
+      return `${year}-${DUTCH_MONTHS[written[2]]}-${pad(written[1])}T00:00:00Z`;
+    }
+  }
   return undefined;
 }
 

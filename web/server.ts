@@ -26,6 +26,7 @@ import {
   getEntityContent,
   getEntityPdfInfo,
   getIndexStats,
+  queryHasPhrase,
   searchMeetings,
   startStatsRefreshLoop,
 } from "./search_api.ts";
@@ -40,6 +41,9 @@ import { getStatus } from "./status_api.ts";
 import { RATE_LIMIT_PAGE_UNIT, RateLimiter, type RateVerdict, requestCost } from "./rate_limit.ts";
 import { apiError } from "./api_errors.ts";
 import { validateSearchParams } from "./search_params.ts";
+import { entityGoneResponse, sourceKeyOfEntityId } from "./entity_gone.ts";
+import { SearchTimeoutError } from "../src/quickwit/client.ts";
+import { phraseSearchSlots, SearchGate } from "./search_gate.ts";
 import { createOpsHandler, OPS_PATH_PREFIX } from "./ops_api.ts";
 import { fetchExtractorStats } from "./extractors.ts";
 import { SITEMAP_FILE_PATTERN, SITEMAP_INDEX_KEY, SITEMAP_PREFIX } from "../src/exports/sitemap.ts";
@@ -255,6 +259,7 @@ function contentType(pathname: string): string {
   if (pathname.endsWith(".js")) return "application/javascript; charset=utf-8";
   if (pathname.endsWith(".mjs")) return "application/javascript; charset=utf-8";
   if (pathname.endsWith(".json")) return "application/json; charset=utf-8";
+  if (pathname.endsWith(".map")) return "application/json; charset=utf-8";
   if (pathname.endsWith(".svg")) return "image/svg+xml";
   if (pathname.endsWith(".png")) return "image/png";
   if (pathname.endsWith(".ico")) return "image/x-icon";
@@ -618,6 +623,22 @@ async function handleRequest(request: Request): Promise<Response> {
     if (invalidParam) {
       return withServerTiming(invalidParam, requestStart, metrics);
     }
+    let releasePhraseSlot: (() => void) | undefined;
+    if (queryHasPhrase(url.searchParams.get("query") ?? "")) {
+      releasePhraseSlot = phraseSearchGate.tryAcquire();
+      if (!releasePhraseSlot) {
+        const response = apiError(
+          "search_busy",
+          503,
+          "Er lopen al andere zoekvragen met een frase. Probeer het over enkele seconden opnieuw.",
+          {
+            hint: "Zoekvragen met een frase tussen aanhalingstekens zijn zwaar en lopen beperkt tegelijk. Zonder aanhalingstekens zoek je op dezelfde woorden los, en dat kan altijd.",
+          },
+        );
+        response.headers.set("retry-after", String(PHRASE_BUSY_RETRY_AFTER_SECONDS));
+        return withServerTiming(response, requestStart, metrics);
+      }
+    }
     try {
       const results = await measureTiming(metrics, "search", () =>
         searchMeetings({
@@ -635,6 +656,17 @@ async function handleRequest(request: Request): Promise<Response> {
 
       return withServerTiming(Response.json(results), requestStart, metrics);
     } catch (error) {
+      // Too heavy is not broken. A 500 invites the same request again, which
+      // only adds load; this says what to change instead (#348).
+      if (error instanceof SearchTimeoutError) {
+        return withServerTiming(
+          apiError("search_timeout", 504, "Deze zoekvraag duurde te lang.", {
+            hint: "Een frase tussen aanhalingstekens kost tijd per woord, en veel meer bij veelvoorkomende woorden zoals 'de', 'van' of 'aan'. Een organization of periode maakt zo'n frase nauwelijks lichter; minder of zeldzamere woorden in de frase wel. Probeer dezelfde vraag niet ongewijzigd opnieuw.",
+          }),
+          requestStart,
+          metrics,
+        );
+      }
       // Never hand the caller what went wrong verbatim. This used to return the
       // search engine's own message, which carried the generated query with its
       // field names and projection_version, and on the schema-error path an
@@ -664,6 +696,8 @@ async function handleRequest(request: Request): Promise<Response> {
         requestStart,
         metrics,
       );
+    } finally {
+      releasePhraseSlot?.();
     }
   }
 
@@ -877,6 +911,13 @@ async function handleRequest(request: Request): Promise<Response> {
     try {
       const content = await measureTiming(metrics, "content", () => getEntityContent(entityId));
       if (!content) {
+        const sourceKey = sourceKeyOfEntityId(entityId);
+        const gone = sourceKey
+          ? entityGoneResponse((await getExportLog()).getEntityRecord(sourceKey, entityId))
+          : null;
+        if (gone) {
+          return withServerTiming(gone, requestStart, metrics);
+        }
         return withServerTiming(
           apiError("entity_not_found", 404, "Resultaat niet gevonden"),
           requestStart,
@@ -941,6 +982,8 @@ async function handleRequest(request: Request): Promise<Response> {
 const RATE_LIMIT_PER_MINUTE = Number(Deno.env.get("WOOZI_RATE_LIMIT_PER_MIN") ?? "60");
 const rateLimitEnabled = Number.isFinite(RATE_LIMIT_PER_MINUTE) && RATE_LIMIT_PER_MINUTE > 0;
 const rateLimiter = new RateLimiter(RATE_LIMIT_PER_MINUTE);
+const phraseSearchGate = new SearchGate(phraseSearchSlots());
+const PHRASE_BUSY_RETRY_AFTER_SECONDS = 5;
 
 /** Caddy appends the peer it actually observed to X-Forwarded-For, so the
  * rightmost entry is the trustworthy one -- a client-supplied prefix cannot

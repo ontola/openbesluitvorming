@@ -12,7 +12,11 @@ import { listRunnableCatalogSources } from "./sources/index.ts";
 import { currentDerivationVersion, currentProjectionVersion } from "./pipeline/versioning.ts";
 
 const WINDOW_DAYS_BEFORE = 7;
-const WINDOW_DAYS_AFTER = 7;
+/** Councils publish an agenda two to four weeks ahead. With +7 days a
+ * Notubiz meeting appeared only in its own week, so the agenda, the part
+ * that matters most to anyone following a decision, came too late (#345).
+ * Meetings already held come from the cache; the cost is listing. */
+const WINDOW_DAYS_AFTER = 28;
 /** The weekly sweep: the 83 days before the nightly window. Councils attach
  * besluitenlijsten, notulen and answers to a meeting weeks after it took
  * place, when the nightly window has long moved past it, and the weekly

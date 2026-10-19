@@ -375,6 +375,7 @@ export function compactEntityPayload(payload?: WooziEntity): unknown {
     parent: payload.parent,
     agenda: payload.agenda,
     attachment: payload.attachment,
+    source_url: payload.source_url,
   };
 }
 
