@@ -650,8 +650,8 @@ Both endpoints return NDJSON (`application/x-ndjson`): one record per line.
   `payload`; remove the entity from your copy. Since October 2026 a delete
   record says why in `reason`: `"takedown"` (removed on request, e.g. a
   privacy report), `"removed_at_source"` (an import found the document taken
-  off its meeting and the source confirmed it can no longer be downloaded;
-  `meeting_id` names that meeting) or `"source_purged"` (a whole source was
+  off its meeting and the source confirmed it can no longer be downloaded,
+  on two imports at least 12 hours apart; `meeting_id` names that meeting) or `"source_purged"` (a whole source was
   withdrawn). Older delete records have no `reason`. A document removed at
   the source can come back as a new `upsert` if the source publishes it
   again.

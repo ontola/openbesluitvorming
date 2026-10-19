@@ -8,11 +8,14 @@ import type { QuickwitSearchDocument } from "./quickwit/project.ts";
 import { projectEntityCommitToQuickwitDocuments } from "./quickwit/project.ts";
 import {
   appendRunIssue,
+  clearSourceRemovalSuspects,
   createRun,
   findActiveRun,
   getRunIssueCount,
   isDocumentBlocklisted,
   listQueuedRuns,
+  listSourceRemovalSuspects,
+  recordSourceRemovalSuspect,
   updateRun,
 } from "./ops/store.ts";
 import { QuickwitClient } from "./quickwit/client.ts";
@@ -343,7 +346,10 @@ async function retractRemovedDocuments(
     });
 
   try {
-    const plan = removals.plan(maxSourceRemovalsPerRun());
+    const plan = removals.plan(maxSourceRemovalsPerRun(), {
+      suspects: await listSourceRemovalSuspects(source.key),
+    });
+    await clearSourceRemovalSuspects(plan.clearSuspects ?? []);
     for (const meetingId of plan.skippedMeetings) {
       await note(
         "info",
@@ -365,6 +371,12 @@ async function retractRemovedDocuments(
       log: exportLog,
       probe: probeDocumentAtSource,
     });
+    // The supplier serves it again: whatever the first sighting was, it is over.
+    await clearSourceRemovalSuspects(
+      confirmed.kept
+        .filter((entry) => entry.firstSeenAt && entry.probe?.presence === "live")
+        .map((entry) => entry.entityId),
+    );
     for (const entry of confirmed.kept) {
       await note(
         "info",
@@ -375,24 +387,37 @@ async function retractRemovedDocuments(
         { meeting_id: entry.meetingId, probe: entry.probe, control: confirmed.control },
       );
     }
-    if (confirmed.remove.length === 0) {
+    const firstSightings = confirmed.remove.filter((entry) => !entry.firstSeenAt);
+    for (const entry of firstSightings) {
+      await recordSourceRemovalSuspect(source.key, entry);
+      await note(
+        "info",
+        "Van de agenda gehaald en weg bij de bron; wordt ingetrokken als een volgende run hetzelfde ziet.",
+        entry.entityId,
+        { meeting_id: entry.meetingId, probe: entry.probe, control: confirmed.control },
+      );
+    }
+    const retract = confirmed.remove.filter((entry) => entry.firstSeenAt);
+    if (retract.length === 0) {
       return;
     }
-    const outcomes = await retractDocumentsGoneAtSource(confirmed.remove, {
+    const outcomes = await retractDocumentsGoneAtSource(retract, {
       quickwit,
       storage: await ObjectStorageClient.fromEnvironment(),
       exportLog,
     });
     for (const outcome of outcomes) {
-      const entry = confirmed.remove.find((candidate) => candidate.entityId === outcome.entityId)!;
+      const entry = retract.find((candidate) => candidate.entityId === outcome.entityId)!;
       const details = {
         meeting_id: entry.meetingId,
+        first_seen_at: entry.firstSeenAt,
         probe: entry.probe,
         control: confirmed.control,
         reached: outcome.reached,
         ...(outcome.error ? { error: outcome.error } : {}),
       };
       if (outcome.reached === "deleted" && !outcome.error) {
+        await clearSourceRemovalSuspects([outcome.entityId]);
         await note("info", "Ingetrokken: verwijderd bij de bron.", outcome.entityId, details);
       } else {
         await note(
