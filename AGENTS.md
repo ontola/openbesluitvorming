@@ -156,10 +156,13 @@ Current implemented slices:
   the one in the export log; a dropped document is retracted only after the
   supplier confirms it is gone (`src/documents/source_presence.ts`, the same
   calibration the sweep uses) and a still-listed document of the same run
-  answers "live". iBabs and Notubiz only. A meeting that lost every document
+  answers "live", and only on the second such sighting, at least 12 hours
+  after the first (`source_removal_suspect` in the ops SQLite,
+  `WOOZI_SOURCE_REMOVALS_MIN_HOURS`). iBabs rebuilds agenda bundles during
+  the day under the same id; one night was not enough (#380). iBabs and Notubiz only. A meeting that lost every document
   is left alone, and a run with more than `WOOZI_SOURCE_REMOVALS_MAX_PER_RUN`
   (default 25) candidates removes nothing. `WOOZI_SOURCE_REMOVALS=0` turns it
-  off. It only sees meetings inside the run's window, so the daily -7..+7
+  off. It only sees meetings inside the run's window, so the daily -7..+28
   days.
 - A retraction leaves a trail: the tombstone carries `reason:
   "removed_at_source"` and `meeting_id`, and every retracted, kept or half
@@ -183,7 +186,7 @@ Current implemented slices:
   `docs_internal/bsn-takedown.md` ("Stap 6") for the per-supplier
   "genuinely gone" calibration and the org-wide-outage-vs-real-deletion
   distinction.
-- The scheduler (`src/scheduler.ts`) enqueues a -7..+7 day window for every
+- The scheduler (`src/scheduler.ts`) enqueues a -7..+28 day window for every
   source nightly, and on Saturday night also the 90..8 days before it. That
   sweep catches documents attached to a meeting weeks after it took place
   (besluitenlijsten, notulen), which the nightly window never sees again.

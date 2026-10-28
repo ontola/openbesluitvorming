@@ -35,12 +35,13 @@ Planning something that makes a lot of requests? See [Rate limits](#rate-limits)
 continuously (a token bucket, not a fixed window — you do not have to wait for a
 minute boundary).
 
-Most requests cost **1 unit**. Two exceptions:
+Most requests cost **1 unit**. The exceptions:
 
 | Request | Cost |
 |---------|------|
 | `/api/search` with `limit=24` or lower (the default) | 1 unit |
 | `/api/search` with a higher `limit` | 1 unit, plus 1 further unit per 250 results above the first 24 — so `limit=100` costs 1.3 |
+| `/api/search` with a quoted phrase of two words or more | 1 further unit per word in the phrase — `query="motie vreemd aan de orde"` costs 6 |
 | `/api/entities/{id}/pdf/page/{n}` | 1/8 unit — a long agenda's thumbnails should not drain your budget |
 
 Nearly all of a search's cost is the query itself, evaluated over the index, and
@@ -48,6 +49,19 @@ that is charged once whatever the page size; the rows it returns add about 1/250
 of it each. So **asking for fewer, larger pages is the cheap way to read in
 bulk**: 1000 results at `limit=100` costs 13 units, where paging the same 1000
 at the default size costs 42.
+
+A phrase is the exception to "the query is charged once": before the search
+engine evaluates it, it loads the word positions of every word in it from the
+whole index, and limiting the search to an `organization` or a period does not
+avoid that. Words that occur everywhere, such as "de", "van" or "aan", make a
+phrase heavy. Only a few phrase searches run at the same time; when they are
+all taken, a phrase search is refused at once with 503 `search_busy` and a
+`Retry-After` header. The same words without quotes are an ordinary search.
+
+A search has one time budget, about 8 seconds, for all the work behind its
+answer. When the estimate of `totalCount` does not fit in what is left of it,
+`totalCount` is the cruder estimate from the rows already read, still marked
+`totalIsApproximate: true`.
 
 Harvesting the whole corpus is better served by the [bulk export API](#bulk-export) than
 by paging through search.
@@ -112,6 +126,7 @@ added as needed; an existing one is not renamed or removed without a note here.
 | `invalid_limit` | 400 | `limit` is not an integer, or is below 1 |
 | `invalid_offset` | 400 | `offset` is not an integer, or is negative |
 | `unsupported_phrase_slop` | 400 | `query` uses the proximity notation `"a b"~10` |
+| `missing_query` | 400 | neither `query` nor `organization` was given; the hint names any parameter the API does not know, such as `q` |
 | `invalid_page_number` | 400 | the page number in a PDF page URL is not a positive integer |
 | `invalid_scale` | 400 | `scale` on a PDF page URL is not `1` or `2` |
 | `missing_export_source` | 400 | an export call omitted `source` |
@@ -120,8 +135,11 @@ added as needed; an existing one is not renamed or removed without a note here.
 | `entity_not_found` | 404 | no entity with that id |
 | `pdf_not_found` | 404 | the entity exists but carries no PDF |
 | `pdf_page_not_found` | 404 | the PDF exists but has no such page |
+| `entity_removed` | 410 | the entity was removed; the body carries `reason` (as on a delete record in the change feed), `removedAt` and, for a document removed at the source, `meetingId` |
 | `rate_limited` | 429 | budget spent; see [Rate limits](#rate-limits) |
 | `search_failed` | 500 | the search could not be completed |
+| `search_busy` | 503 | the slots for phrase searches are all taken; retry after `Retry-After` seconds, or search the same words without quotes |
+| `search_timeout` | 504 | the search did not finish within its time budget; for a phrase, use fewer or rarer words rather than retrying it unchanged (an `organization` or period helps a phrase little, see [Rate limits](#rate-limits)) |
 | `stats_failed` | 500 | `/api/stats` could not be assembled |
 | `status_failed` | 500 | `/api/status` could not be assembled |
 | `export_failed` | 500 | an export page could not be read |
@@ -233,12 +251,19 @@ depends on the type of result:
 |------|---------------|
 | Meeting | The meeting's start, as scheduled by the organization |
 | Document | The start of the meeting at which the document was (last) discussed. A register document (ingekomen stukken, raadsvragen, toezeggingen) gets the date of its register entry, the day the questions were asked; the entity detail also carries `dateModified`, the day the source system last changed the entry, which for questions is the day the answer was added |
-| Motion | The meeting at which the motion was last discussed, else the date the source system gives it |
+| Motion | The meeting at which the motion was last discussed; else the day its agenda field names; else a date field of the motion (submitted, discussed); else, for iBabs, the day the source system last changed the entry |
 | Recording | The start of the meeting it records |
 
 It is never the date a document was written or published by its author: the
 source systems do not expose that reliably. The value is a UTC timestamp; the
 underlying local time is Dutch time (CET/CEST).
+
+A result can lack a date. It then has no `sortDate`, `date` reads "Datum
+onbekend", a date sort puts it last in either direction, and `dateFrom` or
+`dateTo` never return it, so a window that counts zero does not prove there is
+nothing from that period. Until October 2026 this applied to about 3,000 iBabs
+motions, whose date sat in a field the import did not read (#378); they get a
+date as each one is imported again.
 
 ## Index statistics
 
@@ -427,6 +452,20 @@ recordings of it, a motion with its outcome and votes.
 
 > **Note:** `entity_id` values contain colons. URL-encode them: `document:notubiz:gemeente:soest:12345` → `document%3Anotubiz%3Agemeente%3Asoest%3A12345`.
 
+An entity that was removed answers `410` with code `entity_removed` instead of `404`, with the same `reason` a delete record in the change feed carries, `removedAt`, and for a document the source took off a meeting, `meetingId`:
+
+```json
+{
+  "code": "entity_removed",
+  "error": "De bron stelt dit document niet meer beschikbaar. Neem voor de inhoud contact op met de griffie.",
+  "reason": "removed_at_source",
+  "removedAt": "2026-10-10T01:50:40.454Z",
+  "meetingId": "meeting:ibabs:gemeente:harderwijk:7566f1e5-d552-4bcb-b2f5-7fc2303b44d6"
+}
+```
+
+`404` keeps meaning that no entity with that id was ever exported.
+
 **Example:**
 
 ```bash
@@ -448,7 +487,8 @@ curl "https://openbesluitvorming.nl/api/entities/document%3Anotubiz%3Agemeente%3
   "downloadUrl": "https://...",
   "contentType": "application/pdf",
   "pdfUrl": "https://...",
-  "meetingId": "meeting:notubiz:gemeente:soest:830424"
+  "meetingId": "meeting:notubiz:gemeente:soest:830424",
+  "sourceUrl": "https://api.notubiz.nl/document/12345/1"
 }
 ```
 
@@ -463,6 +503,7 @@ curl "https://openbesluitvorming.nl/api/entities/document%3Anotubiz%3Agemeente%3
   "organization": "Soest",
   "date": "7 november 2024",
   "sortDate": "2024-11-07 20:00:00",
+  "sourceUrl": "https://soest.notubiz.nl/vergadering/830424/Raadsvergadering",
   "agenda": [
     {
       "id": "...",
@@ -513,6 +554,8 @@ curl "https://openbesluitvorming.nl/api/entities/document%3Anotubiz%3Agemeente%3
   ]
 }
 ```
+
+`sourceUrl` is where the entity is published at the source: for a meeting the supplier's portal page, which has documents published after our last import and, during the meeting, the live stream; for a document the supplier's own file, the same address as `original_url`. Notubiz meetings carry it from their next import on; iBabs meetings link to `https://<site>.bestuurlijkeinformatie.nl/Agenda/Index/<id>`. It is absent when the source gives none.
 
 `original_url` is the supplier's own link and for part of iBabs answers `403` for a document we hold. A document that looks like a PDF also carries `downloadUrl`, a path on this API that serves our stored copy; prefer it over `original_url`.
 
@@ -607,8 +650,8 @@ Both endpoints return NDJSON (`application/x-ndjson`): one record per line.
   `payload`; remove the entity from your copy. Since October 2026 a delete
   record says why in `reason`: `"takedown"` (removed on request, e.g. a
   privacy report), `"removed_at_source"` (an import found the document taken
-  off its meeting and the source confirmed it can no longer be downloaded;
-  `meeting_id` names that meeting) or `"source_purged"` (a whole source was
+  off its meeting and the source confirmed it can no longer be downloaded,
+  on two imports at least 12 hours apart; `meeting_id` names that meeting) or `"source_purged"` (a whole source was
   withdrawn). Older delete records have no `reason`. A document removed at
   the source can come back as a new `upsert` if the source publishes it
   again.
@@ -646,8 +689,8 @@ curl "https://openbesluitvorming.nl/api/search?query=woningbouw&entityType=Motio
 ```
 
 Add `organization=<source key>` to scope to one municipality. Note that a
-search **requires a `query`** — an empty query returns no results for any
-entity type.
+search **requires a `query` or an `organization`**: without both the API
+answers `400` with `missing_query`.
 
 ### Fetch one motion
 
@@ -683,7 +726,11 @@ The response carries a `motion` object:
 ```
 
 `result` is normalised to `aangenomen`, `verworpen`, `ingetrokken`,
-`aangehouden` or `overig`; `status` keeps the supplier's own wording.
+`aangehouden` or `overig`; `status` keeps the supplier's own wording. `overig`
+also covers a status that describes the follow-up rather than the vote
+("Afgehandeld", "In behandeling") and a tie. A motion with `tally` and no
+`result` is usually one whose source left the status field empty: the vote
+is there, the outcome was not written down.
 
 ### The text of a motion
 
