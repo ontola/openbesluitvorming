@@ -36,6 +36,7 @@ import {
   pdfPageMetaKey,
   renderPdfPageJpeg,
 } from "../src/documents/thumbnails.ts";
+import { annotateApiSpan } from "./client_telemetry.ts";
 import { getStatus } from "./status_api.ts";
 import { RATE_LIMIT_PAGE_UNIT, RateLimiter, type RateVerdict, requestCost } from "./rate_limit.ts";
 import { apiError } from "./api_errors.ts";
@@ -992,6 +993,8 @@ const handleOpsRequest = createOpsHandler({ token: Deno.env.get("WOOZI_OPS_TOKEN
 
 Deno.serve({ port }, async (request, info) => {
   const url = new URL(request.url);
+  // Before the rate limiter, so a refused request still says who was refused.
+  await annotateApiSpan(request, url.pathname, clientKey(request, info?.remoteAddr));
   if (url.pathname.startsWith(OPS_PATH_PREFIX) || url.pathname === "/api/ops") {
     return await handleOpsRequest(request, clientKey(request, info?.remoteAddr));
   }
