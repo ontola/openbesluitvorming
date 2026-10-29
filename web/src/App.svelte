@@ -2333,6 +2333,12 @@
               </span>
             {/if}
           </p>
+          <p>
+            Bij verzoeken aan de API leggen we de user agent vast en een code die uit je IP-adres is berekend met een
+            sleutel die elke dag wordt vervangen. Zo zien we hoeveel verschillende programma's de API gebruiken en
+            wie we moeten waarschuwen bij wijzigingen. Na die dag is de code niet meer terug te leiden tot een
+            IP-adres. Deze gegevens bewaren we 15 dagen bij onze monitoringdienst SigNoz, in de EU.
+          </p>
 
           <h2>Disclaimer</h2>
           <p>
