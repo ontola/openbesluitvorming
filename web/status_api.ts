@@ -230,6 +230,8 @@ function toSourceCoverage(check: CoverageCheckRecord): SourceCoverage {
           // ending in 2022 or 2025).
           null,
     lowerBound: check.warnings > 0,
+    failedRequests: check.warnings,
+    supplierMeetings: check.supplier_meetings,
     missingSample: check.missing_sample,
   };
 }
