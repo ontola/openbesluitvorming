@@ -955,6 +955,16 @@ export interface SourceCoverage {
   missingDocuments: number | null;
   ratio: number | null;
   lowerBound: boolean;
+  /** Supplier requests that failed during the check. Why `lowerBound` is set,
+   * and how much it matters: two failed requests out of thousands are noise,
+   * half of them makes `supplierDocuments` meaningless. Absent when `error`
+   * is set. */
+  failedRequests?: number;
+  /** Meetings the supplier listed in the window, so a drop in
+   * `supplierDocuments` between two checks can be told apart from a drop in
+   * meetings (a check that lost part of its listing). Absent when `error` is
+   * set. */
+  supplierMeetings?: number;
   /** A few of the missing document ids, for a human to verify. */
   missingSample: string[];
   /** Set when the check itself failed for this source. */
