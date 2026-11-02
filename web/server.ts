@@ -39,6 +39,7 @@ import {
 } from "../src/documents/thumbnails.ts";
 import { getStatus } from "./status_api.ts";
 import { RATE_LIMIT_PAGE_UNIT, RateLimiter, type RateVerdict, requestCost } from "./rate_limit.ts";
+import { applySearchNotice, UsageTracker } from "./usage_log.ts";
 import { apiError } from "./api_errors.ts";
 import { validateSearchParams } from "./search_params.ts";
 import { entityGoneResponse, sourceKeyOfEntityId } from "./entity_gone.ts";
@@ -1033,6 +1034,17 @@ function rateLimitedResponse(verdict: RateVerdict): Response {
 // smaller budget (see ops_api.ts). Unset token: the route answers 404.
 const handleOpsRequest = createOpsHandler({ token: Deno.env.get("WOOZI_OPS_TOKEN") });
 
+// One `api_usage` log line per ten minutes: who calls the API, from the site
+// or from a script (see usage_log.ts). WOOZI_USAGE_LOG=0 turns it off.
+const usageTracker =
+  Deno.env.get("WOOZI_USAGE_LOG") === "0"
+    ? null
+    : new UsageTracker((summary) => console.log(JSON.stringify(summary)));
+if (usageTracker) {
+  // Closes a window on a quiet server too. unref: never keeps the process up.
+  Deno.unrefTimer(setInterval(() => usageTracker.rollIfDue(), 60_000));
+}
+
 Deno.serve({ port }, async (request, info) => {
   const url = new URL(request.url);
   if (url.pathname.startsWith(OPS_PATH_PREFIX) || url.pathname === "/api/ops") {
@@ -1043,8 +1055,9 @@ Deno.serve({ port }, async (request, info) => {
     rateLimitEnabled && url.pathname.startsWith("/api/") && !url.pathname.startsWith("/api/admin/");
 
   let verdict: RateVerdict | null = null;
+  const client = clientKey(request, info?.remoteAddr);
   if (rateLimited) {
-    const key = clientKey(request, info?.remoteAddr);
+    const key = client;
     verdict = rateLimiter.consume(key, requestCost(url));
     if (!verdict.allowed) {
       if (verdict.shouldLog) {
@@ -1059,7 +1072,10 @@ Deno.serve({ port }, async (request, info) => {
           }),
         );
       }
-      return rateLimitedResponse(verdict);
+      const limitedResponse = rateLimitedResponse(verdict);
+      applySearchNotice(request, limitedResponse);
+      usageTracker?.record(request, client, limitedResponse.status);
+      return limitedResponse;
     }
   }
 
@@ -1067,6 +1083,8 @@ Deno.serve({ port }, async (request, info) => {
   if (verdict) {
     applyRateLimitHeaders(response, verdict);
   }
+  applySearchNotice(request, response);
+  usageTracker?.record(request, client, response.status);
   logRequestPerformance(request, response);
   return response;
 });
