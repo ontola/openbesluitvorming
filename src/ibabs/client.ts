@@ -122,6 +122,11 @@ const xmlParser = new XMLParser({
   attributeNamePrefix: "",
   parseTagValue: false,
   trimValues: true,
+  // iBabs writes a line break in free text as `&#xD;`. Without this the
+  // parser leaves numeric references alone, so `&#xD;` reached 14.6% of
+  // motion summaries and 44% of agenda descriptions as literal text, and
+  // `&#235;` sat in titles (#376). Named references stay as before.
+  htmlEntities: true,
   processEntities: {
     enabled: true,
     maxTotalExpansions: 100000,

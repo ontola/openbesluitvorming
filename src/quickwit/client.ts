@@ -34,17 +34,31 @@ type QuickwitSearchResponse = {
   aggregations?: Record<string, unknown>;
 };
 
+/** Whether a failed search is worth a second attempt.
+ *
+ * A timeout is not. A query that took the whole budget once takes it again,
+ * and Quickwit keeps working on the abandoned one, so the retry doubled both
+ * the wait and the load: a heavy nationwide phrase answered HTTP 500 after
+ * twice the 8 s budget (#348). It now fails once, as a SearchTimeoutError the
+ * API can answer for what it is. */
 function isRetryableSearchError(error: unknown): boolean {
   if (!(error instanceof Error)) {
     return false;
   }
 
   return (
-    error.name === "TimeoutError" ||
     error.name === "AbortError" ||
     error.message.includes("Quickwit request failed 500") ||
     error.message.includes("No such file or directory")
   );
+}
+
+/** A search that did not finish within QUICKWIT_SEARCH_TIMEOUT_MS. */
+export class SearchTimeoutError extends Error {
+  constructor(readonly timeoutMs: number) {
+    super(`Quickwit search exceeded ${timeoutMs} ms`);
+    this.name = "SearchTimeoutError";
+  }
 }
 
 /** Whether an ingest is worth trying again.
@@ -187,7 +201,8 @@ export function getIngestCommitMode(): IngestCommitMode {
   return value as IngestCommitMode;
 }
 
-function getSearchTimeoutMs(): number {
+/** The time one public search may spend in Quickwit, across all its requests. */
+export function getSearchTimeoutMs(): number {
   const value = Number(Deno.env.get("QUICKWIT_SEARCH_TIMEOUT_MS") ?? DEFAULT_SEARCH_TIMEOUT_MS);
   return Number.isFinite(value) && value > 0 ? value : DEFAULT_SEARCH_TIMEOUT_MS;
 }
@@ -446,8 +461,14 @@ export class QuickwitClient {
     });
   }
 
-  async searchRequest(body: QuickwitSearchRequest): Promise<QuickwitSearchResponse> {
+  /** `timeoutMs` narrows the budget for this request, so a caller that makes
+   * several requests for one answer can keep their total within one budget. */
+  async searchRequest(
+    body: QuickwitSearchRequest,
+    options: { timeoutMs?: number } = {},
+  ): Promise<QuickwitSearchResponse> {
     const attempts = getSearchAttempts();
+    const timeoutMs = Math.max(1, Math.min(options.timeoutMs ?? Infinity, getSearchTimeoutMs()));
     let lastError: unknown;
 
     for (let attempt = 1; attempt <= attempts; attempt += 1) {
@@ -459,11 +480,14 @@ export class QuickwitClient {
             headers: {
               "content-type": "application/json",
             },
-            signal: AbortSignal.timeout(getSearchTimeoutMs()),
+            signal: AbortSignal.timeout(timeoutMs),
             body: JSON.stringify(body),
           },
         );
       } catch (error) {
+        if (error instanceof Error && error.name === "TimeoutError") {
+          throw new SearchTimeoutError(timeoutMs);
+        }
         lastError = error;
         if (attempt === attempts || !isRetryableSearchError(error)) {
           throw error;
@@ -511,4 +535,4 @@ export class QuickwitClient {
   }
 }
 
-export const __test__ = { isRetryableIngestError, shouldHalveBatch };
+export const __test__ = { isRetryableIngestError, isRetryableSearchError, shouldHalveBatch };

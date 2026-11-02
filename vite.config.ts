@@ -11,6 +11,11 @@ export default defineConfig({
   build: {
     outDir: "dist",
     emptyOutDir: true,
+    // Published next to the bundle, with the sourceMappingURL left in. A
+    // browser only fetches a map while its developer tools are open, and the
+    // source is public anyway; without it a production error is a column in a
+    // 44-line file (#352).
+    sourcemap: true,
     rollupOptions: {
       input: {
         main: "web/index.html",

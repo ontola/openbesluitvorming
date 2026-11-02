@@ -5,6 +5,7 @@ import os
 import json
 import shutil
 import tempfile
+import threading
 import time
 from pathlib import Path
 
@@ -117,6 +118,40 @@ def fallback_chunks_with_pymupdf(input_path: Path, max_pages: int) -> list[dict]
     return chunks
 
 
+def _letters(text: str) -> int:
+    return sum(1 for character in text if character.isalnum())
+
+
+# A page whose markdown keeps less than this share of the letters PyMuPDF's
+# plain text finds is read as plain text instead. pymupdf4llm below 1.0 drops
+# text that touches a drawing or image it treats as a picture (Word's
+# page-sized white rectangle, a background image over 78% of the page, cells
+# drawn as filled rectangles), invisible text beside visible text, and text
+# that does not run horizontally. Voerendaal's six-page besluitenlijst came
+# out empty (#356). Markdown keeps headings and tables, so it stays the first
+# choice whenever it holds the text.
+MIN_MARKDOWN_SHARE = 0.5
+MIN_PLAIN_LETTERS = 100
+
+
+def recover_lost_text(pdf_path: Path, chunks: list[dict]) -> list[int]:
+    """Replace, in place, every chunk whose markdown lost most of the page's
+    text with PyMuPDF's plain text. Returns the page numbers replaced."""
+    replaced: list[int] = []
+    with pymupdf.open(str(pdf_path)) as document:
+        for chunk in chunks:
+            page = document.load_page(chunk["page_number"] - 1)
+            plain = normalize_text(page.get_text("text"))
+            plain_letters = _letters(plain)
+            if plain_letters < MIN_PLAIN_LETTERS:
+                continue
+            if _letters(chunk["markdown"]) >= MIN_MARKDOWN_SHARE * plain_letters:
+                continue
+            chunk["markdown"] = plain
+            replaced.append(chunk["page_number"])
+    return replaced
+
+
 def markdown_chunks(pdf_path: Path, pages: list[int]) -> list[dict]:
     """Per-page markdown chunks; the page-level DocumentPage index (and the
     'jump to matched page' feature in the GUI) depends on these."""
@@ -157,12 +192,32 @@ class ExtractRequest(BaseModel):
     max_pages: int = MAX_PAGES_DEFAULT
 
 
+# One PDF at a time per process. PyMuPDF does not support threads, and up to
+# 1.28.0 its table detection keeps the characters and ruling lines of the page
+# it is reading in module-level lists (EDGES, CHARS in table.py). Since
+# materialize_document moved into asyncio.to_thread (31 July 2026), two
+# requests in one uvicorn worker read pages at the same time and took each
+# other's characters and table grids: Castricum's besluitenlijst carried a
+# passage from a De Ronde Venen inspraakreactie, and some 6% of the documents
+# read in October were damaged (#371). Download and upload stay concurrent;
+# only the parsing below is serialised, and the processes uvicorn runs side by
+# side still read in parallel.
+_pdf_lock = threading.Lock()
+
+
 def materialize_document(
     pdf_bytes: bytes, max_pages: int, want_thumbnail: bool
 ) -> tuple[int, list[dict], str, bytes | None, list[str]]:
     """Blocking half of an extraction: write the PDF, parse it, build the
     per-page markdown and optionally the thumbnail. Kept synchronous and run
     via asyncio.to_thread by the caller, so it cannot stall the event loop."""
+    with _pdf_lock:
+        return _materialize_document(pdf_bytes, max_pages, want_thumbnail)
+
+
+def _materialize_document(
+    pdf_bytes: bytes, max_pages: int, want_thumbnail: bool
+) -> tuple[int, list[dict], str, bytes | None, list[str]]:
     warnings: list[str] = []
     WORK_ROOT.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(dir=WORK_ROOT) as work_dir:
@@ -181,6 +236,13 @@ def materialize_document(
 
         try:
             page_chunks = markdown_chunks(pdf_path, pages)
+            replaced = recover_lost_text(pdf_path, page_chunks)
+            if replaced:
+                warnings.append(
+                    "pymupdf4llm left out most of the text on page(s) "
+                    + ", ".join(str(number) for number in replaced)
+                    + "; used plain pymupdf text there."
+                )
         except Exception as error:
             warnings.append(
                 f"pymupdf4llm failed, falling back to plain pymupdf extraction: {error}"

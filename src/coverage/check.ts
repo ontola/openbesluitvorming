@@ -20,6 +20,8 @@
 import { GemeenteOplossingenClient } from "../gemeenteoplossingen/client.ts";
 import { normalizeGoDocuments, normalizeGoMeeting } from "../gemeenteoplossingen/normalize.ts";
 import { IbabsClient } from "../ibabs/client.ts";
+import { listMeetingsAdaptive } from "../ibabs/extractor.ts";
+import { belongsToSiteSibling, ibabsSiteSiblingLabels } from "../ibabs/shared_site.ts";
 import {
   normalizeIbabsDocuments,
   normalizeIbabsMeeting,
@@ -234,9 +236,17 @@ async function listIbabs(
     listing.warnings.push(`meeting types: ${errorText(error)}`);
   }
 
-  for (const rawMeeting of await client.listMeetingsByDateRange(source, dateFrom, dateTo)) {
+  // The same rules as the import, or the check counts what the import was
+  // told to leave: a year in one call is what the large sites time out on
+  // (#309), and on a shared site the sibling's meetings are not ours (#339).
+  const siteSiblings = ibabsSiteSiblingLabels(source);
+  const rawMeetings = await listMeetingsAdaptive(client, source, dateFrom, dateTo, async () => {});
+  for (const rawMeeting of rawMeetings) {
     try {
       const meeting = normalizeIbabsMeeting(source, rawMeeting, meetingTypes);
+      if (belongsToSiteSibling(meeting.name, source.label, siteSiblings)) {
+        continue;
+      }
       listing.meetings += 1;
       for (const document of normalizeIbabsDocuments(source, meeting)) {
         listing.documentIds.add(document.id);
@@ -255,7 +265,7 @@ async function listIbabs(
   }
   const motionPattern = /moties?|amendement|stemming/i;
   for (const list of lists) {
-    if (!list.ListName?.trim()) {
+    if (!list.ListName?.trim() || belongsToSiteSibling(list.ListName, source.label, siteSiblings)) {
       continue;
     }
     let entries;

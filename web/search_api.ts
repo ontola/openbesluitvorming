@@ -18,7 +18,7 @@ import {
   projectionSupportsDateSort,
   projectionSupportsPhraseSearch,
 } from "../src/pipeline/versioning.ts";
-import { QuickwitClient } from "../src/quickwit/client.ts";
+import { getSearchTimeoutMs, QuickwitClient, SearchTimeoutError } from "../src/quickwit/client.ts";
 import { listCatalogSources } from "../src/sources/catalog.ts";
 import { getProjectableSource, getSource, listSources } from "../src/sources/index.ts";
 import { ObjectStorageClient } from "../src/storage/s3.ts";
@@ -43,6 +43,7 @@ type SearchHit = {
   source_key?: string;
   payload?: {
     original_url?: string;
+    source_url?: string;
     media_urls?: Array<{
       url?: string;
       content_type?: string;
@@ -658,7 +659,13 @@ function summarizeContent(content?: string): string {
     return "Geen samenvatting beschikbaar.";
   }
 
-  const compact = content.replaceAll(/\s+/g, " ").trim();
+  // The same cleaning as a snippet gets. Without a search term there is no
+  // snippet, and Notubiz's `<p>` and `&nbsp;` and iBabs's `&#xD;` went into
+  // `summary` as they were (#376).
+  const compact = decodeNumericReferences(decodeHtmlEntities(content))
+    .replaceAll(/<[^>]*>/g, " ")
+    .replaceAll(/\s+/g, " ")
+    .trim();
   if (compact.length <= 240) {
     return compact;
   }
@@ -718,6 +725,22 @@ function decodeHtmlEntities(value: string): string {
   });
 }
 
+/** A second round for numeric references only. Rows indexed before the
+ * iBabs parser decoded them carry `&#xD;`, which reaches a snippet escaped as
+ * `&amp;#xD;` and survives the one round above (#376). No council text means
+ * a literal `&#13;`, unlike `&lt;`, so this round cannot eat real content. */
+function decodeNumericReferences(value: string): string {
+  return value.replaceAll(/&#(x[0-9a-f]+|[0-9]+);/gi, (match, body: string) => {
+    const codePoint =
+      body[0] === "x" || body[0] === "X"
+        ? Number.parseInt(body.slice(1), 16)
+        : Number.parseInt(body, 10);
+    return Number.isFinite(codePoint) && codePoint > 0 && codePoint <= 0x10ffff
+      ? String.fromCodePoint(codePoint)
+      : match;
+  });
+}
+
 /** Quickwit marks the matched terms with `<b>`; everything around them is text
  * that may itself contain markup from the source document. So the highlight is
  * set aside, the rest is decoded and stripped back to prose, and only then is
@@ -734,7 +757,9 @@ function sanitizeSnippet(snippet?: string): { text: string; html: string } | und
     .replaceAll("<b>", HIGHLIGHT_OPEN)
     .replaceAll("</b>", HIGHLIGHT_CLOSE);
 
-  const asProse = stripMarkdownPreviewSyntax(decodeHtmlEntities(withPlaceholders))
+  const asProse = stripMarkdownPreviewSyntax(
+    decodeNumericReferences(decodeHtmlEntities(withPlaceholders)),
+  )
     // Whatever markup the source carried is not part of a text preview. A
     // `<br>` used to be shown to the reader as those four characters.
     .replaceAll(/<[^>]*>/g, "")
@@ -873,6 +898,10 @@ function dedupeLatestIndexedHits(items: IndexedHit[]): IndexedHit[] {
  * order the user did not choose. */
 const RATIO_SAMPLE_ROWS = 2000;
 
+/** Below this much budget the count is not attempted: it would only time out
+ * and leave the scan's own figure anyway. */
+const MIN_ESTIMATE_BUDGET_MS = 500;
+
 /** Estimate how many results a capped scan would have produced.
  *
  * Two things made this number move (#265): the same query showed 146,881,
@@ -897,26 +926,47 @@ async function estimateTotal(
   queryString: string,
   sortBy: string | undefined,
   scan: { scannedRows: number; scannedResults: number; fallbackRows: number },
+  budget: { deadline: number; phrase: boolean },
 ): Promise<number> {
   let rows = scan.fallbackRows;
+  let ratio = scan.scannedResults > 0 ? scan.scannedRows / scan.scannedResults : 1;
+
+  // The count and the sample are each a full Quickwit query, and each loads
+  // every searched word's postings from every split again before it runs
+  // (#348). For a phrase that means the positions of words like "de" and
+  // "van": one nationwide three-word phrase spent 5.5 s on the scan and 19 s
+  // in all (measured 2026-10-16). So both share what is left of the one
+  // search budget, a phrase skips the sample, and a count that ran out of
+  // time is not followed by a sample that would run out too.
+  let remaining = budget.deadline - performance.now();
+  if (remaining < MIN_ESTIMATE_BUDGET_MS) {
+    return roundEstimate(rows / Math.max(ratio, 1));
+  }
   try {
-    const counted = await quickwit.searchRequest({
-      query: queryString,
-      max_hits: 0,
-      count_all: true,
-    });
+    const counted = await quickwit.searchRequest(
+      { query: queryString, max_hits: 0, count_all: true },
+      { timeoutMs: remaining },
+    );
     rows = counted.num_hits;
   } catch {
     // The scan's own num_hits stays as the fallback; it is at least a number.
+    return roundEstimate(rows / Math.max(ratio, 1));
   }
 
   // The scan's own sample is only usable when it is both relevance-ordered
   // and large enough. A first page stops after a few dozen rows, and 32 rows
   // are not a ratio: measured on production, 447,000 from the scan against
   // 195,000 from a proper sample for the same query.
-  let ratio = scan.scannedResults > 0 ? scan.scannedRows / scan.scannedResults : 1;
-  if (sortBy || scan.scannedRows < RATIO_SAMPLE_ROWS) {
-    const sampled = await sampledRowsPerResult(quickwit, queryString);
+  //
+  // A phrase keeps the scan's ratio whatever it is worth. The estimate then
+  // moves a little with the sort again (#265), which is the smaller cost.
+  remaining = budget.deadline - performance.now();
+  if (
+    !budget.phrase &&
+    remaining >= MIN_ESTIMATE_BUDGET_MS &&
+    (sortBy || scan.scannedRows < RATIO_SAMPLE_ROWS)
+  ) {
+    const sampled = await sampledRowsPerResult(quickwit, queryString, remaining);
     if (sampled !== undefined) {
       ratio = sampled;
     }
@@ -935,6 +985,7 @@ const RATIO_CACHE_MAX = 500;
 async function sampledRowsPerResult(
   quickwit: QuickwitClient,
   queryString: string,
+  timeoutMs: number,
 ): Promise<number | undefined> {
   const now = Date.now();
   const cached = ratioCache.get(queryString);
@@ -942,11 +993,10 @@ async function sampledRowsPerResult(
     return cached.ratio;
   }
   try {
-    const sample = await quickwit.searchRequest({
-      query: queryString,
-      max_hits: RATIO_SAMPLE_ROWS,
-      count_all: false,
-    });
+    const sample = await quickwit.searchRequest(
+      { query: queryString, max_hits: RATIO_SAMPLE_ROWS, count_all: false },
+      { timeoutMs },
+    );
     const hits = sample.hits as SearchHit[];
     const distinct = new Set(hits.map((hit) => searchResultEntityId(hit)));
     if (distinct.size === 0) {
@@ -1128,6 +1178,12 @@ async function collectSearchWindow(
   // window already returned. Dedup can only count results it has seen, so every
   // window is read from the top, and the row budget bounds how deep that goes.
   const scanBudget = MAX_SCAN_ROWS;
+  // One time budget for the whole answer, not one per Quickwit request. A
+  // search makes several requests -- the scan in batches, then a count and a
+  // sample -- and with 8 s each a single heavy phrase could hold the engine
+  // for half a minute and still answer 200 (#348).
+  const deadline = performance.now() + getSearchTimeoutMs();
+  const phrase = queryHasPhrase(options.query);
   const collected = new Map<string, SearchResult>();
   const previewKeys = new Map<string, string>();
   let rawOffset = 0;
@@ -1152,18 +1208,25 @@ async function collectSearchWindow(
       scanBudget - rawSeen,
     );
     const quickwitStart = performance.now();
-    const response = await quickwit.searchRequest({
-      query: queryString,
-      max_hits: requestMaxHits,
-      start_offset: rawOffset,
-      // Undocumented in Quickwit 0.8.1's search API, so possibly a no-op --
-      // but it was added deliberately, and if it does bind, dropping it turns
-      // on full hit counting for every public search. Left alone until someone
-      // measures it.
-      count_all: false,
-      ...(sortBy ? { sort_by: sortBy } : {}),
-      ...(snippetFields.length > 0 ? { snippet_fields: snippetFields.join(",") } : {}),
-    });
+    const remaining = deadline - quickwitStart;
+    if (remaining <= 0) {
+      throw new SearchTimeoutError(getSearchTimeoutMs());
+    }
+    const response = await quickwit.searchRequest(
+      {
+        query: queryString,
+        max_hits: requestMaxHits,
+        start_offset: rawOffset,
+        // Undocumented in Quickwit 0.8.1's search API, so possibly a no-op --
+        // but it was added deliberately, and if it does bind, dropping it turns
+        // on full hit counting for every public search. Left alone until someone
+        // measures it.
+        count_all: false,
+        ...(sortBy ? { sort_by: sortBy } : {}),
+        ...(snippetFields.length > 0 ? { snippet_fields: snippetFields.join(",") } : {}),
+      },
+      { timeoutMs: remaining },
+    );
     quickwitMs += performance.now() - quickwitStart;
 
     // num_hits describes the query, not the window, so it is taken once. The
@@ -1293,11 +1356,17 @@ async function collectSearchWindow(
   if (!scannedEverything) {
     totalCount = Math.max(
       groupedCount,
-      await estimateTotal(quickwit, queryString, sortBy, {
-        scannedRows: rawSeen,
-        scannedResults: collected.size,
-        fallbackRows: rawNumHits ?? 0,
-      }),
+      await estimateTotal(
+        quickwit,
+        queryString,
+        sortBy,
+        {
+          scannedRows: rawSeen,
+          scannedResults: collected.size,
+          fallbackRows: rawNumHits ?? 0,
+        },
+        { deadline, phrase },
+      ),
     );
   }
 
@@ -1731,11 +1800,44 @@ export async function getEntityContent(
     pdfUrl: pdfUrl ?? motionAttachment?.pdfUrl,
     pdfEntityId: pdfUrl ? undefined : motionAttachment?.entityId,
     meetingId: hit.payload?.is_referenced_by ?? hit.payload?.meeting,
+    sourceUrl: entitySourceUrl(hit, hit.entity_id ?? entityId),
     agenda: withDownloadUrls(agenda),
     motions: motions && motions.length > 0 ? motions : undefined,
     recordings: recordings && recordings.length > 0 ? recordings : undefined,
     motion,
   };
+}
+
+/** Where an entity is published at the source (#340).
+ *
+ * A document's own file at the supplier. A meeting's portal page: Notubiz
+ * names it, and for iBabs it follows from the site and the meeting id, the
+ * same address the iBabs portal links to
+ * (https://<site>.bestuurlijkeinformatie.nl/Agenda/Index/<id>). Derived at
+ * read time so the meetings imported before the field existed have it too. */
+function entitySourceUrl(hit: SearchHit, entityId: string): string | undefined {
+  if (hit.entity_type === "Document") {
+    return hit.payload?.original_url;
+  }
+  if (hit.entity_type !== "Meeting") {
+    return undefined;
+  }
+  if (hit.payload?.source_url) {
+    return hit.payload.source_url;
+  }
+  if (!hit.source_key) {
+    return undefined;
+  }
+  try {
+    const source = getProjectableSource(hit.source_key);
+    const meetingId = entityId.split(":").at(-1);
+    if (source.supplier === "ibabs" && meetingId) {
+      return `https://${encodeURIComponent(source.ibabsSitename)}.bestuurlijkeinformatie.nl/Agenda/Index/${encodeURIComponent(meetingId)}`;
+    }
+  } catch {
+    // A source no longer in the catalog has no portal to point at.
+  }
+  return undefined;
 }
 
 /** Shape a Motion search hit into the payload the detail endpoint returns. */
@@ -2119,4 +2221,5 @@ export const __test__ = {
   searchResultEntityType,
   preferIndexedHit,
   withDownloadUrls,
+  entitySourceUrl,
 };

@@ -37,9 +37,12 @@ Deno.test("an unknown entityType is refused rather than ignored", async () => {
 
 Deno.test("the documented entity types are all accepted", () => {
   for (const entityType of ["Meeting", "Document", "Motion", "Recording"]) {
-    assert(check(`entityType=${entityType}`) === null, `${entityType} should be accepted`);
+    assert(
+      check(`query=raad&entityType=${entityType}`) === null,
+      `${entityType} should be accepted`,
+    );
   }
-  assert(check("") === null, "no filter at all is fine");
+  assert(check("organization=soest") === null, "an organization alone browses it");
 });
 
 Deno.test("an unknown organization is refused, and points at /api/sources", async () => {
@@ -78,8 +81,8 @@ Deno.test("a non-integer limit or offset is refused", () => {
 
 Deno.test("ordinary paging parameters pass untouched", () => {
   assert(check("query=begroting&organization=soest&limit=24&offset=0") === null, "the common case");
-  assert(check("limit=100&offset=200") === null, "deep paging is not itself invalid");
-  assert(check("limit=&offset=") === null, "empty values fall back to the defaults");
+  assert(check("query=raad&limit=100&offset=200") === null, "deep paging is not itself invalid");
+  assert(check("query=raad&limit=&offset=") === null, "empty values fall back to the defaults");
 });
 
 /** `sort=bogus` used to answer HTTP 200 in a perfectly ordinary order, which is
@@ -96,9 +99,9 @@ Deno.test("an unknown sort is refused rather than silently becoming date_desc", 
 
 Deno.test("every implemented sort order is accepted", () => {
   for (const sort of ["date_desc", "date_asc", "title_asc", "relevance"]) {
-    assert(check(`sort=${sort}`) === null, `${sort} should be accepted`);
+    assert(check(`query=raad&sort=${sort}`) === null, `${sort} should be accepted`);
   }
-  assert(check("sort=") === null, "no sort at all falls back to the default");
+  assert(check("query=raad&sort=") === null, "no sort at all falls back to the default");
 });
 
 /** The dangerous one. An unreadable date filtered every result away, so it read
@@ -116,9 +119,9 @@ Deno.test("an unreadable date is refused instead of quietly emptying the result"
 });
 
 Deno.test("ordinary date ranges pass untouched", () => {
-  assert(check("dateFrom=2026-01-01&dateTo=2026-12-31") === null, "a whole year");
-  assert(check("dateFrom=2024-02-29") === null, "a leap day is a day");
-  assert(check("dateFrom=&dateTo=") === null, "empty values are no filter at all");
+  assert(check("query=raad&dateFrom=2026-01-01&dateTo=2026-12-31") === null, "a whole year");
+  assert(check("query=raad&dateFrom=2024-02-29") === null, "a leap day is a day");
+  assert(check("query=raad&dateFrom=&dateTo=") === null, "empty values are no filter at all");
 });
 
 /** A slop can only widen a phrase, so a caller who writes one expects at least
@@ -137,4 +140,19 @@ Deno.test("ordinary phrase and term queries are not mistaken for a slop", () => 
   assert(check("query=begroting 2026") === null, "a number is an ordinary word");
   assert(check('query="woningen" ~ 10') === null, "a stray tilde is not the notation");
   assert(check("query=~10") === null, "a tilde outside a phrase is punctuation");
+});
+
+/** Neither a term nor a source used to answer HTTP 200 with an exact zero, so
+ * `q=begroting` read as "begroting appears nowhere" (#349). */
+Deno.test("a search without query and organization is refused and names a mistyped parameter", async () => {
+  assert(check("")?.status === 400, "nothing at all");
+  assert(check("entityType=Meeting")?.status === 400, "a type alone selects nothing to browse");
+  assert(check("query=%20%20")?.status === 400, "whitespace is no query");
+
+  const payload = await body("q=begroting&limit=1");
+  assert(payload.code === "missing_query", `wrong code: ${JSON.stringify(payload)}`);
+  assert(payload.hint?.includes('"q"'), `the stray parameter should be named: ${payload.hint}`);
+
+  const specific = await body("sort=bogus");
+  assert(specific.code === "unknown_sort", "a more specific refusal still wins");
 });

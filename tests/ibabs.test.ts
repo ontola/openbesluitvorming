@@ -236,30 +236,87 @@ Deno.test("isSoapTimeout also recognises the database timeout iBabs returns as E
   assert(!isSoapTimeout(new Error("No public account!")), "other errors are not");
 });
 
-Deno.test("listMeetingsAdaptive stops splitting below the floor and rethrows", async () => {
+Deno.test("listMeetingsAdaptive splits the 14-day nightly window down to single days", async () => {
   const { listMeetingsAdaptive } = ibabsExtractorTest;
   const source = getIbabsSource("amstelveen");
 
+  // Anything longer than one day times out, as Rotterdam does at 14 (#309).
+  const calls: string[] = [];
+  const fakeClient = {
+    listMeetingsByDateRange(_source: typeof source, from: string, to: string) {
+      calls.push(`${from}..${to}`);
+      if (from !== to) {
+        return Promise.reject(new Error("Execution Timeout Expired."));
+      }
+      return Promise.resolve([{ Id: `meeting-${from}` }]);
+    },
+  } as unknown as Parameters<typeof listMeetingsAdaptive>[0];
+
+  const meetings = await listMeetingsAdaptive(
+    fakeClient,
+    source,
+    "2026-10-02",
+    "2026-10-16",
+    async () => {},
+  );
+
+  const days = meetings.map((meeting) => (meeting as { Id: string }).Id.slice("meeting-".length));
+  assert(days.length === 15, `every day of the inclusive window once, got ${days.length}`);
+  assert(new Set(days).size === 15, "no day twice");
+  assert(days[0] === "2026-10-02" && days[14] === "2026-10-16", "first and last day included");
+  for (const call of calls) {
+    const [from, to] = call.split("..");
+    assert(from <= to, `no inverted window: ${call}`);
+  }
+});
+
+Deno.test("listMeetingsAdaptive gives up after one failing day instead of trying every day", async () => {
+  const { listMeetingsAdaptive } = ibabsExtractorTest;
+  const source = getIbabsSource("amstelveen");
+
+  let calls = 0;
   const fakeClient = {
     listMeetingsByDateRange() {
+      calls += 1;
       const error = new Error("Signal timed out.");
       error.name = "TimeoutError";
       return Promise.reject(error);
     },
   } as unknown as Parameters<typeof listMeetingsAdaptive>[0];
 
-  let splits = 0;
   let caught = false;
   try {
-    await listMeetingsAdaptive(fakeClient, source, "2025-01-01", "2025-01-10", async () => {
-      splits += 1;
-    });
+    await listMeetingsAdaptive(fakeClient, source, "2025-01-01", "2025-06-30", async () => {});
   } catch (error) {
     caught = true;
     assert(error instanceof Error && error.name === "TimeoutError", "rethrows the timeout");
   }
-  assert(caught, "should bubble the error when the range is below the split floor");
-  assert(splits === 0, "no split when the chunk is already short");
+  assert(caught, "a single day that times out fails the listing");
+  // 181 days: one call per halving down the left edge, about log2(181) + 1.
+  assert(calls <= 10, `stops after the first failing leaf, made ${calls} calls`);
+});
+
+Deno.test("listMeetingsAdaptive does not split a single day", async () => {
+  const { listMeetingsAdaptive } = ibabsExtractorTest;
+  const source = getIbabsSource("amstelveen");
+
+  const fakeClient = {
+    listMeetingsByDateRange() {
+      return Promise.reject(new Error("Execution Timeout Expired."));
+    },
+  } as unknown as Parameters<typeof listMeetingsAdaptive>[0];
+
+  let splits = 0;
+  let caught = false;
+  try {
+    await listMeetingsAdaptive(fakeClient, source, "2025-01-01", "2025-01-01", async () => {
+      splits += 1;
+    });
+  } catch {
+    caught = true;
+  }
+  assert(caught, "rethrows");
+  assert(splits === 0, "nothing left to split");
 });
 
 Deno.test("IbabsMeetingExtractor materializes fixture meetings and documents", async () => {

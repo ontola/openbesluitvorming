@@ -323,6 +323,10 @@ export function normalizeNotubizMeeting(
       Array.isArray(record.agenda_items) ? record.agenda_items : [],
     ),
     attachment: collectAttachmentIds(source, record),
+    // The portal page, e.g. https://gemeentebestuur-haarlem.notubiz.nl/vergadering/1542987/...;
+    // the recording's player_url is the same field.
+    source_url:
+      typeof record.url === "string" && /^https?:\/\//.test(record.url) ? record.url : undefined,
     source_info: {
       supplier: "notubiz",
       source: source.key,
