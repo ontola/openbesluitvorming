@@ -1,6 +1,7 @@
 {
   "name": "woozi",
   "private": true,
+  "license": "EUPL-1.2",
   "type": "module",
   "packageManager": "pnpm@11.7.0",
   "scripts": {

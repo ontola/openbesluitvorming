@@ -465,3 +465,10 @@ If the CLI is missing, PDF extraction fails explicitly and the import records an
 
 There is no remaining host-only Office extractor in the runtime anymore. Unsupported office
 formats are currently skipped with an explicit extraction warning.
+
+## License
+
+This repository is licensed under the [European Union Public Licence v1.2](LICENSE)
+(EUPL-1.2). Third-party dependencies keep their own licences; note that the
+extraction service (`services/extraction/`) depends on PyMuPDF and
+pymupdf4llm, which are AGPL-3.0, a licence the EUPL lists as compatible.
