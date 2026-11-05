@@ -692,6 +692,11 @@ export async function claimQueuedRun(runId: string): Promise<IngestRunRecord | n
   return row ? normalizeRunRecord(row) : null;
 }
 
+/** Queued runs in the order workers should take them: the daily scheduler's
+ * runs first, then everything else oldest first. A bulk re-import enqueues
+ * hundreds of runs at once; in plain FIFO order the next morning's daily runs
+ * land behind all of them, and on 4 and 5 November 2026 no source got a fresh
+ * import for two days while an iBabs motion backfill drained. */
 export async function listQueuedRuns(): Promise<IngestRunRecord[]> {
   const db = await getDatabase();
   return (
@@ -704,7 +709,7 @@ export async function listQueuedRuns(): Promise<IngestRunRecord[]> {
         issue_count, quickwit_index_id, error_message
        FROM ingest_run
        WHERE status = 'queued'
-       ORDER BY started_at ASC`,
+       ORDER BY trigger_mode = 'scheduled' DESC, started_at ASC, rowid ASC`,
       )
       .all() as unknown as IngestRunRecord[]
   ).map(normalizeRunRecord);
