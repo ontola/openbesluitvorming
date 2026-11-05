@@ -619,7 +619,7 @@ Both endpoints return NDJSON (`application/x-ndjson`): one record per line.
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `source` | string | Source key (required, see `/api/sources`) |
-| `cursor` | string | Position in the change log. Omit to start from the beginning. |
+| `cursor` | string | Position in the change log: the `seq` of the first record to return (inclusive). Omit to start from the beginning. |
 | `limit` | integer | Records per page (default 500, max 1000) |
 
 **Response headers:** `X-Next-Cursor`, `X-Has-More`. An empty body with
@@ -657,8 +657,15 @@ Both endpoints return NDJSON (`application/x-ndjson`): one record per line.
   again.
 - The feed is deduplicated on `content_hash`: re-indexing unchanged data adds
   no records, so polling stays cheap.
-- `seq` is monotonic per source. Cursors are stable: the same cursor always
-  resumes at the same position.
+- `seq` is monotonic per source and never reused or renumbered, also not when
+  data is removed (removals are appended as delete records). Cursors are
+  stable: the same cursor always resumes at the same position.
+- The changes cursor equals `seq`: `X-Next-Cursor` is the `seq` of the last
+  record in the response plus one. To resume after any record you processed
+  (for example to cap how many records you ingest per run), pass that
+  record's `seq + 1` as `cursor`. Passing its `seq` returns that record again.
+  This is part of the API contract; a change will be announced here in
+  advance.
 
 > **Note:** the export log is populated from ingests going forward. A source's
 > history appears in the feed after its next full import; until then the
