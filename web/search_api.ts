@@ -1147,6 +1147,7 @@ async function collectSearchWindow(
   results: SearchResult[];
   totalCount: number;
   totalIsApproximate: boolean;
+  reachableCount: number;
   hasMore: boolean;
 }> {
   const queryString = buildQuickwitQuery(
@@ -1370,13 +1371,19 @@ async function collectSearchWindow(
     );
   }
 
+  // Every page is read from the top with the same row budget, so when the
+  // budget ran out the results collected here are all that paging can ever
+  // reach, whatever the offset. Saying `hasMore` past that point sent clients
+  // to an empty page, and `totalCount` alone did not say where reading would
+  // stop: soest announced 8,800 and paging ended at 1,072 (#405).
+  const reachableCount = scannedEverything ? totalCount : groupedCount;
   return {
     results: pageResults,
     totalCount,
     totalIsApproximate: !scannedEverything,
+    reachableCount,
     hasMore:
-      pageHasResults &&
-      (sortedResults.length > options.offset + options.limit || !exhausted || scanLimitReached),
+      pageHasResults && (sortedResults.length > options.offset + options.limit || !exhausted),
   };
 }
 
@@ -1491,6 +1498,9 @@ export interface SourceIndexActivity {
   /** Newest `start_date` held for the source: the meeting furthest in the
    * future whose agenda we already have. */
   latestContentDate?: string;
+  /** Newest `start_date` that is not after the moment of asking: the latest
+   * material that already exists, rather than an agenda for next month. */
+  latestPastContentDate?: string;
   /** Newest `time`: when we last wrote anything at all for the source. */
   lastIndexedAt?: string;
   /** Documents in the index for the source, exact at the moment of asking:
@@ -1566,30 +1576,43 @@ export async function getSourceIndexActivity(): Promise<Map<string, SourceIndexA
   // cannot go on the request above, because a range clause also drops the
   // rows that have no start_date from `last_indexed`.
   const latestStartDates = new Map<string, string>();
+  const latestPastStartDates = new Map<string, string>();
   if (withStartDate) {
     const horizon = `${futureDateHorizon().toISOString().slice(0, 19)}Z`;
-    try {
-      const dated = await quickwit.searchRequest({
-        query: `projection_version:${escapeTerm(currentProjectionVersion())} AND start_date:[* TO ${horizon}]`,
-        max_hits: 0,
-        aggs: {
-          by_source: {
-            terms: { field: "source_key", size: 500 },
-            aggs: { latest_start_date: { max: { field: "start_date" } } },
-          },
-        },
-      });
-      const datedBuckets = ((dated.aggregations?.by_source as { buckets?: unknown[] })?.buckets ??
-        []) as Array<{ key?: unknown; latest_start_date?: { value?: unknown } }>;
-      for (const bucket of datedBuckets) {
-        const latest = fromAggregationTimestamp(bucket.latest_start_date?.value);
-        if (typeof bucket.key === "string" && latest) {
-          latestStartDates.set(bucket.key, latest);
+    const now = `${new Date().toISOString().slice(0, 19)}Z`;
+    // Two bounds, two requests: Quickwit has no filter aggregation to split
+    // one terms bucket by date. The past-bounded one is what answers "is new
+    // material still arriving": the unbounded one is a scheduled meeting at
+    // 302 of 321 sources (#397).
+    await Promise.all(
+      [
+        { bound: horizon, into: latestStartDates },
+        { bound: now, into: latestPastStartDates },
+      ].map(async ({ bound, into }) => {
+        try {
+          const dated = await quickwit.searchRequest({
+            query: `projection_version:${escapeTerm(currentProjectionVersion())} AND start_date:[* TO ${bound}]`,
+            max_hits: 0,
+            aggs: {
+              by_source: {
+                terms: { field: "source_key", size: 500 },
+                aggs: { latest_start_date: { max: { field: "start_date" } } },
+              },
+            },
+          });
+          const datedBuckets = ((dated.aggregations?.by_source as { buckets?: unknown[] })
+            ?.buckets ?? []) as Array<{ key?: unknown; latest_start_date?: { value?: unknown } }>;
+          for (const bucket of datedBuckets) {
+            const latest = fromAggregationTimestamp(bucket.latest_start_date?.value);
+            if (typeof bucket.key === "string" && latest) {
+              into.set(bucket.key, latest);
+            }
+          }
+        } catch {
+          // As with the count: absent, and the rest still answers.
         }
-      }
-    } catch {
-      // As with the count: absent, and the rest still answers.
-    }
+      }),
+    );
   }
 
   // A second request for the document count per source: Quickwit's
@@ -1621,6 +1644,7 @@ export async function getSourceIndexActivity(): Promise<Map<string, SourceIndexA
     activity.set(sourceKey, {
       lastIndexedAt: fromAggregationTimestamp(bucket.last_indexed?.value),
       latestContentDate: latestStartDates.get(sourceKey),
+      latestPastContentDate: latestPastStartDates.get(sourceKey),
       documentCount: documentCounts.get(sourceKey),
     });
   }
@@ -1654,6 +1678,7 @@ export async function searchMeetings(
       results: [],
       totalCount: 0,
       totalIsApproximate: false,
+      reachableCount: 0,
       hasMore: false,
     };
   }

@@ -766,6 +766,9 @@ export interface SearchResponse {
   results: SearchResult[];
   totalCount?: number;
   totalIsApproximate?: boolean;
+  /** How many results paging can reach. Equal to `totalCount` unless the scan
+   * ran out of budget, when it is the depth at which pages run dry. */
+  reachableCount?: number;
   hasMore?: boolean;
 }
 
@@ -921,6 +924,9 @@ export interface SourceStatus {
   /** Newest meeting date held for this source. Often in the future: an agenda
    * is published before the meeting happens. */
   latestContentDate?: string;
+  /** Newest meeting date held for this source that is not after the moment
+   * of the request: the latest material that already exists (#397). */
+  latestPastContentDate?: string;
   /** When anything was last written to the search index for this source. */
   lastIndexedAt?: string;
   /** Documents in the search index for this source, exact at the moment of

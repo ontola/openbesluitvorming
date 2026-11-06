@@ -701,11 +701,14 @@ async function handleRequest(request: Request): Promise<Response> {
     }
   }
 
-  const pageRenderMatch = url.pathname.match(/^\/api\/entities\/([^/]+)\/pdf\/page\/(\d+)$/);
+  // Any last segment, so a page number that is not one answers
+  // invalid_page_number instead of falling through to the entity route, which
+  // would read the whole remainder as an id (#408).
+  const pageRenderMatch = url.pathname.match(/^\/api\/entities\/([^/]+)\/pdf\/page\/([^/]+)$/);
   if (pageRenderMatch && request.method === "GET") {
     const metrics: ServerTimingMetric[] = [];
     const entityId = decodeURIComponent(pageRenderMatch[1]);
-    const pageNumber = parseInt(pageRenderMatch[2], 10);
+    const pageNumber = /^\d+$/.test(pageRenderMatch[2]) ? parseInt(pageRenderMatch[2], 10) : NaN;
 
     if (isNaN(pageNumber) || pageNumber < 1) {
       return withServerTiming(
@@ -845,9 +848,14 @@ async function handleRequest(request: Request): Promise<Response> {
       }
 
       const upstreamHeaders = new Headers();
-      const range = request.headers.get("range");
-      if (range) {
-        upstreamHeaders.set("range", range);
+      // Range and the conditional headers go to object storage as they came:
+      // it holds the ETag and Last-Modified of the stored copy, and answering
+      // 304 there spares both the transfer and the client's re-download (#404).
+      for (const name of ["range", "if-none-match", "if-modified-since"]) {
+        const value = request.headers.get(name);
+        if (value) {
+          upstreamHeaders.set(name, value);
+        }
       }
 
       const upstream = await measureTiming(metrics, "pdf_fetch", () =>
@@ -856,6 +864,22 @@ async function handleRequest(request: Request): Promise<Response> {
           redirect: "follow",
         }),
       );
+
+      if (upstream.status === 304) {
+        await upstream.body?.cancel();
+        const notModified = new Headers({ "cache-control": "private, max-age=60" });
+        for (const name of ["etag", "last-modified"]) {
+          const value = upstream.headers.get(name);
+          if (value) {
+            notModified.set(name, value);
+          }
+        }
+        return withServerTiming(
+          new Response(null, { status: 304, headers: notModified }),
+          requestStart,
+          metrics,
+        );
+      }
 
       if (!upstream.ok && upstream.status !== 206) {
         return withServerTiming(
@@ -881,6 +905,14 @@ async function handleRequest(request: Request): Promise<Response> {
 
       const acceptRanges = upstream.headers.get("accept-ranges");
       headers.set("accept-ranges", acceptRanges ?? "bytes");
+      for (const name of ["etag", "last-modified"]) {
+        const value = upstream.headers.get(name);
+        if (value) {
+          headers.set(name, value);
+        }
+      }
+      // Private on purpose: a document taken down on request has to stop being
+      // served at once, which a shared cache would not know.
       headers.set("cache-control", "private, max-age=60");
 
       return withServerTiming(
@@ -904,7 +936,13 @@ async function handleRequest(request: Request): Promise<Response> {
     }
   }
 
-  if (url.pathname.startsWith("/api/entities/") && request.method === "GET") {
+  // An entity id never holds a raw slash (one inside an id arrives as %2F), so
+  // a path with more segments is a sub-route that does not exist, not an id.
+  if (
+    url.pathname.startsWith("/api/entities/") &&
+    !url.pathname.slice("/api/entities/".length).includes("/") &&
+    request.method === "GET"
+  ) {
     const metrics: ServerTimingMetric[] = [];
     const entityId = decodeURIComponent(url.pathname.replace("/api/entities/", ""));
 
@@ -948,6 +986,17 @@ async function handleRequest(request: Request): Promise<Response> {
     "/docs/api": "/docs.html",
     "/docs/migration-guide": "/docs.html",
   };
+
+  // Nothing under /api/ is a file. Answering there with the static handler's
+  // plain-text 404 broke the promise that every API error is JSON with a
+  // `code`, on exactly the requests where a client needs it: a typo or an old
+  // Open Raadsinformatie path (#408).
+  if (url.pathname === "/api" || url.pathname.startsWith("/api/")) {
+    return withServerTiming(
+      apiError("route_not_found", 404, "Onbekend API-adres; zie /docs/api voor de endpoints."),
+      requestStart,
+    );
+  }
 
   const pathname = PAGES[url.pathname] ?? url.pathname;
   const file = await readStaticFile(pathname);

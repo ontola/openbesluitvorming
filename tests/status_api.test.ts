@@ -28,7 +28,10 @@ function hoursAgo(hours: number): string {
 function build(options: {
   sources?: SourceRunStatus[];
   supplierWindows?: SupplierRunWindow[];
-  indexActivity?: Map<string, { latestContentDate?: string; lastIndexedAt?: string }> | null;
+  indexActivity?: Map<
+    string,
+    { latestContentDate?: string; latestPastContentDate?: string; lastIndexedAt?: string }
+  > | null;
 }): StatusResponse {
   return buildStatusResponse({
     runStatus: {
@@ -224,6 +227,7 @@ Deno.test("index activity is merged per source and is optional", () => {
         "soest",
         {
           latestContentDate: "2026-08-20T13:30:00.000Z",
+          latestPastContentDate: "2026-08-14T17:30:00.000Z",
           lastIndexedAt: "2026-08-16T00:09:59.000Z",
           documentCount: 12345,
         },
@@ -234,6 +238,11 @@ Deno.test("index activity is merged per source and is optional", () => {
     source(withActivity, "soest").latestContentDate,
     "2026-08-20T13:30:00.000Z",
     "a meeting already on the agenda for next week",
+  );
+  assertEquals(
+    source(withActivity, "soest").latestPastContentDate,
+    "2026-08-14T17:30:00.000Z",
+    "the newest meeting that already took place travels separately (#397)",
   );
   assertEquals(withActivity.indexActivityAvailable, true, "the index answered");
   assertEquals(
