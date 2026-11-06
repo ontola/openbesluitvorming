@@ -177,6 +177,14 @@ export class ExportChangesLog {
     });
   }
 
+  /** Append a corrected version of a stored record, for repairs that fix
+   * data in the log without a new import. The caller supplies the new payload
+   * and its content hash; the usual deduplication applies, so a repair that
+   * changes nothing appends nothing. */
+  recordRepair(record: Omit<ExportChangeRecord, "seq">): ExportChangeRecord | null {
+    return this.append({ ...record, seq: 0 });
+  }
+
   private append(record: ExportChangeRecord): ExportChangeRecord | null {
     this.db.exec("BEGIN IMMEDIATE");
     try {

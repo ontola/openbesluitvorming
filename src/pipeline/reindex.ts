@@ -165,6 +165,63 @@ async function rehydrateTranscript(
   return true;
 }
 
+/** Project stored export records into Quickwit rows, rehydrating document
+ * text and transcripts from object storage on the way.
+ *
+ * This is the per-record half of a reindex, shared with repairs that rewrite a
+ * handful of records and need exactly those back in the index without
+ * replaying the whole source. `emit` receives each record's rows as soon as
+ * its own read completes. */
+export async function projectExportRecords(
+  records: ExportChangeRecord[],
+  context: {
+    storage: ObjectStorageClient | undefined;
+    concurrency: number;
+    stats: ReindexStats;
+    emit: (documents: QuickwitSearchDocument[]) => Promise<void>;
+    onIssue?: (issue: ExtractionIssue) => Promise<void> | void;
+  },
+): Promise<void> {
+  const { stats } = context;
+  await mapLimit(records, context.concurrency, async (record) => {
+    let event: EntityCommitEvent<WooziEntity>;
+    let isDocument = false;
+    let rehydrated = false;
+    try {
+      event = toCommitEvent(record);
+      const payload = event.data.payload;
+      isDocument = payload?.type === "Document";
+
+      if (payload?.type === "Document") {
+        rehydrated = await rehydrateDocumentText(payload, context.storage);
+      } else if (payload?.type === "Recording") {
+        rehydrated = await rehydrateTranscript(payload, context.storage);
+      }
+    } catch (error) {
+      stats.issue_count += 1;
+      await context.onIssue?.({
+        severity: "warning",
+        step: "ingest_quickwit",
+        entity_id: record.entity_id,
+        message: `Reindex skipped ${record.entity_id}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      });
+      return;
+    }
+
+    if (isDocument) {
+      stats.document_count += 1;
+    }
+    if (rehydrated) {
+      stats.rehydrated_count += 1;
+    }
+
+    stats.entity_count += 1;
+    await context.emit(projectEntityCommitToQuickwitDocuments(event));
+  });
+}
+
 /**
  * Re-project every live entity of a source into Quickwit, without touching the
  * supplier APIs.
@@ -245,48 +302,19 @@ export async function reindexSource(
     // `concurrency` rehydrated documents exist beyond `pending`, because a
     // record is projected (and its text handed to `pending`) before the slot
     // is reused.
-    await mapLimit(page.records, concurrency, async (record) => {
-      let event: EntityCommitEvent<WooziEntity>;
-      let isDocument = false;
-      let rehydrated = false;
-      try {
-        event = toCommitEvent(record);
-        const payload = event.data.payload;
-        isDocument = payload?.type === "Document";
-
-        if (payload?.type === "Document") {
-          rehydrated = await rehydrateDocumentText(payload, context.storage);
-        } else if (payload?.type === "Recording") {
-          rehydrated = await rehydrateTranscript(payload, context.storage);
+    await projectExportRecords(page.records, {
+      storage: context.storage,
+      concurrency,
+      stats,
+      onIssue: context.onIssue,
+      emit: async (documents) => {
+        pending.push(...documents);
+        // Documents carry their page chunks until the batch is flushed, so
+        // flush on the projected-document count rather than the entity count.
+        if (pending.length >= context.batchSize) {
+          await flush();
         }
-      } catch (error) {
-        stats.issue_count += 1;
-        await context.onIssue?.({
-          severity: "warning",
-          step: "ingest_quickwit",
-          entity_id: record.entity_id,
-          message: `Reindex skipped ${record.entity_id}: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
-        });
-        return;
-      }
-
-      if (isDocument) {
-        stats.document_count += 1;
-      }
-      if (rehydrated) {
-        stats.rehydrated_count += 1;
-      }
-
-      pending.push(...projectEntityCommitToQuickwitDocuments(event));
-      stats.entity_count += 1;
-
-      // Documents carry their page chunks until the batch is flushed, so
-      // flush on the projected-document count rather than the entity count.
-      if (pending.length >= context.batchSize) {
-        await flush();
-      }
+      },
     });
 
     await context.onProgress?.(stats);
