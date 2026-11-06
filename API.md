@@ -13,10 +13,11 @@ https://openbesluitvorming.nl
 | Endpoint | Method | Description | Try it |
 |----------|--------|-------------|--------|
 | [`/api/search`](#search) | GET | Search meetings, documents, motions and spoken word (recommended) | [begroting in Soest](https://openbesluitvorming.nl/api/search?query=begroting&organization=soest&limit=5) |
-| [`/api/stats`](#index-statistics) | GET | Index statistics (document count, organization count) | [live](https://openbesluitvorming.nl/api/stats) |
+| [`/api/stats`](#index-statistics) | GET | Index statistics (document count, organization counts) | [live](https://openbesluitvorming.nl/api/stats) |
 | [`/api/sources`](#sources) | GET | List available data sources | [live](https://openbesluitvorming.nl/api/sources) |
 | [`/api/status`](#status) | GET | Import freshness per organization and per source system, in one call | [live](https://openbesluitvorming.nl/api/status) |
 | [`/api/entities/{entity_id}`](#entity-detail) | GET | Full entity detail (text, agenda, motions with votes, recordings with transcript, download URL) | |
+| [`/api/entities/{entity_id}/pdf`](#stored-pdf) | GET | Our stored copy of a document | |
 | [`/api/entities/{entity_id}/pdf/page/{n}`](#pdf-page-rendering) | GET | Rendered PDF page as JPEG image | |
 | [`/api/export/snapshot`](#bulk-export) | GET | Bulk export: current state per source (NDJSON) | |
 | [`/api/export/changes`](#bulk-export) | GET | Bulk export: change feed per source (NDJSON) | |
@@ -157,6 +158,7 @@ added as needed; an existing one is not renamed or removed without a note here.
 | `unknown_export_source` | 400 | an export call named a source that does not exist |
 | `invalid_export_cursor` | 400 | `cursor` was not produced by an earlier export response |
 | `entity_not_found` | 404 | no entity with that id |
+| `route_not_found` | 404 | the path under `/api/` is not an endpoint of this API, for example a typo or an old Open Raadsinformatie path |
 | `pdf_not_found` | 404 | the entity exists but carries no PDF |
 | `pdf_page_not_found` | 404 | the PDF exists but has no such page |
 | `entity_removed` | 410 | the entity was removed; the body carries `reason` (as on a delete record in the change feed), `removedAt` and, for a document removed at the source, `meetingId` |
@@ -223,7 +225,7 @@ The recommended search endpoint. Returns grouped, deduplicated results with docu
 | `sort` | string | Sort order: `date_desc` (default), `date_asc`, `title_asc` or `relevance`. Any other value returns `400`. `title_asc` orders the fetched window rather than the whole result set. |
 | `dateFrom` | string | Earliest date, `YYYY-MM-DD` only (e.g. `2024-01-01`), inclusive. Filters on the result's `sortDate`, see [What the date is](#what-the-date-is). A value that is not a calendar date returns `400`; a time or time zone on the end is not accepted. |
 | `dateTo` | string | Latest date, same format, **inclusive of the whole day**: `dateFrom=2026-01-01&dateTo=2026-01-01` returns everything dated 1 January 2026, not nothing. It is a "tot en met", not a "tot". |
-| `offset` | integer | Pagination offset (default: 0). Must be zero or greater. Pages are cut from the deduplicated results, which are read from the top, so paging reaches a limited depth (a few hundred to about a thousand results). To go further, narrow with `dateFrom` and `dateTo`, or harvest through the [export API](#bulk-export). |
+| `offset` | integer | Pagination offset (default: 0). Must be zero or greater. Pages are cut from the deduplicated results, which are read from the top, so paging reaches a limited depth (a few hundred to about a thousand results); `reachableCount` in the answer says where it ends. To go further, narrow with `dateFrom` and `dateTo`, or harvest through the [export API](#bulk-export). |
 | `limit` | integer | Results per page (default: 24, minimum 1, values above 100 are capped at 100). |
 
 Parameters that cannot be honoured are refused with `400` rather than ignored:
@@ -247,7 +249,7 @@ curl "https://openbesluitvorming.nl/api/search?query=begroting&organization=soes
       "entityTypeLabel": "Document",
       "organization": "Soest",
       "date": "7 november 2024",
-      "sortDate": "2024-11-07 00:00:00",
+      "sortDate": "2024-11-07T19:00:00Z",
       "title": "Raadsvoorstel begroting 2024",
       "summary": "De begroting voor 2024 bedraagt...",
       "summaryHtml": "De <b>begroting</b> voor 2024 bedraagt...",
@@ -258,10 +260,20 @@ curl "https://openbesluitvorming.nl/api/search?query=begroting&organization=soes
     }
   ],
   "totalCount": 42,
-  "totalIsApproximate": true,
+  "totalIsApproximate": false,
+  "reachableCount": 42,
   "hasMore": true
 }
 ```
+
+`totalCount` is how many results match; `reachableCount` is how many of them
+paging can reach. They differ only when `totalIsApproximate` is `true`: the
+search then stopped reading at its budget, and every page is read from the top
+with the same budget, so no `offset` gets past `reachableCount`. `hasMore` is
+`false` on the last reachable page. A search on one organization can match
+8,800 results and reach about 1,000 of them; to read the rest, narrow with
+`dateFrom` and `dateTo` until `totalIsApproximate` is `false`, or harvest
+through the [export API](#bulk-export).
 
 ---
 
@@ -293,14 +305,18 @@ date as each one is imported again.
 
 ### `GET /api/stats`
 
-Returns the total number of indexed documents and unique organizations.
+Returns the number of indexed documents and of organizations, with the
+organizations split by kind.
 
 **Response:**
 
 ```json
 {
-  "documentCount": 3045470,
-  "organizationCount": 124
+  "documentCount": 5997585,
+  "organizationCount": 326,
+  "municipalityCount": 308,
+  "waterBoardCount": 13,
+  "provinceCount": 8
 }
 ```
 
@@ -383,6 +399,7 @@ No parameters. Cached for 10 minutes.
       "lastRunStatus": "failed",
       "lastErrorMessage": "iBabs blocks requests from this host (403 \"The request is blocked\").",
       "latestContentDate": "2026-08-20T13:30:00.000Z",
+      "latestPastContentDate": "2026-08-14T17:30:00.000Z",
       "lastIndexedAt": "2026-08-05T22:40:51.000Z"
     }
   ]
@@ -454,13 +471,14 @@ at all — i.e. how long the outage has lasted.
 | `lastRunAt` / `lastRunStatus` | The most recent full import attempt, whatever its outcome |
 | `lastErrorMessage` | Why the last run failed. Present only when it did. Query strings are stripped |
 | `latestContentDate` | Newest meeting date held for this organization. Often in the future — an agenda is published before the meeting happens. Dates more than two years ahead are typos at the source and are left out |
+| `latestPastContentDate` | Newest meeting date held for this organization that is not after `generatedAt`: the latest material that already exists. Use this one to check whether a feed is still delivering |
 | `lastIndexedAt` | When anything was last written to the search index for this organization |
 | `indexedDocuments` | Documents in the search index for this organization, exact at the moment of the request: one per document, pages not counted. The number to reconcile against the source system's own list. Absent when the index did not answer |
 | `coverage` | Present once the weekly coverage check has covered this organization. What the source system's own API listed for a date window, against what the index holds: `supplierDocuments`, `heldDocuments`, `missingDocuments` (the first two partition the third), `ratio` (held over supplier, so the share that is complete; 1 means complete; `null` when the supplier listed no documents in the window, because 0 of 0 says nothing about completeness), `windowFrom`/`windowTo` (calendar dates, both inclusive: the window is `windowFrom` 00:00 through the whole of `windowTo`), `checkedAt`, `missingSample` (up to 25 missing document ids, highest first, which for suppliers that number their documents as they create them means the most recent), `lowerBound` (true when some supplier requests failed, so the gap may be larger), and `error` when the check itself failed. When `error` is set the four numbers `supplierDocuments`, `heldDocuments`, `missingDocuments` and `ratio` are `null`: the check measured nothing, which is not the same as measuring zero. `state: "ok"` says the last import ran; `coverage` says whether it asked for everything |
 | `discontinuedAt` | The date the organization ceased to exist. Only on `discontinued` |
 | `succeededBy` | `{ cbsId, label, sourceKey }` of the organization that took over. `sourceKey` is absent when we do not import the successor. Only on `discontinued` |
 
-`latestContentDate` and `lastIndexedAt` come from the search index. If it cannot
+`latestContentDate`, `latestPastContentDate` and `lastIndexedAt` come from the search index. If it cannot
 be reached, `indexActivityAvailable` is `false` and both are omitted everywhere;
 the import half of the answer is unaffected.
 
@@ -506,7 +524,7 @@ curl "https://openbesluitvorming.nl/api/entities/document%3Anotubiz%3Agemeente%3
   "title": "Raadsvoorstel begroting 2024",
   "organization": "Soest",
   "date": "7 november 2024",
-  "sortDate": "2024-11-07 00:00:00",
+  "sortDate": "2024-11-07T19:00:00Z",
   "markdownText": "# Raadsvoorstel begroting 2024\n\n...",
   "downloadUrl": "https://...",
   "contentType": "application/pdf",
@@ -526,22 +544,26 @@ curl "https://openbesluitvorming.nl/api/entities/document%3Anotubiz%3Agemeente%3
   "title": "Raadsvergadering 2024-11-07",
   "organization": "Soest",
   "date": "7 november 2024",
-  "sortDate": "2024-11-07 20:00:00",
+  "sortDate": "2024-11-07T19:00:00Z",
   "sourceUrl": "https://soest.notubiz.nl/vergadering/830424/Raadsvergadering",
   "agenda": [
     {
       "id": "...",
       "title": "Opening",
       "number": "1",
+      "order": 1,
+      "is_heading": false,
+      "classification": "...",
       "documents": [
         {
           "id": "document:notubiz:gemeente:soest:12345",
           "name": "Raadsvoorstel begroting 2024",
+          "file_name": "Raadsvoorstel begroting 2024.pdf",
+          "content_type": "application/pdf",
           "original_url": "https://...",
           "downloadUrl": "/api/entities/document%3Anotubiz%3Agemeente%3Asoest%3A12345/pdf"
         }
-      ],
-      "agenda_items": []
+      ]
     }
   ],
   "motions": [
@@ -583,9 +605,41 @@ curl "https://openbesluitvorming.nl/api/entities/document%3Anotubiz%3Agemeente%3
 
 `original_url` is the supplier's own link and for part of iBabs answers `403` for a document we hold. A document that looks like a PDF also carries `downloadUrl`, a path on this API that serves our stored copy; prefer it over `original_url`.
 
+Agenda items differ per source system. Every item has `id`, `title` and
+`order`. Notubiz adds `number`, `is_heading` and `classification`; iBabs has no
+`number` and adds `description` on some items. `documents` is present only on
+items that have documents; `content_type` on such a document is Notubiz only.
+Items are a flat list: there are no nested `agenda_items`. On a document's own
+detail, `contentType` is present only when the source system states it, which
+iBabs does not.
+
 `motions` and `recordings` are present only on a `Meeting`, and only when the
 source publishes them. See [voting data](#use-case-voting-data) and
 [spoken word](#use-case-spoken-word) below for what to expect from each.
+
+---
+
+## Stored PDF
+
+### `GET /api/entities/{entity_id}/pdf`
+
+Returns our stored copy of a document, the `downloadUrl` a document and an
+agenda document carry. Costs 1 unit; see also
+[Downloading original files](#downloading-original-files).
+
+**Response headers:**
+- `Content-Type` as stored, normally `application/pdf`
+- `Accept-Ranges: bytes`; a `Range` request answers `206`
+- `ETag` and `Last-Modified` of the stored copy
+- `Cache-Control: private, max-age=60`
+
+Send `If-None-Match` or `If-Modified-Since` to revalidate: an unchanged copy
+answers `304` without a body. The copy is kept private to the client rather than
+shared caches, because a document taken down on request has to stop being
+served at once.
+
+**Errors:** `pdf_not_found` (404, the entity has no stored PDF),
+`pdf_fetch_failed` (502 or 500, the stored copy could not be read).
 
 ---
 
@@ -907,4 +961,4 @@ Canonical entity schemas are published as JSON Schema documents:
 | [vote.schema.json](/schemas/vote.schema.json) | Vote record (shape reused inside `Motion.votes`) |
 | [entity-commit.schema.json](/schemas/entity-commit.schema.json) | CloudEvents envelope |
 
-These define the structure of entity detail responses.
+These describe the `payload` of the [bulk export](#bulk-export) records (snake case, such as `start_date` and `last_discussed_at`). The answers of `/api/entities/{id}` are shaped differently (camel case, such as `sortDate` and `downloadUrl`) and are described by the examples under [Entity detail](#entity-detail); there is no JSON Schema for them yet.

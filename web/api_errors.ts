@@ -32,6 +32,7 @@ export const API_ERROR_CODES = [
   "invalid_export_cursor",
   // 404 — the request was well formed and the thing is not here.
   "entity_not_found",
+  "route_not_found",
   "pdf_not_found",
   "pdf_page_not_found",
   // 410 — the thing was here and has been removed; the body says why.
