@@ -25,7 +25,7 @@ No authentication is required. All endpoints are read-only.
 
 Looking for voting behaviour per party? See [Use case: voting data](#use-case-voting-data).
 Looking for what was actually said in a debate? See [Use case: spoken word](#use-case-spoken-word).
-Planning something that makes a lot of requests? See [Rate limits](#rate-limits).
+Planning something that makes a lot of requests? See [Rate limits](#rate-limits) and [Downloading original files](#downloading-original-files).
 
 ---
 
@@ -96,6 +96,30 @@ Treat `429` as "slow down", not as an error: honour `Retry-After` and continue.
 For bulk work, prefer the [export endpoints](#bulk-export) over paging through
 `/api/search` — they are built to hand over a whole source in one stream and
 cost one unit per call.
+
+### Downloading original files
+
+The `downloadUrl` and `previewImageUrl` fields (and `media_urls` in entities and
+exports) point straight at our object storage, not at `/api/*`. They do not
+count against the budget above, but they share one request ceiling with every
+visitor of the site and with our own imports. So we ask every client that
+fetches them to keep to these rules, per end user:
+
+- **Fetch on demand only.** Download a file when a user opens or copies it. Do
+  not prefetch, mirror or index whole folders or organizations.
+- **At most 2 downloads at a time and 2 requests per second.** Do not fetch
+  thumbnails you do not show.
+- **Back off** on `429`, `503` or `SlowDown`: wait, then retry with growing
+  pauses.
+- **Cache.** An object key never changes content; keep what you fetched and
+  revalidate with `If-None-Match` and the `ETag` instead of downloading again.
+- **Use the API for listings and metadata**, not bucket listings.
+- **Ask first for bulk.** More than about 1 GB or 500 files per user per day,
+  or all files of an organization, needs an arrangement: open an issue.
+
+Clients that ignore these rules may be blocked. If the load becomes a problem,
+downloads may move behind this domain and its rate limit; we will announce that
+in advance.
 
 ---
 
