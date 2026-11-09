@@ -2,7 +2,7 @@
 // UTC (#203).
 //
 // Usage:
-//   deno run -A scripts/repair_ibabs_times.ts [--apply] [--before <iso>] [<sourceKey> ...]
+//   deno run -A scripts/repair_ibabs_times.ts [--apply] [--before <iso>] [--project <types>] [<sourceKey> ...]
 //
 // Without source keys it walks every iBabs source in the catalog. Without
 // --apply this is a dry run: it reports per source how many records it would
@@ -19,6 +19,12 @@
 // into Quickwit again. The new row carries the repair's own time, so it wins
 // `dedupeLatestIndexedHits` over the stale row instead of tying with it
 // (AGENTS.md, on reindexing in place). Nothing is asked of iBabs.
+//
+// --project limits which repaired types go back into Quickwit, for example
+// `--project Meeting`. Every repaired record still goes to the export log.
+// Re-projecting a document rehydrates its text and appends all its page rows,
+// which for the iBabs backlog is ~1.9M documents; leaving those to the next
+// projection-version reindex keeps that load off a live index.
 //
 // Must run where the export log, object storage and Quickwit are reachable:
 // on the server, inside the openbesluitvorming container.
@@ -45,8 +51,18 @@ async function main(): Promise<void> {
     console.error(`--before is not a timestamp: ${before}`);
     Deno.exit(1);
   }
+  const projectArg = argValue("project");
+  const projectTypes = projectArg
+    ? new Set(
+        projectArg
+          .split(",")
+          .map((type) => type.trim())
+          .filter(Boolean),
+      )
+    : null;
   const named = Deno.args.filter(
-    (arg, index) => !arg.startsWith("--") && Deno.args[index - 1] !== "--before",
+    (arg, index) =>
+      !arg.startsWith("--") && !["--before", "--project"].includes(Deno.args[index - 1]),
   );
   const ibabsKeys = new Set(
     listCatalogSources()
@@ -72,7 +88,8 @@ async function main(): Promise<void> {
   const batchSize = Math.max(1, Number(Deno.env.get("QUICKWIT_BATCH_SIZE") ?? "64"));
 
   console.log(
-    `${apply ? "APPLY" : "DRY RUN"}: ${sourceKeys.length} iBabs sources, records written before ${before}`,
+    `${apply ? "APPLY" : "DRY RUN"}: ${sourceKeys.length} iBabs sources, records written before ${before}` +
+      (projectTypes ? `, projecting only ${[...projectTypes].join(",")}` : ""),
   );
 
   let totalScanned = 0;
@@ -101,7 +118,10 @@ async function main(): Promise<void> {
             };
             // One record at a time keeps the flushes in order; the reads are
             // a few hundred per page at most.
-            await projectExportRecords(records, {
+            const toProject = projectTypes
+              ? records.filter((record) => projectTypes.has(record.entity_type))
+              : records;
+            await projectExportRecords(toProject, {
               storage,
               concurrency: 1,
               stats: projection,
