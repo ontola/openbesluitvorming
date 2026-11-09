@@ -133,6 +133,7 @@ export function buildStatusResponse(options: {
         lastRunStatus: run?.lastRunStatus,
         lastErrorMessage,
         latestContentDate: activity?.latestContentDate,
+        latestPastContentDate: activity?.latestPastContentDate,
         lastIndexedAt: activity?.lastIndexedAt,
         indexedDocuments: activity?.documentCount,
         discontinuedAt: source.discontinuedAt,

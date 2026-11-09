@@ -463,7 +463,13 @@ Deno.test("searchMeetings caps broad document scans after grouping", async () =>
     });
 
     assert(response.results.length === 1, "duplicate documents should still collapse");
-    assert(response.hasMore === true, "capped broad scans should still advertise more results");
+    // The budget ran out, and every page is read from the top with the same
+    // budget, so no offset reaches past what this scan collected: advertising
+    // a next page here sent clients to an empty one (#405). The answer says
+    // how far paging reaches instead.
+    assert(response.hasMore === false, "a capped scan has no page beyond its reach");
+    assert(response.totalIsApproximate === true, "the total is an estimate past the budget");
+    assert(response.reachableCount === 1, "paging reaches exactly what the scan collected");
     // Every window is read from the top (#312), so the scan has to be bounded
     // by a row budget rather than by the page size.
     const rowsRead = startOffsets.length > 0 ? Math.max(...startOffsets) : 0;
