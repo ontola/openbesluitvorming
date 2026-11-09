@@ -47,6 +47,7 @@ import { phraseSearchSlots, SearchGate } from "./search_gate.ts";
 import { createOpsHandler, OPS_PATH_PREFIX } from "./ops_api.ts";
 import { fetchExtractorStats } from "./extractors.ts";
 import { SITEMAP_FILE_PATTERN, SITEMAP_INDEX_KEY, SITEMAP_PREFIX } from "../src/exports/sitemap.ts";
+import { toNdjson } from "../src/exports/ndjson.ts";
 
 const root = new URL("./", import.meta.url);
 const distRoot = new URL("./dist/", import.meta.url);
@@ -135,9 +136,7 @@ function exportLimitParam(url: URL): number | undefined {
 }
 
 function ndjsonResponse(records: unknown[], headers: Record<string, string>): Response {
-  const body =
-    records.length > 0 ? records.map((record) => JSON.stringify(record)).join("\n") + "\n" : "";
-  return new Response(body, {
+  return new Response(toNdjson(records), {
     headers: {
       "content-type": "application/x-ndjson; charset=utf-8",
       ...headers,

@@ -680,6 +680,10 @@ Synchronization works in two steps:
    meeting), corrections, and deletions — there is no need to re-harvest.
 
 Both endpoints return NDJSON (`application/x-ndjson`): one record per line.
+Lines end in `\n` only; no record contains a raw line break. U+0085, U+2028 and
+U+2029 inside strings are escaped as `\u0085`, `\u2028` and `\u2029`, so a
+splitter that also breaks on those (such as Python's `str.splitlines()`) still
+sees one record per line. Splitting on `\n` is the safest choice.
 
 ### `GET /api/export/snapshot`
 
