@@ -1391,6 +1391,12 @@ Deno.test("an organization covers the organizations merged into it", async () =>
     amsterdam.includes("amsterdam_weesp"),
     `Amsterdam includes Stadsgebied Weesp, got ${amsterdam}`,
   );
+  // Landgraaf publishes meetings and video in Notubiz and documents in iBabs;
+  // one filter on Landgraaf should cover both systems.
+  assert(
+    organizationSourceKeys("landgraaf").join() === "landgraaf,landgraaf_ibabs",
+    `Landgraaf includes its iBabs source, got ${organizationSourceKeys("landgraaf")}`,
+  );
   assert(
     organizationSourceKeys("weesp").join() === "weesp",
     "a predecessor still filters on its own",
