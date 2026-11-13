@@ -37,7 +37,7 @@
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^7.3.0",
     "fast-xml-parser": "^5.11.0",
-    "happy-dom": "^20.11.6",
+    "happy-dom": "^21.0.4",
     "marked": "^18.0.11",
     "oxfmt": "^0.65.0",
     "oxlint": "^1.80.0",
