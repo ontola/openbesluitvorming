@@ -2,6 +2,7 @@ import { DatabaseSync } from "node:sqlite";
 import { buildEntityCommitEvent } from "../src/events/entity_commit.ts";
 import {
   EXPORT_BATCH_LIMIT_MAX,
+  EXPORT_SEGMENT_MAX_RECORDS,
   ExportChangesLog,
   type ExportSegmentStorage,
   parseChangesCursor,
@@ -381,4 +382,71 @@ Deno.test("iterateLiveRecords yields a source's live records under a prefix", as
     "only this source's documents",
   );
   assertEquals([...log.iterateLiveRecords("soest", "meeting:")], [], "no meetings, none returned");
+});
+
+Deno.test("flush cuts a large run into page-sized segments (#414)", async () => {
+  const { log, storage } = makeLog();
+  const total = EXPORT_SEGMENT_MAX_RECORDS * 2 + 5;
+  for (let index = 0; index < total; index += 1) {
+    await commit(log, makeDocument({ nativeId: String(index) }));
+  }
+
+  const flushed = await log.flush("soest");
+  assertEquals(flushed.recordCount, total, "flush reports every record");
+  assertEquals(storage.putCount, 3, "one object per page-sized chunk");
+  for (const body of storage.objects.values()) {
+    const lines = body.trim().split("\n").length;
+    assert(lines <= EXPORT_SEGMENT_MAX_RECORDS, `segment holds ${lines} lines`);
+  }
+  assertEquals(log.listOversizedSegments().length, 0, "no oversized segment is registered");
+
+  const seqs: number[] = [];
+  let cursor: string | null = null;
+  let hasMore = true;
+  while (hasMore) {
+    const page = await log.readChanges("soest", { cursor, limit: 700 });
+    seqs.push(...page.records.map((record) => record.seq));
+    cursor = page.nextCursor;
+    hasMore = page.hasMore;
+  }
+  assertEquals(seqs.length, total, "paging reads every record once");
+  assert(
+    seqs.every((seq, index) => seq === index),
+    "records come back in seq order across segment boundaries",
+  );
+});
+
+Deno.test("splitSegment rewrites a legacy oversized segment without changing the feed", async () => {
+  const storage = new FakeStorage();
+  const db = new DatabaseSync(":memory:");
+  const log = new ExportChangesLog({ db, storage });
+  const total = EXPORT_SEGMENT_MAX_RECORDS + 300;
+  for (let index = 0; index < total; index += 1) {
+    await commit(log, makeDocument({ nativeId: String(index) }));
+  }
+  await log.flush("soest");
+
+  // Recreate what an older flush published: the whole run as one object.
+  const segments = db
+    .prepare("SELECT object_key FROM export_segment WHERE source_key = 'soest' ORDER BY start_seq")
+    .all() as Array<{ object_key: string }>;
+  const legacyBody = segments.map((row) => storage.objects.get(row.object_key) ?? "").join("");
+  const legacyKey = "exports/soest/changes/legacy.ndjson";
+  storage.objects.set(legacyKey, legacyBody);
+  db.exec("DELETE FROM export_segment");
+  db.prepare(
+    `INSERT INTO export_segment (source_key, start_seq, end_seq, object_key, record_count, created_at)
+     VALUES ('soest', 0, ?, ?, ?, '2026-07-10T12:00:00.000Z')`,
+  ).run(total - 1, legacyKey, total);
+
+  const before = await log.readChanges("soest", { cursor: "950", limit: 100 });
+  assertEquals(log.listOversizedSegments("soest").length, 1, "legacy segment is oversized");
+
+  const parts = await log.splitSegment("soest", 0);
+  assertEquals(parts, 2, "split into two page-sized segments");
+  assertEquals(log.listOversizedSegments().length, 0, "nothing oversized remains");
+
+  const after = await log.readChanges("soest", { cursor: "950", limit: 100 });
+  assertEquals(after, before, "the same page reads the same records after the split");
+  assertEquals(await log.splitSegment("soest", 0), 0, "splitting again is a no-op");
 });
