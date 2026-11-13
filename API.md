@@ -669,6 +669,12 @@ curl -o page1.jpg "https://openbesluitvorming.nl/api/entities/document%3Anotubiz
 The export endpoints are the supported way to harvest or synchronize data in
 bulk. Do not use the search endpoints for harvesting.
 
+A search call that does not come from a browser (no `Sec-Fetch-Site` header)
+gets a `Link: <https://openbesluitvorming.nl/docs/api#bulk-export>; rel="help"`
+header and an `X-Openbesluitvorming-Notice` header pointing here. If you see
+them, you are probably harvesting through search: switch to the export
+endpoints below.
+
 Synchronization works in two steps:
 
 1. **Initial sync** — page through `/api/export/snapshot` for the current

@@ -1050,6 +1050,16 @@ worker socket-leak signal). It ships everything to
 `/opt/woozi/.env`. Disable app telemetry with `OTEL_DENO=0` in that `.env`.
 Losing the collector never pages: it is not in the monitor's critical path.
 
+Request spans carry only the path, not the query string, user agent or client
+address. Who uses the API is in the `api_usage` log line instead
+([web/usage_log.ts](web/usage_log.ts)): one per web container per ten minutes,
+with requests per route, search calls split by origin (`site` is the search
+box on openbesluitvorming.nl, `script` is anything without `Sec-Fetch-Site`),
+and the 15 busiest clients. For scripts that includes their address and user
+agent (often the only contact address a reuser leaves); browsers stay
+anonymous. Query text is never
+logged. `WOOZI_USAGE_LOG=0` turns it off.
+
 Satellite nodes (extraction workers, ori3) run a hostmetrics-only collector
 ([otel/node-collector.yaml](otel/node-collector.yaml)) so the whole fleet is
 visible in SigNoz's Infrastructure view. New extraction hosts get it from
