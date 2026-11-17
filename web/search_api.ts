@@ -11,6 +11,7 @@ import type {
 } from "../src/types.ts";
 import { getConfigValue } from "../src/config.ts";
 import { getExportLog } from "../src/exports/log.ts";
+import { resultContradictsTally } from "../src/motions/normalize.ts";
 import { NotubizClient } from "../src/notubiz/client.ts";
 import { normalizeNotubizAgendaItems } from "../src/notubiz/normalize.ts";
 import {
@@ -1879,6 +1880,10 @@ function motionFromHit(hit: SearchHit): MeetingMotion {
     parties: hit.payload?.parties,
     votes: hit.payload?.votes,
     tally: hit.payload?.tally,
+    // Computed at read time, so motions already in the index carry it too.
+    result_contradicts_tally: resultContradictsTally(hit.payload?.result, hit.payload?.tally)
+      ? true
+      : undefined,
     vote_summary: hit.payload?.vote_summary,
     agenda_item: hit.payload?.agenda_item,
     agenda_item_hint: hit.payload?.agenda_item_hint,
@@ -2247,4 +2252,5 @@ export const __test__ = {
   preferIndexedHit,
   withDownloadUrls,
   entitySourceUrl,
+  motionFromHit,
 };
