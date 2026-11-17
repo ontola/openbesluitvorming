@@ -15,6 +15,7 @@ import {
   type SupplierRunWindow,
 } from "../src/ops/store.ts";
 import { listCatalogSources, SUPPLIER_LABELS } from "../src/sources/index.ts";
+import { getExportLog } from "../src/exports/log.ts";
 import { getSourceIndexActivity, type SourceIndexActivity } from "./search_api.ts";
 
 /** How long a source may go without a successful import before it stops
@@ -99,11 +100,14 @@ function latestTimestamp(values: Array<string | undefined>): string | undefined 
 export function buildStatusResponse(options: {
   runStatus: { sources: SourceRunStatus[]; supplierWindows: SupplierRunWindow[] };
   indexActivity: Map<string, SourceIndexActivity> | null;
+  /** Live documents per source from the export log, or null when it could not
+   * be read. */
+  documentCounts?: Map<string, number> | null;
   coverageChecks?: CoverageCheckRecord[];
   now: number;
   windowHours: number;
 }): StatusResponse {
-  const { runStatus, indexActivity, coverageChecks, now, windowHours } = options;
+  const { runStatus, indexActivity, documentCounts, coverageChecks, now, windowHours } = options;
   const runBySource = new Map(runStatus.sources.map((row) => [row.sourceKey, row]));
   const windowBySupplier = new Map(runStatus.supplierWindows.map((row) => [row.supplier, row]));
 
@@ -135,7 +139,7 @@ export function buildStatusResponse(options: {
         latestContentDate: activity?.latestContentDate,
         latestPastContentDate: activity?.latestPastContentDate,
         lastIndexedAt: activity?.lastIndexedAt,
-        indexedDocuments: activity?.documentCount,
+        indexedDocuments: documentCounts?.get(source.key),
         discontinuedAt: source.discontinuedAt,
         succeededBy:
           source.succeededByCbsId && source.succeededByLabel
@@ -251,6 +255,23 @@ async function computeStatus(windowHours: number): Promise<StatusResponse> {
     console.warn(`[status] index activity unavailable, reporting imports only: ${message}`);
   }
 
+  // The document count comes from the export log, not the search index. The
+  // index is append-only and keeps a row for every commit of a document, so
+  // after a re-import it counted Provincie Limburg's 56,687 documents as
+  // 141,933 (#431). The export log keeps one row per entity: the same set the
+  // export hands out, and what the coverage check compares with.
+  let documentCounts: Map<string, number> | null = null;
+  try {
+    const log = await getExportLog();
+    documentCounts = log.countLiveEntitiesBySource(
+      listCatalogSources().map((source) => source.key),
+      "document:",
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[status] document counts unavailable: ${message}`);
+  }
+
   // The coverage check is optional in the same way: absent until the weekly
   // job has run, and never a reason for the endpoint to fail.
   let coverageChecks: CoverageCheckRecord[] | undefined;
@@ -264,6 +285,7 @@ async function computeStatus(windowHours: number): Promise<StatusResponse> {
   return buildStatusResponse({
     runStatus,
     indexActivity,
+    documentCounts,
     coverageChecks,
     now: Date.now(),
     windowHours,
