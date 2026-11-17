@@ -136,6 +136,8 @@ Deno.test("a recorded check surfaces on the status response as coverage", async 
   assertEquals(source?.coverage?.supplierDocuments, 1600);
   assertEquals(source?.coverage?.ratio, 0.988);
   assertEquals(source?.coverage?.lowerBound, true, "two failed requests make it a lower bound");
+  assertEquals(source?.coverage?.failedRequests, 2, "and says how many failed");
+  assertEquals(source?.coverage?.supplierMeetings, 70);
   const other = response.sources.find((row) => row.sourceKey === "dongen");
   assertEquals(other?.coverage, undefined, "no check, no field");
 });
@@ -171,6 +173,7 @@ Deno.test("a failed check publishes no numbers instead of zeros", async () => {
   assertEquals(coverage?.missingDocuments, null);
   assertEquals(coverage?.ratio, null);
   assertEquals(coverage?.lowerBound, true);
+  assertEquals(coverage?.failedRequests, undefined, "a failed check counts nothing");
 });
 
 Deno.test("a supplier listing nothing has no ratio instead of 1", async () => {
