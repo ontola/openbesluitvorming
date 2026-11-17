@@ -142,3 +142,24 @@ export function supplierDateTimeToUtc(value?: string): string | undefined {
     ),
   );
 }
+
+const SECOND_PRECISION_ZULU = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?)Z$/;
+
+/** Undo the old stamping: read a `…Z` value as the Dutch wall clock it was.
+ *
+ * Until 2026-08-13 the iBabs normaliser appended `Z` to its bare readings, so
+ * a 19:30 meeting was stored as `19:30:00Z`. The export log still holds those
+ * values for every entity no import has rewritten since, and nothing in the
+ * value tells them apart from a real UTC instant; only the record's write time
+ * does. This is for repairing exactly those records, and wrong on anything
+ * else: applied to a correct value it shifts it again.
+ *
+ * Midnight stays midnight, for the reason `supplierDateTimeToUtc` gives. A
+ * value of any other shape is returned unchanged. */
+export function reinterpretZuluAsWallClock(value: string): string {
+  const match = SECOND_PRECISION_ZULU.exec(value);
+  if (!match) {
+    return value;
+  }
+  return supplierDateTimeToUtc(match[1]) ?? value;
+}

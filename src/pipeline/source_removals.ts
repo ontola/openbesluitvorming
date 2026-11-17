@@ -25,12 +25,21 @@
  *     only unlinked from the agenda but still downloads stays. So that an
  *     outage or a block cannot pass for a removal, a document the meeting
  *     still lists is asked first and has to answer "live".
+ *   - One sighting is not enough (#380). The first run that finds a document
+ *     dropped and gone only records it as a suspect. A later run, at least
+ *     `minSuspectAgeMs` after that, retracts it if the meeting still leaves
+ *     it out and the supplier again says gone. iBabs rebuilds an agenda
+ *     bundle during the day under the same id, and in the first two weeks a
+ *     third of the bundles retracted after one night were back the next day.
+ *     A suspect the meeting lists again, or that the supplier serves again,
+ *     is forgotten.
  */
 
 import type { SourceProbe } from "../documents/source_presence.ts";
 import type { ExportChangeRecord, MeetingEntity } from "../types.ts";
 
 const DEFAULT_MAX_REMOVALS_PER_RUN = 25;
+const DEFAULT_MIN_SUSPECT_AGE_HOURS = 12;
 
 /** Entity kinds whose records list documents. */
 const REFERENCING_PREFIXES = ["meeting:", "motion:"];
@@ -40,9 +49,27 @@ export interface SourceRemovalLog {
   findReferencedEntityIds(sourceKey: string, entityIds: string[], prefixes: string[]): Set<string>;
 }
 
+/** A document an earlier run found dropped and gone once. */
+export interface SourceRemovalSuspect {
+  entityId: string;
+  meetingId: string;
+  firstSeenAt: string;
+}
+
+export interface SourceRemovalCandidate {
+  entityId: string;
+  meetingId: string;
+  /** Set for a second sighting: when the first run saw it. Without it the
+   * candidate is a first sighting and only becomes a suspect. */
+  firstSeenAt?: string;
+}
+
 export interface SourceRemovalPlan {
-  /** Document entity ids to retract. Empty when the cap was exceeded. */
-  remove: Array<{ entityId: string; meetingId: string }>;
+  /** Documents to ask the supplier about. Empty when the cap was exceeded. */
+  remove: SourceRemovalCandidate[];
+  /** Suspects that are back on their meeting, emitted again or already
+   * deleted: forget them. */
+  clearSuspects?: string[];
   /** A document still listed by one of those meetings, to tell an outage
    * apart from a removal. */
   controlEntityId?: string;
@@ -62,6 +89,17 @@ export function maxSourceRemovalsPerRun(): number {
   return Number.isFinite(value) && value >= 0 ? value : DEFAULT_MAX_REMOVALS_PER_RUN;
 }
 
+/** How long a suspect waits before a run may retract it. Long enough that a
+ * second run on the same night (a manual run, the weekly sweep) does not
+ * count as a second sighting. */
+export function minSourceRemovalSuspectAgeMs(): number {
+  const value = Number(
+    Deno.env.get("WOOZI_SOURCE_REMOVALS_MIN_HOURS") ?? DEFAULT_MIN_SUSPECT_AGE_HOURS,
+  );
+  const hours = Number.isFinite(value) && value >= 0 ? value : DEFAULT_MIN_SUSPECT_AGE_HOURS;
+  return hours * 3_600_000;
+}
+
 function attachmentIds(payload: unknown): string[] {
   const attachment = (payload as { attachment?: unknown } | undefined)?.attachment;
   return Array.isArray(attachment)
@@ -72,6 +110,8 @@ function attachmentIds(payload: unknown): string[] {
 export class SourceRemovalTracker {
   private readonly candidates = new Map<string, string>();
   private readonly emitted = new Set<string>();
+  /** Every meeting this run saw, with the documents it lists now. */
+  private readonly observed = new Map<string, Set<string>>();
   private readonly skippedMeetings: string[] = [];
   private controlEntityId: string | undefined;
 
@@ -82,6 +122,7 @@ export class SourceRemovalTracker {
 
   /** Call before the meeting's new version is committed to the log. */
   observeMeeting(meeting: MeetingEntity): void {
+    this.observed.set(meeting.id, new Set(meeting.attachment ?? []));
     const previous = this.log.getEntityRecord(this.sourceKey, meeting.id);
     if (!previous || previous.op !== "upsert") {
       return;
@@ -112,39 +153,85 @@ export class SourceRemovalTracker {
     this.emitted.add(entityId);
   }
 
-  plan(maxPerRun: number): SourceRemovalPlan {
-    const pending = [...this.candidates.keys()].filter((entityId) => {
-      if (this.emitted.has(entityId)) {
-        return false;
+  plan(
+    maxPerRun: number,
+    options: { suspects?: SourceRemovalSuspect[]; now?: Date; minSuspectAgeMs?: number } = {},
+  ): SourceRemovalPlan {
+    const isLive = (entityId: string) =>
+      !this.emitted.has(entityId) &&
+      this.log.getEntityRecord(this.sourceKey, entityId)?.op === "upsert";
+
+    const firstSeen = new Map<string, string>();
+    const meetingOf = new Map(this.candidates);
+    const clearSuspects: string[] = [];
+    let control = this.controlEntityId;
+    const now = (options.now ?? new Date()).getTime();
+    const minAge = options.minSuspectAgeMs ?? minSourceRemovalSuspectAgeMs();
+    for (const suspect of options.suspects ?? []) {
+      const listed = this.observed.get(suspect.meetingId);
+      if (!listed) {
+        // The meeting did not come back this run: no new sighting either way.
+        continue;
       }
-      const current = this.log.getEntityRecord(this.sourceKey, entityId);
-      return current?.op === "upsert";
-    });
+      if (listed.has(suspect.entityId) || !isLive(suspect.entityId)) {
+        clearSuspects.push(suspect.entityId);
+        continue;
+      }
+      if (now - Date.parse(suspect.firstSeenAt) < minAge) {
+        continue;
+      }
+      firstSeen.set(suspect.entityId, suspect.firstSeenAt);
+      meetingOf.set(suspect.entityId, suspect.meetingId);
+      // A meeting unchanged since the first sighting dropped nothing new, so
+      // no control document was picked yet: take one it still lists.
+      control ??= [...listed].find((id) => id.startsWith("document:"));
+    }
+
+    const pending = [...meetingOf.keys()].filter(isLive);
     const referenced =
       pending.length > 0
         ? this.log.findReferencedEntityIds(this.sourceKey, pending, REFERENCING_PREFIXES)
         : new Set<string>();
+    for (const entityId of pending) {
+      if (referenced.has(entityId) && firstSeen.has(entityId)) {
+        clearSuspects.push(entityId);
+      }
+    }
     const remove = pending
       .filter((entityId) => !referenced.has(entityId))
-      .map((entityId) => ({ entityId, meetingId: this.candidates.get(entityId)! }));
+      .map((entityId): SourceRemovalCandidate => {
+        const seen = firstSeen.get(entityId);
+        return {
+          entityId,
+          meetingId: meetingOf.get(entityId)!,
+          ...(seen ? { firstSeenAt: seen } : {}),
+        };
+      });
+    const cleared = clearSuspects.length > 0 ? { clearSuspects } : {};
 
     if (remove.length > maxPerRun) {
       return {
         remove: [],
+        ...cleared,
         capExceeded: { candidates: remove.length, max: maxPerRun },
         skippedMeetings: this.skippedMeetings,
       };
     }
-    return { remove, controlEntityId: this.controlEntityId, skippedMeetings: this.skippedMeetings };
+    return {
+      remove,
+      ...cleared,
+      controlEntityId: control,
+      skippedMeetings: this.skippedMeetings,
+    };
   }
 }
 
 export interface ConfirmedRemovals {
   /** Confirmed gone, each with the supplier's answer as evidence. */
-  remove: Array<{ entityId: string; meetingId: string; probe: SourceProbe }>;
+  remove: Array<SourceRemovalCandidate & { probe: SourceProbe }>;
   /** Candidates the supplier still serves, or could not say about. Without a
    * probe when the control document stopped the run before asking. */
-  kept: Array<{ entityId: string; meetingId: string; probe?: SourceProbe }>;
+  kept: Array<SourceRemovalCandidate & { probe?: SourceProbe }>;
   /** The still-listed document asked first, and its answer. */
   control?: { entityId: string; probe: SourceProbe };
   /** True when the control document did not answer "live". */

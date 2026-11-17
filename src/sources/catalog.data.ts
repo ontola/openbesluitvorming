@@ -3728,6 +3728,26 @@ export const sourceCatalog = [
     implemented: true,
   },
   {
+    sourceRef: "ibabs:gemeente:landgraaf",
+    key: "landgraaf_ibabs",
+    label: "Landgraaf (iBabs)",
+    sourceName: "Landgraaf",
+    supplier: "ibabs",
+    organizationType: "gemeente",
+    allmanakId: 34171,
+    cbsId: "GM0882",
+    ibabsSitename: "landgraaf",
+    // Not in the ORI inventory: added 2026-11-12 after questions from the
+    // municipality via VNG. Landgraaf moved its council documents from
+    // Notubiz (`landgraaf`, still used for meetings and video) to iBabs
+    // around 2023; Notubiz has held almost no documents since. Searched
+    // under `landgraaf` so one organization filter covers both systems.
+    partOfSourceKey: "landgraaf",
+    legacyConfigFile: "ori.ibabs.yaml",
+    legacyConfigRoot: "ori.ibabs",
+    implemented: true,
+  },
+  {
     sourceRef: "notubiz:gemeente:laren",
     key: "laren",
     label: "Laren",

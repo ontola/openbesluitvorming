@@ -34,7 +34,7 @@ Deno.test("a weeknight enqueues only the nightly window", () => {
   // Tuesday 2026-09-29, 02:00 CEST.
   const windows = __test__.scheduledWindows(new Date("2026-09-29T00:00:00Z"));
   assert(windows.length === 1, `got ${JSON.stringify(windows)}`);
-  assert(windows[0].dateFrom === "2026-09-22" && windows[0].dateTo === "2026-10-06", "±7 days");
+  assert(windows[0].dateFrom === "2026-09-22" && windows[0].dateTo === "2026-10-27", "-7..+28 days");
 });
 
 Deno.test("Saturday night adds the sweep, adjacent to the nightly window", () => {

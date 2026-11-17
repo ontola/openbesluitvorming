@@ -48,6 +48,10 @@ export interface MeetingEntity {
   parent?: string;
   agenda?: MeetingAgendaItem[];
   attachment?: string[];
+  /** The meeting's page on the supplier's own portal, where a visitor finds
+   * documents published after our last import and the live stream (#340).
+   * Notubiz names it; for iBabs the detail endpoint derives it from the site. */
+  source_url?: string;
   source_info: SourceInfo;
   raw: unknown;
 }
@@ -762,6 +766,9 @@ export interface SearchResponse {
   results: SearchResult[];
   totalCount?: number;
   totalIsApproximate?: boolean;
+  /** How many results paging can reach. Equal to `totalCount` unless the scan
+   * ran out of budget, when it is the depth at which pages run dry. */
+  reachableCount?: number;
   hasMore?: boolean;
 }
 
@@ -827,6 +834,9 @@ export interface EntityContentResponse {
   contentType?: string;
   pdfUrl?: string;
   meetingId?: string;
+  /** Where this entity is published at the source: the supplier's portal page
+   * for a meeting, the supplier's file for a document (#340). */
+  sourceUrl?: string;
   agenda?: MeetingAgendaItem[];
   /** Motions decided in this meeting, when the entity is a Meeting. */
   motions?: MeetingMotion[];
@@ -914,6 +924,9 @@ export interface SourceStatus {
   /** Newest meeting date held for this source. Often in the future: an agenda
    * is published before the meeting happens. */
   latestContentDate?: string;
+  /** Newest meeting date held for this source that is not after the moment
+   * of the request: the latest material that already exists (#397). */
+  latestPastContentDate?: string;
   /** When anything was last written to the search index for this source. */
   lastIndexedAt?: string;
   /** Documents in the search index for this source, exact at the moment of
@@ -948,6 +961,16 @@ export interface SourceCoverage {
   missingDocuments: number | null;
   ratio: number | null;
   lowerBound: boolean;
+  /** Supplier requests that failed during the check. Why `lowerBound` is set,
+   * and how much it matters: two failed requests out of thousands are noise,
+   * half of them makes `supplierDocuments` meaningless. Absent when `error`
+   * is set. */
+  failedRequests?: number;
+  /** Meetings the supplier listed in the window, so a drop in
+   * `supplierDocuments` between two checks can be told apart from a drop in
+   * meetings (a check that lost part of its listing). Absent when `error` is
+   * set. */
+  supplierMeetings?: number;
   /** A few of the missing document ids, for a human to verify. */
   missingSample: string[];
   /** Set when the check itself failed for this source. */

@@ -670,7 +670,12 @@ export async function materializeDocument(
           return quarantined;
         }
 
-        const quality = payload.markdown ? assessMarkdownQuality(payload.markdown) : null;
+        // An empty result from a PDF with pages is suspect too: it is a scan, or
+        // text the extractor could not see (#356). It used to carry no verdict.
+        const quality =
+          payload.page_count > 0 || payload.markdown
+            ? assessMarkdownQuality(payload.markdown ?? "")
+            : null;
         console.log(
           `[timing] ${docId} path=${pageRepairFallback ? "page_repair" : "extraction_service"} ${Math.round(performance.now() - t0)}ms pages=${payload.page_count} md=${Math.round(payload.markdown.length / 1024)}KB`,
         );

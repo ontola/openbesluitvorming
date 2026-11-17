@@ -13,7 +13,7 @@ import {
 } from "./motions.ts";
 import { normalizeNotubizRecording } from "./recordings.ts";
 import { storeTranscript } from "../recordings/storage.ts";
-import { MeetingIndex } from "../motions/normalize.ts";
+import { createUnmappedStatusReporter, MeetingIndex } from "../motions/normalize.ts";
 import { ObjectStorageClient } from "../storage/s3.ts";
 import { mapLimit } from "../util/map_limit.ts";
 import { splitDateRange } from "../util/date_range.ts";
@@ -543,6 +543,7 @@ export class NotubizMeetingExtractor {
       return;
     }
 
+    const reportUnmappedStatus = createUnmappedStatusReporter(source.key);
     for (const module of modules.filter((m) => isMotionModule(m) || isRegisterModule(m))) {
       let items: NotubizModuleItem[];
       try {
@@ -570,6 +571,7 @@ export class NotubizMeetingExtractor {
         }
         if (isMotionModule(module)) {
           const motion = normalizeNotubizMotion(source, module, item, context.meetingIndex);
+          reportUnmappedStatus(motion.status);
           await context.onMotion(motion, normalizeNotubizMotionDocuments(source, motion, item));
         } else {
           const documents = normalizeNotubizRegisterDocuments(
