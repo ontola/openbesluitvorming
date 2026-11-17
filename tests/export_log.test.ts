@@ -369,6 +369,34 @@ Deno.test("countLiveEntities dedupes commits and excludes deletes", async () => 
   assertEquals(log.countLiveEntities("meeting:"), 0, "prefix scopes the count");
 });
 
+Deno.test("countLiveEntitiesBySource counts one per entity per source, without deletes (#431)", async () => {
+  const { log } = makeLog();
+
+  await commit(log, makeDocument({ nativeId: "1" }));
+  await commit(log, makeDocument({ nativeId: "1", markdown: ["# Nieuwe inhoud"] })); // re-commit
+  await commit(log, makeDocument({ nativeId: "2" }));
+  await commit(log, makeDocument({ sourceKey: "haarlem", nativeId: "1" }));
+  const deleted = makeDocument({ nativeId: "3" });
+  await commit(log, deleted);
+  log.recordDelete({
+    entityId: deleted.id,
+    sourceKey: "soest",
+    supplier: "notubiz",
+    entityType: "Document",
+    time: "2026-07-11T12:00:00.000Z",
+  });
+
+  const counts = log.countLiveEntitiesBySource(["soest", "haarlem", "elders"], "document:");
+  assertEquals(counts.get("soest"), 2, "a re-commit and a delete do not add to the count");
+  assertEquals(counts.get("haarlem"), 1, "each source is counted on its own");
+  assertEquals(counts.get("elders"), 0, "a source without rows answers 0");
+  assertEquals(
+    log.countLiveEntitiesBySource(["soest"], "meeting:").get("soest"),
+    0,
+    "the prefix scopes the count",
+  );
+});
+
 Deno.test("iterateLiveRecords yields a source's live records under a prefix", async () => {
   const { log } = makeLog();
   await commit(log, makeDocument({ nativeId: "1" }));
