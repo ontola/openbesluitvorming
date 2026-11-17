@@ -37,6 +37,7 @@ import {
   pdfPageMetaKey,
   renderPdfPageJpeg,
 } from "../src/documents/thumbnails.ts";
+import { annotateApiSpan } from "./client_telemetry.ts";
 import { getStatus } from "./status_api.ts";
 import { RATE_LIMIT_PAGE_UNIT, RateLimiter, type RateVerdict, requestCost } from "./rate_limit.ts";
 import { apiError } from "./api_errors.ts";
@@ -47,6 +48,7 @@ import { phraseSearchSlots, SearchGate } from "./search_gate.ts";
 import { createOpsHandler, OPS_PATH_PREFIX } from "./ops_api.ts";
 import { fetchExtractorStats } from "./extractors.ts";
 import { SITEMAP_FILE_PATTERN, SITEMAP_INDEX_KEY, SITEMAP_PREFIX } from "../src/exports/sitemap.ts";
+import { toNdjson } from "../src/exports/ndjson.ts";
 
 const root = new URL("./", import.meta.url);
 const distRoot = new URL("./dist/", import.meta.url);
@@ -135,9 +137,7 @@ function exportLimitParam(url: URL): number | undefined {
 }
 
 function ndjsonResponse(records: unknown[], headers: Record<string, string>): Response {
-  const body =
-    records.length > 0 ? records.map((record) => JSON.stringify(record)).join("\n") + "\n" : "";
-  return new Response(body, {
+  return new Response(toNdjson(records), {
     headers: {
       "content-type": "application/x-ndjson; charset=utf-8",
       ...headers,
@@ -1084,6 +1084,8 @@ const handleOpsRequest = createOpsHandler({ token: Deno.env.get("WOOZI_OPS_TOKEN
 
 Deno.serve({ port }, async (request, info) => {
   const url = new URL(request.url);
+  // Before the rate limiter, so a refused request still says who was refused.
+  await annotateApiSpan(request, url.pathname, clientKey(request, info?.remoteAddr));
   if (url.pathname.startsWith(OPS_PATH_PREFIX) || url.pathname === "/api/ops") {
     return await handleOpsRequest(request, clientKey(request, info?.remoteAddr));
   }
