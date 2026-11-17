@@ -25,21 +25,14 @@ jobs:
 
     steps:
       - name: Check out
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Set up Deno
         uses: denoland/setup-deno@v2
         with:
-          # Deliberately NOT the 2.7.7 in Dockerfile.web. The codebase does not
-          # type-check on 2.7.7: aws4fetch's fetch signature resolves without
-          # `method` there, giving 9 errors in src/storage/s3.ts. Verified by
-          # running deno check in both images — 2.7.7 fails, 2.8.3 is clean.
-          #
-          # Types are not enforced at runtime, so production is unaffected, but
-          # the runtime image and the version developers run have drifted apart.
-          # Worth closing by bumping Dockerfile.web; that is a change to what
-          # runs in production and belongs in its own commit, not smuggled into
-          # a CI fix.
+          # Keep in step with the runtime image in Dockerfile.web. 2.7.7 did not
+          # type-check this codebase (aws4fetch's fetch signature resolved
+          # without `method`, 9 errors in src/storage/s3.ts); 2.8.3 is clean.
           deno-version: 2.8.3
 
       - name: Check types
@@ -53,7 +46,7 @@ jobs:
 
     steps:
       - name: Check out
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       # pnpm comes from its own action, not from corepack: corepack downloads
       # pnpm on every run and that download tripped an undici assertion in
@@ -63,7 +56,7 @@ jobs:
         uses: pnpm/action-setup@v4
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: pnpm
