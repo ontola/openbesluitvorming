@@ -12,6 +12,8 @@ import type {
 
 export const EXPORT_BATCH_LIMIT_MAX = 1000;
 export const EXPORT_BATCH_LIMIT_DEFAULT = 500;
+/** Most records one published changes segment holds: one full page. */
+export const EXPORT_SEGMENT_MAX_RECORDS = EXPORT_BATCH_LIMIT_MAX;
 
 /** Structural subset of ObjectStorageClient so tests can use an in-memory fake. */
 export interface ExportSegmentStorage {
@@ -277,6 +279,39 @@ export class ExportChangesLog {
       return { recordCount: 0 };
     }
 
+    // A backfill run can buffer tens of thousands of records before its one
+    // flush. Published as a single object, every changes page that touched it
+    // downloaded and scanned the whole thing (10 to 20 s a page, #414). Cut
+    // the run into segments no larger than a page, so a page reads at most
+    // two small objects.
+    const segments: Array<{ startSeq: number; endSeq: number; objectKey: string; count: number }> =
+      [];
+    for (let offset = 0; offset < rows.length; offset += EXPORT_SEGMENT_MAX_RECORDS) {
+      const chunk = rows.slice(offset, offset + EXPORT_SEGMENT_MAX_RECORDS);
+      segments.push(await this.putSegment(sourceKey, chunk));
+    }
+
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      for (const segment of segments) {
+        this.registerSegment(sourceKey, segment);
+      }
+      this.db
+        .prepare("DELETE FROM export_pending WHERE source_key = ? AND seq <= ?")
+        .run(sourceKey, rows[rows.length - 1].seq);
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+
+    return { recordCount: rows.length, objectKey: segments[0].objectKey };
+  }
+
+  private async putSegment(
+    sourceKey: string,
+    rows: Array<{ seq: number; record: string }>,
+  ): Promise<{ startSeq: number; endSeq: number; objectKey: string; count: number }> {
     const startSeq = rows[0].seq;
     const endSeq = rows[rows.length - 1].seq;
     const objectKey = `exports/${sourceKey}/changes/${padSeq(startSeq)}-${padSeq(endSeq)}.ndjson`;
@@ -284,30 +319,118 @@ export class ExportChangesLog {
     await this.storage.putObject(objectKey, new TextEncoder().encode(body), {
       contentType: "application/x-ndjson",
     });
+    return { startSeq, endSeq, objectKey, count: rows.length };
+  }
+
+  private registerSegment(
+    sourceKey: string,
+    segment: { startSeq: number; endSeq: number; objectKey: string; count: number },
+  ): void {
+    this.db
+      .prepare(
+        `INSERT INTO export_segment (source_key, start_seq, end_seq, object_key, record_count, created_at)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(source_key, start_seq) DO UPDATE SET
+           end_seq = excluded.end_seq,
+           object_key = excluded.object_key,
+           record_count = excluded.record_count,
+           created_at = excluded.created_at`,
+      )
+      .run(
+        sourceKey,
+        segment.startSeq,
+        segment.endSeq,
+        segment.objectKey,
+        segment.count,
+        new Date().toISOString(),
+      );
+  }
+
+  /** Segments published before flush cut runs into pages, larger than
+   * EXPORT_SEGMENT_MAX_RECORDS. */
+  listOversizedSegments(sourceKey?: string): Array<{
+    sourceKey: string;
+    startSeq: number;
+    endSeq: number;
+    objectKey: string;
+    recordCount: number;
+  }> {
+    const rows = this.db
+      .prepare(
+        `SELECT source_key, start_seq, end_seq, object_key, record_count FROM export_segment
+         WHERE record_count > ? AND (? IS NULL OR source_key = ?)
+         ORDER BY source_key, start_seq`,
+      )
+      .all(EXPORT_SEGMENT_MAX_RECORDS, sourceKey ?? null, sourceKey ?? null) as Array<{
+      source_key: string;
+      start_seq: number;
+      end_seq: number;
+      object_key: string;
+      record_count: number;
+    }>;
+    return rows.map((row) => ({
+      sourceKey: row.source_key,
+      startSeq: row.start_seq,
+      endSeq: row.end_seq,
+      objectKey: row.object_key,
+      recordCount: row.record_count,
+    }));
+  }
+
+  /** Rewrite one oversized segment as page-sized segments covering the same
+   * seq range. The records and their order do not change, so a client in the
+   * middle of the feed keeps reading the same lines. The old object is left in
+   * storage; nothing references it once the new rows are committed. */
+  async splitSegment(sourceKey: string, startSeq: number): Promise<number> {
+    const row = this.db
+      .prepare(
+        "SELECT end_seq, object_key, record_count FROM export_segment WHERE source_key = ? AND start_seq = ?",
+      )
+      .get(sourceKey, startSeq) as
+      | { end_seq: number; object_key: string; record_count: number }
+      | undefined;
+    if (!row || row.record_count <= EXPORT_SEGMENT_MAX_RECORDS) {
+      return 0;
+    }
+
+    const text = await this.storage.getObjectText(row.object_key);
+    const lines: Array<{ seq: number; record: string }> = [];
+    for (const line of text.split("\n")) {
+      const trimmed = line.trim();
+      if (trimmed) {
+        lines.push({ seq: (JSON.parse(trimmed) as ExportChangeRecord).seq, record: trimmed });
+      }
+    }
+    if (
+      lines.length !== row.record_count ||
+      lines[0].seq !== startSeq ||
+      lines[lines.length - 1].seq !== row.end_seq
+    ) {
+      throw new Error(
+        `Segment ${row.object_key} does not match its registration ` +
+          `(${lines.length} lines, expected ${row.record_count} for ${startSeq}-${row.end_seq})`,
+      );
+    }
+
+    const segments: Array<{ startSeq: number; endSeq: number; objectKey: string; count: number }> =
+      [];
+    for (let offset = 0; offset < lines.length; offset += EXPORT_SEGMENT_MAX_RECORDS) {
+      segments.push(
+        await this.putSegment(sourceKey, lines.slice(offset, offset + EXPORT_SEGMENT_MAX_RECORDS)),
+      );
+    }
 
     this.db.exec("BEGIN IMMEDIATE");
     try {
-      this.db
-        .prepare(
-          `INSERT INTO export_segment (source_key, start_seq, end_seq, object_key, record_count, created_at)
-           VALUES (?, ?, ?, ?, ?, ?)
-           ON CONFLICT(source_key, start_seq) DO UPDATE SET
-             end_seq = excluded.end_seq,
-             object_key = excluded.object_key,
-             record_count = excluded.record_count,
-             created_at = excluded.created_at`,
-        )
-        .run(sourceKey, startSeq, endSeq, objectKey, rows.length, new Date().toISOString());
-      this.db
-        .prepare("DELETE FROM export_pending WHERE source_key = ? AND seq <= ?")
-        .run(sourceKey, endSeq);
+      for (const segment of segments) {
+        this.registerSegment(sourceKey, segment);
+      }
       this.db.exec("COMMIT");
     } catch (error) {
       this.db.exec("ROLLBACK");
       throw error;
     }
-
-    return { recordCount: rows.length, objectKey };
+    return segments.length;
   }
 
   private headNextSeq(sourceKey: string): number {
