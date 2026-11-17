@@ -4,6 +4,7 @@
     "jsr:@std/assert@*": "1.0.19",
     "jsr:@std/internal@^1.0.12": "1.0.14",
     "npm:@aws-sdk/client-s3@*": "3.1020.0",
+    "npm:@opentelemetry/api@^1.9.0": "1.10.0",
     "npm:@smithy/node-http-handler@*": "4.5.1",
     "npm:@sveltejs/vite-plugin-svelte@^7.3.1": "7.3.1_svelte@5.57.3_vite@8.3.8",
     "npm:aws4fetch@*": "1.0.20",
@@ -595,6 +596,9 @@
     },
     "@nodable/entities@3.1.0": {
       "integrity": "sha512-LsS/DjHr+uDM647Gru/cA8+J3a3HfhttwCKLyuoyN7yXTFCxKBtSgMQBvrW9yNPa2/zDRUNuGPaH5QUFoa4arQ=="
+    },
+    "@opentelemetry/api@1.10.0": {
+      "integrity": "sha512-lMkyes8iHrG+mk6WH7X70MdCLI2RS0FwNBY1PyQ8UemaijE2m5mv5A0Niy3HtbYTFrgkUEQjFMXmSAk2hQDuPQ=="
     },
     "@oxc-project/types@0.156.0": {
       "integrity": "sha512-1Duyg48TdJNdyhEB8Xn1L36bT9Pv6GUtlKjHxOys8xkaF/rQq3XJE+bAurSK/AgIz5mGFsb77cn9Pb20+WCScw=="
