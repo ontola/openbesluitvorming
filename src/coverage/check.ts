@@ -20,6 +20,8 @@
 import { GemeenteOplossingenClient } from "../gemeenteoplossingen/client.ts";
 import { normalizeGoDocuments, normalizeGoMeeting } from "../gemeenteoplossingen/normalize.ts";
 import { IbabsClient } from "../ibabs/client.ts";
+import { listMeetingsAdaptive } from "../ibabs/extractor.ts";
+import { belongsToSiteSibling, ibabsSiteSiblingLabels } from "../ibabs/shared_site.ts";
 import {
   normalizeIbabsDocuments,
   normalizeIbabsMeeting,
@@ -64,7 +66,8 @@ export interface CoverageComparison {
   heldDocuments: number;
   /** Supplier documents absent from the export log. */
   missingDocuments: number;
-  /** Up to `sampleSize` missing ids, for a human to look at. */
+  /** Up to `sampleSize` missing ids, highest (usually newest) first, for a human
+   * to look at. */
   missingSample: string[];
 }
 
@@ -87,13 +90,26 @@ export function compareCoverage(
       missing.push(id);
     }
   }
-  missing.sort();
+  // Newest first. Ids are not dates, but a supplier numbers its documents as it
+  // creates them, so for the suppliers that use numbers the highest ids are the
+  // most recent, which is what a person checking a sample wants to see (#331).
+  // Compared as numbers where both are, so 9 sorts below 10.
+  missing.sort((left, right) => compareIdsDescending(left, right));
   return {
     supplierDocuments: supplier.size,
     heldDocuments: heldInWindow,
     missingDocuments: missing.length,
     missingSample: missing.slice(0, sampleSize),
   };
+}
+
+function compareIdsDescending(left: string, right: string): number {
+  const leftNumber = Number(left.slice(left.lastIndexOf(":") + 1));
+  const rightNumber = Number(right.slice(right.lastIndexOf(":") + 1));
+  if (Number.isFinite(leftNumber) && Number.isFinite(rightNumber) && leftNumber !== rightNumber) {
+    return rightNumber - leftNumber;
+  }
+  return right < left ? -1 : right > left ? 1 : 0;
 }
 
 const NOTUBIZ_MEETING_CONCURRENCY = 4;
@@ -220,9 +236,17 @@ async function listIbabs(
     listing.warnings.push(`meeting types: ${errorText(error)}`);
   }
 
-  for (const rawMeeting of await client.listMeetingsByDateRange(source, dateFrom, dateTo)) {
+  // The same rules as the import, or the check counts what the import was
+  // told to leave: a year in one call is what the large sites time out on
+  // (#309), and on a shared site the sibling's meetings are not ours (#339).
+  const siteSiblings = ibabsSiteSiblingLabels(source);
+  const rawMeetings = await listMeetingsAdaptive(client, source, dateFrom, dateTo, async () => {});
+  for (const rawMeeting of rawMeetings) {
     try {
       const meeting = normalizeIbabsMeeting(source, rawMeeting, meetingTypes);
+      if (belongsToSiteSibling(meeting.name, source.label, siteSiblings)) {
+        continue;
+      }
       listing.meetings += 1;
       for (const document of normalizeIbabsDocuments(source, meeting)) {
         listing.documentIds.add(document.id);
@@ -241,7 +265,7 @@ async function listIbabs(
   }
   const motionPattern = /moties?|amendement|stemming/i;
   for (const list of lists) {
-    if (!list.ListName?.trim()) {
+    if (!list.ListName?.trim() || belongsToSiteSibling(list.ListName, source.label, siteSiblings)) {
       continue;
     }
     let entries;

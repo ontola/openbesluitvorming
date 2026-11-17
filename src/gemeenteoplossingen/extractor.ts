@@ -206,17 +206,30 @@ export class GemeenteOplossingenExtractor {
     const chunks = splitDateRange(dateFrom, dateTo, chunkMonths);
 
     const rawMeetings: GoMeeting[] = [];
+    let failedChunks = 0;
+    let firstChunkFailure = "";
     for (const [chunkFrom, chunkTo] of chunks) {
       try {
         const chunk = await client.listMeetingsByDateRange(chunkFrom, chunkTo);
         rawMeetings.push(...chunk);
       } catch (error) {
+        failedChunks += 1;
+        const message = `Failed to list GO meetings ${chunkFrom}..${chunkTo}: ${error instanceof Error ? error.message : String(error)}`;
+        firstChunkFailure ||= message;
         await registerIssue({
           severity: "error",
           step: "list_events",
-          message: `Failed to list GO meetings ${chunkFrom}..${chunkTo}: ${error instanceof Error ? error.message : String(error)}`,
+          message,
         });
       }
+    }
+    // When not one chunk could be listed, the council site was not reached
+    // at all: a "partial" run would put the source on "ok" in /api/status
+    // while it imports nothing. Leiderdorp did exactly that for months, and
+    // Venlo from 8 October 2026, both behind a certificate the site no longer
+    // serves correctly. Failing the run surfaces the cause as lastErrorMessage.
+    if (chunks.length > 0 && failedChunks === chunks.length) {
+      throw new Error(firstChunkFailure);
     }
     const normalizedMeetings = rawMeetings.map((meeting) => normalizeGoMeeting(source, meeting));
 

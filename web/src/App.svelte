@@ -991,6 +991,12 @@
         return null;
       }
 
+      // Removed, and the body says why: say that rather than a load failure.
+      if (response.status === 410) {
+        const gone = (await response.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(gone?.error ?? "Dit resultaat is verwijderd.");
+      }
+
       if (!response.ok) {
         throw new Error("Documentdetail kon niet worden geladen.");
       }
@@ -1278,6 +1284,23 @@
       activeSearchSignature = "";
       nextSearchOffset = PAGE_SIZE;
       closeDetail(false);
+      if (mode) writeRouteState(mode);
+      return;
+    }
+
+    // A type or a period alone gives the API nothing to search or browse, and
+    // it refuses that (#349). The answer was always empty; say so without the
+    // round trip.
+    if (!query.trim() && !organization.trim()) {
+      searchAbortController?.abort();
+      searchAbortController = null;
+      searched = true;
+      searchError = null;
+      results = [];
+      totalCount = 0;
+      totalIsApproximate = false;
+      hasMore = false;
+      activeSearchSignature = currentSearchSignature();
       if (mode) writeRouteState(mode);
       return;
     }
@@ -2424,6 +2447,22 @@
                   </button>
                 </div>
               {/if}
+            <!-- The supplier's own page (#340): for a meeting the portal, with
+                 late documents and the live stream. A document's source is
+                 usually the very file Download already links to, so it only
+                 gets its own button when it is somewhere else. -->
+            {#if detailContent?.sourceUrl && detailContent.sourceUrl !== (detailContent.downloadUrl ?? detailItem.downloadUrl)}
+              <a
+                class="ghost-button button-with-icon"
+                href={detailContent.sourceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Bekijk bij de bron"
+              >
+                <span class="button-icon" aria-hidden="true">↗</span>
+                <span class="button-label">Bron</span>
+              </a>
+            {/if}
             {#if detailContent?.downloadUrl || detailItem.downloadUrl}
               <a
                 class="primary-button button-with-icon"
@@ -2476,13 +2515,18 @@
         </div>
 
         <div class="detail-sheet__header-top">
-          {#if detailContent?.meetingId}
+          <!-- meetingId is whatever the document is referenced by. For a register
+               entry or an attachment without a meeting that is the organization,
+               and a link to it only led back to the search page (#334). -->
+          {#if detailContent?.meetingId?.startsWith("meeting:") || detailContent?.meetingId?.startsWith("motion:")}
             <button
               type="button"
               class="detail-sheet__meeting-crumb"
               on:click={() => void openDetailById(detailContent.meetingId)}
             >
-              ← Bekijk vergadering
+              ← {detailContent.meetingId.startsWith("motion:")
+                ? "Bekijk motie"
+                : "Bekijk vergadering"}
             </button>
           {/if}
           <h2 id="detail-title">{detailItem.title}</h2>

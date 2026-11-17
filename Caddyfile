@@ -35,14 +35,11 @@ openbesluitvorming.nl, zoek.openraadsinformatie.nl, openraadsinformatie.nl {
 
   encode gzip zstd
 
-  # Expose only Quickwit's search endpoint publicly. Everything else under
-  # /api/v1 (ingest, delete-tasks, index management) stays internal — the old
-  # exclusion list missed /api/v1/*/delete-tasks.
-  @quickwit {
-    path /api/v1/*/search /api/v1/*/search/*
-    method GET POST
-  }
-  reverse_proxy @quickwit quickwit:7280
-
+  # Quickwit is not reachable from outside, not even its search endpoint. It
+  # used to be proxied here, and on 2026-10-12 and 2026-10-19 one client sent
+  # it cardinality aggregations over every row (/api/v1/woozi*/search) until
+  # Quickwit was killed (exit 137) in a loop and the whole site was down.
+  # Public search is /api/search, which bounds what a query may cost;
+  # /api/v1/* now falls through to the app like any other path.
   reverse_proxy openbesluitvorming:8787
 }

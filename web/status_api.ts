@@ -133,6 +133,7 @@ export function buildStatusResponse(options: {
         lastRunStatus: run?.lastRunStatus,
         lastErrorMessage,
         latestContentDate: activity?.latestContentDate,
+        latestPastContentDate: activity?.latestPastContentDate,
         lastIndexedAt: activity?.lastIndexedAt,
         indexedDocuments: activity?.documentCount,
         discontinuedAt: source.discontinuedAt,
@@ -196,6 +197,24 @@ let cached: { value: StatusResponse; expiresAt: number } | null = null;
 let inFlight: Promise<StatusResponse> | null = null;
 
 function toSourceCoverage(check: CoverageCheckRecord): SourceCoverage {
+  // A check that failed measured nothing. The stored zeros are the absence of an
+  // answer, and published as numbers they read as "the supplier lists nothing"
+  // with a ratio of 1, which is how Texel came to be reported as complete while
+  // its supplier timed out (#309). `null` is what "unknown" looks like.
+  if (check.error) {
+    return {
+      checkedAt: check.checked_at,
+      windowFrom: check.window_from,
+      windowTo: check.window_to,
+      supplierDocuments: null,
+      heldDocuments: null,
+      missingDocuments: null,
+      ratio: null,
+      lowerBound: true,
+      missingSample: [],
+      error: check.error,
+    };
+  }
   return {
     checkedAt: check.checked_at,
     windowFrom: check.window_from,
@@ -206,10 +225,15 @@ function toSourceCoverage(check: CoverageCheckRecord): SourceCoverage {
     ratio:
       check.supplier_documents > 0
         ? Math.round((check.held_documents / check.supplier_documents) * 1000) / 1000
-        : 1,
+        : // 0 of 0 is not "complete": the supplier listed nothing, which is also what
+          // a source looks like when it publishes through a module we do not read, or
+          // elsewhere altogether (Leiden, Zaanstad, Purmerend, all "1" with content
+          // ending in 2022 or 2025).
+          null,
     lowerBound: check.warnings > 0,
+    failedRequests: check.warnings,
+    supplierMeetings: check.supplier_meetings,
     missingSample: check.missing_sample,
-    error: check.error,
   };
 }
 

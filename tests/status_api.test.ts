@@ -28,7 +28,10 @@ function hoursAgo(hours: number): string {
 function build(options: {
   sources?: SourceRunStatus[];
   supplierWindows?: SupplierRunWindow[];
-  indexActivity?: Map<string, { latestContentDate?: string; lastIndexedAt?: string }> | null;
+  indexActivity?: Map<
+    string,
+    { latestContentDate?: string; latestPastContentDate?: string; lastIndexedAt?: string }
+  > | null;
 }): StatusResponse {
   return buildStatusResponse({
     runStatus: {
@@ -57,7 +60,7 @@ Deno.test("every catalog source is reported, including ones we never import", ()
   const response = build({});
 
   // The catalog: 329 ORI sources plus Uitgeest (#256).
-  assertEquals(response.sources.length, 392, "the whole catalog should be one call");
+  assertEquals(response.sources.length, 394, "the whole catalog should be one call");
   // Dongen is withdrawn from importing but its data still answers searches.
   assertEquals(
     source(response, "dongen").state,
@@ -224,6 +227,7 @@ Deno.test("index activity is merged per source and is optional", () => {
         "soest",
         {
           latestContentDate: "2026-08-20T13:30:00.000Z",
+          latestPastContentDate: "2026-08-14T17:30:00.000Z",
           lastIndexedAt: "2026-08-16T00:09:59.000Z",
           documentCount: 12345,
         },
@@ -234,6 +238,11 @@ Deno.test("index activity is merged per source and is optional", () => {
     source(withActivity, "soest").latestContentDate,
     "2026-08-20T13:30:00.000Z",
     "a meeting already on the agenda for next week",
+  );
+  assertEquals(
+    source(withActivity, "soest").latestPastContentDate,
+    "2026-08-14T17:30:00.000Z",
+    "the newest meeting that already took place travels separately (#397)",
   );
   assertEquals(withActivity.indexActivityAvailable, true, "the index answered");
   assertEquals(
@@ -250,7 +259,7 @@ Deno.test("index activity is merged per source and is optional", () => {
   );
   assertEquals(
     withoutActivity.sources.length,
-    392,
+    394,
     "and the import half of the answer still arrives",
   );
 });

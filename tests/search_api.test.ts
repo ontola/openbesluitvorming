@@ -463,10 +463,19 @@ Deno.test("searchMeetings caps broad document scans after grouping", async () =>
     });
 
     assert(response.results.length === 1, "duplicate documents should still collapse");
-    assert(response.hasMore === true, "capped broad scans should still advertise more results");
+    // The budget ran out, and every page is read from the top with the same
+    // budget, so no offset reaches past what this scan collected: advertising
+    // a next page here sent clients to an empty one (#405). The answer says
+    // how far paging reaches instead.
+    assert(response.hasMore === false, "a capped scan has no page beyond its reach");
+    assert(response.totalIsApproximate === true, "the total is an estimate past the budget");
+    assert(response.reachableCount === 1, "paging reaches exactly what the scan collected");
+    // Every window is read from the top (#312), so the scan has to be bounded
+    // by a row budget rather than by the page size.
+    const rowsRead = startOffsets.length > 0 ? Math.max(...startOffsets) : 0;
     assert(
-      startOffsets.every((offset) => offset < 49),
-      "broad document scans should not continue into deep Quickwit offsets",
+      startOffsets.length <= 20 && rowsRead < 6000,
+      `a scan of nothing but duplicates must stop at the row budget, made ${startOffsets.length} requests`,
     );
   } finally {
     globalThis.fetch = originalFetch;
@@ -1010,6 +1019,76 @@ Deno.test("a full page is delivered even when rows collapse seven to one", async
   }
 });
 
+/** #312: paging a browse without a query repeated documents.
+ *
+ * A document is committed again by every import that re-emits it, and Quickwit
+ * hands back a sort tie split by split, so the copies of one document are a
+ * whole page of rows apart: rows 0..39 are the 40 documents once, rows 40..79
+ * the same 40 again, and so on. Skipping `offset` rows then lands page two on
+ * the second copy of page one. Pages have to be cut from the deduplicated
+ * results, so they must be disjoint and together cover every document once.
+ */
+Deno.test("paging a browse without a query neither repeats nor skips documents", async () => {
+  const originalFetch = globalThis.fetch;
+  const DOCUMENTS = 40;
+  const COPIES = 5;
+
+  globalThis.fetch = async (_input, init) => {
+    const body = JSON.parse(String((init as { body?: string } | undefined)?.body ?? "{}"));
+    const startOffset = Number(body.start_offset ?? 0);
+    const maxHits = Number(body.max_hits);
+    const totalRows = DOCUMENTS * COPIES;
+    const count = Math.max(0, Math.min(maxHits, totalRows - startOffset));
+
+    const hits = Array.from({ length: count }, (_, index) => {
+      const row = startOffset + index;
+      const copy = Math.floor(row / DOCUMENTS);
+      return {
+        time: `2026-03-31T0${copy}:00:00Z`,
+        entity_id: `document:notubiz:gemeente:amsterdam:${row % DOCUMENTS}`,
+        entity_type: "Document",
+        name: `Document ${row % DOCUMENTS}`,
+        start_date: "2025-03-27T00:00:00Z",
+        source_key: "amsterdam",
+        content: `Document ${row % DOCUMENTS}`,
+      };
+    });
+
+    return new Response(JSON.stringify({ num_hits: totalRows, hits }), {
+      headers: { "content-type": "application/json" },
+    });
+  };
+
+  try {
+    const seen: string[] = [];
+    for (const offset of [0, 10, 20, 30]) {
+      const page = await searchMeetings({
+        organization: "amsterdam",
+        entityType: "Document",
+        sort: "date_desc",
+        limit: 10,
+        offset,
+      });
+      assert(page.results.length === 10, `offset ${offset} should hold 10 results`);
+      seen.push(...page.results.map((result) => result.entityId));
+    }
+
+    assert(new Set(seen).size === seen.length, "no document may appear on two pages");
+    assert(seen.length === DOCUMENTS, `every document appears once, saw ${seen.length}`);
+
+    const last = await searchMeetings({
+      organization: "amsterdam",
+      entityType: "Document",
+      sort: "date_desc",
+      limit: 10,
+      offset: 30,
+    });
+    assert(last.hasMore === false, "the fourth page is the last one");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 /** #195: identical URLs answered with wildly different totals.
  *
  * The reported swing (4,153 / 8,358 / 9,933) came from forwarding Quickwit's
@@ -1299,4 +1378,150 @@ Deno.test("naming an organization in the query also matches on its source", asyn
     buildSearchClause("woningbouw") === "woningbouw",
     "a word that names no organization is left alone",
   );
+});
+
+Deno.test("an organization covers the organizations merged into it", async () => {
+  // Weesp became part of Amsterdam on 24 March 2022; searching Amsterdam
+  // should include Weesp's records from before the merger.
+  const { buildSearchClause, organizationSourceKeys } = await import("../web/search_api.ts");
+  const amsterdam = organizationSourceKeys("amsterdam");
+  assert(amsterdam[0] === "amsterdam", `own key first, got ${amsterdam}`);
+  assert(amsterdam.includes("weesp"), `Amsterdam includes Weesp, got ${amsterdam}`);
+  assert(
+    amsterdam.includes("amsterdam_weesp"),
+    `Amsterdam includes Stadsgebied Weesp, got ${amsterdam}`,
+  );
+  // Landgraaf publishes meetings and video in Notubiz and documents in iBabs;
+  // one filter on Landgraaf should cover both systems.
+  assert(
+    organizationSourceKeys("landgraaf").join() === "landgraaf,landgraaf_ibabs",
+    `Landgraaf includes its iBabs source, got ${organizationSourceKeys("landgraaf")}`,
+  );
+  assert(
+    organizationSourceKeys("weesp").join() === "weesp",
+    "a predecessor still filters on its own",
+  );
+  assert(
+    organizationSourceKeys("amersfoort").join() === "amersfoort",
+    "an organization without predecessors is only itself",
+  );
+  const clause = buildSearchClause("amsterdam begroting");
+  assert(
+    clause.includes('source_key:"amsterdam"') && clause.includes('source_key:"weesp"'),
+    `naming Amsterdam in the query also matches Weesp, got ${clause}`,
+  );
+});
+
+Deno.test("a phrase search makes no sample request, and none after a failed count (#348)", async () => {
+  // Every Quickwit request loads the postings of every searched word again,
+  // with positions for a phrase. The count and the 2,000-row sample were each
+  // a full request on top of the scan, and for a nationwide phrase they took
+  // most of the time.
+  const originalFetch = globalThis.fetch;
+  const requests: Array<Record<string, unknown>> = [];
+  let countFails = false;
+  const serve = async (_input: unknown, init?: unknown) => {
+    const body = JSON.parse(String((init as { body?: string } | undefined)?.body ?? "{}"));
+    requests.push(body);
+    if (body.count_all) {
+      if (countFails) {
+        return new Response("boom", { status: 400 });
+      }
+      return new Response(JSON.stringify({ num_hits: 500_000, hits: [] }));
+    }
+    const maxHits = Number(body.max_hits);
+    const startOffset = Number(body.start_offset ?? 0);
+    const hits = Array.from({ length: maxHits }, (_, index) => {
+      const row = startOffset + index;
+      const documentIndex = Math.floor(row / 2);
+      return {
+        time: "2026-03-31T11:00:00Z",
+        entity_id: `document:notubiz:gemeente:ermelo:${documentIndex}#page=${(row % 2) + 1}`,
+        parent_entity_id: `document:notubiz:gemeente:ermelo:${documentIndex}`,
+        page_number: (row % 2) + 1,
+        entity_type: "DocumentPage",
+        name: `Motie ${documentIndex}`,
+        start_date: "2025-01-14T17:00:00Z",
+        source_key: "ermelo",
+        content: "motie vreemd aan de orde van de dag",
+      };
+    });
+    return new Response(JSON.stringify({ num_hits: 4190, hits }));
+  };
+  const isSample = (body: Record<string, unknown>) =>
+    !body.count_all && body.start_offset === undefined;
+
+  try {
+    globalThis.fetch = serve as typeof globalThis.fetch;
+    await withV3Projection(async () => {
+      const phrase = await searchMeetings({
+        query: '"motie vreemd aan de orde"',
+        sort: "date_desc",
+        limit: 24,
+      });
+      assert(phrase.totalIsApproximate, "a capped scan is still an estimate");
+      assert(
+        requests.some((body) => body.count_all),
+        "the count still runs",
+      );
+      assert(!requests.some(isSample), "but no sample for a phrase");
+
+      requests.length = 0;
+      await searchMeetings({ query: "motie vreemd", sort: "date_desc", limit: 24 });
+      assert(requests.some(isSample), "loose words under a sort are still sampled");
+
+      requests.length = 0;
+      countFails = true;
+      await searchMeetings({ query: "motie orde", sort: "date_desc", limit: 24 });
+      assert(!requests.some(isSample), "no sample once the count has failed");
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+Deno.test("summary is plain text with or without a search term (#376)", async () => {
+  const originalFetch = globalThis.fetch;
+  const serve = async (_input: unknown, init?: unknown) => {
+    const body = JSON.parse(String((init as { body?: string } | undefined)?.body ?? "{}"));
+    const hit = {
+      time: "2026-03-31T11:00:00Z",
+      entity_id: "motion:ibabs:gemeente:oss:1",
+      entity_type: "Motion",
+      name: "Motie",
+      start_date: "2025-12-11T00:00:00Z",
+      source_key: "oss",
+      content: "Voor: PVV&#xD; Tegen: VVD&#xD; <p>Raad</p>&nbsp;Oss",
+    };
+    return new Response(
+      JSON.stringify({
+        num_hits: 1,
+        hits: body.max_hits === 0 ? [] : [hit],
+        snippets: body.snippet_fields
+          ? [{ content: ["Voor: PVV&amp;#xD; <b>Tegen</b>: VVD&amp;#xD;"] }]
+          : undefined,
+      }),
+    );
+  };
+  try {
+    globalThis.fetch = serve as typeof globalThis.fetch;
+    await withV3Projection(async () => {
+      const browse = await searchMeetings({ organization: "oss", entityType: "Motion" });
+      assert(
+        browse.results[0].summary === "Voor: PVV Tegen: VVD Raad Oss",
+        `without a term, got ${JSON.stringify(browse.results[0].summary)}`,
+      );
+      const searched = await searchMeetings({ query: "tegen", organization: "oss" });
+      assert(
+        !searched.results[0].summary.includes("&#"),
+        `with a term, got ${JSON.stringify(searched.results[0].summary)}`,
+      );
+      assert(
+        !(searched.results[0].summaryHtml ?? "").includes("&amp;#"),
+        `summaryHtml, got ${JSON.stringify(searched.results[0].summaryHtml)}`,
+      );
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });

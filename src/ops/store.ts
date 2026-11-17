@@ -107,6 +107,16 @@ async function getDatabase(): Promise<DatabaseSync> {
         error TEXT,
         PRIMARY KEY (source_key, checked_at)
       );
+      -- A document an import found taken off its meeting and gone at the
+      -- supplier once. It is retracted only when a later run sees the same
+      -- (#380); see src/pipeline/source_removals.ts.
+      CREATE TABLE IF NOT EXISTS source_removal_suspect (
+          entity_id TEXT PRIMARY KEY,
+          source_key TEXT NOT NULL,
+          meeting_id TEXT NOT NULL,
+          first_seen_at TEXT NOT NULL,
+          probe TEXT
+        );
       CREATE TABLE IF NOT EXISTS revalidation_cursor (
           supplier TEXT PRIMARY KEY,
           start_offset INTEGER NOT NULL DEFAULT 0
@@ -682,6 +692,11 @@ export async function claimQueuedRun(runId: string): Promise<IngestRunRecord | n
   return row ? normalizeRunRecord(row) : null;
 }
 
+/** Queued runs in the order workers should take them: the daily scheduler's
+ * runs first, then everything else oldest first. A bulk re-import enqueues
+ * hundreds of runs at once; in plain FIFO order the next morning's daily runs
+ * land behind all of them, and on 4 and 5 November 2026 no source got a fresh
+ * import for two days while an iBabs motion backfill drained. */
 export async function listQueuedRuns(): Promise<IngestRunRecord[]> {
   const db = await getDatabase();
   return (
@@ -694,7 +709,7 @@ export async function listQueuedRuns(): Promise<IngestRunRecord[]> {
         issue_count, quickwit_index_id, error_message
        FROM ingest_run
        WHERE status = 'queued'
-       ORDER BY started_at ASC`,
+       ORDER BY trigger_mode = 'scheduled' DESC, started_at ASC, rowid ASC`,
       )
       .all() as unknown as IngestRunRecord[]
   ).map(normalizeRunRecord);
@@ -1220,6 +1235,61 @@ export async function listConfirmedGoneDocuments(
        ORDER BY streak DESC`,
     )
     .all({ supplier, threshold }) as unknown as RevalidationEntry[];
+}
+
+/** Suspects older than this are forgotten: their meeting has long left the
+ * import window, so no run will see it again. The revalidation sweep still
+ * reports a document that stays gone. */
+const SOURCE_REMOVAL_SUSPECT_TTL_DAYS = 30;
+
+export interface SourceRemovalSuspectRecord {
+  entityId: string;
+  meetingId: string;
+  firstSeenAt: string;
+}
+
+export async function listSourceRemovalSuspects(
+  sourceKey: string,
+): Promise<SourceRemovalSuspectRecord[]> {
+  const db = await getDatabase();
+  const cutoff = new Date(Date.now() - SOURCE_REMOVAL_SUSPECT_TTL_DAYS * 86_400_000).toISOString();
+  db.prepare("DELETE FROM source_removal_suspect WHERE first_seen_at < ?").run(cutoff);
+  return db
+    .prepare(
+      `SELECT entity_id AS entityId, meeting_id AS meetingId, first_seen_at AS firstSeenAt
+       FROM source_removal_suspect WHERE source_key = ? ORDER BY first_seen_at`,
+    )
+    .all(sourceKey) as unknown as SourceRemovalSuspectRecord[];
+}
+
+/** Keeps the first sighting when the document is already a suspect. */
+export async function recordSourceRemovalSuspect(
+  sourceKey: string,
+  entry: { entityId: string; meetingId: string; probe?: unknown },
+): Promise<void> {
+  const db = await getDatabase();
+  db.prepare(
+    `INSERT INTO source_removal_suspect (entity_id, source_key, meeting_id, first_seen_at, probe)
+     VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(entity_id) DO NOTHING`,
+  ).run(
+    entry.entityId,
+    sourceKey,
+    entry.meetingId,
+    new Date().toISOString(),
+    entry.probe === undefined ? null : JSON.stringify(entry.probe),
+  );
+}
+
+export async function clearSourceRemovalSuspects(entityIds: string[]): Promise<void> {
+  if (entityIds.length === 0) {
+    return;
+  }
+  const db = await getDatabase();
+  const statement = db.prepare("DELETE FROM source_removal_suspect WHERE entity_id = ?");
+  for (const entityId of entityIds) {
+    statement.run(entityId);
+  }
 }
 
 /** One coverage check of one source: what the supplier listed for the window

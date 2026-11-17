@@ -230,3 +230,71 @@ Deno.test("GemeenteOplossingenExtractor emits committees, parties, persons, meet
     globalThis.fetch = originalFetch;
   }
 });
+
+Deno.test("GemeenteOplossingenExtractor fails the run when no meeting chunk can be listed", async () => {
+  const source = makeSource();
+  const originalFetch = globalThis.fetch;
+  // Allmanak still answers: a run that only reaches Allmanak must not pass
+  // for a successful import of the council site.
+  globalThis.fetch = async () => new Response("[]", { status: 200 });
+  try {
+    const extractor = new GemeenteOplossingenExtractor(
+      () =>
+        ({
+          listCommittees: async () => {
+            throw new Error("invalid peer certificate: UnknownIssuer");
+          },
+          listMeetingsByDateRange: async () => {
+            throw new Error("invalid peer certificate: UnknownIssuer");
+          },
+        }) as never,
+      new (await import("../src/allmanak/client.ts")).AllmanakClient("v1"),
+      async () => new FakeStorage() as never,
+    );
+
+    let thrown: unknown;
+    try {
+      await extractor.extractForDateRange(source, "2024-01-01", "2025-12-31");
+    } catch (error) {
+      thrown = error;
+    }
+    assert(thrown instanceof Error, "expected the run to fail");
+    assert(
+      thrown.message.includes("Failed to list GO meetings 2024-01-01") &&
+        thrown.message.includes("UnknownIssuer"),
+      `expected the first chunk's failure as the error, got ${thrown.message}`,
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+Deno.test("GemeenteOplossingenExtractor keeps a run partial when only some chunks fail", async () => {
+  const source = makeSource();
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response("[]", { status: 200 });
+  try {
+    let calls = 0;
+    const extractor = new GemeenteOplossingenExtractor(
+      () =>
+        ({
+          listCommittees: async () => [],
+          listMeetingsByDateRange: async () => {
+            calls += 1;
+            if (calls === 1) {
+              throw new Error("HTTP 500");
+            }
+            return [];
+          },
+        }) as never,
+      new (await import("../src/allmanak/client.ts")).AllmanakClient("v1"),
+      async () => new FakeStorage() as never,
+    );
+
+    const bundle = await extractor.extractForDateRange(source, "2024-01-01", "2025-12-31");
+    assert(calls > 1, "expected more than one chunk");
+    assert(bundle.stats.issue_count === 1, "expected the failed chunk as one issue");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

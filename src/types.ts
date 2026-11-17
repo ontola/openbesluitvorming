@@ -48,6 +48,10 @@ export interface MeetingEntity {
   parent?: string;
   agenda?: MeetingAgendaItem[];
   attachment?: string[];
+  /** The meeting's page on the supplier's own portal, where a visitor finds
+   * documents published after our last import and the live stream (#340).
+   * Notubiz names it; for iBabs the detail endpoint derives it from the site. */
+  source_url?: string;
   source_info: SourceInfo;
   raw: unknown;
 }
@@ -58,6 +62,10 @@ export interface MeetingAgendaDocumentLink {
   file_name?: string;
   content_type?: string;
   original_url?: string;
+  /** Where to fetch the PDF from us. Present on documents that look like a
+   * PDF. `original_url` points at the supplier, which for part of iBabs
+   * answers 403 for a file we hold and serve (#313). */
+  downloadUrl?: string;
 }
 
 export interface MeetingAgendaItem {
@@ -351,7 +359,7 @@ export interface ExtractionStats {
 }
 
 export interface ExtractionIssue {
-  severity: "warning" | "error";
+  severity: "info" | "warning" | "error";
   step:
     | "list_events"
     | "get_meeting"
@@ -363,6 +371,7 @@ export interface ExtractionIssue {
     | "upload_s3"
     | "ingest_quickwit"
     | "export_log_flush"
+    | "source_removals"
     | "bsn_quarantine";
   entity_id?: string;
   message: string;
@@ -505,6 +514,10 @@ export interface SourceCatalogEntry extends SourceDefinitionBase {
   succeededByCbsId?: string;
   succeededByLabel?: string;
   succeededBySourceKey?: string;
+  /** Catalog key of the organization this one is part of and searched under,
+   * for a body that is not merged away but lives on inside it: Stadsgebied
+   * Weesp inside Amsterdam. */
+  partOfSourceKey?: string;
   notubizOrganizationId?: number;
   ibabsSitename?: string;
   baseUrl?: string;
@@ -753,6 +766,9 @@ export interface SearchResponse {
   results: SearchResult[];
   totalCount?: number;
   totalIsApproximate?: boolean;
+  /** How many results paging can reach. Equal to `totalCount` unless the scan
+   * ran out of budget, when it is the depth at which pages run dry. */
+  reachableCount?: number;
   hasMore?: boolean;
 }
 
@@ -818,6 +834,9 @@ export interface EntityContentResponse {
   contentType?: string;
   pdfUrl?: string;
   meetingId?: string;
+  /** Where this entity is published at the source: the supplier's portal page
+   * for a meeting, the supplier's file for a document (#340). */
+  sourceUrl?: string;
   agenda?: MeetingAgendaItem[];
   /** Motions decided in this meeting, when the entity is a Meeting. */
   motions?: MeetingMotion[];
@@ -849,7 +868,14 @@ export interface ExportChangeRecord {
   content_hash?: string;
   schema_version?: string;
   payload?: unknown;
+  /** Delete records only: why the entity went. */
+  reason?: ExportDeleteReason;
+  /** Delete records with reason "removed_at_source": the meeting the source
+   * took the document off. */
+  meeting_id?: string;
 }
+
+export type ExportDeleteReason = "takedown" | "removed_at_source" | "source_purged";
 
 export interface ExportPage {
   records: ExportChangeRecord[];
@@ -898,6 +924,9 @@ export interface SourceStatus {
   /** Newest meeting date held for this source. Often in the future: an agenda
    * is published before the meeting happens. */
   latestContentDate?: string;
+  /** Newest meeting date held for this source that is not after the moment
+   * of the request: the latest material that already exists (#397). */
+  latestPastContentDate?: string;
   /** When anything was last written to the search index for this source. */
   lastIndexedAt?: string;
   /** Documents in the search index for this source, exact at the moment of
@@ -917,18 +946,31 @@ export interface SourceStatus {
 
 /** Result of one coverage check (src/coverage/check.ts). `heldDocuments` and
  * `missingDocuments` partition `supplierDocuments`; `ratio` is held over
- * supplier, 1 meaning every document the supplier lists is in the index.
+ * supplier, 1 meaning every document the supplier lists is in the index; `null`
+ * when the supplier listed none, which says nothing about completeness.
  * `lowerBound` is true when some supplier requests failed, so the supplier
  * count (and the gap) may be larger than reported. */
 export interface SourceCoverage {
   checkedAt: string;
   windowFrom: string;
   windowTo: string;
-  supplierDocuments: number;
-  heldDocuments: number;
-  missingDocuments: number;
-  ratio: number;
+  /** `null` in this and the next three fields when `error` is set: the check
+   * measured nothing, which is not the same as measuring zero. */
+  supplierDocuments: number | null;
+  heldDocuments: number | null;
+  missingDocuments: number | null;
+  ratio: number | null;
   lowerBound: boolean;
+  /** Supplier requests that failed during the check. Why `lowerBound` is set,
+   * and how much it matters: two failed requests out of thousands are noise,
+   * half of them makes `supplierDocuments` meaningless. Absent when `error`
+   * is set. */
+  failedRequests?: number;
+  /** Meetings the supplier listed in the window, so a drop in
+   * `supplierDocuments` between two checks can be told apart from a drop in
+   * meetings (a check that lost part of its listing). Absent when `error` is
+   * set. */
+  supplierMeetings?: number;
   /** A few of the missing document ids, for a human to verify. */
   missingSample: string[];
   /** Set when the check itself failed for this source. */

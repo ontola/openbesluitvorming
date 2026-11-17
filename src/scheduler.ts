@@ -12,7 +12,21 @@ import { listRunnableCatalogSources } from "./sources/index.ts";
 import { currentDerivationVersion, currentProjectionVersion } from "./pipeline/versioning.ts";
 
 const WINDOW_DAYS_BEFORE = 7;
-const WINDOW_DAYS_AFTER = 7;
+/** Councils publish an agenda two to four weeks ahead. With +7 days a
+ * Notubiz meeting appeared only in its own week, so the agenda, the part
+ * that matters most to anyone following a decision, came too late (#345).
+ * Meetings already held come from the cache; the cost is listing. */
+const WINDOW_DAYS_AFTER = 28;
+/** The weekly sweep: the 83 days before the nightly window. Councils attach
+ * besluitenlijsten, notulen and answers to a meeting weeks after it took
+ * place, when the nightly window has long moved past it, and the weekly
+ * coverage check (12 months back) counted every one of them as missing:
+ * VNG's weekly status of 28 September 2026 saw the gaps grow by 677
+ * documents in a week across 179 municipalities. Documents already held come
+ * from the object-store cache, so the cost is listing, not downloading. */
+const SWEEP_DAYS_BEFORE = 90;
+/** Saturday night, so Sunday's coverage check measures what the sweep found. */
+const SWEEP_WEEKDAY_AMSTERDAM = "Saturday";
 const SCHEDULE_HOUR_AMSTERDAM = 2;
 const DAY_MS = 86_400_000;
 const DEFAULT_MAX_ACTIVE_SCHEDULED_RUNS = 0;
@@ -52,10 +66,32 @@ function schedulerMaxActiveRuns(): number {
   return Number.isFinite(value) && value >= 0 ? value : DEFAULT_MAX_ACTIVE_SCHEDULED_RUNS;
 }
 
+function amsterdamWeekday(date: Date): string {
+  return new Intl.DateTimeFormat("en-US", { timeZone: "Europe/Amsterdam", weekday: "long" }).format(
+    date,
+  );
+}
+
+/** The windows a tick enqueues for every source: the nightly one, and on the
+ * sweep night also the stretch before it, adjacent and not overlapping. */
+function scheduledWindows(now: Date): Array<{ dateFrom: string; dateTo: string }> {
+  const windows = [
+    {
+      dateFrom: isoDate(new Date(now.getTime() - WINDOW_DAYS_BEFORE * DAY_MS)),
+      dateTo: isoDate(new Date(now.getTime() + WINDOW_DAYS_AFTER * DAY_MS)),
+    },
+  ];
+  if (amsterdamWeekday(now) === SWEEP_WEEKDAY_AMSTERDAM) {
+    windows.push({
+      dateFrom: isoDate(new Date(now.getTime() - SWEEP_DAYS_BEFORE * DAY_MS)),
+      dateTo: isoDate(new Date(now.getTime() - (WINDOW_DAYS_BEFORE + 1) * DAY_MS)),
+    });
+  }
+  return windows;
+}
+
 async function enqueueDailyScheduledRuns(): Promise<void> {
   const now = new Date();
-  const dateFrom = isoDate(new Date(now.getTime() - WINDOW_DAYS_BEFORE * DAY_MS));
-  const dateTo = isoDate(new Date(now.getTime() + WINDOW_DAYS_AFTER * DAY_MS));
   const maxActiveScheduledRuns = schedulerMaxActiveRuns();
   const activeScheduledRuns = await countActiveScheduledRuns();
   if (activeScheduledRuns > maxActiveScheduledRuns) {
@@ -67,6 +103,16 @@ async function enqueueDailyScheduledRuns(): Promise<void> {
   }
 
   const sources = listRunnableCatalogSources();
+  for (const { dateFrom, dateTo } of scheduledWindows(now)) {
+    await enqueueWindow(sources, dateFrom, dateTo);
+  }
+}
+
+async function enqueueWindow(
+  sources: ReturnType<typeof listRunnableCatalogSources>,
+  dateFrom: string,
+  dateTo: string,
+): Promise<void> {
   let enqueued = 0;
   let skipped = 0;
 
@@ -129,7 +175,8 @@ export function startScheduler(): void {
   }
   console.log(
     `[scheduler] enabled — daily at 0${SCHEDULE_HOUR_AMSTERDAM}:00 Europe/Amsterdam, window ` +
-      `-${WINDOW_DAYS_BEFORE}..+${WINDOW_DAYS_AFTER} days`,
+      `-${WINDOW_DAYS_BEFORE}..+${WINDOW_DAYS_AFTER} days; ${SWEEP_WEEKDAY_AMSTERDAM}s also ` +
+      `-${SWEEP_DAYS_BEFORE}..-${WINDOW_DAYS_BEFORE + 1} days`,
   );
   scheduleNextTick();
 }
@@ -137,4 +184,5 @@ export function startScheduler(): void {
 export const __test__ = {
   nextScheduledTime,
   isoDate,
+  scheduledWindows,
 };

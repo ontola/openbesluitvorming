@@ -52,6 +52,19 @@ const PHRASE_SLOP = /"[^"]*"~\d/;
 /** Every refusal carries a code as well as a sentence. The sentence is what a
  * person reads and is free to change; the code is what a program matches on
  * and is not (#224). */
+/** Parameters /api/search reads. Anything else is ignored, which is only worth
+ * mentioning when it explains a request that cannot be answered. */
+const KNOWN_SEARCH_PARAMS = [
+  "query",
+  "organization",
+  "entityType",
+  "sort",
+  "dateFrom",
+  "dateTo",
+  "limit",
+  "offset",
+];
+
 function badRequest(code: ApiErrorCode, error: string, hint?: string): Response {
   return apiError(code, 400, error, hint ? { hint } : undefined);
 }
@@ -147,6 +160,24 @@ export function validateSearchParams(url: URL): Response | null {
         `Parameter offset kan niet negatief zijn, kreeg ${value}.`,
       );
     }
+  }
+
+  // Checked last, so a more specific refusal wins. Without either there is
+  // nothing to search or browse, and the answer used to be HTTP 200 with an
+  // exact zero: "there is nothing", stated with certainty, for a question that
+  // was never asked. `q=` instead of `query=`
+  // looked exactly like a term that matches nothing (#349).
+  if (!query.trim() && !organization) {
+    const unknown = [...new Set(url.searchParams.keys())].filter(
+      (name) => !KNOWN_SEARCH_PARAMS.includes(name),
+    );
+    return badRequest(
+      "missing_query",
+      "Geef een query, een organization of allebei.",
+      unknown.length > 0
+        ? `Onbekende parameter ${unknown.map((name) => `"${name}"`).join(", ")}; de zoekterm heet \`query\`.`
+        : "Een organization zonder query bladert door die bron.",
+    );
   }
 
   return null;

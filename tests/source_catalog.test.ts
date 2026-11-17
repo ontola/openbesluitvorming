@@ -22,9 +22,9 @@ Deno.test("source catalog includes the full ORI inventory with unique source ref
   const refs = new Set(sources.map((source) => source.sourceRef));
   const keys = new Set(sources.map((source) => source.key));
 
-  // The ORI inventory (329) plus what was added since: Uitgeest (#256) and the
-  // 61 organizations of #277.
-  assert(sources.length === 392, "expected the full ORI source inventory plus later additions");
+  // The ORI inventory (329) plus what was added since: Uitgeest (#256), the
+  // 61 organizations of #277, Stadsgebied Weesp and Landgraaf's iBabs.
+  assert(sources.length === 394, "expected the full ORI source inventory plus later additions");
   assert(refs.size === sources.length, "sourceRef must be unique across all imported ORI sources");
   assert(keys.size === sources.length, "key must be globally unique across the source catalog");
   assert(
@@ -137,4 +137,32 @@ Deno.test("an unknown source is unknown to both lookups", () => {
     }
     assert(threw, `${name} should reject an unknown key`);
   }
+});
+
+Deno.test("every municipality carries its own well-formed CBS code", () => {
+  // VNG's weekly check normalises municipalities by CBS code, so a gemeente
+  // without one drops out of the coverage count (Dordrecht did until
+  // September 2026). The Amsterdam stadsdelen are a deliberate share: they
+  // are parts of GM0363, not municipalities of their own. A second source
+  // system of the same municipality (Landgraaf: Notubiz and iBabs) is the
+  // other, and says so with `partOfSourceKey`.
+  const byCode = new Map<string, string[]>();
+  for (const source of listCatalogSources()) {
+    if (source.organizationType !== "gemeente") continue;
+    if (source.partOfSourceKey) {
+      const parent = getCatalogSourceByKey(source.partOfSourceKey);
+      if (parent.cbsId === source.cbsId) continue;
+    }
+    assert(source.cbsId, `${source.key} has no CBS code`);
+    assert(/^GM\d{4}$/.test(source.cbsId), `${source.key} has malformed CBS code ${source.cbsId}`);
+    byCode.set(source.cbsId, [...(byCode.get(source.cbsId) ?? []), source.key]);
+  }
+  for (const [code, keys] of byCode) {
+    const shared = keys.filter((key) => key !== "amsterdam" && !key.startsWith("amsterdam_"));
+    assert(
+      keys.length === 1 || shared.length === 0,
+      `CBS code ${code} is shared by ${keys.join(", ")}`,
+    );
+  }
+  assert(getCatalogSourceByKey("dordrecht").cbsId === "GM0505", "expected Dordrecht's CBS code");
 });

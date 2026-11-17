@@ -127,6 +127,7 @@ export const sourceCatalog = [
     supplier: "gemeenteoplossingen",
     organizationType: "gemeente",
     allmanakId: 40563,
+    cbsId: "GM0505",
     baseUrl: "https://raad.dordrecht.nl/api",
     legacyConfigFile: "ori.go.yaml",
     legacyConfigRoot: "ori.go",
@@ -2993,6 +2994,26 @@ export const sourceCatalog = [
     implemented: true,
   },
   {
+    sourceRef: "notubiz:gemeente:amsterdam_weesp",
+    key: "amsterdam_weesp",
+    label: "Stadsgebied Weesp",
+    sourceName: "Bestuurscommissie Weesp",
+    supplier: "notubiz",
+    organizationType: "gemeente",
+    // Amsterdam's: the Notubiz import does not use it, and the stadsgebied's
+    // own Allmanak entry has not been verified.
+    allmanakId: 25698,
+    cbsId: "GM0363",
+    notubizOrganizationId: 4187,
+    // Not in the ORI inventory: added 2026-09-29 on request of VNG. Weesp's
+    // own feed (`weesp`) stops at the merger of 24 March 2022; the
+    // Bestuurscommissie Weesp has published here since.
+    partOfSourceKey: "amsterdam",
+    legacyConfigFile: "ori.notubiz.yaml",
+    legacyConfigRoot: "ori.notubiz",
+    implemented: true,
+  },
+  {
     sourceRef: "notubiz:gemeente:baarle_nassau",
     key: "baarle_nassau",
     label: "Baarle Nassau",
@@ -3704,6 +3725,26 @@ export const sourceCatalog = [
     notubizOrganizationId: 918,
     legacyConfigFile: "ori.notubiz.yaml",
     legacyConfigRoot: "ori.notubiz",
+    implemented: true,
+  },
+  {
+    sourceRef: "ibabs:gemeente:landgraaf",
+    key: "landgraaf_ibabs",
+    label: "Landgraaf (iBabs)",
+    sourceName: "Landgraaf",
+    supplier: "ibabs",
+    organizationType: "gemeente",
+    allmanakId: 34171,
+    cbsId: "GM0882",
+    ibabsSitename: "landgraaf",
+    // Not in the ORI inventory: added 2026-11-12 after questions from the
+    // municipality via VNG. Landgraaf moved its council documents from
+    // Notubiz (`landgraaf`, still used for meetings and video) to iBabs
+    // around 2023; Notubiz has held almost no documents since. Searched
+    // under `landgraaf` so one organization filter covers both systems.
+    partOfSourceKey: "landgraaf",
+    legacyConfigFile: "ori.ibabs.yaml",
+    legacyConfigRoot: "ori.ibabs",
     implemented: true,
   },
   {

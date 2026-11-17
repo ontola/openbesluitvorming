@@ -1,6 +1,9 @@
 fastapi>=0.115,<1
 uvicorn[standard]>=0.34,<1
-pymupdf>=1.25,<2
-pymupdf4llm>=0.0.17,<1
+# Pinned: the version used to depend on the day the image was built, and
+# 1.28.0 and older share table-detection state between threads (#371).
+# Raise both together, and only after comparing output on a few PDFs.
+pymupdf==1.28.2
+pymupdf4llm==0.3.4
 boto3>=1.35,<2
 httpx>=0.28,<1
