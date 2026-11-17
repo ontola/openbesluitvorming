@@ -821,6 +821,17 @@ also covers a status that describes the follow-up rather than the vote
 `result` is usually one whose source left the status field empty: the vote
 is there, the outcome was not written down.
 
+`result_contradicts_tally: true` is present when `tally` has a strict majority
+opposite to `result`: adopted with more votes against, or rejected with more
+votes in favour. `status` and `result` stay exactly as the source has them; we
+do not guess which of the two is wrong. In the cases checked against the
+council's own besluitenlijst the votes were right and the status was not: some
+griffies register each beslispunt of a motion as its own entry with its own
+vote, and give every entry the status of the motion as a whole. A tie, and an
+outcome other than `aangenomen` or `verworpen`, are never flagged. The flag is
+computed when the motion is served, so it is on the entity detail and on the
+motions of a meeting, not in the export feed.
+
 ### The text of a motion
 
 A motion is a registry entry, not a file: its text lives in an attached

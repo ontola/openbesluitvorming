@@ -785,6 +785,9 @@ export interface MeetingMotion {
   parties?: string[];
   votes?: MotionVote[];
   tally?: MotionVoteTally;
+  /** Present (always `true`) when `tally` has a majority opposite to `result`:
+   * the source's status and its votes disagree. See resultContradictsTally. */
+  result_contradicts_tally?: true;
   vote_summary?: string;
   agenda_item?: string;
   agenda_item_hint?: string;

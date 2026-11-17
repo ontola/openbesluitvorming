@@ -9,7 +9,9 @@ import {
   parseAgendaPointReference,
   parseMotionDate,
   partyFromProposer,
+  resultContradictsTally,
 } from "../src/motions/normalize.ts";
+import { __test__ as searchApiTest } from "../web/search_api.ts";
 import {
   __test__ as notubizMotionTest,
   isMotionModule,
@@ -833,4 +835,56 @@ Deno.test("overig is either a known non-outcome or flagged as unmapped (#342 rev
   for (const status of ["Aangneomen", "Akkoord bevonden", "xyz"]) {
     assertEquals(isMappedMotionStatus(status), false, `${status} is not mapped yet`);
   }
+});
+
+Deno.test("votes that contradict the status are flagged, not overwritten (beslispunten, 2026-11-17)", () => {
+  // Nijmegen, 24 april 2024: besluitenlijst says "Beslispunten 1, 3 en 4
+  // aanvaard" with 33 for and 4 against; iBabs says "Verworpen".
+  assertEquals(resultContradictsTally("verworpen", { in_favour: 33, against: 4 }), true, "case 1");
+  // Nijmegen, 26 juni 2019, "Omarm de ondernemer, beslispunt 1": 5 for, 31
+  // against, iBabs "Aangenomen".
+  assertEquals(resultContradictsTally("aangenomen", { in_favour: 5, against: 31 }), true, "case 2");
+  assertEquals(
+    resultContradictsTally("aangenomen", { in_favour: 22, against: 15 }),
+    false,
+    "case 3",
+  );
+  assertEquals(
+    resultContradictsTally("verworpen", { in_favour: 12, against: 25 }),
+    false,
+    "case 4",
+  );
+  // A tie is decided by a re-vote, not by the tally.
+  assertEquals(
+    resultContradictsTally("aangenomen", { in_favour: 18, against: 18 }),
+    false,
+    "case 5",
+  );
+  assertEquals(
+    resultContradictsTally("verworpen", { in_favour: 18, against: 18 }),
+    false,
+    "case 6",
+  );
+  // Aangehouden with a vote says nothing the tally can contradict.
+  assertEquals(
+    resultContradictsTally("aangehouden", { in_favour: 38, against: 0 }),
+    false,
+    "case 7",
+  );
+  assertEquals(resultContradictsTally("aangenomen", undefined), false, "case 8");
+  assertEquals(resultContradictsTally(undefined, { in_favour: 1, against: 9 }), false, "case 9");
+
+  const hit = (result: string, in_favour: number, against: number) => ({
+    entity_id: "motion:ibabs:gemeente:nijmegen:1fed4369-1274-4a2d-8096-39c324258e67",
+    entity_type: "Motion",
+    name: "Geluid en schone lucht met ambitie beslispunten 1, 3 en 4",
+    payload: { status: "Verworpen", result, tally: { in_favour, against } },
+  });
+  const flagged = searchApiTest.motionFromHit(hit("verworpen", 33, 4) as never);
+  assertEquals(flagged.result_contradicts_tally, true, "case 10");
+  // The source's own fields stay as they were.
+  assertEquals(flagged.status, "Verworpen", "case 11");
+  assertEquals(flagged.result, "verworpen", "case 12");
+  const consistent = searchApiTest.motionFromHit(hit("verworpen", 4, 33) as never);
+  assertEquals(consistent.result_contradicts_tally, undefined, "case 13");
 });

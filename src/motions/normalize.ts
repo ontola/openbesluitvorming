@@ -92,6 +92,34 @@ export function tallyVotes(votes: MotionVote[]): MotionVoteTally | undefined {
   };
 }
 
+/** Whether the recorded votes contradict the supplier's outcome.
+ *
+ * Some griffies register each beslispunt of a motion as its own entry with its
+ * own vote, then give every entry the status of the motion as a whole. At
+ * Nijmegen "Geluid en schone lucht met ambitie, beslispunten 1, 3 en 4" has
+ * 33 votes in favour and 4 against, matching the besluitenlijst ("aanvaard"),
+ * yet its iBabs status is "Verworpen" (reported 2026-11-17). We keep `status`
+ * and `result` verbatim from the source and flag the conflict instead of
+ * guessing which field is wrong.
+ *
+ * Only a strict majority counts: a tie (staking van stemmen) and outcomes
+ * other than adopted/rejected say nothing a tally can contradict. */
+export function resultContradictsTally(
+  result: MotionEntity["result"] | undefined,
+  tally: MotionVoteTally | undefined,
+): boolean {
+  if (!tally) {
+    return false;
+  }
+  if (result === "aangenomen") {
+    return tally.against > tally.in_favour;
+  }
+  if (result === "verworpen") {
+    return tally.in_favour > tally.against;
+  }
+  return false;
+}
+
 /** Pull the party out of an iBabs proposer string.
  *
  * Format: "Passier, C.E. (Charlotte) (Volt)" — the first parenthesis holds the
