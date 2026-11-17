@@ -96,10 +96,24 @@ def parse_ps(text: str) -> list[dict]:
     return [json.loads(line) for line in text.splitlines() if line.strip()]
 
 
+def is_one_off(container: dict) -> bool:
+    """A `docker compose run` container: same service label as the service's
+    own containers, but not one of its replicas. The weekly coverage check
+    runs this way (install-production-coverage.sh) and ran for over a day
+    under `openbesluitvorming`, where it read as a second web container."""
+    labels = container.get("Labels") or ""
+    if isinstance(labels, dict):
+        return str(labels.get("com.docker.compose.oneoff", "")).lower() == "true"
+    return "com.docker.compose.oneoff=True" in labels
+
+
 def summarize_services(containers: list[dict]) -> dict[str, dict]:
+    """Per service, and per service's `run` containers under `<service>:run`."""
     services: dict[str, dict] = {}
     for container in containers:
         name = container.get("Service") or container.get("Name") or "unknown"
+        if is_one_off(container):
+            name = f"{name}:run"
         state = container.get("State") or "unknown"
         entry = services.setdefault(
             name, {"state": state, "health": None, "status": None, "replicas": 0}
@@ -220,6 +234,11 @@ def run_logs(params: dict) -> str:
         raise JobError(f"service must be one of {', '.join(LOGGABLE_SERVICES)}")
     since = bounded(params, "sinceMinutes", 60, MAX_LOG_SINCE_MINUTES)
     lines = bounded(params, "lines", 200, MAX_LOG_LINES)
+    runs = params.get("runs", False)
+    if not isinstance(runs, bool):
+        raise JobError("runs must be a boolean")
+    if runs:
+        return run_one_off_logs(service, since, lines)
     result = compose(
         "logs",
         "--no-color",
@@ -237,6 +256,29 @@ def run_logs(params: dict) -> str:
     # times `lines`. Keep the newest `lines` across all of them.
     collected = (result.stdout + result.stderr).splitlines()
     return "\n".join(collected[-lines:]) + "\n"
+
+
+def run_one_off_logs(service: str, since: int, lines: int) -> str:
+    """Logs of the service's `docker compose run` containers, which
+    `compose logs` leaves out."""
+    listed = compose("ps", "--all", "--format", "json", service, timeout=PS_TIMEOUT_SECONDS)
+    if listed.returncode != 0:
+        raise JobError(f"ps exited {listed.returncode}: {listed.stderr.strip()[:500]}")
+    names = [c.get("Name") for c in parse_ps(listed.stdout) if is_one_off(c) and c.get("Name")]
+    if not names:
+        return f"No run containers of {service}.\n"
+    output: list[str] = []
+    for name in names:
+        result = subprocess.run(
+            [DOCKER, "logs", "--timestamps", "--since", f"{since}m", "--tail", str(lines), name],
+            capture_output=True,
+            text=True,
+            timeout=LOGS_TIMEOUT_SECONDS,
+        )
+        if result.returncode != 0:
+            raise JobError(f"logs of {name} exited {result.returncode}: {result.stderr.strip()[:500]}")
+        output.extend(f"{name} | {line}" for line in (result.stdout + result.stderr).splitlines())
+    return "\n".join(output[-lines:]) + "\n"
 
 
 def run_job(db: sqlite3.Connection, job: sqlite3.Row) -> None:
