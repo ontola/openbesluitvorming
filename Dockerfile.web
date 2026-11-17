@@ -14,7 +14,7 @@ COPY src ./src
 
 RUN pnpm run build:web
 
-FROM denoland/deno:2.7.7
+FROM denoland/deno:2.8.3
 
 WORKDIR /app
 
