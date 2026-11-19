@@ -108,8 +108,8 @@ export function normalizeParlaeusCommittee(
 
 function normalizeDocument(
   source: SourceDefinitionBase,
+  meetingId: string,
   meetingStartIso: string,
-  agendaItemId: string,
   doc: ParlaeusDocumentRef,
 ): DocumentEntity {
   const id = canonicalDocumentId(source, doc.dcid);
@@ -124,7 +124,10 @@ function normalizeDocument(
     identifier_url: link,
     file_name: fileNameFromUrl(link),
     last_discussed_at: meetingStartIso,
-    is_referenced_by: agendaItemId,
+    // The meeting, as for every other supplier: an agenda item is not an
+    // entity, so a client following meetingId got a 404 (#424). The agenda
+    // item still lists the document in the meeting's agenda.
+    is_referenced_by: meetingId,
     organization: canonicalOrganizationId(source),
     source_info: {
       supplier: source.supplier,
@@ -140,6 +143,7 @@ function normalizeDocument(
 
 function normalizeAgendaPoint(
   source: SourceDefinitionBase,
+  meetingId: string,
   meetingStartIso: string,
   point: ParlaeusAgendaPoint,
   order: number,
@@ -147,7 +151,7 @@ function normalizeAgendaPoint(
   const agendaItemId = canonicalAgendaItemId(source, point.apid);
   const documents = (point.documents ?? [])
     .filter((doc) => doc && doc.dcid)
-    .map((doc) => normalizeDocument(source, meetingStartIso, agendaItemId, doc));
+    .map((doc) => normalizeDocument(source, meetingId, meetingStartIso, doc));
 
   const item: MeetingAgendaItem = {
     id: agendaItemId,
@@ -184,7 +188,13 @@ export function normalizeParlaeusAgenda(
     if (!point || !point.apid) {
       return;
     }
-    const { item, documents } = normalizeAgendaPoint(source, startDate, point, index + 1);
+    const { item, documents } = normalizeAgendaPoint(
+      source,
+      meetingId,
+      startDate,
+      point,
+      index + 1,
+    );
     agenda.push(item);
     allDocuments.push(...documents);
   });
