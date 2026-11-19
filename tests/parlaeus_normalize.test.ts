@@ -139,8 +139,8 @@ Deno.test("normalizeParlaeusAgenda turns the API payload into a meeting + docume
   const [doc] = documents;
   assert(doc.id === "document:parlaeus:gemeente:apeldoorn:doc-1", "canonical document id");
   assert(
-    doc.is_referenced_by === "agenda_item:parlaeus:gemeente:apeldoorn:point-2",
-    "document references its agenda point",
+    doc.is_referenced_by === meeting.id && meeting.id.startsWith("meeting:"),
+    "document references its meeting, not the agenda point (#424)",
   );
   assert(doc.file_name === "foo.pdf", "filename comes from the URL trailing segment");
   assert(meeting.attachment?.[0] === doc.id, "meeting attachments include the doc id");

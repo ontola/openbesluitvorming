@@ -76,3 +76,42 @@ export async function annotateApiSpan(
     span.setAttribute("client.id", await hashClient(clientAddress, dailySalt().salt));
   }
 }
+
+const INVALID_TRACE_ID = "00000000000000000000000000000000";
+
+/** The active server span as a W3C `traceresponse` value
+ * (`00-<trace-id>-<span-id>-<flags>`, Trace Context Level 2), so a caller can
+ * point at the one request they mean (#427). Deno's server span adopts an
+ * incoming `traceparent`, so a caller that sends one gets its own trace id
+ * back. Undefined when telemetry is off. */
+export function traceResponseHeader(): string | undefined {
+  const context = trace.getActiveSpan()?.spanContext();
+  if (!context || !context.traceId || context.traceId === INVALID_TRACE_ID) {
+    return undefined;
+  }
+  const flags = (context.traceFlags & 0xff).toString(16).padStart(2, "0");
+  return `00-${context.traceId}-${context.spanId}-${flags}`;
+}
+
+/** The trace id of the active server span, for an error body a reporter can
+ * quote. Undefined when telemetry is off. */
+export function activeTraceId(): string | undefined {
+  return traceResponseHeader()?.split("-")[1];
+}
+
+/** Sets `traceresponse` on an /api/* answer. Some responses (a proxied body)
+ * carry immutable headers; those go out without it rather than failing. */
+export function applyTraceResponse(response: Response, pathname: string): void {
+  if (!pathname.startsWith("/api/")) {
+    return;
+  }
+  const value = traceResponseHeader();
+  if (!value) {
+    return;
+  }
+  try {
+    response.headers.set("traceresponse", value);
+  } catch {
+    // Immutable headers: leave the response as it is.
+  }
+}

@@ -1,4 +1,4 @@
-import { getEntityContent, searchMeetings } from "../web/search_api.ts";
+import { getEntityContent, parentMeetingId, searchMeetings } from "../web/search_api.ts";
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) {
@@ -1524,4 +1524,32 @@ Deno.test("summary is plain text with or without a search term (#376)", async ()
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+Deno.test("meetingId is only ever a meeting (#424)", () => {
+  // A register document without a meeting had the organization as parent,
+  // and older Parlaeus documents their agenda item; neither can be opened.
+  const meeting = "meeting:ibabs:gemeente:houten:abc";
+  assert(
+    parentMeetingId({ payload: { is_referenced_by: meeting } } as never) === meeting,
+    "a meeting stays",
+  );
+  assert(
+    parentMeetingId({
+      payload: { is_referenced_by: "organization:nl:gemeente:ermelo" },
+    } as never) === undefined,
+    "an organization is not a meeting",
+  );
+  assert(
+    parentMeetingId({
+      payload: { is_referenced_by: "agenda_item:parlaeus:gemeente:apeldoorn:1" },
+    } as never) === undefined,
+    "an agenda item is not a meeting",
+  );
+  assert(
+    parentMeetingId({
+      payload: { is_referenced_by: "organization:nl:gemeente:oss", meeting },
+    } as never) === meeting,
+    "falls back to the meeting field",
+  );
 });

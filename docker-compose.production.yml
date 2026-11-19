@@ -114,6 +114,9 @@ services:
       WOOZI_IBABS_BREAKER_PATH: /data/ibabs-breaker.json
       OTEL_DENO: ${OTEL_DENO:-true}
       OTEL_SERVICE_NAME: woozi-web
+      # Adopt an incoming traceparent, but not a caller's baggage: that would
+      # travel on with every outbound fetch the request makes (#427).
+      OTEL_PROPAGATORS: tracecontext
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
     expose:
       - "8787"

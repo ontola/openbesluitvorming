@@ -1824,13 +1824,27 @@ export async function getEntityContent(
     contentType: contentType ?? motionAttachment?.contentType,
     pdfUrl: pdfUrl ?? motionAttachment?.pdfUrl,
     pdfEntityId: pdfUrl ? undefined : motionAttachment?.entityId,
-    meetingId: hit.payload?.is_referenced_by ?? hit.payload?.meeting,
+    meetingId: parentMeetingId(hit),
     sourceUrl: entitySourceUrl(hit, hit.entity_id ?? entityId),
     agenda: withDownloadUrls(agenda),
     motions: motions && motions.length > 0 ? motions : undefined,
     recordings: recordings && recordings.length > 0 ? recordings : undefined,
     motion,
   };
+}
+
+/** The meeting an entity hangs off, and only a meeting (#424).
+ *
+ * `is_referenced_by` is whatever the import found as parent. For a register
+ * document without a meeting that is the organization, and Parlaeus
+ * documents imported before 2026-11-19 name their agenda item. Neither is
+ * something /api/entities can open, and a client that follows `meetingId`
+ * as API.md says got a 404 or counted an organization as a meeting. */
+export function parentMeetingId(hit: SearchHit): string | undefined {
+  const candidates = [hit.payload?.is_referenced_by, hit.payload?.meeting];
+  return candidates.find(
+    (value): value is string => typeof value === "string" && value.startsWith("meeting:"),
+  );
 }
 
 /** Where an entity is published at the source (#340).
