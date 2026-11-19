@@ -19,6 +19,18 @@ export const EXPORT_SEGMENT_MAX_RECORDS = EXPORT_BATCH_LIMIT_MAX;
 export interface ExportSegmentStorage {
   putObject(key: string, body: Uint8Array, options?: { contentType?: string }): Promise<unknown>;
   getObjectText(key: string): Promise<string>;
+  /** Lines of an object as they arrive, so a page can stop reading early
+   * (#429). Optional: without it a segment is read whole. */
+  streamObjectLines?(key: string): AsyncIterable<string>;
+}
+
+/** Object storage did not hand over a changes segment. Retrying later makes
+ * sense; the caller is told so with a 503, not the storage key (#429). */
+export class ExportStorageError extends Error {
+  constructor(message: string, options?: { cause?: unknown }) {
+    super(message, options);
+    this.name = "ExportStorageError";
+  }
 }
 
 export interface ExportSnapshotPage extends ExportPage {
@@ -440,6 +452,18 @@ export class ExportChangesLog {
     return head?.next_seq ?? 0;
   }
 
+  /** A segment's lines, streamed where the storage can: a page stops reading
+   * as soon as it is full, instead of downloading every record of a legacy
+   * segment first (#429). */
+  private async *segmentLines(objectKey: string): AsyncGenerator<string> {
+    if (this.storage.streamObjectLines) {
+      yield* this.storage.streamObjectLines(objectKey);
+      return;
+    }
+    const text = await this.storage.getObjectText(objectKey);
+    yield* text.split("\n");
+  }
+
   /** Read change records with seq >= cursor, oldest first, from published
    * segments plus the unflushed pending tail. */
   async readChanges(
@@ -461,20 +485,31 @@ export class ExportChangesLog {
       if (records.length >= limit) {
         break;
       }
-      const text = await this.storage.getObjectText(segment.object_key);
-      for (const line of text.split("\n")) {
-        if (records.length >= limit) {
-          break;
+      try {
+        for await (const line of this.segmentLines(segment.object_key)) {
+          const trimmed = line.trim();
+          if (!trimmed) {
+            continue;
+          }
+          const record = JSON.parse(trimmed) as ExportChangeRecord;
+          if (record.seq < cursor) {
+            continue;
+          }
+          records.push(record);
+          if (records.length >= limit) {
+            break;
+          }
         }
-        const trimmed = line.trim();
-        if (!trimmed) {
-          continue;
+      } catch (error) {
+        if (error instanceof SyntaxError) {
+          throw error;
         }
-        const record = JSON.parse(trimmed) as ExportChangeRecord;
-        if (record.seq < cursor) {
-          continue;
-        }
-        records.push(record);
+        throw new ExportStorageError(
+          `Reading changes segment ${segment.object_key} failed: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+          { cause: error },
+        );
       }
     }
 

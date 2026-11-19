@@ -440,6 +440,112 @@ export class ObjectStorageClient {
     return deleted;
   }
 
+  /** Read an NDJSON object line by line, so a caller that needs only its
+   * first lines stops downloading there.
+   *
+   * A changes page used to download a whole segment before it could hand back
+   * one record. Segments written before #414 hold up to tens of thousands of
+   * records; reading one of those took longer than the per-attempt ceiling of
+   * getObjectBytes, every attempt timed out, and `/api/export/changes` from
+   * the start answered 500 after two minutes at most sources (#429). Here the
+   * ceiling is on silence instead: each chunk must arrive within
+   * READ_TIMEOUT_MS of the previous one, however long the object is. Opening
+   * the object is retried like a read; a stall after lines have been handed
+   * out is not, because the caller has already used them. Returning early
+   * (a `break` in the caller's `for await`) cancels the download. */
+  async *streamObjectLines(key: string): AsyncGenerator<string> {
+    const url = this.objectUrl(key);
+    let response: Response | undefined;
+    let controller: AbortController | undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const arm = () => {
+      clearTimeout(timer);
+      timer = setTimeout(
+        () => controller?.abort(new DOMException("Signal timed out.", "TimeoutError")),
+        READ_TIMEOUT_MS,
+      );
+    };
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= READ_ATTEMPTS; attempt += 1) {
+      controller = new AbortController();
+      arm();
+      let candidate: Response;
+      try {
+        const signed = await this.client.sign(url, { method: "GET" });
+        candidate = await fetch(signed, { signal: controller.signal });
+      } catch (error) {
+        clearTimeout(timer);
+        lastError = error;
+        if (attempt < READ_ATTEMPTS) {
+          await sleep(readRetryDelayMs(attempt, null));
+          continue;
+        }
+        throw describeStorageError("read", key, error);
+      }
+      if (candidate.status === 404) {
+        clearTimeout(timer);
+        await candidate.body?.cancel();
+        return;
+      }
+      if (candidate.status === 429 || candidate.status >= 500) {
+        const retryAfter = candidate.headers.get("retry-after");
+        lastError = new Error(await errorSummary(candidate));
+        clearTimeout(timer);
+        if (attempt < READ_ATTEMPTS) {
+          await sleep(readRetryDelayMs(attempt, retryAfter));
+          continue;
+        }
+        throw describeStorageError("read", key, lastError);
+      }
+      if (!candidate.ok) {
+        clearTimeout(timer);
+        throw describeStorageError("read", key, new Error(await errorSummary(candidate)));
+      }
+      response = candidate;
+      break;
+    }
+    if (!response?.body) {
+      clearTimeout(timer);
+      if (response) {
+        return;
+      }
+      throw describeStorageError("read", key, lastError);
+    }
+
+    const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+    let buffered = "";
+    try {
+      while (true) {
+        arm();
+        let chunk: ReadableStreamReadResult<string>;
+        try {
+          chunk = await reader.read();
+        } catch (error) {
+          throw describeStorageError("read", key, error);
+        }
+        if (chunk.done) {
+          break;
+        }
+        buffered += chunk.value;
+        let newline = buffered.indexOf("\n");
+        while (newline >= 0) {
+          const line = buffered.slice(0, newline);
+          buffered = buffered.slice(newline + 1);
+          clearTimeout(timer);
+          yield line;
+          newline = buffered.indexOf("\n");
+        }
+      }
+      clearTimeout(timer);
+      if (buffered) {
+        yield buffered;
+      }
+    } finally {
+      clearTimeout(timer);
+      await reader.cancel().catch(() => undefined);
+    }
+  }
+
   /** Read one object, with a ceiling on how long a single attempt may take.
    *
    * Object storage answers most reads in tens of milliseconds and a few in

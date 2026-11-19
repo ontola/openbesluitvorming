@@ -96,3 +96,62 @@ Deno.test("absent is an answer: 404 is returned at once, not retried", async () 
   assertEquals(bytes, null);
   assertEquals(calls, 1);
 });
+
+Deno.test("streamObjectLines hands out the first lines of a slow object and stops there (#429)", async () => {
+  // A legacy changes segment took longer to download than one read may take.
+  // Streamed, the first line arrives at once; the caller stops, and the rest
+  // is never fetched. The body here trickles one line per 30ms, under the
+  // 80ms silence ceiling, for far longer than that ceiling in total.
+  let cancelled = false;
+  let sent = 0;
+  const stub: FetchFn = () => {
+    const body = new ReadableStream<Uint8Array>({
+      async pull(controller) {
+        await new Promise((resolve) => setTimeout(resolve, 30));
+        sent += 1;
+        controller.enqueue(new TextEncoder().encode(`{"seq":${sent - 1}}\n`));
+      },
+      cancel() {
+        cancelled = true;
+      },
+    });
+    return Promise.resolve(new Response(body, { status: 200 }));
+  };
+  const storage = await ObjectStorageClient.fromEnvironment();
+  const lines = await withFetch(stub, async () => {
+    const out: string[] = [];
+    for await (const line of storage.streamObjectLines("exports/x/changes/0-9.ndjson")) {
+      out.push(line);
+      if (out.length === 5) {
+        break;
+      }
+    }
+    return out;
+  });
+  assertEquals(lines, ['{"seq":0}', '{"seq":1}', '{"seq":2}', '{"seq":3}', '{"seq":4}']);
+  assert(cancelled, "the rest of the object is not downloaded");
+});
+
+Deno.test("streamObjectLines gives up on a body that goes silent (#429)", async () => {
+  const stub: FetchFn = (_input, init) => {
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('{"seq":0}\n'));
+        init?.signal?.addEventListener("abort", () => controller.error(init.signal?.reason));
+      },
+    });
+    return Promise.resolve(new Response(body, { status: 200 }));
+  };
+  const storage = await ObjectStorageClient.fromEnvironment();
+  await withFetch(stub, () =>
+    assertRejects(
+      async () => {
+        for await (const _line of storage.streamObjectLines("exports/x/changes/0-9.ndjson")) {
+          // keep reading
+        }
+      },
+      Error,
+      "S3 read failed",
+    ),
+  );
+});

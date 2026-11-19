@@ -5,6 +5,7 @@ import {
   EXPORT_SEGMENT_MAX_RECORDS,
   ExportChangesLog,
   type ExportSegmentStorage,
+  ExportStorageError,
   parseChangesCursor,
 } from "../src/exports/log.ts";
 import type { DocumentEntity, ExportChangeRecord } from "../src/types.ts";
@@ -449,4 +450,61 @@ Deno.test("splitSegment rewrites a legacy oversized segment without changing the
   const after = await log.readChanges("soest", { cursor: "950", limit: 100 });
   assertEquals(after, before, "the same page reads the same records after the split");
   assertEquals(await log.splitSegment("soest", 0), 0, "splitting again is a no-op");
+});
+
+class StreamingStorage extends FakeStorage {
+  linesRead = 0;
+  failStreamFor: string | null = null;
+
+  async *streamObjectLines(key: string): AsyncGenerator<string> {
+    if (this.failStreamFor === key) {
+      throw new Error(`S3 read failed for ${key}: TimeoutError: Signal timed out.`);
+    }
+    for (const line of (this.objects.get(key) ?? "").split("\n")) {
+      this.linesRead += 1;
+      yield line;
+    }
+  }
+}
+
+Deno.test("readChanges stops reading a legacy segment once the page is full (#429)", async () => {
+  const storage = new StreamingStorage();
+  const log = new ExportChangesLog({ db: new DatabaseSync(":memory:"), storage });
+  // One legacy segment far larger than a page, as before #414.
+  const lines = Array.from({ length: 5000 }, (_, seq) =>
+    JSON.stringify({ seq, op: "upsert", id: `document:x:${seq}` }),
+  );
+  const key = "exports/soest/changes/000000000000-000000004999.ndjson";
+  storage.objects.set(key, lines.join("\n") + "\n");
+  // deno-lint-ignore no-explicit-any
+  const db = (log as any).db as DatabaseSync;
+  db.prepare(
+    `INSERT INTO export_segment (source_key, start_seq, end_seq, object_key, record_count, created_at)
+     VALUES ('soest', 0, 4999, ?, 5000, '2026-01-01T00:00:00Z')`,
+  ).run(key);
+  db.prepare("INSERT INTO export_head (source_key, next_seq) VALUES ('soest', 5000)").run();
+
+  const page = await log.readChanges("soest", { cursor: "0", limit: 1 });
+  assertEquals(
+    page.records.map((record) => record.seq),
+    [0],
+    "first record from the start",
+  );
+  assertEquals(page.hasMore, true, "more to come");
+  assert(storage.linesRead <= 2, `read ${storage.linesRead} lines for a page of one`);
+});
+
+Deno.test("readChanges reports a storage failure as ExportStorageError (#429)", async () => {
+  const storage = new StreamingStorage();
+  const log = new ExportChangesLog({ db: new DatabaseSync(":memory:"), storage });
+  await commit(log, makeDocument({ nativeId: "1" }));
+  await log.flush("soest");
+  storage.failStreamFor = [...storage.objects.keys()][0];
+  let caught: unknown;
+  try {
+    await log.readChanges("soest");
+  } catch (error) {
+    caught = error;
+  }
+  assert(caught instanceof ExportStorageError, "a storage failure is retryable");
 });
