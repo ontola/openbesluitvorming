@@ -14,7 +14,7 @@ import {
   reconcileInterruptedRuns,
 } from "../src/ops/store.ts";
 import { startScheduler } from "../src/scheduler.ts";
-import { getExportLog, parseChangesCursor } from "../src/exports/log.ts";
+import { ExportStorageError, getExportLog, parseChangesCursor } from "../src/exports/log.ts";
 import {
   getSource,
   listAdminSourceOptions,
@@ -37,7 +37,7 @@ import {
   pdfPageMetaKey,
   renderPdfPageJpeg,
 } from "../src/documents/thumbnails.ts";
-import { annotateApiSpan } from "./client_telemetry.ts";
+import { activeTraceId, annotateApiSpan, applyTraceResponse } from "./client_telemetry.ts";
 import { getStatus } from "./status_api.ts";
 import { RATE_LIMIT_PAGE_UNIT, RateLimiter, type RateVerdict, requestCost } from "./rate_limit.ts";
 import { apiError } from "./api_errors.ts";
@@ -408,11 +408,7 @@ async function handleRequest(request: Request): Promise<Response> {
         "x-has-more": String(page.hasMore),
       });
     } catch (error) {
-      return apiError(
-        "export_failed",
-        500,
-        error instanceof Error ? error.message : "Export changes ophalen mislukt",
-      );
+      return exportFailure(error, "changes", sourceKey);
     }
   }
 
@@ -434,11 +430,7 @@ async function handleRequest(request: Request): Promise<Response> {
         "x-changes-cursor": page.changesCursor,
       });
     } catch (error) {
-      return apiError(
-        "export_failed",
-        500,
-        error instanceof Error ? error.message : "Export snapshot ophalen mislukt",
-      );
+      return exportFailure(error, "snapshot", sourceKey);
     }
   }
 
@@ -674,11 +666,13 @@ async function handleRequest(request: Request): Promise<Response> {
       // made a bug in our query construction look like their mistake. The
       // detail goes to the log under an id the reporter can quote.
       const requestId = crypto.randomUUID().slice(0, 8);
+      const traceId = activeTraceId();
       console.error(
         JSON.stringify({
           level: "error",
           event: "search_failed",
           request_id: requestId,
+          ...(traceId ? { trace_id: traceId } : {}),
           // Same shape the performance log uses, which hashes the query rather
           // than storing what people searched for. A failure is not a reason to
           // start keeping that.
@@ -691,7 +685,7 @@ async function handleRequest(request: Request): Promise<Response> {
           "search_failed",
           500,
           "Zoeken mislukt. Probeer het opnieuw of meld deze fout met het request ID.",
-          { request_id: requestId },
+          { request_id: requestId, ...(traceId ? { trace_id: traceId } : {}) },
         ),
         requestStart,
         metrics,
@@ -1055,6 +1049,42 @@ function clientKey(request: Request, remoteAddr?: Deno.Addr): string {
   return "unknown";
 }
 
+/** An export page that could not be read. Object storage that does not hand
+ * over a segment is a 503 with Retry-After: trying again later makes sense,
+ * and a client should know that (#429). Anything else is our bug, a 500. The
+ * detail, with storage keys, goes to the log, not to the caller. */
+function exportFailure(error: unknown, feed: "changes" | "snapshot", sourceKey: string): Response {
+  const unavailable = error instanceof ExportStorageError;
+  const traceId = activeTraceId();
+  console.error(
+    JSON.stringify({
+      level: "error",
+      event: "export_failed",
+      feed,
+      source: sourceKey,
+      ...(traceId ? { trace_id: traceId } : {}),
+      message: error instanceof Error ? error.message : String(error),
+    }),
+  );
+  if (unavailable) {
+    const response = apiError(
+      "export_failed",
+      503,
+      "De opslag gaf dit deel van de export niet op tijd. Probeer het over een minuut opnieuw.",
+      { retry_after_seconds: EXPORT_RETRY_AFTER_SECONDS },
+    );
+    response.headers.set("Retry-After", String(EXPORT_RETRY_AFTER_SECONDS));
+    return response;
+  }
+  return apiError(
+    "export_failed",
+    500,
+    feed === "changes" ? "Export changes ophalen mislukt." : "Export snapshot ophalen mislukt.",
+  );
+}
+
+const EXPORT_RETRY_AFTER_SECONDS = 60;
+
 function applyRateLimitHeaders(response: Response, verdict: RateVerdict): void {
   response.headers.set("RateLimit-Limit", String(verdict.limit));
   response.headers.set("RateLimit-Remaining", String(verdict.remaining));
@@ -1110,7 +1140,9 @@ Deno.serve({ port }, async (request, info) => {
           }),
         );
       }
-      return rateLimitedResponse(verdict);
+      const refused = rateLimitedResponse(verdict);
+      applyTraceResponse(refused, url.pathname);
+      return refused;
     }
   }
 
@@ -1118,6 +1150,7 @@ Deno.serve({ port }, async (request, info) => {
   if (verdict) {
     applyRateLimitHeaders(response, verdict);
   }
+  applyTraceResponse(response, url.pathname);
   logRequestPerformance(request, response);
   return response;
 });

@@ -168,7 +168,7 @@ added as needed; an existing one is not renamed or removed without a note here.
 | `search_timeout` | 504 | the search did not finish within its time budget; for a phrase, use fewer or rarer words rather than retrying it unchanged (an `organization` or period helps a phrase little, see [Rate limits](#rate-limits)) |
 | `stats_failed` | 500 | `/api/stats` could not be assembled |
 | `status_failed` | 500 | `/api/status` could not be assembled |
-| `export_failed` | 500 | an export page could not be read |
+| `export_failed` | 500, 503 | an export page could not be read; a 503 means object storage did not answer in time and carries `Retry-After`, so retrying later makes sense |
 | `pdf_fetch_failed` | 500, 502 | the source PDF could not be retrieved |
 | `pdf_render_failed` | 500 | the page could not be rendered to an image |
 | `entity_content_failed` | 500 | the entity's content could not be assembled |
@@ -179,7 +179,8 @@ A failing search adds a `request_id`:
 {
   "code": "search_failed",
   "error": "Zoeken mislukt. Probeer het opnieuw of meld deze fout met het request ID.",
-  "request_id": "3f9c1a2b"
+  "request_id": "3f9c1a2b",
+  "trace_id": "0af7651916cd43dd8448eb211c80319c"
 }
 ```
 
@@ -188,6 +189,16 @@ under the same id. The response deliberately does not carry it: an earlier
 version returned the search engine's own message, which exposed the generated
 query and internal identifiers while telling the caller nothing they could act
 on.
+
+### Tracing a request
+
+Every answer under `/api/` carries a `traceresponse` header
+([W3C Trace Context Level 2](https://www.w3.org/TR/trace-context-2/#traceresponse-header)),
+`00-<trace-id>-<span-id>-<flags>`, naming the request in our own traces. Send
+a `traceparent` header and the server adopts its trace id, so the id you log
+on your side is the one we find on ours. `baggage` is not propagated. A
+failing search also gives the trace id as `trace_id` in the body. Quote either
+when reporting a problem with a specific call.
 
 ### Punctuation in queries
 
@@ -534,6 +545,12 @@ curl "https://openbesluitvorming.nl/api/entities/document%3Anotubiz%3Agemeente%3
 }
 ```
 
+`meetingId` is always a meeting id, one `/api/entities` can open. It is absent
+when the document hangs off no meeting: a register entry (ingekomen stukken,
+raadsvoorstellen, toezeggingen) for which the source names no meeting. The
+export payload keeps the import's own parent in `is_referenced_by`, which for
+such a document is the organization.
+
 **Response (meeting):**
 
 ```json
@@ -706,6 +723,10 @@ sees one record per line. Splitting on `\n` is the safest choice.
 
 **Response headers:** `X-Next-Cursor`, `X-Has-More`. An empty body with
 `X-Has-More: false` means you are caught up; store the cursor and poll later.
+
+A `503` with code `export_failed` and a `Retry-After` header means object
+storage did not hand over that part of the log in time. Nothing is wrong with
+your cursor: retry the same request after the advised number of seconds.
 
 ### Record format
 
