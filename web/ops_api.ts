@@ -68,7 +68,7 @@ export async function tokensMatch(presented: string, expected: string): Promise<
   return difference === 0;
 }
 
-function bearerToken(request: Request): string | null {
+export function bearerToken(request: Request): string | null {
   const header = request.headers.get("authorization");
   if (!header) {
     return null;

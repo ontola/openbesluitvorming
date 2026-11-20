@@ -4,6 +4,7 @@ import type {
   GemeenteOplossingenSourceDefinition,
   IbabsSourceDefinition,
   NotubizSourceDefinition,
+  OpenMeetingSourceDefinition,
   ParlaeusSourceDefinition,
   Supplier,
   SourceCatalogEntry,
@@ -15,6 +16,7 @@ const RUNNABLE_SUPPLIERS = new Set<Supplier>([
   "ibabs",
   "gemeenteoplossingen",
   "parlaeus",
+  "openmeeting",
 ]);
 
 /** The full ORI catalog, implemented or not. Callers that want only what we
@@ -63,6 +65,17 @@ function toRuntimeSourceDefinition(source: SourceCatalogEntry): SourceDefinition
     } satisfies ParlaeusSourceDefinition;
   }
 
+  if (source.supplier === "openmeeting") {
+    return {
+      key: source.key,
+      label: source.label,
+      supplier: "openmeeting",
+      organizationType: source.organizationType,
+      allmanakId: source.allmanakId,
+      cbsId: source.cbsId,
+    } satisfies OpenMeetingSourceDefinition;
+  }
+
   return {
     key: source.key,
     label: source.label,
@@ -99,6 +112,7 @@ export const SUPPLIER_LABELS: Record<Supplier, string> = {
   ibabs: "iBabs",
   gemeenteoplossingen: "GemeenteOplossingen",
   parlaeus: "Parlaeus",
+  openmeeting: "OpenMeeting",
   allmanak: "Allmanak",
 };
 

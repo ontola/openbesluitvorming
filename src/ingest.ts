@@ -4,6 +4,7 @@ import { GemeenteOplossingenExtractor } from "./gemeenteoplossingen/extractor.ts
 import { IbabsMeetingExtractor } from "./ibabs/extractor.ts";
 import { NotubizMeetingExtractor } from "./notubiz/extractor.ts";
 import { ParlaeusExtractor } from "./parlaeus/extractor.ts";
+import { OpenMeetingExtractor } from "./openmeeting/extractor.ts";
 import type { QuickwitSearchDocument } from "./quickwit/project.ts";
 import { projectEntityCommitToQuickwitDocuments } from "./quickwit/project.ts";
 import {
@@ -117,6 +118,10 @@ function runExtractor(
 
   if (source.supplier === "parlaeus") {
     return new ParlaeusExtractor().extractForDateRange(source, dateFrom, dateTo, options);
+  }
+
+  if (source.supplier === "openmeeting") {
+    return new OpenMeetingExtractor().extractForDateRange(source, dateFrom, dateTo, options);
   }
 
   return new IbabsMeetingExtractor().extractForDateRange(source, dateFrom, dateTo, options);
