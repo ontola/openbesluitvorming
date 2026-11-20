@@ -41,11 +41,19 @@ import {
 import { normalizeNotubizDocuments, normalizeNotubizMeeting } from "../notubiz/normalize.ts";
 import { ParlaeusClient } from "../parlaeus/client.ts";
 import { normalizeParlaeusAgenda } from "../parlaeus/normalize.ts";
+import { normalizePublishedMeeting } from "../openmeeting/normalize.ts";
+import {
+  amsterdamDay,
+  PublishedMeetings,
+  type PublishedStorage,
+} from "../openmeeting/published.ts";
+import { ObjectStorageClient } from "../storage/s3.ts";
 import type {
   GemeenteOplossingenSourceDefinition,
   IbabsSourceDefinition,
   NotubizModuleItem,
   NotubizSourceDefinition,
+  OpenMeetingSourceDefinition,
   ParlaeusSourceDefinition,
   SourceDefinition,
 } from "../types.ts";
@@ -356,6 +364,37 @@ async function listParlaeus(
   return listing;
 }
 
+/** What a council published from OpenMeeting is, for coverage, what the
+ * supplier exposes: the documents of the published meetings in the window. */
+async function listOpenMeeting(
+  source: OpenMeetingSourceDefinition,
+  dateFrom: string,
+  dateTo: string,
+  storage?: PublishedStorage,
+): Promise<SupplierDocumentListing> {
+  const listing: SupplierDocumentListing = {
+    documentIds: new Set(),
+    meetings: 0,
+    registerEntries: 0,
+    warnings: [],
+  };
+  const store = new PublishedMeetings(storage ?? (await ObjectStorageClient.fromEnvironment()));
+  for await (const { key, meeting } of store.list(source.key)) {
+    const day = amsterdamDay(meeting.start_date);
+    if (day < dateFrom || day > dateTo) continue;
+    try {
+      const { documents } = await normalizePublishedMeeting(source, meeting);
+      listing.meetings += 1;
+      for (const document of documents) {
+        listing.documentIds.add(document.id);
+      }
+    } catch (error) {
+      listing.warnings.push(`${key}: ${errorText(error)}`);
+    }
+  }
+  return listing;
+}
+
 /** List what the supplier exposes for the source in the window. */
 export function listSupplierDocuments(
   source: SourceDefinition,
@@ -375,6 +414,8 @@ export function listSupplierDocuments(
       );
     case "parlaeus":
       return listParlaeus(source as ParlaeusSourceDefinition, dateFrom, dateTo);
+    case "openmeeting":
+      return listOpenMeeting(source as OpenMeetingSourceDefinition, dateFrom, dateTo);
     default:
       return Promise.reject(
         new Error(`No coverage listing for supplier ${(source as SourceDefinition).supplier}`),
@@ -386,4 +427,10 @@ function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-export const __test__ = { listNotubiz, listIbabs, listGemeenteOplossingen, listParlaeus };
+export const __test__ = {
+  listNotubiz,
+  listIbabs,
+  listGemeenteOplossingen,
+  listParlaeus,
+  listOpenMeeting,
+};

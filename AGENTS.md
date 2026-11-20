@@ -64,6 +64,12 @@ Current implemented slices:
   organisations publish most new material this way (#258); the Notubiz
   window is the module item's date, the iBabs window its MutationDate, and
   `WOOZI_IBABS_REGISTER_LIMIT` (default 2000) caps entries per run.
+- OpenMeeting councils publish instead of being polled (`src/openmeeting/`,
+  `web/publish_api.ts`, docs/publishing.md): meetings with agenda and openbare
+  documents arrive at `PUT /api/publish/{source}/meetings`, are kept in object
+  storage and imported by the worker like any other source. Configured per
+  deployment in `WOOZI_OPENMEETING_SOURCES`, not in the ORI catalog. Every
+  `original_url` they send must be public https; the worker downloads it.
 - document download and caching
 - markdown extraction with `transmutation` + remote extraction workers
 - PDF page-chunk derivation

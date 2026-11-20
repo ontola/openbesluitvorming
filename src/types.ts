@@ -379,7 +379,13 @@ export interface ExtractionIssue {
 }
 
 export type OrganizationType = "gemeente" | "provincie" | "waterschap";
-export type Supplier = "notubiz" | "ibabs" | "gemeenteoplossingen" | "parlaeus" | "allmanak";
+export type Supplier =
+  | "notubiz"
+  | "ibabs"
+  | "gemeenteoplossingen"
+  | "parlaeus"
+  | "openmeeting"
+  | "allmanak";
 
 export interface SourceDefinitionBase {
   key: string;
@@ -489,11 +495,20 @@ export interface ParlaeusSourceDefinition extends SourceDefinitionBase {
   sessionId: string;
 }
 
+/** A council that publishes to us from OpenMeeting instead of us polling a
+ * supplier API: the meetings arrive through `PUT /api/publish/...` and the
+ * extractor reads what was published (src/openmeeting/). Declared per
+ * deployment in `WOOZI_OPENMEETING_SOURCES`, not in the ORI catalog. */
+export interface OpenMeetingSourceDefinition extends SourceDefinitionBase {
+  supplier: "openmeeting";
+}
+
 export type SourceDefinition =
   | NotubizSourceDefinition
   | IbabsSourceDefinition
   | GemeenteOplossingenSourceDefinition
-  | ParlaeusSourceDefinition;
+  | ParlaeusSourceDefinition
+  | OpenMeetingSourceDefinition;
 
 export interface SourceCatalogEntry extends SourceDefinitionBase {
   sourceRef: string;

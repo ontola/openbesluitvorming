@@ -24,6 +24,8 @@ https://openbesluitvorming.nl
 
 No authentication is required. All endpoints are read-only.
 
+The one exception is `/api/publish/*`, where an OpenMeeting council publishes its meetings with a token. It is a supplier's endpoint, not part of this API; see [docs/publishing.md](docs/publishing.md).
+
 Looking for voting behaviour per party? See [Use case: voting data](#use-case-voting-data).
 Looking for what was actually said in a debate? See [Use case: spoken word](#use-case-spoken-word).
 Planning something that makes a lot of requests? See [Rate limits](#rate-limits) and [Downloading original files](#downloading-original-files).

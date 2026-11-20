@@ -802,6 +802,14 @@ Example `.env` value:
 ADMIN_PASSWORD_HASH=$$2a$$14$$exampleexampleexampleexampleexampleexampleexampleexample
 ```
 
+## OpenMeeting councils
+
+Councils that publish from OpenMeeting are configured with
+`WOOZI_OPENMEETING_SOURCES` in `/opt/woozi/.env`, read by both the web and
+the worker container; each has its own bearer token. Format, request and what
+is refused: [docs/publishing.md](docs/publishing.md). Unset, no council can
+publish and every path under `/api/publish/` answers 401.
+
 ## Ops Endpoint
 
 `/api/ops/*` lets an operator (or an agent acting for one) check imports and
