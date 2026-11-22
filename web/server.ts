@@ -46,8 +46,7 @@ import { entityGoneResponse, sourceKeyOfEntityId } from "./entity_gone.ts";
 import { SearchTimeoutError } from "../src/quickwit/client.ts";
 import { phraseSearchSlots, SearchGate } from "./search_gate.ts";
 import { createOpsHandler, OPS_PATH_PREFIX } from "./ops_api.ts";
-import { createPublishHandler, PUBLISH_PATH_PREFIX } from "./publish_api.ts";
-import { configuredOpenMeetingSources } from "../src/openmeeting/sources.ts";
+import { startOdsPoller } from "../src/ods/poller.ts";
 import { fetchExtractorStats } from "./extractors.ts";
 import { SITEMAP_FILE_PATTERN, SITEMAP_INDEX_KEY, SITEMAP_PREFIX } from "../src/exports/sitemap.ts";
 import { toNdjson } from "../src/exports/ndjson.ts";
@@ -251,6 +250,8 @@ if (reconciledRuns.length > 0) {
 // Start the daily rolling-window scheduler. Gated behind WOOZI_SCHEDULER_ENABLED
 // so only one container (the web one) enqueues scheduled runs.
 startScheduler();
+// Between nightly runs, queue an import when an ODS feed has news (src/ods/).
+startOdsPoller();
 
 // Keeps the homepage stats cache warm in the background so /api/stats never
 // makes a request wait on it (see search_api.ts for the full reasoning).
@@ -1114,24 +1115,12 @@ function rateLimitedResponse(verdict: RateVerdict): Response {
 // smaller budget (see ops_api.ts). Unset token: the route answers 404.
 const handleOpsRequest = createOpsHandler({ token: Deno.env.get("WOOZI_OPS_TOKEN") });
 
-// /api/publish/* is where OpenMeeting councils push their meetings. A bearer
-// token per source, its own budget, like /api/ops (see publish_api.ts).
-const handlePublishRequest = createPublishHandler({
-  sources: configuredOpenMeetingSources(),
-  storage: () => ObjectStorageClient.fromEnvironment(),
-  startIngest: (sourceRef, dateFrom, dateTo) =>
-    startIngest(sourceRef, dateFrom, dateTo, { ingestToQuickwit: true, trigger: "api" }),
-});
-
 Deno.serve({ port }, async (request, info) => {
   const url = new URL(request.url);
   // Before the rate limiter, so a refused request still says who was refused.
   await annotateApiSpan(request, url.pathname, clientKey(request, info?.remoteAddr));
   if (url.pathname.startsWith(OPS_PATH_PREFIX) || url.pathname === "/api/ops") {
     return await handleOpsRequest(request, clientKey(request, info?.remoteAddr));
-  }
-  if (url.pathname.startsWith(PUBLISH_PATH_PREFIX)) {
-    return await handlePublishRequest(request, clientKey(request, info?.remoteAddr));
   }
   // /api/admin/* sits behind Caddy basic auth and is used by ops tooling.
   const rateLimited =

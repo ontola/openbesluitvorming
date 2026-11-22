@@ -1,6 +1,6 @@
 import type { SourceCatalogEntry } from "../types.ts";
 import { sourceCatalog } from "./catalog.data.ts";
-import { configuredOpenMeetingSources, toOpenMeetingCatalogEntry } from "../openmeeting/sources.ts";
+import { configuredOdsSources, toOdsCatalogEntry } from "../ods/sources.ts";
 
 interface CatalogIndex {
   entries: SourceCatalogEntry[];
@@ -8,8 +8,8 @@ interface CatalogIndex {
   byRef: Record<string, SourceCatalogEntry>;
 }
 
-/** The ORI catalog plus the OpenMeeting councils this deployment declares
- * (src/openmeeting/sources.ts). Built on first use, so an environment set
+/** The ORI catalog plus the ODS feed sources this deployment declares
+ * (src/ods/sources.ts). Built on first use, so an environment set
  * before the first lookup is the one that counts. */
 let index: CatalogIndex | undefined;
 
@@ -19,7 +19,7 @@ function catalogIndex(): CatalogIndex {
   }
   const entries: SourceCatalogEntry[] = [
     ...sourceCatalog,
-    ...configuredOpenMeetingSources().map(toOpenMeetingCatalogEntry),
+    ...configuredOdsSources().map(toOdsCatalogEntry),
   ];
   const byKey: Record<string, SourceCatalogEntry> = {};
   const byRef: Record<string, SourceCatalogEntry> = {};
@@ -35,10 +35,10 @@ function catalogIndex(): CatalogIndex {
   }
 
   if (duplicates.size > 0) {
-    // An OpenMeeting council with the key of a catalog organisation would
-    // file its meetings under someone else's ids. Moving a council from its
-    // old supplier to OpenMeeting means changing that catalog entry, not
-    // adding a second one.
+    // An ODS source with the key of a catalog organisation would file its
+    // meetings under someone else's ids. Moving a council from its old
+    // supplier to a feed means changing that catalog entry, not adding a
+    // second one.
     throw new Error(
       `Duplicate source key(s) in source catalog: ${[...duplicates].sort((left, right) => left.localeCompare(right, "nl")).join(", ")}`,
     );

@@ -494,7 +494,7 @@ async function rederiveFromStoredFile(
 }
 
 /** A document whose text came with it instead of in a file: a source that
- * publishes to us (OpenMeeting) can send the text of a document written in
+ * reaches us through an ODS feed can send the text of a document written in
  * its own app. The text is stored where an extracted file's markdown goes, so
  * the reader opens it like any other, and it passes the same blocklist and
  * BSN checks. */

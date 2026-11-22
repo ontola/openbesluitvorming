@@ -1,0 +1,581 @@
+{
+  "snapshot": {
+    "records": [
+      {
+        "sequenceNumber": 1,
+        "op": "upsert",
+        "resourceType": "Vergadering",
+        "resource": {
+          "organisatiecode": "gm9999",
+          "bronidentificatie": "om-26"
+        },
+        "contentHash": "sha256:4d1f092904600f3ef55b7322df69d30cd40c71287ff9e001ad8fc90ce832f02b",
+        "storedAt": "2026-10-20T09:00:01Z",
+        "data": {
+          "bronidentificatie": "om-26",
+          "url": "https://eemdal.example/ori/v1/organisaties/gm9999/vergaderingen/om-26",
+          "dossiertype": "vergadering",
+          "organisatie": {
+            "gemeente": "gm9999",
+            "naam": "Gemeente Eemdal"
+          },
+          "naam": "Commissie Ruimte",
+          "geplandeaanvang": "2026-10-30T19:30:00Z",
+          "geplandeeinde": "2026-10-30T22:30:00Z",
+          "geplandedatum": "2026-10-30",
+          "locatie": "Raadzaal, gemeentehuis Eemdal",
+          "vergaderstatus": "gepland",
+          "vergaderingstype": "commissie",
+          "georganiseerddoorgremium": {
+            "gremiumidentificatie": "om-22",
+            "gremiumnaam": "Commissie Ruimte"
+          },
+          "agendapunten": [
+            {
+              "bronidentificatie": "om-27",
+              "url": "https://eemdal.example/ori/v1/organisaties/gm9999/agendapunten/om-27"
+            },
+            {
+              "bronidentificatie": "om-28",
+              "url": "https://eemdal.example/ori/v1/organisaties/gm9999/agendapunten/om-28"
+            },
+            {
+              "bronidentificatie": "om-29",
+              "url": "https://eemdal.example/ori/v1/organisaties/gm9999/agendapunten/om-29"
+            },
+            {
+              "bronidentificatie": "om-30",
+              "url": "https://eemdal.example/ori/v1/organisaties/gm9999/agendapunten/om-30"
+            },
+            {
+              "bronidentificatie": "om-34",
+              "url": "https://eemdal.example/ori/v1/organisaties/gm9999/agendapunten/om-34"
+            },
+            {
+              "bronidentificatie": "om-37",
+              "url": "https://eemdal.example/ori/v1/organisaties/gm9999/agendapunten/om-37"
+            },
+            {
+              "bronidentificatie": "om-40",
+              "url": "https://eemdal.example/ori/v1/organisaties/gm9999/agendapunten/om-40"
+            }
+          ]
+        }
+      },
+      {
+        "sequenceNumber": 2,
+        "op": "upsert",
+        "resourceType": "Agendapunt",
+        "resource": {
+          "organisatiecode": "gm9999",
+          "bronidentificatie": "om-27"
+        },
+        "contentHash": "sha256:f56722b71847c5529fe56e8ae89f837bcc96a7152215d7a2d42b085a525612cf",
+        "storedAt": "2026-10-20T09:00:02Z",
+        "data": {
+          "bronidentificatie": "om-27",
+          "url": "https://eemdal.example/ori/v1/organisaties/gm9999/agendapunten/om-27",
+          "dossiertype": "agendapunt",
+          "organisatie": {
+            "gemeente": "gm9999",
+            "naam": "Gemeente Eemdal"
+          },
+          "agendapuntnaam": "Opening en mededelingen",
+          "vergadering": {
+            "bronidentificatie": "om-26",
+            "url": "https://eemdal.example/ori/v1/organisaties/gm9999/vergaderingen/om-26"
+          },
+          "volgnummer": "1"
+        }
+      },
+      {
+        "sequenceNumber": 3,
+        "op": "upsert",
+        "resourceType": "Agendapunt",
+        "resource": {
+          "organisatiecode": "gm9999",
+          "bronidentificatie": "om-28"
+        },
+        "contentHash": "sha256:a32402946d65eaa8d6665d979b6c37e8a4ec17eb600a5d8f32a49cb233579b4e",
+        "storedAt": "2026-10-20T09:00:03Z",
+        "data": {
+          "bronidentificatie": "om-28",
+          "url": "https://eemdal.example/ori/v1/organisaties/gm9999/agendapunten/om-28",
+          "dossiertype": "agendapunt",
+          "organisatie": {
+            "gemeente": "gm9999",
+            "naam": "Gemeente Eemdal"
+          },
+          "agendapuntnaam": "Vaststellen van de agenda",
+          "vergadering": {
+            "bronidentificatie": "om-26",
+            "url": "https://eemdal.example/ori/v1/organisaties/gm9999/vergaderingen/om-26"
+          },
+          "volgnummer": "2",
+          "indicatiehamerstuk": true
+        }
+      },
+      {
+        "sequenceNumber": 4,
+        "op": "upsert",
+        "resourceType": "Agendapunt",
+        "resource": {
+          "organisatiecode": "gm9999",
+          "bronidentificatie": "om-29"
+        },
+        "contentHash": "sha256:a1c434701cec9f777e5330a291e58ab502f282bee2f7834fd5f33cb38b76e71e",
+        "storedAt": "2026-10-20T09:00:04Z",
+        "data": {
+          "bronidentificatie": "om-29",
+          "url": "https://eemdal.example/ori/v1/organisaties/gm9999/agendapunten/om-29",
+          "dossiertype": "agendapunt",
+          "organisatie": {
+            "gemeente": "gm9999",
+            "naam": "Gemeente Eemdal"
+          },
+          "agendapuntnaam": "Spreekrecht inwoners",
+          "vergadering": {
+            "bronidentificatie": "om-26",
+            "url": "https://eemdal.example/ori/v1/organisaties/gm9999/vergaderingen/om-26"
+          },
+          "volgnummer": "3",
+          "omschrijving": "Twee insprekers over het zonnepark De Hooge Weide. Maximaal vijf minuten per inspreker."
+        }
+      },
+      {
+        "sequenceNumber": 5,
+        "op": "upsert",
+        "resourceType": "Agendapunt",
+        "resource": {
+          "organisatiecode": "gm9999",
+          "bronidentificatie": "om-30"
+        },
+        "contentHash": "sha256:618572af009f9186c6ec34f2489afb1854e8c23ef8b2fd6b67a6cbe538aa8806",
+        "storedAt": "2026-10-20T09:00:05Z",
+        "data": {
+          "bronidentificatie": "om-30",
+          "url": "https://eemdal.example/ori/v1/organisaties/gm9999/agendapunten/om-30",
+          "dossiertype": "agendapunt",
+          "organisatie": {
+            "gemeente": "gm9999",
+            "naam": "Gemeente Eemdal"
+          },
+          "agendapuntnaam": "Omgevingsvisie Eemdal 2040",
+          "vergadering": {
+            "bronidentificatie": "om-26",
+            "url": "https://eemdal.example/ori/v1/organisaties/gm9999/vergaderingen/om-26"
+          },
+          "volgnummer": "4",
+          "omschrijving": "Het college vraagt de commissie om advies over de ontwerp-omgevingsvisie. De visie kiest voor bouwen binnen de bestaande kernen, 1.800 woningen tot 2040, en een groene buffer langs de Eem."
+        }
+      },
+      {
+        "sequenceNumber": 6,
+        "op": "upsert",
+        "resourceType": "Agendapunt",
+        "resource": {
+          "organisatiecode": "gm9999",
+          "bronidentificatie": "om-34"
+        },
+        "contentHash": "sha256:01996f9181a904de24dd39032dba9a0183fb0795f76da2b9cab319553795d4e7",
+        "storedAt": "2026-10-20T09:00:06Z",
+        "data": {
+          "bronidentificatie": "om-34",
+          "url": "https://eemdal.example/ori/v1/organisaties/gm9999/agendapunten/om-34",
+          "dossiertype": "agendapunt",
+          "organisatie": {
+            "gemeente": "gm9999",
+            "naam": "Gemeente Eemdal"
+          },
+          "agendapuntnaam": "Krediet fietsparkeren stationsgebied",
+          "vergadering": {
+            "bronidentificatie": "om-26",
+            "url": "https://eemdal.example/ori/v1/organisaties/gm9999/vergaderingen/om-26"
+          },
+          "volgnummer": "5",
+          "omschrijving": "Krediet van € 1,2 miljoen voor een bewaakte fietsenstalling met 900 plekken."
+        }
+      },
+      {
+        "sequenceNumber": 7,
+        "op": "upsert",
+        "resourceType": "Agendapunt",
+        "resource": {
+          "organisatiecode": "gm9999",
+          "bronidentificatie": "om-37"
+        },
+        "contentHash": "sha256:189515115ed1db6583c5b267c749cbdd8e9fd17b6c73004f4c5b2c82f34e89a6",
+        "storedAt": "2026-10-20T09:00:07Z",
+        "data": {
+          "bronidentificatie": "om-37",
+          "url": "https://eemdal.example/ori/v1/organisaties/gm9999/agendapunten/om-37",
+          "dossiertype": "agendapunt",
+          "organisatie": {
+            "gemeente": "gm9999",
+            "naam": "Gemeente Eemdal"
+          },
+          "agendapuntnaam": "Zonnepark De Hooge Weide",
+          "vergadering": {
+            "bronidentificatie": "om-26",
+            "url": "https://eemdal.example/ori/v1/organisaties/gm9999/vergaderingen/om-26"
+          },
+          "volgnummer": "6",
+          "omschrijving": "Verklaring van geen bedenkingen voor een zonnepark van 14 hectare. Omwonenden vragen om meer afstand en een lokaal eigendomsaandeel van 50 procent."
+        }
+      },
+      {
+        "sequenceNumber": 8,
+        "op": "upsert",
+        "resourceType": "Agendapunt",
+        "resource": {
+          "organisatiecode": "gm9999",
+          "bronidentificatie": "om-40"
+        },
+        "contentHash": "sha256:a4063aec0b4671af823ed0d70a98416e224dff5cd21674614875a82540aa6cee",
+        "storedAt": "2026-10-20T09:00:08Z",
+        "data": {
+          "bronidentificatie": "om-40",
+          "url": "https://eemdal.example/ori/v1/organisaties/gm9999/agendapunten/om-40",
+          "dossiertype": "agendapunt",
+          "organisatie": {
+            "gemeente": "gm9999",
+            "naam": "Gemeente Eemdal"
+          },
+          "agendapuntnaam": "Rondvraag en sluiting",
+          "vergadering": {
+            "bronidentificatie": "om-26",
+            "url": "https://eemdal.example/ori/v1/organisaties/gm9999/vergaderingen/om-26"
+          },
+          "volgnummer": "7"
+        }
+      },
+      {
+        "sequenceNumber": 9,
+        "op": "upsert",
+        "resourceType": "Informatieobject",
+        "resource": {
+          "organisatiecode": "gm9999",
+          "bronidentificatie": "om-31"
+        },
+        "contentHash": "sha256:9041318a9c502943d2b5091e8ca308afaee410b3624af1cc742cf9f7f0e7e2ca",
+        "storedAt": "2026-10-20T09:00:09Z",
+        "data": {
+          "bronidentificatie": "om-31",
+          "url": "https://eemdal.example/ori/v1/organisaties/gm9999/informatieobjecten/om-31",
+          "dossiertype": "informatieobject",
+          "organisatie": {
+            "gemeente": "gm9999",
+            "naam": "Gemeente Eemdal"
+          },
+          "webpaginalink": "https://eemdal.example/stukken/om-31",
+          "titel": "Raadsvoorstel Omgevingsvisie Eemdal 2040",
+          "wooinformatiecategorie": "c_db4862c3",
+          "datumingediend": "2026-10-16",
+          "informatieobjecttype": "voorstel",
+          "agendapunten": [
+            {
+              "bronidentificatie": "om-30",
+              "url": "https://eemdal.example/ori/v1/organisaties/gm9999/agendapunten/om-30"
+            }
+          ],
+          "vergaderingen": [
+            {
+              "bronidentificatie": "om-26",
+              "url": "https://eemdal.example/ori/v1/organisaties/gm9999/vergaderingen/om-26"
+            }
+          ],
+          "omschrijving": "**Beslispunten**\n\n1. De ontwerp-omgevingsvisie Eemdal 2040 vrijgeven voor zienswijzen.\n2. Het college opdracht geven de visie na de zienswijzenperiode ter vaststelling aan de raad voor te leggen.\n\n**Samenvatting**\n\nDe omgevingsvisie vervangt de structuurvisie uit 2013. Ze legt vast waar Eemdal tot 2040 bouwt, waar niet, en hoe de gemeente omgaat met klimaat en bereikbaarheid. Het college kiest voor verdichting binnen de kernen en een groene buffer langs de Eem.\n\n**Financiën**\n\nDe visie zelf heeft geen directe financiële gevolgen. Uitwerkingen komen als programma's naar de raad."
+        }
+      },
+      {
+        "sequenceNumber": 10,
+        "op": "upsert",
+        "resourceType": "Informatieobject",
+        "resource": {
+          "organisatiecode": "gm9999",
+          "bronidentificatie": "om-32"
+        },
+        "contentHash": "sha256:bcfc96f783026d5929aea95e7e5cab37fa714fd19bca810f38d9962c8a3d4314",
+        "storedAt": "2026-10-20T09:00:10Z",
+        "data": {
+          "bronidentificatie": "om-32",
+          "url": "https://eemdal.example/ori/v1/organisaties/gm9999/informatieobjecten/om-32",
+          "dossiertype": "informatieobject",
+          "organisatie": {
+            "gemeente": "gm9999",
+            "naam": "Gemeente Eemdal"
+          },
+          "webpaginalink": "https://eemdal.example/stukken/om-32",
+          "titel": "Ontwerp-omgevingsvisie (hoofdrapport)",
+          "wooinformatiecategorie": "c_db4862c3",
+          "datumingediend": "2026-10-16",
+          "informatieobjecttype": "bijlage",
+          "agendapunten": [
+            {
+              "bronidentificatie": "om-30",
+              "url": "https://eemdal.example/ori/v1/organisaties/gm9999/agendapunten/om-30"
+            }
+          ],
+          "vergaderingen": [
+            {
+              "bronidentificatie": "om-26",
+              "url": "https://eemdal.example/ori/v1/organisaties/gm9999/vergaderingen/om-26"
+            }
+          ],
+          "omschrijving": "Het hoofdrapport beschrijft vijf opgaven: wonen, klimaat, bereikbaarheid, landschap en economie. Hoofdstuk 3 gaat over verdichting rond het station; hoofdstuk 5 over de groene buffer."
+        }
+      },
+      {
+        "sequenceNumber": 11,
+        "op": "upsert",
+        "resourceType": "Informatieobject",
+        "resource": {
+          "organisatiecode": "gm9999",
+          "bronidentificatie": "om-33"
+        },
+        "contentHash": "sha256:61958991fa296b86cbce4db16f75eb600d468307f911655f861831e92291053e",
+        "storedAt": "2026-10-20T09:00:11Z",
+        "data": {
+          "bronidentificatie": "om-33",
+          "url": "https://eemdal.example/ori/v1/organisaties/gm9999/informatieobjecten/om-33",
+          "dossiertype": "informatieobject",
+          "organisatie": {
+            "gemeente": "gm9999",
+            "naam": "Gemeente Eemdal"
+          },
+          "webpaginalink": "https://eemdal.example/stukken/om-33",
+          "titel": "Reactienota participatie",
+          "wooinformatiecategorie": "c_db4862c3",
+          "datumingediend": "2026-10-16",
+          "informatieobjecttype": "bijlage",
+          "agendapunten": [
+            {
+              "bronidentificatie": "om-30",
+              "url": "https://eemdal.example/ori/v1/organisaties/gm9999/agendapunten/om-30"
+            }
+          ],
+          "vergaderingen": [
+            {
+              "bronidentificatie": "om-26",
+              "url": "https://eemdal.example/ori/v1/organisaties/gm9999/vergaderingen/om-26"
+            }
+          ],
+          "omschrijving": "412 reacties zijn verwerkt. De meest genoemde zorgen: verkeer op de Dorpsstraat, het verdwijnen van volkstuinen en de hoogte van nieuwbouw bij het station."
+        }
+      },
+      {
+        "sequenceNumber": 12,
+        "op": "upsert",
+        "resourceType": "Informatieobject",
+        "resource": {
+          "organisatiecode": "gm9999",
+          "bronidentificatie": "om-35"
+        },
+        "contentHash": "sha256:cd3ee90141a5587171da5f8c0c46c03ef68bef2d39ba29aec920421a85e11b08",
+        "storedAt": "2026-10-20T09:00:12Z",
+        "data": {
+          "bronidentificatie": "om-35",
+          "url": "https://eemdal.example/ori/v1/organisaties/gm9999/informatieobjecten/om-35",
+          "dossiertype": "informatieobject",
+          "organisatie": {
+            "gemeente": "gm9999",
+            "naam": "Gemeente Eemdal"
+          },
+          "webpaginalink": "https://eemdal.example/stukken/om-35",
+          "titel": "Raadsvoorstel krediet fietsparkeren",
+          "wooinformatiecategorie": "c_db4862c3",
+          "datumingediend": "2026-10-16",
+          "informatieobjecttype": "voorstel",
+          "agendapunten": [
+            {
+              "bronidentificatie": "om-34",
+              "url": "https://eemdal.example/ori/v1/organisaties/gm9999/agendapunten/om-34"
+            }
+          ],
+          "vergaderingen": [
+            {
+              "bronidentificatie": "om-26",
+              "url": "https://eemdal.example/ori/v1/organisaties/gm9999/vergaderingen/om-26"
+            }
+          ],
+          "omschrijving": "Het college stelt voor een krediet van € 1.200.000 beschikbaar te stellen. De provincie draagt € 400.000 bij. Exploitatie kost jaarlijks € 85.000."
+        }
+      },
+      {
+        "sequenceNumber": 13,
+        "op": "upsert",
+        "resourceType": "Informatieobject",
+        "resource": {
+          "organisatiecode": "gm9999",
+          "bronidentificatie": "om-36"
+        },
+        "contentHash": "sha256:752866f2a9d9b1212fe3f19284dd8b621a47006b521ae89f146cbce1a738ce3f",
+        "storedAt": "2026-10-20T09:00:13Z",
+        "data": {
+          "bronidentificatie": "om-36",
+          "url": "https://eemdal.example/ori/v1/organisaties/gm9999/informatieobjecten/om-36",
+          "dossiertype": "informatieobject",
+          "organisatie": {
+            "gemeente": "gm9999",
+            "naam": "Gemeente Eemdal"
+          },
+          "webpaginalink": "https://eemdal.example/stukken/om-36",
+          "titel": "Variantenstudie stalling",
+          "wooinformatiecategorie": "c_db4862c3",
+          "datumingediend": "2026-10-16",
+          "informatieobjecttype": "bijlage",
+          "agendapunten": [
+            {
+              "bronidentificatie": "om-34",
+              "url": "https://eemdal.example/ori/v1/organisaties/gm9999/agendapunten/om-34"
+            }
+          ],
+          "vergaderingen": [
+            {
+              "bronidentificatie": "om-26",
+              "url": "https://eemdal.example/ori/v1/organisaties/gm9999/vergaderingen/om-26"
+            }
+          ],
+          "omschrijving": "Drie varianten zijn onderzocht: ondergronds, in de plint van het nieuwe stationsgebouw en een losse stalling op het Stationsplein."
+        }
+      },
+      {
+        "sequenceNumber": 14,
+        "op": "upsert",
+        "resourceType": "Informatieobject",
+        "resource": {
+          "organisatiecode": "gm9999",
+          "bronidentificatie": "om-38"
+        },
+        "contentHash": "sha256:61153ccdc8ba3c5b5d568f615d753c0516107aa994b4a02f96fcc1b41c7bce2b",
+        "storedAt": "2026-10-20T09:00:14Z",
+        "data": {
+          "bronidentificatie": "om-38",
+          "url": "https://eemdal.example/ori/v1/organisaties/gm9999/informatieobjecten/om-38",
+          "dossiertype": "informatieobject",
+          "organisatie": {
+            "gemeente": "gm9999",
+            "naam": "Gemeente Eemdal"
+          },
+          "webpaginalink": "https://eemdal.example/stukken/om-38",
+          "titel": "Raadsvoorstel verklaring van geen bedenkingen",
+          "wooinformatiecategorie": "c_db4862c3",
+          "datumingediend": "2026-10-16",
+          "informatieobjecttype": "voorstel",
+          "agendapunten": [
+            {
+              "bronidentificatie": "om-37",
+              "url": "https://eemdal.example/ori/v1/organisaties/gm9999/agendapunten/om-37"
+            }
+          ],
+          "vergaderingen": [
+            {
+              "bronidentificatie": "om-26",
+              "url": "https://eemdal.example/ori/v1/organisaties/gm9999/vergaderingen/om-26"
+            }
+          ],
+          "omschrijving": "De initiatiefnemer biedt 25 procent lokaal eigendom aan via de energiecoöperatie. De afstand tot de dichtstbijzijnde woning is 180 meter."
+        }
+      },
+      {
+        "sequenceNumber": 15,
+        "op": "upsert",
+        "resourceType": "Informatieobject",
+        "resource": {
+          "organisatiecode": "gm9999",
+          "bronidentificatie": "om-39"
+        },
+        "contentHash": "sha256:101ac1d202ed54f5701ac341e023dc30612f4cc7aaf9a52a589765f86a64ee9a",
+        "storedAt": "2026-10-20T09:00:15Z",
+        "data": {
+          "bronidentificatie": "om-39",
+          "url": "https://eemdal.example/ori/v1/organisaties/gm9999/informatieobjecten/om-39",
+          "dossiertype": "informatieobject",
+          "organisatie": {
+            "gemeente": "gm9999",
+            "naam": "Gemeente Eemdal"
+          },
+          "webpaginalink": "https://eemdal.example/stukken/om-39",
+          "titel": "Brief Bewonersvereniging Hooge Weide",
+          "wooinformatiecategorie": "c_db4862c3",
+          "datumingediend": "2026-10-16",
+          "informatieobjecttype": "ingekomen_stuk",
+          "agendapunten": [
+            {
+              "bronidentificatie": "om-37",
+              "url": "https://eemdal.example/ori/v1/organisaties/gm9999/agendapunten/om-37"
+            }
+          ],
+          "vergaderingen": [
+            {
+              "bronidentificatie": "om-26",
+              "url": "https://eemdal.example/ori/v1/organisaties/gm9999/vergaderingen/om-26"
+            }
+          ],
+          "omschrijving": "De bewoners vragen om 300 meter afstand, een landschapsplan en 50 procent lokaal eigendom."
+        }
+      }
+    ],
+    "feedCursor": "c-16",
+    "cursor": null,
+    "hasMore": false,
+    "next": null
+  },
+  "feed": {
+    "records": [
+      {
+        "sequenceNumber": 16,
+        "op": "upsert",
+        "resourceType": "Informatieobject",
+        "resource": {
+          "organisatiecode": "gm9999",
+          "bronidentificatie": "om-31"
+        },
+        "contentHash": "sha256:7663f2816ff8d24cacbb2025792cb2b8ec0719091bcdb7ce57049750659371c2",
+        "storedAt": "2026-10-21T08:00:00Z",
+        "data": {
+          "bronidentificatie": "om-31",
+          "url": "https://eemdal.example/ori/v1/organisaties/gm9999/informatieobjecten/om-31",
+          "dossiertype": "informatieobject",
+          "organisatie": {
+            "gemeente": "gm9999",
+            "naam": "Gemeente Eemdal"
+          },
+          "webpaginalink": "https://eemdal.example/stukken/om-31",
+          "titel": "Raadsvoorstel Omgevingsvisie Eemdal 2040 (gewijzigd)",
+          "wooinformatiecategorie": "c_db4862c3",
+          "datumingediend": "2026-10-16",
+          "informatieobjecttype": "voorstel",
+          "agendapunten": [
+            {
+              "bronidentificatie": "om-30",
+              "url": "https://eemdal.example/ori/v1/organisaties/gm9999/agendapunten/om-30"
+            }
+          ],
+          "vergaderingen": [
+            {
+              "bronidentificatie": "om-26",
+              "url": "https://eemdal.example/ori/v1/organisaties/gm9999/vergaderingen/om-26"
+            }
+          ],
+          "omschrijving": "**Beslispunten**\n\n1. De ontwerp-omgevingsvisie Eemdal 2040 vrijgeven voor zienswijzen.\n2. Het college opdracht geven de visie na de zienswijzenperiode ter vaststelling aan de raad voor te leggen.\n\n**Samenvatting**\n\nDe omgevingsvisie vervangt de structuurvisie uit 2013. Ze legt vast waar Eemdal tot 2040 bouwt, waar niet, en hoe de gemeente omgaat met klimaat en bereikbaarheid. Het college kiest voor verdichting binnen de kernen en een groene buffer langs de Eem.\n\n**Financiën**\n\nDe visie zelf heeft geen directe financiële gevolgen. Uitwerkingen komen als programma's naar de raad."
+        }
+      },
+      {
+        "sequenceNumber": 17,
+        "op": "delete",
+        "resourceType": "Informatieobject",
+        "resource": {
+          "organisatiecode": "gm9999",
+          "bronidentificatie": "om-39"
+        },
+        "verwijderreden": "ingetrokken",
+        "storedAt": "2026-10-21T08:05:00Z"
+      }
+    ],
+    "cursor": "c-18",
+    "head": 17,
+    "hasMore": false,
+    "next": null
+  }
+}

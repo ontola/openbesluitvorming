@@ -4,7 +4,7 @@ import { GemeenteOplossingenExtractor } from "./gemeenteoplossingen/extractor.ts
 import { IbabsMeetingExtractor } from "./ibabs/extractor.ts";
 import { NotubizMeetingExtractor } from "./notubiz/extractor.ts";
 import { ParlaeusExtractor } from "./parlaeus/extractor.ts";
-import { OpenMeetingExtractor } from "./openmeeting/extractor.ts";
+import { OdsExtractor } from "./ods/extractor.ts";
 import type { QuickwitSearchDocument } from "./quickwit/project.ts";
 import { projectEntityCommitToQuickwitDocuments } from "./quickwit/project.ts";
 import {
@@ -28,13 +28,17 @@ import {
   sourceRemovalsEnabled,
 } from "./pipeline/source_removals.ts";
 import { canProbeSupplier, probeDocumentAtSource } from "./documents/source_presence.ts";
-import { retractDocumentsGoneAtSource } from "./ops/delete_document.ts";
+import {
+  retractDocumentsGoneAtSource,
+  retractMeetingsGoneAtSource,
+} from "./ops/delete_document.ts";
 import { ObjectStorageClient } from "./storage/s3.ts";
 import { currentDerivationVersion, currentProjectionVersion } from "./pipeline/versioning.ts";
 import { getProjectableSource, getSource } from "./sources/index.ts";
 import { computeAllowedIngestConcurrency } from "./ingest_scheduler.ts";
 import type {
   EntityCommitEvent,
+  ExtractionBundle,
   IngestExecutionMode,
   IngestRunRecord,
   IngestRunTrigger,
@@ -120,8 +124,8 @@ function runExtractor(
     return new ParlaeusExtractor().extractForDateRange(source, dateFrom, dateTo, options);
   }
 
-  if (source.supplier === "openmeeting") {
-    return new OpenMeetingExtractor().extractForDateRange(source, dateFrom, dateTo, options);
+  if (source.supplier === "ods") {
+    return new OdsExtractor().extractForDateRange(source, dateFrom, dateTo, options);
   }
 
   return new IbabsMeetingExtractor().extractForDateRange(source, dateFrom, dateTo, options);
@@ -265,6 +269,9 @@ export async function executeIngest(
     if (removals && quickwit && exportLog) {
       await retractRemovedDocuments(run.id, source, removals, quickwit, exportLog);
     }
+    if (extraction.retractions && quickwit && exportLog) {
+      await retractDeletedAtSource(run.id, extraction.retractions, quickwit, exportLog);
+    }
 
     if (exportLog) {
       try {
@@ -315,6 +322,66 @@ export async function executeIngest(
       issue_count: issueCount || 1,
     });
     throw new Error(`Run ${updated.id} failed: ${message}`);
+  }
+}
+
+/**
+ * Retract what the source itself said it deleted: the `delete` and `redact`
+ * records of an ODS feed. Unlike `retractRemovedDocuments` there is nothing
+ * to infer or confirm: the source is explicit, so it is acted on at once.
+ * What was fully retracted is reported back with `done`; the rest stays
+ * pending and is tried again on the next run.
+ */
+async function retractDeletedAtSource(
+  runId: string,
+  retractions: NonNullable<ExtractionBundle["retractions"]>,
+  quickwit: QuickwitClient,
+  exportLog: Awaited<ReturnType<typeof getExportLog>>,
+): Promise<void> {
+  const step = "source_removals" as const;
+  try {
+    const documents = retractions.entries.filter((entry) => entry.entityType === "Document");
+    const meetings = retractions.entries.filter((entry) => entry.entityType === "Meeting");
+    const outcomes = [
+      ...(documents.length > 0
+        ? await retractDocumentsGoneAtSource(documents, {
+            quickwit,
+            storage: await ObjectStorageClient.fromEnvironment(),
+            exportLog,
+          })
+        : []),
+      ...(meetings.length > 0
+        ? await retractMeetingsGoneAtSource(meetings, { quickwit, exportLog })
+        : []),
+    ];
+    const done: string[] = [];
+    for (const outcome of outcomes) {
+      if (outcome.reached === "deleted" && !outcome.error) {
+        done.push(outcome.entityId);
+        await appendRunIssue(runId, {
+          severity: "info",
+          step,
+          entity_id: outcome.entityId,
+          message: "Ingetrokken: de bron heeft het verwijderd.",
+        });
+      } else {
+        await appendRunIssue(runId, {
+          severity: "warning",
+          step,
+          entity_id: outcome.entityId,
+          message: `Intrekking onvolledig (stap bereikt: ${outcome.reached}): ${outcome.error ?? "onbekend"}`,
+        });
+      }
+    }
+    await retractions.done(done);
+  } catch (error) {
+    await appendRunIssue(runId, {
+      severity: "warning",
+      step,
+      message: `Intrekken van bij de bron verwijderde stukken mislukt: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    });
   }
 }
 

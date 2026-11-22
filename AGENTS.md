@@ -64,12 +64,16 @@ Current implemented slices:
   organisations publish most new material this way (#258); the Notubiz
   window is the module item's date, the iBabs window its MutationDate, and
   `WOOZI_IBABS_REGISTER_LIMIT` (default 2000) caps entries per run.
-- OpenMeeting councils publish instead of being polled (`src/openmeeting/`,
-  `web/publish_api.ts`, docs/publishing.md): meetings with agenda and openbare
-  documents arrive at `PUT /api/publish/{source}/meetings`, are kept in object
-  storage and imported by the worker like any other source. Configured per
-  deployment in `WOOZI_OPENMEETING_SOURCES`, not in the ORI catalog. Every
-  `original_url` they send must be public https; the worker downloads it.
+- ODS event polling feeds (VNG ODS Open Raadsinformatie 0.0.3, first served
+  by OpenMeeting): `src/ods/`, docs/ods-feed.md. The worker reads `/snapshot`
+  once and then `/feed` from a saved cursor into a mirror in object storage
+  (`ods/{source}/`), and imports from that mirror. A run emits the meetings
+  in its window plus every meeting the feed changed; `delete` and `redact`
+  are retracted at once (no probing: the source is explicit). The web
+  container polls each feed every `WOOZI_ODS_POLL_SECONDS` and queues an
+  import when there is news; only the worker moves the cursor. Configured
+  per deployment in `WOOZI_ODS_SOURCES`, not in the ORI catalog. Every
+  `bestandsurl` must be public https; the worker downloads it.
 - document download and caching
 - markdown extraction with `transmutation` + remote extraction workers
 - PDF page-chunk derivation

@@ -802,13 +802,13 @@ Example `.env` value:
 ADMIN_PASSWORD_HASH=$$2a$$14$$exampleexampleexampleexampleexampleexampleexampleexample
 ```
 
-## OpenMeeting councils
+## ODS feed sources
 
-Councils that publish from OpenMeeting are configured with
-`WOOZI_OPENMEETING_SOURCES` in `/opt/woozi/.env`, read by both the web and
-the worker container; each has its own bearer token. Format, request and what
-is refused: [docs/publishing.md](docs/publishing.md). Unset, no council can
-publish and every path under `/api/publish/` answers 401.
+Organisations we read from an ODS event polling feed (such as an OpenMeeting
+council) are configured with `WOOZI_ODS_SOURCES` in `/opt/woozi/.env`, read
+by both the web and the worker container. The web container polls each feed
+every `WOOZI_ODS_POLL_SECONDS` (default 300) when `WOOZI_SCHEDULER_ENABLED=1`.
+Format and behaviour: [docs/ods-feed.md](docs/ods-feed.md).
 
 ## Ops Endpoint
 

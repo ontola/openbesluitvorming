@@ -4,7 +4,7 @@ import type {
   GemeenteOplossingenSourceDefinition,
   IbabsSourceDefinition,
   NotubizSourceDefinition,
-  OpenMeetingSourceDefinition,
+  OdsSourceDefinition,
   ParlaeusSourceDefinition,
   Supplier,
   SourceCatalogEntry,
@@ -16,7 +16,7 @@ const RUNNABLE_SUPPLIERS = new Set<Supplier>([
   "ibabs",
   "gemeenteoplossingen",
   "parlaeus",
-  "openmeeting",
+  "ods",
 ]);
 
 /** The full ORI catalog, implemented or not. Callers that want only what we
@@ -65,15 +65,17 @@ function toRuntimeSourceDefinition(source: SourceCatalogEntry): SourceDefinition
     } satisfies ParlaeusSourceDefinition;
   }
 
-  if (source.supplier === "openmeeting") {
+  if (source.supplier === "ods") {
     return {
       key: source.key,
       label: source.label,
-      supplier: "openmeeting",
+      supplier: "ods",
       organizationType: source.organizationType,
       allmanakId: source.allmanakId,
       cbsId: source.cbsId,
-    } satisfies OpenMeetingSourceDefinition;
+      organisatiecode: source.organisatiecode!,
+      feedUrl: source.odsFeedUrl!,
+    } satisfies OdsSourceDefinition;
   }
 
   return {
@@ -112,7 +114,7 @@ export const SUPPLIER_LABELS: Record<Supplier, string> = {
   ibabs: "iBabs",
   gemeenteoplossingen: "GemeenteOplossingen",
   parlaeus: "Parlaeus",
-  openmeeting: "OpenMeeting",
+  ods: "ODS-feed",
   allmanak: "Allmanak",
 };
 
