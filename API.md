@@ -21,6 +21,7 @@ https://openbesluitvorming.nl
 | [`/api/entities/{entity_id}/pdf/page/{n}`](#pdf-page-rendering) | GET | Rendered PDF page as JPEG image | |
 | [`/api/export/snapshot`](#bulk-export) | GET | Bulk export: current state per source (NDJSON) | |
 | [`/api/export/changes`](#bulk-export) | GET | Bulk export: change feed per source (NDJSON) | |
+| [`/api/dcat`](#catalogue-dcat) | GET | Catalogue of the datasets per organization (DCAT-AP-DONL: JSON-LD, Turtle, RDF/XML) | [live](https://openbesluitvorming.nl/api/dcat) |
 
 No authentication is required. All endpoints are read-only.
 
@@ -157,6 +158,7 @@ added as needed; an existing one is not renamed or removed without a note here.
 | `missing_export_source` | 400 | an export call omitted `source` |
 | `unknown_export_source` | 400 | an export call named a source that does not exist |
 | `invalid_export_cursor` | 400 | `cursor` was not produced by an earlier export response |
+| `unknown_dcat_format` | 400 | `format` on `/api/dcat` is not `jsonld`, `turtle` or `rdfxml` |
 | `entity_not_found` | 404 | no entity with that id |
 | `route_not_found` | 404 | the path under `/api/` is not an endpoint of this API, for example a typo or an old Open Raadsinformatie path |
 | `pdf_not_found` | 404 | the entity exists but carries no PDF |
@@ -773,6 +775,74 @@ your cursor: retry the same request after the advised number of seconds.
 > **Note:** the export log is populated from ingests going forward. A source's
 > history appears in the feed after its next full import; until then the
 > snapshot may be empty or partial for that source.
+
+---
+
+## Catalogue (DCAT)
+
+### `GET /api/dcat`
+
+A machine-readable catalogue of everything on this site, for open data portals
+and harvesters such as [data.overheid.nl](https://data.overheid.nl). It
+follows DCAT-AP-DONL, the application profile data.overheid.nl uses, and
+already carries what DCAT-AP-NL 3.0 asks for.
+
+The catalogue (`dcat:Catalog`) holds **one dataset per source** in
+`/api/sources?implemented=true`. Each dataset has:
+
+| Property | Value |
+|----------|-------|
+| `dct:identifier` | `https://openbesluitvorming.nl/api/dcat#{source key}`, also the dataset's IRI |
+| `dct:title`, `dct:description` | In Dutch |
+| `dct:publisher`, `dct:creator` | The organization's [TOOI](https://standaarden.overheid.nl/tooi) URI: `…/tooi/id/gemeente/gm0392` (the CBS code), `…/tooi/id/provincie/pv27`, `…/tooi/id/waterschap/ws0155` (the waterschapscode, which is not the CBS `WSnn` code). Amsterdam's stadsdelen are published by the gemeente Amsterdam |
+| `dct:modified` | When the source's change feed last grew; before its first export, when anything was last indexed for it. Absent when neither is known |
+| `dct:temporal` | A `dct:PeriodOfTime` from the oldest to the newest meeting or document date that is not in the future |
+| `dct:license` | `http://creativecommons.org/publicdomain/zero/1.0/deed.nl`, with `dct:rights` explaining what it covers |
+| `dcat:theme` | `Bestuur` (TaxonomieBeleidsagenda) and the EU data theme `GOVE` |
+| `dct:language` | Dutch (`…/language/NLD`) |
+| `dcat:landingPage` | The search page filtered on the organization |
+
+and three distributions:
+
+| Distribution | `dcat:accessURL` |
+|--------------|------------------|
+| Bulk export | `/api/export/snapshot?source={key}` (also `dcat:downloadURL`) |
+| Change feed | `/api/export/changes?source={key}` (also `dcat:downloadURL`) |
+| Search API | `/api/search?organization={key}`, with `dcat:accessService` naming the API |
+
+**Serialisations.** JSON-LD by default. Ask for another with `format`, or with
+an `Accept` header when `format` is absent:
+
+| `format` | `Accept` | Content type |
+|----------|----------|--------------|
+| `jsonld` (default) | `application/ld+json` | `application/ld+json` |
+| `turtle` | `text/turtle` | `text/turtle` |
+| `rdfxml` | `application/rdf+xml` | `application/rdf+xml` |
+
+An unknown `format` is a 400 `unknown_dcat_format`; an `Accept` header that
+names none of these gets JSON-LD.
+
+**Example** (one dataset, abridged):
+
+```json
+{
+  "@id": "https://openbesluitvorming.nl/api/dcat#haarlem",
+  "@type": ["dcat:Dataset"],
+  "dct:title": { "@value": "Besluitvorming Gemeente Haarlem", "@language": "nl" },
+  "dct:publisher": { "@id": "https://identifier.overheid.nl/tooi/id/gemeente/gm0392" },
+  "dct:modified": { "@value": "2026-11-23T02:10:41.000Z", "@type": "xsd:dateTime" },
+  "dct:temporal": { "@id": "https://openbesluitvorming.nl/api/dcat#haarlem-period" },
+  "dct:license": { "@id": "http://creativecommons.org/publicdomain/zero/1.0/deed.nl" },
+  "dcat:distribution": [
+    { "@id": "https://openbesluitvorming.nl/api/dcat#haarlem-snapshot" },
+    { "@id": "https://openbesluitvorming.nl/api/dcat#haarlem-changes" },
+    { "@id": "https://openbesluitvorming.nl/api/dcat#haarlem-search" }
+  ]
+}
+```
+
+Cached for 10 minutes. The dates lag by at most that, and the start of each
+period by at most a day.
 
 ---
 

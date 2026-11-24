@@ -30,6 +30,7 @@ export const API_ERROR_CODES = [
   "missing_export_source",
   "unknown_export_source",
   "invalid_export_cursor",
+  "unknown_dcat_format",
   // 404 — the request was well formed and the thing is not here.
   "entity_not_found",
   "route_not_found",

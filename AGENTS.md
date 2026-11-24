@@ -69,6 +69,9 @@ Current implemented slices:
 - PDF page-chunk derivation
 - Quickwit indexing
 - export API for bulk harvesting/sync (snapshot + changes feed, see API.md)
+- DCAT catalogue (`/api/dcat`, `web/dcat_api.ts`): one dataset per implemented
+  source, publisher as TOOI URI (`src/sources/tooi.ts` holds the province and
+  water board codes, which the catalog lacks), for open data portals
 - BSN detection during ingest (detect-only by default) + document blocklist
   with a takedown script (`scripts/delete_document.ts`)
 - public search UI
