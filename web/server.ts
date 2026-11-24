@@ -39,6 +39,7 @@ import {
 } from "../src/documents/thumbnails.ts";
 import { activeTraceId, annotateApiSpan, applyTraceResponse } from "./client_telemetry.ts";
 import { getStatus } from "./status_api.ts";
+import { DCAT_CONTENT_TYPES, getDcatCatalog, negotiateDcatFormat } from "./dcat_api.ts";
 import { RATE_LIMIT_PAGE_UNIT, RateLimiter, type RateVerdict, requestCost } from "./rate_limit.ts";
 import { apiError } from "./api_errors.ts";
 import { validateSearchParams } from "./search_params.ts";
@@ -378,6 +379,29 @@ async function handleRequest(request: Request): Promise<Response> {
         error instanceof Error ? error.message : "Status ophalen mislukt",
       );
     }
+  }
+
+  if (url.pathname === "/api/dcat" && request.method === "GET") {
+    const format = negotiateDcatFormat(
+      url.searchParams.get("format"),
+      request.headers.get("accept"),
+    );
+    if (!format) {
+      return apiError(
+        "unknown_dcat_format",
+        400,
+        `Onbekend formaat "${url.searchParams.get("format")}"; kies jsonld, turtle of rdfxml.`,
+      );
+    }
+    return new Response(await getDcatCatalog(format), {
+      headers: {
+        "content-type": DCAT_CONTENT_TYPES[format],
+        // Matches the catalogue's own cache in dcat_api.ts. Without `format`
+        // the answer depends on Accept, and a shared cache must know that.
+        "cache-control": "public, max-age=600",
+        vary: "Accept",
+      },
+    });
   }
 
   if (url.pathname === "/api/export/changes" && request.method === "GET") {

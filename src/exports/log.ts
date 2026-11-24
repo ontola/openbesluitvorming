@@ -604,6 +604,33 @@ export class ExportChangesLog {
     return referenced;
   }
 
+  /** When each source's change feed last grew, for every source at once: the
+   * newest segment's flush time, or the newest unflushed record's commit time
+   * when that is later. "Last modified" in the DCAT catalogue. The feed is
+   * deduplicated on content, so a run or a reindex that changed nothing does
+   * not move it. Splitting an oversized segment re-registers it and does move
+   * it; that is maintenance and rare. Both tables are small next to
+   * export_entity_state, so this stays a cheap scan. */
+  lastChangeTimes(): Map<string, string> {
+    const rows = this.db
+      .prepare(
+        `SELECT source_key, MAX(changed_at) AS changed_at FROM (
+           SELECT source_key, MAX(created_at) AS changed_at FROM export_segment GROUP BY source_key
+           UNION ALL
+           SELECT source_key, MAX(json_extract(record, '$.time')) AS changed_at
+             FROM export_pending GROUP BY source_key
+         ) GROUP BY source_key`,
+      )
+      .all() as Array<{ source_key: string; changed_at: string | null }>;
+    const times = new Map<string, string>();
+    for (const row of rows) {
+      if (row.changed_at) {
+        times.set(row.source_key, row.changed_at);
+      }
+    }
+    return times;
+  }
+
   /** Read the current state per entity (latest upsert record, tombstones
    * excluded), ordered by entity_id. Cursor is the last entity_id of the
    * previous page. */

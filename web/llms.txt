@@ -33,6 +33,8 @@ Dit is de opvolger van Open Raadsinformatie. Zie de migratiegids hieronder.
   bijgewerkt.
 - `GET /api/export/snapshot` en `/api/export/changes` — bulk ophalen en synchroniseren.
   Dit is de bedoelde route voor wie de collectie in zijn geheel wil, niet de zoek-API.
+- `GET /api/dcat` — DCAT-catalogus (DCAT-AP-DONL) met per bestuursorgaan één dataset,
+  als JSON-LD, Turtle (`?format=turtle`) of RDF/XML (`?format=rdfxml`).
 
 Elke foutmelding draagt een stabiele `code` naast de Nederlandse tekst; zie de
 foutcodetabel in de API-documentatie. Match op `code`, niet op de tekst.

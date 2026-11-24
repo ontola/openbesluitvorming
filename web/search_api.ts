@@ -1651,6 +1651,43 @@ export async function getSourceIndexActivity(): Promise<Map<string, SourceIndexA
   return activity;
 }
 
+/** No raadsinformatiesysteem predates this. An earlier `start_date` is a typo
+ * at the source (a year of 0201 or 1900), and taken as the start of a dataset's
+ * period it would claim decades that hold nothing. */
+const EARLIEST_PLAUSIBLE_CONTENT_DATE = "1990-01-01T00:00:00Z";
+
+/** Oldest meeting or document date per source, in one aggregation over the
+ * index: the start of each organization's period in the DCAT catalogue
+ * (web/dcat_api.ts). That caller caches the answer for a day, so this runs
+ * about once a day however often the catalogue is harvested. Empty where the
+ * projection has no mapped `start_date` (see getSourceIndexActivity). */
+export async function getSourceEarliestContentDates(): Promise<Map<string, string>> {
+  const earliest = new Map<string, string>();
+  if (!projectionSupportsDateSort()) {
+    return earliest;
+  }
+  const now = `${new Date().toISOString().slice(0, 19)}Z`;
+  const response = await new QuickwitClient().searchRequest({
+    query: `projection_version:${escapeTerm(currentProjectionVersion())} AND start_date:[${EARLIEST_PLAUSIBLE_CONTENT_DATE} TO ${now}]`,
+    max_hits: 0,
+    aggs: {
+      by_source: {
+        terms: { field: "source_key", size: 500 },
+        aggs: { earliest_start_date: { min: { field: "start_date" } } },
+      },
+    },
+  });
+  const buckets = ((response.aggregations?.by_source as { buckets?: unknown[] })?.buckets ??
+    []) as Array<{ key?: unknown; earliest_start_date?: { value?: unknown } }>;
+  for (const bucket of buckets) {
+    const value = fromAggregationTimestamp(bucket.earliest_start_date?.value);
+    if (typeof bucket.key === "string" && value) {
+      earliest.set(bucket.key, value);
+    }
+  }
+  return earliest;
+}
+
 export async function searchMeetings(
   options: {
     query?: string;
