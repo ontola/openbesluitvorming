@@ -21,6 +21,7 @@
     "test": "deno test -A",
     "test:e2e": "WOOZI_RUN_LIVE_INTEGRATION=1 deno test -A tests/notubiz.test.ts",
     "test:quickwit": "WOOZI_RUN_LIVE_INTEGRATION=1 deno test -A tests/quickwit.test.ts",
+    "test:a11y": "node scripts/a11y_check.mjs",
     "test:gui": "WOOZI_RUN_LIVE_INTEGRATION=1 deno test -A tests/gui_e2e.test.ts",
     "export:opub": "deno run -A src/integrations/opub/export.ts",
     "extract:haarlem": "deno run -A src/main.ts haarlem 2025-01-14 2025-01-15",
@@ -35,12 +36,14 @@
     "swetrix": "^4.8.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.14.0",
     "@sveltejs/vite-plugin-svelte": "^7.3.1",
     "fast-xml-parser": "^5.12.1",
     "happy-dom": "^21.0.4",
     "marked": "^18.2.0",
     "oxfmt": "^0.78.0",
     "oxlint": "^1.93.0",
+    "playwright": "1.63.0",
     "svelte": "^5.57.3",
     "typescript": "^7.0.2",
     "vite": "^8.3.8"

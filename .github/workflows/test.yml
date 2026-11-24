@@ -66,3 +66,35 @@ jobs:
 
       - name: Build the front end
         run: pnpm run build:web
+
+      # WCAG 2.1 A/AA check with axe-core on the public pages, against the
+      # build above. Needs no Quickwit: the search API is mocked in the
+      # browser. See scripts/a11y_check.mjs and scripts/a11y-baseline.json.
+      - name: Set up Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: 2.8.3
+
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Check accessibility
+        run: pnpm run test:a11y
+
+  sbom:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v7
+
+      # CycloneDX SBOM of the dependencies syft finds in the repository's lock
+      # files (pnpm-lock.yaml for the web app). Kept as a workflow artifact; the
+      # published image carries its own SBOM attestation (publish workflow).
+      - name: Generate SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          path: .
+          format: cyclonedx-json
+          output-file: sbom.cdx.json
+          artifact-name: sbom.cdx.json
