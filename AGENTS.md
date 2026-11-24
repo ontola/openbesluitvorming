@@ -323,6 +323,16 @@ What they cover:
   - projection + Quickwit indexing/search validation
 - `test:gui`
   - GUI-driven import/search flow validation
+- `test:a11y` (after `build:web`)
+  - axe-core WCAG 2.1 A/AA check of home, search (results and empty), the
+    document reader and the API docs pages; the search API is mocked, so no
+    Quickwit is needed. Runs in the Tests workflow and fails on serious or
+    critical violations not listed in `scripts/a11y-baseline.json` (empty
+    today: keep it that way, fix rather than baseline).
+
+The Tests workflow also uploads a CycloneDX SBOM (syft over the lock files) as
+the `sbom.cdx.json` artifact; the published image carries an SPDX SBOM
+attestation in GHCR (`sbom: true` in the publish workflow).
 
 If you change search shaping, result rendering, or snippet behavior, `test:quickwit` and `test:gui` are the most relevant.
 

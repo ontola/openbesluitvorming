@@ -47,6 +47,8 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          # SPDX SBOM attestation attached to the image in GHCR.
+          sbom: true
 
       - name: Write image digest to summary
         run: |
