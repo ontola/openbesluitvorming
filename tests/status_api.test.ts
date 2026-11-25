@@ -32,6 +32,7 @@ function build(options: {
     string,
     { latestContentDate?: string; latestPastContentDate?: string; lastIndexedAt?: string }
   > | null;
+  documentCounts?: Map<string, number> | null;
 }): StatusResponse {
   return buildStatusResponse({
     runStatus: {
@@ -39,6 +40,7 @@ function build(options: {
       supplierWindows: options.supplierWindows ?? [],
     },
     indexActivity: options.indexActivity === undefined ? new Map() : options.indexActivity,
+    documentCounts: options.documentCounts,
     now: NOW,
     windowHours: WINDOW_HOURS,
   });
@@ -229,7 +231,6 @@ Deno.test("index activity is merged per source and is optional", () => {
           latestContentDate: "2026-08-20T13:30:00.000Z",
           latestPastContentDate: "2026-08-14T17:30:00.000Z",
           lastIndexedAt: "2026-08-16T00:09:59.000Z",
-          documentCount: 12345,
         },
       ],
     ]),
@@ -245,11 +246,6 @@ Deno.test("index activity is merged per source and is optional", () => {
     "the newest meeting that already took place travels separately (#397)",
   );
   assertEquals(withActivity.indexActivityAvailable, true, "the index answered");
-  assertEquals(
-    source(withActivity, "soest").indexedDocuments,
-    12345,
-    "the exact document count travels with the activity (#260)",
-  );
 
   const withoutActivity = build({ indexActivity: null });
   assertEquals(
@@ -373,5 +369,27 @@ Deno.test("a discontinued organization is not counted against its source system"
     notubiz.sourceCount,
     stillRunning,
     "a supplier is not marked short for organizations that no longer exist",
+  );
+});
+
+Deno.test("indexedDocuments comes from the export log's per-entity count, not the index (#431)", () => {
+  const withCounts = build({
+    indexActivity: new Map([["soest", { lastIndexedAt: "2026-08-16T00:09:59.000Z" }]]),
+    documentCounts: new Map([["soest", 12345]]),
+  });
+  assertEquals(source(withCounts, "soest").indexedDocuments, 12345, "the per-entity count");
+
+  const withoutCounts = build({ documentCounts: null });
+  assertEquals(
+    source(withoutCounts, "soest").indexedDocuments,
+    undefined,
+    "a count that could not be read is absent, not zero",
+  );
+  assertEquals(
+    build({ indexActivity: null, documentCounts: new Map([["soest", 7]]) }).sources.find(
+      (row) => row.sourceKey === "soest",
+    )?.indexedDocuments,
+    7,
+    "the count does not depend on the search index answering",
   );
 });

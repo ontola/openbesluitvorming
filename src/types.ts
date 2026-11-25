@@ -929,9 +929,10 @@ export interface SourceStatus {
   latestPastContentDate?: string;
   /** When anything was last written to the search index for this source. */
   lastIndexedAt?: string;
-  /** Documents in the search index for this source, exact at the moment of
-   * the request: one per document, pages not counted. Absent when the index
-   * did not answer. */
+  /** Documents we hold for this source, exact as of the last refresh of the
+   * status (at most ten minutes old): one per document, however often it was
+   * re-imported, pages not counted, removed documents left out. The same set
+   * the export returns. Absent when the count could not be read. */
   indexedDocuments?: number;
   /** Set only when `state` is `discontinued`: when the organization ceased to
    * exist, and who took over. `sourceKey` is present when we import the
