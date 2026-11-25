@@ -41,11 +41,15 @@ import {
 import { normalizeNotubizDocuments, normalizeNotubizMeeting } from "../notubiz/normalize.ts";
 import { ParlaeusClient } from "../parlaeus/client.ts";
 import { normalizeParlaeusAgenda } from "../parlaeus/normalize.ts";
+import { amsterdamDay, normalizeOdsMeeting, vergaderingStart } from "../ods/normalize.ts";
+import { type MirrorStorage, OdsMirror } from "../ods/mirror.ts";
+import { ObjectStorageClient } from "../storage/s3.ts";
 import type {
   GemeenteOplossingenSourceDefinition,
   IbabsSourceDefinition,
   NotubizModuleItem,
   NotubizSourceDefinition,
+  OdsSourceDefinition,
   ParlaeusSourceDefinition,
   SourceDefinition,
 } from "../types.ts";
@@ -356,6 +360,43 @@ async function listParlaeus(
   return listing;
 }
 
+/** For an ODS feed, what the supplier exposes is our mirror of the feed: the
+ * documents of the vergaderingen in the window. It does not read the feed
+ * itself, so the check never moves the cursor the worker owns. */
+async function listOds(
+  source: OdsSourceDefinition,
+  dateFrom: string,
+  dateTo: string,
+  storage?: MirrorStorage,
+): Promise<SupplierDocumentListing> {
+  const listing: SupplierDocumentListing = {
+    documentIds: new Set(),
+    meetings: 0,
+    registerEntries: 0,
+    warnings: [],
+  };
+  const mirror = new OdsMirror(
+    storage ?? (await ObjectStorageClient.fromEnvironment()),
+    source.key,
+  );
+  const index = await mirror.index();
+  for (const vergadering of index.vergaderingen.values()) {
+    const start = vergaderingStart(vergadering);
+    const day = start ? amsterdamDay(start) : undefined;
+    if (!day || day < dateFrom || day > dateTo) continue;
+    try {
+      const { documents } = await normalizeOdsMeeting(source, vergadering, index);
+      listing.meetings += 1;
+      for (const document of documents) {
+        listing.documentIds.add(document.id);
+      }
+    } catch (error) {
+      listing.warnings.push(`${vergadering.bronidentificatie}: ${errorText(error)}`);
+    }
+  }
+  return listing;
+}
+
 /** List what the supplier exposes for the source in the window. */
 export function listSupplierDocuments(
   source: SourceDefinition,
@@ -375,6 +416,8 @@ export function listSupplierDocuments(
       );
     case "parlaeus":
       return listParlaeus(source as ParlaeusSourceDefinition, dateFrom, dateTo);
+    case "ods":
+      return listOds(source as OdsSourceDefinition, dateFrom, dateTo);
     default:
       return Promise.reject(
         new Error(`No coverage listing for supplier ${(source as SourceDefinition).supplier}`),
@@ -386,4 +429,10 @@ function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-export const __test__ = { listNotubiz, listIbabs, listGemeenteOplossingen, listParlaeus };
+export const __test__ = {
+  listNotubiz,
+  listIbabs,
+  listGemeenteOplossingen,
+  listParlaeus,
+  listOds,
+};

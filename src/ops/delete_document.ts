@@ -56,6 +56,7 @@ function deleteMarker(
   entityId: string,
   parentId: string | null,
   kind: DeleteMarkerKind = "takedown",
+  entityType: "Document" | "Meeting" = "Document",
 ): QuickwitSearchDocument {
   const now = new Date().toISOString();
   return {
@@ -65,11 +66,11 @@ function deleteMarker(
     source: kind,
     subject: entityId,
     entity_id: entityId,
-    entity_type: parentId ? "DocumentPage" : "Document",
+    entity_type: parentId ? "DocumentPage" : entityType,
     commit_id: `commit:${entityId}:${kind}`,
     op: "delete",
     mode: kind,
-    schema_name: "Document",
+    schema_name: entityType,
     schema_version: "0",
     content_hash: kind,
     projection_version: currentProjectionVersion(),
@@ -260,7 +261,11 @@ export interface RetractionOutcome {
  * tombstone, because each task makes Quickwit rewrite the splits it matches.
  */
 export async function retractDocumentsGoneAtSource(
-  entries: Array<{ entityId: string; meetingId: string }>,
+  entries: Array<{
+    entityId: string;
+    meetingId?: string;
+    reason?: "removed_at_source" | "takedown";
+  }>,
   options: {
     quickwit: RetractionQuickwit;
     storage: RetractionStorage;
@@ -268,15 +273,15 @@ export async function retractDocumentsGoneAtSource(
   },
 ): Promise<RetractionOutcome[]> {
   const outcomes: RetractionOutcome[] = [];
-  for (const { entityId, meetingId } of entries) {
+  for (const { entityId, meetingId, reason = "removed_at_source" } of entries) {
     const outcome: RetractionOutcome = { entityId, reached: "nothing" };
     outcomes.push(outcome);
     try {
       const parsed = parseDocumentEntityId(entityId);
       const { pageIds } = await collectPageEntityIds(options.quickwit, entityId);
       await options.quickwit.ingestDocuments([
-        deleteMarker(entityId, null, "removed_at_source"),
-        ...pageIds.map((pageId) => deleteMarker(pageId, entityId, "removed_at_source")),
+        deleteMarker(entityId, null, reason),
+        ...pageIds.map((pageId) => deleteMarker(pageId, entityId, reason)),
       ]);
       outcome.reached = "hidden";
       options.exportLog.recordDelete({
@@ -284,7 +289,7 @@ export async function retractDocumentsGoneAtSource(
         supplier: parsed.supplier,
         entityId,
         entityType: "Document",
-        reason: "removed_at_source",
+        reason,
         meetingId,
       });
       outcome.reached = "tombstoned";
@@ -316,6 +321,58 @@ export async function retractDocumentsGoneAtSource(
       for (const outcome of tombstoned) {
         outcome.error ??= message;
       }
+    }
+  }
+  return outcomes;
+}
+
+/**
+ * Take meetings out of search and the export feed because their source
+ * deleted them (an ODS feed's `delete` or `redact` of a Vergadering, see
+ * src/ods/). Their documents are retracted separately, each by its own
+ * record. A meeting has no files of its own in storage, so this is the
+ * marker, the tombstone and the delete task.
+ */
+export async function retractMeetingsGoneAtSource(
+  entries: Array<{ entityId: string; reason?: "removed_at_source" | "takedown" }>,
+  options: {
+    quickwit: RetractionQuickwit;
+    exportLog: { recordDelete: ExportChangesLog["recordDelete"] };
+  },
+): Promise<RetractionOutcome[]> {
+  const outcomes: RetractionOutcome[] = [];
+  for (const { entityId, reason = "removed_at_source" } of entries) {
+    const outcome: RetractionOutcome = { entityId, reached: "nothing" };
+    outcomes.push(outcome);
+    try {
+      const parts = entityId.split(":");
+      if (parts.length < 5 || parts[0] !== "meeting") {
+        throw new Error(`Not a meeting entity id: ${entityId}`);
+      }
+      await options.quickwit.ingestDocuments([deleteMarker(entityId, null, reason, "Meeting")]);
+      outcome.reached = "hidden";
+      options.exportLog.recordDelete({
+        sourceKey: parts[3],
+        supplier: parts[1],
+        entityId,
+        entityType: "Meeting",
+        reason,
+      });
+      outcome.reached = "tombstoned";
+    } catch (error) {
+      outcome.error = error instanceof Error ? error.message : String(error);
+    }
+  }
+  const tombstoned = outcomes.filter((outcome) => outcome.reached === "tombstoned");
+  if (tombstoned.length > 0) {
+    try {
+      await options.quickwit.createDeleteTask(
+        tombstoned.map(({ entityId }) => `entity_id:${quote(entityId)}`).join(" OR "),
+      );
+      for (const outcome of tombstoned) outcome.reached = "deleted";
+    } catch (error) {
+      const message = `delete task: ${error instanceof Error ? error.message : String(error)}`;
+      for (const outcome of tombstoned) outcome.error ??= message;
     }
   }
   return outcomes;

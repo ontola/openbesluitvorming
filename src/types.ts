@@ -346,6 +346,22 @@ export interface ExtractionBundle {
   recordings?: RecordingEntity[];
   stats: ExtractionStats;
   issues: ExtractionIssue[];
+  /** Entities the source itself deleted, for the import to retract (ODS
+   * feeds only: their `delete` and `redact` records). `done` is called with
+   * the ids that were fully retracted, so the rest is tried again next run. */
+  retractions?: {
+    entries: ExtractionRetraction[];
+    done: (entityIds: string[]) => Promise<void>;
+  };
+}
+
+export interface ExtractionRetraction {
+  entityId: string;
+  entityType: "Document" | "Meeting";
+  meetingId?: string;
+  /** `takedown` for a redact: the content itself should never have been
+   * public. */
+  reason: "removed_at_source" | "takedown";
 }
 
 export interface ExtractionStats {
@@ -379,7 +395,13 @@ export interface ExtractionIssue {
 }
 
 export type OrganizationType = "gemeente" | "provincie" | "waterschap";
-export type Supplier = "notubiz" | "ibabs" | "gemeenteoplossingen" | "parlaeus" | "allmanak";
+export type Supplier =
+  | "notubiz"
+  | "ibabs"
+  | "gemeenteoplossingen"
+  | "parlaeus"
+  | "ods"
+  | "allmanak";
 
 export interface SourceDefinitionBase {
   key: string;
@@ -489,11 +511,24 @@ export interface ParlaeusSourceDefinition extends SourceDefinitionBase {
   sessionId: string;
 }
 
+/** An organisation we read from an ODS Open Raadsinformatie event polling
+ * feed (version 0.0.3), such as one served by OpenMeeting: `/snapshot` once,
+ * then `/feed` with a cursor (src/ods/). Declared per deployment in
+ * `WOOZI_ODS_SOURCES`, not in the ORI catalog. */
+export interface OdsSourceDefinition extends SourceDefinitionBase {
+  supplier: "ods";
+  /** TOOI code, lower case, e.g. gm0363. Also the feed's filter. */
+  organisatiecode: string;
+  /** The feed's base URL; `/feed` and `/snapshot` are below it. */
+  feedUrl: string;
+}
+
 export type SourceDefinition =
   | NotubizSourceDefinition
   | IbabsSourceDefinition
   | GemeenteOplossingenSourceDefinition
-  | ParlaeusSourceDefinition;
+  | ParlaeusSourceDefinition
+  | OdsSourceDefinition;
 
 export interface SourceCatalogEntry extends SourceDefinitionBase {
   sourceRef: string;
@@ -522,6 +557,9 @@ export interface SourceCatalogEntry extends SourceDefinitionBase {
   ibabsSitename?: string;
   baseUrl?: string;
   sessionId?: string;
+  /** ODS feed sources only (src/ods/sources.ts). */
+  organisatiecode?: string;
+  odsFeedUrl?: string;
 }
 
 export interface IbabsMeetingType {

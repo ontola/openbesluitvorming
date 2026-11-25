@@ -47,6 +47,7 @@ import { entityGoneResponse, sourceKeyOfEntityId } from "./entity_gone.ts";
 import { SearchTimeoutError } from "../src/quickwit/client.ts";
 import { phraseSearchSlots, SearchGate } from "./search_gate.ts";
 import { createOpsHandler, OPS_PATH_PREFIX } from "./ops_api.ts";
+import { startOdsPoller } from "../src/ods/poller.ts";
 import { fetchExtractorStats } from "./extractors.ts";
 import { SITEMAP_FILE_PATTERN, SITEMAP_INDEX_KEY, SITEMAP_PREFIX } from "../src/exports/sitemap.ts";
 import { toNdjson } from "../src/exports/ndjson.ts";
@@ -250,6 +251,8 @@ if (reconciledRuns.length > 0) {
 // Start the daily rolling-window scheduler. Gated behind WOOZI_SCHEDULER_ENABLED
 // so only one container (the web one) enqueues scheduled runs.
 startScheduler();
+// Between nightly runs, queue an import when an ODS feed has news (src/ods/).
+startOdsPoller();
 
 // Keeps the homepage stats cache warm in the background so /api/stats never
 // makes a request wait on it (see search_api.ts for the full reasoning).
