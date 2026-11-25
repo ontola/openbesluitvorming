@@ -124,7 +124,7 @@ function isUnsearchableMedia(document: DocumentEntity): boolean {
   return UNSEARCHABLE_MEDIA_EXTENSIONS.some((ext) => name.endsWith(ext));
 }
 
-interface CachedStorage {
+export interface CachedStorage {
   hasObject(key: string): Promise<boolean>;
   putObject(
     key: string,
@@ -489,6 +489,49 @@ async function rederiveFromStoredFile(
           content_type: document.content_type,
         },
       ],
+    },
+  };
+}
+
+/** A document whose text came with it instead of in a file: a source that
+ * publishes to us (OpenMeeting) can send the text of a document written in
+ * its own app. The text is stored where an extracted file's markdown goes, so
+ * the reader opens it like any other, and it passes the same blocklist and
+ * BSN checks. */
+export async function materializeInlineText(
+  document: DocumentEntity,
+  text: string,
+  storage: CachedStorage | undefined,
+): Promise<MaterializedDocumentResult> {
+  if (await isDocumentBlocklisted(document.id)) {
+    return { document, cacheHit: true, issues: [], blocked: true };
+  }
+  const issues: ExtractionIssue[] = [];
+  const writtenKeys: string[] = [];
+  let markdownKey: string | undefined;
+  if (storage) {
+    markdownKey = extractedMarkdownKey(document);
+    await storage.putObject(markdownKey, new TextEncoder().encode(text), {
+      contentType: "text/markdown; charset=utf-8",
+    });
+    writtenKeys.push(markdownKey);
+  }
+  const quarantined = await quarantineBsnDocument(document, text, storage, writtenKeys, issues);
+  if (quarantined) {
+    return quarantined;
+  }
+  const quality = assessMarkdownQuality(text);
+  return {
+    cacheHit: false,
+    issues,
+    document: {
+      ...document,
+      md_text: [text],
+      derived_content: {
+        markdown_key: markdownKey,
+        extraction_quality_score: quality.score,
+        extraction_quality_status: quality.status,
+      },
     },
   };
 }
